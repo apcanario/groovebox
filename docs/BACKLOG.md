@@ -6,12 +6,11 @@ The next open bundle is the first bundle below with a row not in Done. `docs/RUN
 
 Fixes waiting for the next chat. The first builder of the next bundle clears them.
 
-- None.
+- **C1. Slight crackle in the treble** on Pedro's phone in the G0 spike (22 Nov 2026), on the Pages build. Not yet narrowed down. Check in this order and fix what is found: aliasing from the kick's distortion and from the detuned saws at high resonance (oversample the drive, cap resonance, band-limit); the hat and clap noise level into the limiter; the limiter being driven too hard (lower the bus levels); buffer underruns (default the context to `balanced` if `interactive` is the cause). Record in the changelog what was changed. Pedro confirms by ear.
 
 ## By hand (Pedro)
 
-- **H1. Turn on GitHub Pages.** Repo Settings → Pages → Source: GitHub Actions. Then re-run the failed "Deploy to GitHub Pages" run under Actions, or wait for the next push. Until this is done there is no URL to test on the phone.
-- **H2. Listen to the spike** on headphones for ten minutes with every layer on. Report: crackle or not, which buffer setting (fast, balanced, safe) was clean, and anything that sounds wrong.
+- None open. H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026. The app is at https://apcanario.github.io/groovebox/.
 
 ## Bundle 1: the instrument exists
 
@@ -21,20 +20,21 @@ Replace the hard-coded spike with a real engine.
 
 - `src/engine/`: song document types and a default song; clock and step scheduler; the five instruments as basic patches; shared delay and reverb; master chain with pump and limiter (reuse what works in the spike).
 - `src/music/` (no audio imports): scales and moods, chord building and voicings for easy mode, bass rhythm presets, drum presets, Euclidean rhythm, seeded random generator, the generative lead from spec section 3.
-- Sections: up to four, switching on the bar line; per-section on/off per instrument; per-section chord sequence.
+- Sections: up to four; per-section on/off per instrument; per-section chord sequence.
+- Queued switching (spec sections 3 and 7): section switches and instrument on/off land together on the next bar line; a second tap before the bar line cancels; the engine exposes what is pending.
 - Engine API as in spec section 7. Parameter changes ramp.
 - Unit tests with Vitest for everything in `src/music/` and for the song schema. Add them to `npm run check`.
 - Keep `window.__groovebox` with `playing`, `level()` and `setLayer()` working for the five instruments, and update `tools/smoke.py` to the new layer names.
 - UI for this row: a bare test screen is enough (play, section buttons, instrument toggles).
 
-**Done when:** a four-section default song in A minor, mood House, plays; sections switch on the bar; each instrument toggles per section; the same seed gives the same lead twice (tested); `check` and `smoke` pass.
+**Done when:** a four-section default song in A minor, mood House, plays; sections switch on the bar; each instrument toggles per section; three toggles tapped inside one bar all land on the same bar line (tested); the same seed gives the same lead twice (tested); `check` and `smoke` pass.
 
 ### G2. Shell
 
 The screens around the engine, in Preact.
 
 - Transport bar, section strip (playing and editing states, follow by default), icon tab bar with all eight tabs.
-- Play tab grid as in spec section 5, including long-press on a column header.
+- Play tab grid as in spec section 5, including long-press on a column header and the pending state for queued switches.
 - Reusable `Dial` (vertical drag, large, value in the middle), `XYPad` and `SendBar` components.
 - Chords tab, easy mode: mood picker, key picker, seven degree buttons, the section's sequence with add, remove and reorder.
 - The other six tabs exist and show their instrument's name, on/off and an XY pad wired to its filter. Their full controls come in bundles 2 and 3.
@@ -88,6 +88,14 @@ The screens around the engine, in Preact.
 
 **Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
 
+## Bundle 5: retouch
+
+### G7. Retouch
+
+Runs only when the starter carries a `Notes:` line. After the MVP (G1 to G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+
+**Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
+
 ## Later
 
 Not scheduled. Each becomes a row when Pedro asks for it.
@@ -102,4 +110,4 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 
 ## Done
 
-- **G0. Sound spike** (22 Nov 2026). Built and pushed. Waiting on H1 and H2.
+- **G0. Sound spike** (22 Nov 2026). Built, deployed and heard by Pedro: it works, with a slight treble crackle carried as C1.

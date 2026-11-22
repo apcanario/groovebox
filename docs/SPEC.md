@@ -23,7 +23,8 @@ A groovebox for jamming on a phone: pick chords, shape synths, switch sections, 
 - **One key and one mood per song.** Everything stays in that scale.
 - **Bpm:** 80 to 180, one value per song.
 - **Bar:** 16 steps of a sixteenth note. All patterns are 16 steps unless a loop length says otherwise.
-- **Sections:** 1 to 4 per song (A to D), each with a name such as Intro, Groove, Break, Outro. A section switch takes effect on the next bar line.
+- **Sections:** 1 to 4 per song (A to D), each with a name such as Intro, Groove, Break, Outro.
+- **Everything that is switched lands on the next bar line, never immediately:** a section switch, and an instrument turned on or off. Several switches tapped within one bar all take effect together on that bar line. A switch tapped again before the bar line is cancelled. Knobs, the XY pad and sends are the opposite: they act at once.
 - **Instruments:** five, fixed.
 
 | Instrument | Role |
@@ -100,7 +101,8 @@ Vertical, flat, one thumb. Colours and type come from `src/style.css` tokens. `d
 **Play tab**
 - A grid: rows are instruments, columns are sections.
 - Tap a column header: switch to that section on the next bar.
-- Tap a cell: turn that instrument on or off in that section.
+- Tap a cell: turn that instrument on or off in that section. For the playing section it lands on the next bar.
+- A queued switch shows as pending (outlined, not filled) until the bar line, so it is clear what is about to change.
 - Tap a row label: open that instrument's tab.
 - Long-press a column header: rename, copy, delete, add a section.
 
@@ -119,6 +121,7 @@ Vertical, flat, one thumb. Colours and type come from `src/style.css` tokens. `d
 
 - UI never touches Tone.js. It calls the engine: load song, play, stop, set parameter, switch section, toggle instrument.
 - Parameter changes are ramped, never stepped.
+- Section switches and instrument on/off are queued in the engine and applied together at the next bar line. The engine reports pending switches so the UI can show them.
 - All scheduling is done ahead of time on the audio clock, never from UI timers.
 - All randomness comes from a seeded generator.
 - Pure logic (scales, chords, voicings, Euclidean rhythm, the generative lead, the song schema) has unit tests and no audio dependency.
