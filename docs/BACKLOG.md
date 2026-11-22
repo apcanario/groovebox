@@ -6,28 +6,13 @@ The next open bundle is the first bundle below with a row not in Done. `docs/RUN
 
 Fixes waiting for the next chat. The first builder of the next bundle clears them.
 
-- **C1. Slight crackle in the treble** on Pedro's phone in the G0 spike (22 Nov 2026), on the Pages build. Not yet narrowed down. Check in this order and fix what is found: aliasing from the kick's distortion and from the detuned saws at high resonance (oversample the drive, cap resonance, band-limit); the hat and clap noise level into the limiter; the limiter being driven too hard (lower the bus levels); buffer underruns (default the context to `balanced` if `interactive` is the cause). Record in the changelog what was changed. Pedro confirms by ear.
+- **C1. Treble crackle, applied, waiting for Pedro's ear.** G1 changed everything on the original list (22 Nov 2026): 4x oversampled kick drive and waveshapers, resonance capped (Q 6, level-compensated), filters top out at 10 kHz, hats and clap lower, master bus 0.5, limiter now -4 dB with 1 ms attack, compressor with 120 ms release in place of Tone.Limiter, pump ramps 4 ms, buffer default `balanced`. Pedro confirms by ear; if it still crackles, the next suspects are the 4x oversampled shapers' CPU cost and buffer underruns (`?hint=interactive` vs `balanced`).
 
 ## By hand (Pedro)
 
 - None open. H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026. The app is at https://apcanario.github.io/groovebox/.
 
 ## Bundle 1: the instrument exists
-
-### G1. Engine
-
-Replace the hard-coded spike with a real engine.
-
-- `src/engine/`: song document types and a default song; clock and step scheduler; the five instruments as basic patches; shared delay and reverb; master chain with pump and limiter (reuse what works in the spike).
-- `src/music/` (no audio imports): scales and moods, chord building and voicings for easy mode, bass rhythm presets, drum presets, Euclidean rhythm, seeded random generator, the generative lead from spec section 3.
-- Sections: up to four; per-section on/off per instrument; per-section chord sequence.
-- Queued switching (spec sections 3 and 7): section switches and instrument on/off land together on the next bar line; a second tap before the bar line cancels; the engine exposes what is pending.
-- Engine API as in spec section 7. Parameter changes ramp.
-- Unit tests with Vitest for everything in `src/music/` and for the song schema. Add them to `npm run check`.
-- Keep `window.__groovebox` with `playing`, `level()` and `setLayer()` working for the five instruments, and update `tools/smoke.py` to the new layer names.
-- UI for this row: a bare test screen is enough (play, section buttons, instrument toggles).
-
-**Done when:** a four-section default song in A minor, mood House, plays; sections switch on the bar; each instrument toggles per section; three toggles tapped inside one bar all land on the same bar line (tested); the same seed gives the same lead twice (tested); `check` and `smoke` pass.
 
 ### G2. Shell
 
@@ -111,3 +96,4 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 ## Done
 
 - **G0. Sound spike** (22 Nov 2026). Built, deployed and heard by Pedro: it works, with a slight treble crackle carried as C1.
+- **G1. Engine** (22 Nov 2026). Built, reviewed (fix: 0 errors, 7 should-fix, 10 minor, all applied), pushed. Report in `docs/reviews/G1.md`.
