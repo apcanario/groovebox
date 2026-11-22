@@ -23,16 +23,21 @@ import {
 
 export const STEPS_PER_BAR = 16;
 
+/**
+ * One note or hit. `shift` is the swing delay in sixteenths: on odd steps of a swung section every
+ * instrument carries the drum pattern's swing, so bass and synth stay with the hats.
+ */
 export type NoteEvent =
   | { inst: "drums"; voice: DrumVoice; vel: number; shift: number }
-  | { inst: "bass"; midi: number; len: number; vel: number }
-  | { inst: "synth"; notes: number[]; len: number; vel: number }
+  | { inst: "bass"; midi: number; len: number; vel: number; shift: number }
+  | { inst: "synth"; notes: number[]; len: number; vel: number; shift: number }
   | {
       inst: LayerInstrument;
       mode: LayerMode;
       notes: number[];
       len: number;
       vel: number;
+      shift: number;
       env?: { attack: number; release: number };
     };
 
@@ -161,36 +166,36 @@ export class Sequencer {
 
     const pos = chordAt(this.song, section, this.sectionStep);
     const chordStart = pos.starts;
+    const shift = step % 2 === 1 ? DRUM_PATTERNS[section.drums.preset].swing : 0;
 
     if (now.has("drums")) {
       const grid = sectionDrumGrid(section);
-      const swing = DRUM_PATTERNS[section.drums.preset].swing;
       for (const voice of DRUM_VOICES) {
         const vel = grid[voice][step];
-        if (vel > 0) events.push({ inst: "drums", voice, vel, shift: step % 2 === 1 ? swing : 0 });
+        if (vel > 0) events.push({ inst: "drums", voice, vel, shift });
       }
     }
 
     if (now.has("bass")) {
       for (const hit of BASS_RHYTHMS[section.bass.rhythm]) {
-        if (hit.step === step) events.push({ inst: "bass", midi: pos.chord.bass, len: Math.min(hit.len, pos.remaining), vel: hit.vel });
+        if (hit.step === step) events.push({ inst: "bass", midi: pos.chord.bass, len: Math.min(hit.len, pos.remaining), vel: hit.vel, shift });
       }
     }
 
     if (now.has("synth")) {
       const rhythm = section.synth.rhythm;
       if (rhythm === "sustained") {
-        if (chordStart || entered.has("synth")) events.push({ inst: "synth", notes: pos.chord.notes, len: pos.remaining, vel: 0.7 });
+        if (chordStart || entered.has("synth")) events.push({ inst: "synth", notes: pos.chord.notes, len: pos.remaining, vel: 0.7, shift });
       } else {
         for (const hit of SYNTH_RHYTHMS[rhythm]) {
-          if (hit.step === step) events.push({ inst: "synth", notes: pos.chord.notes, len: hit.len, vel: hit.vel });
+          if (hit.step === step) events.push({ inst: "synth", notes: pos.chord.notes, len: hit.len, vel: hit.vel, shift });
         }
       }
     }
 
     for (const id of LAYER_IDS) {
       if (!now.has(id)) continue;
-      const ev = this.layerEvent(id, section, step, pos, chordStart || entered.has(id));
+      const ev = this.layerEvent(id, section, step, pos, chordStart || entered.has(id), shift);
       if (ev) events.push(ev);
     }
 
@@ -205,6 +210,7 @@ export class Sequencer {
     step: number,
     pos: ChordPosition,
     fresh: boolean,
+    shift: number,
   ): NoteEvent | null {
     const p = section[id];
     if (p.mode === "pad") {
@@ -215,6 +221,7 @@ export class Sequencer {
         notes: pos.chord.notes.slice(0, 4),
         len: pos.remaining,
         vel: 0.7,
+        shift,
         env: { attack: p.pad.attack, release: p.pad.release },
       };
     }
@@ -223,7 +230,7 @@ export class Sequencer {
       const i = this.arpIndex.get(id) ?? 0;
       this.arpIndex.set(id, i + 1);
       const midi = arpNote(pos.chord.notes, p.arp, i, this.arpRng.get(id)!);
-      return { inst: id, mode: "arp", notes: [midi], len: p.arp.rate * p.arp.gate, vel: i % 4 === 0 ? 0.8 : 0.6 };
+      return { inst: id, mode: "arp", notes: [midi], len: p.arp.rate * p.arp.gate, vel: i % 4 === 0 ? 0.8 : 0.6, shift };
     }
     let lead = this.leads.get(id);
     if (!lead || lead.seedValue !== p.gen.seed) {
@@ -235,7 +242,7 @@ export class Sequencer {
       scale: scalePitchClasses(this.song.key, this.song.mood),
     });
     if (!note) return null;
-    return { inst: id, mode: "generative", notes: [note.midi], len: 0.8, vel: note.vel };
+    return { inst: id, mode: "generative", notes: [note.midi], len: 0.8, vel: note.vel, shift };
   }
 
   private applyPending(p: Pending): void {

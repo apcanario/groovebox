@@ -89,11 +89,15 @@ def main() -> int:
             wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
 
             levels = []
+            peaks = []
             for _ in range(32):
                 time.sleep(0.25)
                 v = page.evaluate("window.__groovebox.level()")
                 if v is not None and v > -200:
                     levels.append(v)
+                pk = page.evaluate("window.__groovebox.peak()")
+                if pk is not None and pk > -200:
+                    peaks.append(pk)
             if not page.evaluate("window.__groovebox.playing"):
                 failures.append("transport did not start")
             if not levels:
@@ -105,6 +109,14 @@ def main() -> int:
                     failures.append(f"output too quiet ({hi:.1f} dB)")
                 if hi > -3:
                     failures.append(f"output too hot before the limiter ({hi:.1f} dB)")
+            # The meter is a smoothed RMS; the peak reads raw samples after the limiter.
+            if not peaks:
+                failures.append("no output peak measured")
+            else:
+                top = max(peaks)
+                print(f"output peak: {top:.1f} dBFS")
+                if top >= 0:
+                    failures.append(f"output clips ({top:.1f} dBFS)")
 
             solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
             for layer in LAYERS:
@@ -123,8 +135,16 @@ def main() -> int:
 
             if shot:
                 page.screenshot(path=shot)
+            # Stop just after a bar line: nothing scheduled in the lookahead may start after Stop.
+            wait_for(page, "window.__groovebox.position().step === 0", 3.0)
             page.click("#play")
-            time.sleep(0.3)
+            at_stop = page.evaluate("window.__groovebox.attacks()")
+            time.sleep(1.0)
+            after = page.evaluate("window.__groovebox.attacks()")
+            if after != at_stop:
+                failures.append(f"{after - at_stop} attacks started after Stop")
+            else:
+                print("no attacks after Stop")
             if page.evaluate("window.__groovebox.playing"):
                 failures.append("transport did not stop")
             browser.close()

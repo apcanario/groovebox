@@ -1,11 +1,11 @@
-import { describe, expect, it } from "../../tests/harness.ts";
+import { describe, expect, it } from "vitest";
 import { arpSequence, arpNote } from "./arp.ts";
 import { buildChord, degreeChords } from "./chords.ts";
 import { GenerativeLead, mutationChance, type LeadParams } from "./lead.ts";
 import { BASS_PRESETS, BASS_RHYTHMS, DRUM_PATTERNS, DRUM_PRESETS, DRUM_VOICES, SYNTH_RHYTHMS } from "./presets.ts";
 import { createRng, deriveSeed } from "./random.ts";
 import { euclid } from "./rhythm.ts";
-import { MOODS, NOTE_NAMES, inScale, midiToName, scalePitchClasses } from "./scales.ts";
+import { MOODS, NOTE_NAMES, inScale, midiToName, scaleNotesInRange, scalePitchClasses } from "./scales.ts";
 
 describe("random", () => {
   it("same seed gives the same sequence", () => {
@@ -33,6 +33,10 @@ describe("random", () => {
 });
 
 describe("scales", () => {
+  it("scaleNotesInRange lists the scale's notes in a range, ascending and inclusive", () => {
+    expect(scaleNotesInRange("A", "minor", 57, 69)).toEqual([57, 59, 60, 62, 64, 65, 67, 69]);
+    expect(scaleNotesInRange("C", "major", 61, 61)).toEqual([]);
+  });
   it("A minor is A B C D E F G", () => {
     expect(scalePitchClasses("A", "minor").map((p) => NOTE_NAMES[p])).toEqual(["A", "B", "C", "D", "E", "F", "G"]);
   });

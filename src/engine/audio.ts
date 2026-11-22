@@ -6,6 +6,13 @@
  * capped and the synth filters stop below 10 kHz, hats and clap sit lower, the master bus is
  * lower, the limiter's release is slow enough not to modulate the bass, and the pump ramps
  * instead of stepping.
+ *
+ * Phone CPU (G1 review S7): the kick drive and the master saturation stay 4x oversampled; the
+ * per-channel drives run at 2x and are disconnected from the chain while their amount is 0.
+ * Resonance (G1 review M5): Q is capped at 6 and the channel level drops as Q rises, so a
+ * resonance sweep does not jump about 10 dB.
+ * Waves (G1 review S2): a wave change goes to a fresh voice set; notes already sounding keep the
+ * old wave and ring out, so no oscillator is swapped mid-note.
  */
 import * as Tone from "tone";
 import { midiToHz } from "../music/scales.ts";
@@ -13,7 +20,18 @@ import type { DrumVoice } from "../music/presets.ts";
 import type { InstrumentId, NumericPatchKey, Patch, Wave } from "./song.ts";
 
 const RAMP = 0.03; // seconds; every continuous parameter change is ramped this long
-const MAX_Q = 8; // resonance cap (the spike went to 14)
+const MAX_Q = 6; // resonance cap (the spike went to 14, G1 shipped 8)
+/** Level compensation as Q rises: about -5 dB at the cap. */
+const qComp = (q: number): number => 1 / (1 + 0.15 * (q - 0.7));
+/** Equal-power dry/wet pair for an amount 0..1. */
+const dryWet = (v: number): [number, number] => [Math.cos((v * Math.PI) / 2), Math.sin((v * Math.PI) / 2)];
+const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
+
+/** Run `fn` once the audio clock's lookahead and a ramp have passed (Tone.now() runs ahead). */
+function afterRamp(fn: () => void): void {
+  const ctx = Tone.getContext();
+  ctx.setTimeout(fn, ctx.lookAhead + RAMP + 0.05);
+}
 
 interface Buses {
   duck: Tone.Gain; // music bus, ducked by the kick
@@ -26,12 +44,19 @@ interface Buses {
 class Channel {
   readonly input = new Tone.Gain(1);
   readonly filter: Tone.Filter;
+  /** Fully wet; the mix is the dry and wet gains around it. Out of the chain while its amount is 0. */
   readonly drive: Tone.Distortion | null;
+  private readonly dry = new Tone.Gain(1);
+  private readonly wet = new Tone.Gain(0);
+  private driveOn = false;
+  private driveGen = 0;
   /** Mute point used by the smoke test's solo. Musical on/off is the sequencer's job. */
   readonly gate = new Tone.Gain(1);
   readonly level: Tone.Gain;
   readonly delaySend: Tone.Gain;
   readonly reverbSend: Tone.Gain;
+  private levelValue = 1;
+  private comp = 1;
 
   constructor(
     out: Tone.Gain,
@@ -41,12 +66,13 @@ class Channel {
     private readonly trim: number,
   ) {
     this.filter = new Tone.Filter({ frequency: hz[1], type: "lowpass", rolloff: -24, Q: 0.7 });
-    this.drive = withDrive ? new Tone.Distortion({ distortion: 0.4, oversample: "4x", wet: 0 }) : null;
+    this.drive = withDrive ? new Tone.Distortion({ distortion: 0.4, oversample: "2x", wet: 1 }) : null;
     this.level = new Tone.Gain(trim);
     this.delaySend = new Tone.Gain(0).connect(buses.delay);
     this.reverbSend = new Tone.Gain(0).connect(buses.reverb);
-    if (this.drive) this.input.chain(this.filter, this.drive, this.gate, this.level, out);
-    else this.input.chain(this.filter, this.gate, this.level, out);
+    this.input.chain(this.filter, this.dry, this.gate);
+    if (this.drive) this.drive.chain(this.wet, this.gate);
+    this.gate.chain(this.level, out);
     this.level.connect(this.delaySend);
     this.level.connect(this.reverbSend);
   }
@@ -60,19 +86,44 @@ class Channel {
     switch (key) {
       case "cutoff":
         return void this.filter.frequency.rampTo(this.cutoffHz(v), RAMP);
-      case "resonance":
-        return void this.filter.Q.rampTo(0.7 + Math.max(0, Math.min(1, v)) * (MAX_Q - 0.7), RAMP);
+      case "resonance": {
+        const q = 0.7 + clamp01(v) * (MAX_Q - 0.7);
+        this.filter.Q.rampTo(q, RAMP);
+        this.comp = qComp(q);
+        return void this.level.gain.rampTo(this.levelValue * this.trim * this.comp, RAMP);
+      }
       case "drive":
-        return void this.drive?.wet.rampTo(Math.max(0, Math.min(1, v)), RAMP);
+        return this.setDrive(clamp01(v));
       case "delay":
         return void this.delaySend.gain.rampTo(v, RAMP);
       case "reverb":
         return void this.reverbSend.gain.rampTo(v, RAMP);
       case "level":
-        return void this.level.gain.rampTo(v * this.trim, RAMP);
+        this.levelValue = v;
+        return void this.level.gain.rampTo(v * this.trim * this.comp, RAMP);
       default:
         return;
     }
+  }
+
+  /** Crossfade dry and driven over RAMP; at 0 the drive leaves the chain once the fade is done. */
+  private setDrive(v: number): void {
+    const drive = this.drive;
+    if (!drive) return;
+    const gen = ++this.driveGen;
+    if (v > 0 && !this.driveOn) {
+      this.filter.connect(drive);
+      this.driveOn = true;
+    }
+    const [d, w] = dryWet(v);
+    this.dry.gain.rampTo(d, RAMP);
+    this.wet.gain.rampTo(w, RAMP);
+    if (v === 0 && this.driveOn)
+      afterRamp(() => {
+        if (gen !== this.driveGen || !this.driveOn) return;
+        this.filter.disconnect(drive);
+        this.driveOn = false;
+      });
   }
 }
 
@@ -82,10 +133,77 @@ function oscFor(wave: Wave, fat: number): Record<string, unknown> {
   return { type: wave };
 }
 
+/**
+ * Two voice sets of one instrument. A wave change makes a fresh set the live one; the previous set
+ * keeps its sounding notes (old wave) until they are silent, then it is faded and freed.
+ */
+class VoiceSets<T extends Tone.ToneAudioNode> {
+  live: { synth: T; gain: Tone.Gain } | null = null;
+  old: { synth: T; gain: Tone.Gain } | null = null;
+
+  constructor(private readonly dest: Tone.Gain) {}
+
+  swap(make: () => T): void {
+    if (this.old) this.drop(this.old);
+    this.old = this.live;
+    const synth = make();
+    const gain = new Tone.Gain(1).connect(this.dest);
+    synth.connect(gain);
+    this.live = { synth, gain };
+  }
+
+  each(fn: (s: T) => void): void {
+    if (this.live) fn(this.live.synth);
+    if (this.old) fn(this.old.synth);
+  }
+
+  /** Free the previous set once `silent` says it has stopped sounding. */
+  retireIf(silent: (s: T) => boolean): void {
+    if (this.old && silent(this.old.synth)) {
+      this.drop(this.old);
+      this.old = null;
+    }
+  }
+
+  private drop(v: { synth: T; gain: Tone.Gain }): void {
+    v.gain.gain.rampTo(0, RAMP);
+    afterRamp(() => {
+      v.synth.dispose();
+      v.gain.dispose();
+    });
+  }
+}
+
 export abstract class Instrument {
   readonly channel: Channel;
+  /** Bumped by `cancel()` (Stop): attacks scheduled before it never start. */
+  private epoch = 0;
+  /** Attacks actually started; read by the smoke test to prove Stop leaves nothing scheduled. */
+  attacks = 0;
   constructor(channel: Channel) {
     this.channel = channel;
+  }
+
+  /**
+   * Start an attack at audio time `time`. One in the future (a swung step) waits on the context's
+   * clock, like Tone's own PolySynth, and is dropped if Stop comes first.
+   */
+  protected atTime(time: number, fn: () => void): void {
+    const ctx = Tone.getContext();
+    const epoch = this.epoch;
+    const run = (): void => {
+      if (epoch !== this.epoch) return;
+      this.attacks++;
+      fn();
+    };
+    const wait = time - ctx.now();
+    if (wait <= 0) run();
+    else ctx.setTimeout(run, wait);
+  }
+
+  /** Drop every attack not yet started. */
+  cancel(): void {
+    this.epoch++;
   }
   apply(p: Patch): void {
     for (const k of ["cutoff", "resonance", "drive", "delay", "reverb", "level"] as const) this.channel.set(k, p[k]);
@@ -154,30 +272,32 @@ export class Drums extends Instrument {
   }
 
   override set(key: keyof Patch, v: number | Wave, patch: Patch): void {
-    if (key === "drive") return void this.kickDrive.wet.rampTo(Math.max(0, Math.min(1, v as number)), RAMP);
+    if (key === "drive") return void this.kickDrive.wet.rampTo(clamp01(v as number), RAMP);
     super.set(key, v, patch);
   }
 
   override apply(p: Patch): void {
     super.apply(p);
-    this.kickDrive.wet.rampTo(p.drive, RAMP);
+    this.kickDrive.wet.rampTo(clamp01(p.drive), RAMP);
   }
 
   protected setWave(): void {}
   protected setEnvelope(): void {}
 
   trigger(voice: DrumVoice, time: number, vel: number): void {
-    switch (voice) {
-      case "kick":
-        return void this.kick.triggerAttackRelease(49, 0.12, time, vel);
-      case "hat":
-        this.open.triggerRelease(time); // closed hat chokes the open one
-        return void this.hat.triggerAttackRelease(0.03, time, vel);
-      case "open":
-        return void this.open.triggerAttackRelease(0.1, time, vel);
-      case "clap":
-        return void this.clap.triggerAttackRelease(0.05, time, vel);
-    }
+    this.atTime(time, () => {
+      switch (voice) {
+        case "kick":
+          return void this.kick.triggerAttackRelease(49, 0.12, time, vel);
+        case "hat":
+          this.open.triggerRelease(time); // closed hat chokes the open one
+          return void this.hat.triggerAttackRelease(0.03, time, vel);
+        case "open":
+          return void this.open.triggerAttackRelease(0.1, time, vel);
+        case "clap":
+          return void this.clap.triggerAttackRelease(0.05, time, vel);
+      }
+    });
   }
 
   releaseAll(time: number): void {
@@ -186,72 +306,101 @@ export class Drums extends Instrument {
 }
 
 export class Bass extends Instrument {
-  private mono: Tone.MonoSynth;
+  private monos: VoiceSets<Tone.MonoSynth>;
   private sub: Tone.Synth;
+  private wave: Wave | null = null;
+  private env = { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.08 };
 
   constructor(buses: Buses) {
     super(new Channel(buses.duck, buses, [80, 6000], true, 0.75));
-    this.mono = new Tone.MonoSynth({
-      oscillator: { type: "sawtooth" },
-      filter: { Q: 2, type: "lowpass", rolloff: -24 },
-      envelope: { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.08 },
-      filterEnvelope: { attack: 0.005, decay: 0.16, sustain: 0.15, release: 0.1, baseFrequency: 80, octaves: 3.2 },
-    });
+    this.monos = new VoiceSets(this.channel.input);
     this.sub = new Tone.Synth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.08 },
     });
-    this.mono.connect(this.channel.input);
     this.sub.connect(this.channel.input);
+    this.setWave("sawtooth");
   }
 
+  /** The new wave plays from the next note; the sounding note keeps the old one. */
   protected setWave(w: Wave): void {
-    this.mono.set({ oscillator: { type: w } });
+    if (w === this.wave) return;
+    this.wave = w;
+    this.monos.swap(
+      () =>
+        new Tone.MonoSynth({
+          oscillator: { type: w },
+          filter: { Q: 2, type: "lowpass", rolloff: -24 },
+          envelope: this.env,
+          filterEnvelope: { attack: 0.005, decay: 0.16, sustain: 0.15, release: 0.1, baseFrequency: 80, octaves: 3.2 },
+        }),
+    );
   }
 
   protected setEnvelope(p: Patch): void {
-    const env = { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release };
-    this.mono.set({ envelope: env });
-    this.sub.set({ envelope: { ...env, sustain: Math.max(p.sustain, 0.6) } });
+    this.env = { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release };
+    this.monos.each((m) => m.set({ envelope: this.env }));
+    this.sub.set({ envelope: { ...this.env, sustain: Math.max(p.sustain, 0.6) } });
   }
 
   trigger(midi: number, dur: number, time: number, vel: number): void {
-    const hz = midiToHz(midi);
-    this.mono.triggerAttackRelease(hz, dur, time, vel);
-    this.sub.triggerAttackRelease(hz, dur, time, vel * 0.9);
+    this.atTime(time, () => {
+      const hz = midiToHz(midi);
+      // A mono bass: the next note ends one still held by the previous voice set.
+      this.monos.old?.synth.triggerRelease(time);
+      this.monos.retireIf((m) => m.getLevelAtTime(Tone.now()) < 1e-4);
+      this.monos.live!.synth.triggerAttackRelease(hz, dur, time, vel);
+      this.sub.triggerAttackRelease(hz, dur, time, vel * 0.9);
+    });
   }
 
   releaseAll(time: number): void {
-    this.mono.triggerRelease(time);
+    this.monos.each((m) => m.triggerRelease(time));
     this.sub.triggerRelease(time);
   }
 }
 
 /** A polyphonic voice: the Synth instrument and both layers. */
 export class Poly extends Instrument {
-  private poly: Tone.PolySynth;
+  private polys: VoiceSets<Tone.PolySynth>;
+  private wave: Wave | null = null;
+  private env = { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.3 };
   private patchEnv: Patch | null = null;
   private padEnv: { attack: number; release: number } | null = null;
 
   constructor(
     buses: Buses,
     private readonly fat: number,
-    maxPolyphony: number,
+    private readonly maxPolyphony: number,
     trim: number,
   ) {
     super(new Channel(buses.duck, buses, [100, 10000], true, trim));
-    this.poly = new Tone.PolySynth(Tone.Synth, { envelope: { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.3 } });
-    this.poly.maxPolyphony = maxPolyphony;
-    this.poly.connect(this.channel.input);
+    this.polys = new VoiceSets(this.channel.input);
+    this.setWave("sawtooth");
   }
 
+  /** The new wave plays from the next note; sounding notes keep the old one and ring out. */
   protected setWave(w: Wave): void {
-    this.poly.set({ oscillator: oscFor(w, this.fat) } as Parameters<Tone.PolySynth["set"]>[0]);
+    if (w === this.wave) return;
+    this.wave = w;
+    this.polys.swap(() => {
+      const p = new Tone.PolySynth(Tone.Synth, {
+        oscillator: oscFor(w, this.fat),
+        envelope: this.env,
+      } as unknown as Partial<Tone.SynthOptions>);
+      p.maxPolyphony = this.maxPolyphony;
+      return p;
+    });
+  }
+
+  private setEnv(env: { attack: number; decay: number; sustain: number; release: number }): void {
+    this.env = env;
+    this.polys.each((p) => p.set({ envelope: env }));
   }
 
   protected setEnvelope(p: Patch): void {
     this.patchEnv = p;
-    if (!this.padEnv) this.poly.set({ envelope: { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release } });
+    if (!this.padEnv) this.setEnv({ attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release });
   }
 
   /** Pad mode takes its attack and release from the section's pad settings; other modes from the patch. */
@@ -259,7 +408,7 @@ export class Poly extends Instrument {
     if (pad) {
       if (this.padEnv && this.padEnv.attack === pad.attack && this.padEnv.release === pad.release) return;
       this.padEnv = pad;
-      this.poly.set({ envelope: { attack: pad.attack, decay: 0.6, sustain: 0.8, release: pad.release } });
+      this.setEnv({ attack: pad.attack, decay: 0.6, sustain: 0.8, release: pad.release });
     } else if (this.padEnv) {
       this.padEnv = null;
       if (this.patchEnv) this.setEnvelope(this.patchEnv);
@@ -267,11 +416,14 @@ export class Poly extends Instrument {
   }
 
   trigger(notes: number[], dur: number, time: number, vel: number): void {
-    this.poly.triggerAttackRelease(notes.map(midiToHz), dur, time, vel);
+    this.atTime(time, () => {
+      this.polys.retireIf((p) => p.activeVoices === 0);
+      this.polys.live!.synth.triggerAttackRelease(notes.map(midiToHz), dur, time, vel);
+    });
   }
 
   releaseAll(time: number): void {
-    this.poly.releaseAll(time);
+    this.polys.each((p) => p.releaseAll(time));
   }
 }
 
@@ -286,14 +438,24 @@ export class Graph {
   readonly buses: Buses;
   readonly instruments: { drums: Drums; bass: Bass; synth: Poly; layer1: Poly; layer2: Poly };
   private meter: Tone.Meter;
+  /** Raw samples after the limiter, for the peak reading (the last 16384, about 0.37 s at 44.1 kHz). */
+  private scope: Tone.Analyser;
   private lp: Tone.Filter;
   private hp: Tone.Filter;
   private sat: Tone.Distortion;
   pumpDepth = 0.6;
 
-  private constructor(buses: Buses, meter: Tone.Meter, lp: Tone.Filter, hp: Tone.Filter, sat: Tone.Distortion) {
+  private constructor(
+    buses: Buses,
+    meter: Tone.Meter,
+    scope: Tone.Analyser,
+    lp: Tone.Filter,
+    hp: Tone.Filter,
+    sat: Tone.Distortion,
+  ) {
     this.buses = buses;
     this.meter = meter;
+    this.scope = scope;
     this.lp = lp;
     this.hp = hp;
     this.sat = sat;
@@ -301,16 +463,18 @@ export class Graph {
       drums: new Drums(buses),
       bass: new Bass(buses),
       synth: new Poly(buses, 2, 16, 0.5),
-      layer1: new Poly(buses, 2, 6, 0.5),
-      layer2: new Poly(buses, 2, 12, 0.5),
+      // Either layer can be a pad: 4 notes times 2 overlapping chords, plus headroom.
+      layer1: new Poly(buses, 2, 10, 0.5),
+      layer2: new Poly(buses, 2, 10, 0.5),
     };
   }
 
   static async build(): Promise<Graph> {
     // Limiter: Tone.Limiter has a 10 ms release, fast enough to ride the gain within one cycle of
     // the bass and kick (audible as fuzz and crackle). A compressor at limiter ratio with a 120 ms
-    // release holds the gain steady instead.
-    const limiter = new Tone.Compressor({ threshold: -2, ratio: 20, attack: 0.003, release: 0.12, knee: 0 }).toDestination();
+    // release holds the gain steady instead. Its attack lets kick transients overshoot: with the
+    // G1 setting (-2 dB, 3 ms) the peak after it reached +0.2 dBFS, so it is -4 dB with a 1 ms attack.
+    const limiter = new Tone.Compressor({ threshold: -4, ratio: 20, attack: 0.001, release: 0.12, knee: 0 }).toDestination();
     const sat = new Tone.Distortion({ distortion: 0.25, oversample: "4x", wet: 0 });
     const meter = new Tone.Meter({ smoothing: 0.6 });
     const lp = new Tone.Filter({ frequency: 20000, type: "lowpass", rolloff: -12 });
@@ -318,6 +482,8 @@ export class Graph {
     const master = new Tone.Gain(0.5); // was 0.7 in the spike: more headroom into the limiter
     master.chain(lp, hp, sat, limiter);
     sat.connect(meter);
+    const scope = new Tone.Analyser({ type: "waveform", size: 16384 });
+    limiter.connect(scope);
 
     const duck = new Tone.Gain(1).connect(master);
     const drums = new Tone.Gain(1).connect(master);
@@ -326,15 +492,15 @@ export class Graph {
     reverb.connect(duck);
     const delay = new Tone.FeedbackDelay({ delayTime: "8n.", feedback: 0.36, wet: 1 });
     delay.connect(duck);
-    return new Graph({ duck, drums, delay, reverb }, meter, lp, hp, sat);
+    return new Graph({ duck, drums, delay, reverb }, meter, scope, lp, hp, sat);
   }
 
-  /** Duck the music bus on a kick: a 4 ms ramp down, then a swell back. Never a step. */
+  /** Duck the music bus on a kick: an 8 ms ramp down, then a swell back. Never a step. */
   pump(time: number): void {
     if (this.pumpDepth <= 0) return;
     const g = this.buses.duck.gain;
     g.cancelAndHoldAtTime(time);
-    g.linearRampToValueAtTime(1 - this.pumpDepth, time + 0.004);
+    g.linearRampToValueAtTime(1 - this.pumpDepth, time + 0.008);
     g.setTargetAtTime(1, time + 0.02, 0.075);
   }
 
@@ -362,5 +528,18 @@ export class Graph {
   level(): number {
     const v = this.meter.getValue();
     return typeof v === "number" ? v : v[0];
+  }
+
+  /** Largest absolute sample after the limiter over the last ~0.37 s, in dBFS. */
+  peak(): number {
+    const v = this.scope.getValue() as Float32Array;
+    let m = 0;
+    for (let i = 0; i < v.length; i++) m = Math.max(m, Math.abs(v[i]));
+    return m > 0 ? 20 * Math.log10(m) : -Infinity;
+  }
+
+  /** Attacks started so far, over every instrument. */
+  attacks(): number {
+    return Object.values(this.instruments).reduce((n, i) => n + i.attacks, 0);
   }
 }

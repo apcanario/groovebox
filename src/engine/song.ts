@@ -63,6 +63,14 @@ export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
   level: [0, 1],
 };
 
+/** A patch value forced into its allowed range; null for an unknown wave or a non-number. */
+export function clampPatchValue<K extends keyof Patch>(key: K, value: Patch[K]): Patch[K] | null {
+  if (key === "wave") return (WAVES as readonly unknown[]).includes(value) ? value : null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const [lo, hi] = PATCH_RANGES[key as NumericPatchKey];
+  return Math.max(lo, Math.min(hi, value)) as Patch[K];
+}
+
 export const LAYER_MODES = ["arp", "pad", "generative"] as const;
 export type LayerMode = (typeof LAYER_MODES)[number];
 
@@ -87,7 +95,10 @@ export interface ChordStep {
 
 export interface DrumsPattern {
   preset: DrumPreset;
-  /** Set when the preset was opened in the sequencer and edited. */
+  /**
+   * Set when the preset was opened in the sequencer and edited. Stored at 16 steps (sixteenths) so
+   * the presets' sixteenth hats survive an edit; the 8-step editor of G3 edits the even steps.
+   */
   grid?: DrumGrid;
 }
 

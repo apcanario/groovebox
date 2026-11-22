@@ -1,8 +1,20 @@
-import { describe, expect, it } from "../../tests/harness.ts";
+import { describe, expect, it } from "vitest";
 import { inScale } from "../music/scales.ts";
 import { SwitchQueue } from "./queue.ts";
 import { Sequencer, chordAt, type StepResult } from "./sequencer.ts";
-import { INSTRUMENTS, cloneSong, defaultSong, parseSong, serializeSong, validateSong, type InstrumentId } from "./song.ts";
+import { DRUM_PATTERNS } from "../music/presets.ts";
+import {
+  INSTRUMENTS,
+  PATCH_RANGES,
+  clampPatchValue,
+  cloneSong,
+  defaultSong,
+  parseSong,
+  sectionDrumGrid,
+  serializeSong,
+  validateSong,
+  type InstrumentId,
+} from "./song.ts";
 
 const run = (seq: Sequencer, steps: number): StepResult[] => Array.from({ length: steps }, () => seq.next());
 const sounding = (r: StepResult, inst: InstrumentId): boolean => r.events.some((e) => e.inst === inst);
@@ -53,6 +65,35 @@ describe("song schema", () => {
     const s = defaultSong();
     for (const id of INSTRUMENTS) expect(s.patches[id]).toBeTruthy();
     for (const sec of s.sections) expect((sec as unknown as Record<string, unknown>).patches).toBe(undefined);
+  });
+});
+
+describe("patch values", () => {
+  it("clamps numbers to PATCH_RANGES and refuses unknown waves", () => {
+    expect(clampPatchValue("attack", 0)).toBe(PATCH_RANGES.attack[0]);
+    expect(clampPatchValue("cutoff", 2)).toBe(1);
+    expect(clampPatchValue("level", -1)).toBe(0);
+    expect(clampPatchValue("release", 1.5)).toBe(1.5);
+    expect(clampPatchValue("resonance", Number.NaN)).toBe(null);
+    expect(clampPatchValue("wave", "square")).toBe("square");
+    expect(clampPatchValue("wave", "noise" as never)).toBe(null);
+  });
+});
+
+describe("drum grids", () => {
+  it("a section plays its edited grid instead of the preset's", () => {
+    const song = defaultSong();
+    const grid = { kick: Array(16).fill(0), clap: Array(16).fill(0), hat: Array(16).fill(0), open: Array(16).fill(0) };
+    grid.kick[3] = 1;
+    song.sections[0].drums.grid = grid;
+    expect(validateSong(song)).toEqual([]);
+    expect(sectionDrumGrid(song.sections[0])).toBe(grid);
+    expect(sectionDrumGrid(song.sections[1])).toBe(DRUM_PATTERNS[song.sections[1].drums.preset].grid);
+    const seq = new Sequencer(song);
+    seq.start();
+    const bar = run(seq, 16);
+    const hits = bar.flatMap((r) => r.events.filter((e) => e.inst === "drums").map((e) => [r.step, (e as { voice: string }).voice]));
+    expect(hits).toEqual([[3, "kick"]]);
   });
 });
 
@@ -221,6 +262,56 @@ describe("sequencer", () => {
       return JSON.stringify(run(seq, 16 * 32).map((r) => r.events));
     };
     expect(play()).toBe(play());
+  });
+
+  it("half-bar chords last eight steps", () => {
+    const song = defaultSong();
+    const sec = song.sections[0];
+    sec.chords = [
+      { degree: 0, bars: 0.5 },
+      { degree: 3, bars: 0.5 },
+      { degree: 4, bars: 1 },
+    ];
+    expect(chordAt(song, sec, 0).chord.degree).toBe(0);
+    expect(chordAt(song, sec, 7).remaining).toBe(1);
+    expect(chordAt(song, sec, 8).chord.degree).toBe(3);
+    expect(chordAt(song, sec, 8).starts).toBe(true);
+    expect(chordAt(song, sec, 16).chord.degree).toBe(4);
+    expect(chordAt(song, sec, 32).chord.degree).toBe(0); // wraps after two bars
+  });
+
+  it("in a swung section every event on an odd step carries the same shift", () => {
+    const song = defaultSong();
+    const outro = song.sections[3]; // houseShuffle with the rolling bass
+    for (const id of INSTRUMENTS) outro.on[id] = true;
+    const swing = DRUM_PATTERNS[outro.drums.preset].swing;
+    expect(swing).toBeGreaterThan(0);
+    const seq = new Sequencer(song);
+    seq.switchSection(3);
+    seq.start();
+    const steps = run(seq, 16 * 4);
+    const odd = steps.filter((r) => r.step % 2 === 1).flatMap((r) => r.events);
+    expect(odd.some((e) => e.inst === "bass")).toBe(true);
+    for (const e of odd) expect(e.shift).toBe(swing);
+    for (const r of steps.filter((r) => r.step % 2 === 0)) for (const e of r.events) expect(e.shift).toBe(0);
+  });
+
+  it("a song saved and reloaded plays note for note", () => {
+    const play = (song: ReturnType<typeof defaultSong>): StepResult[] => {
+      const seq = new Sequencer(song);
+      const out: StepResult[] = [];
+      for (let i = 0; i < song.sections.length; i++) {
+        seq.stop();
+        seq.switchSection(i);
+        seq.start();
+        out.push(...run(seq, 16 * 8));
+      }
+      return out;
+    };
+    const song = defaultSong();
+    song.sections[1].layer1.gen.seed = 4242;
+    song.sections[2].drums.grid = { ...DRUM_PATTERNS.houseShuffle.grid, kick: Array(16).fill(0.5) };
+    expect(play(parseSong(serializeSong(song)))).toEqual(play(cloneSong(song)));
   });
 
   it("the pad starts on a bar where it is turned on mid-chord", () => {

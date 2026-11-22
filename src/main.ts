@@ -75,9 +75,14 @@ app.innerHTML = `
     <div><span>level</span><b id="d-level">–</b></div>
   </div>
 
-  <p class="hints"${import.meta.env.MODE === "single" ? " hidden" : ""}>If it crackles, reload with a larger buffer:
-    <a href="?hint=interactive">fast</a> · <a href="?hint=balanced">balanced</a> · <a href="?hint=playback">safe</a>
-  </p>
+  <div class="hints"${import.meta.env.MODE === "single" ? " hidden" : ""}>
+    <p>If it crackles, reload with a larger buffer:</p>
+    <div class="seg">
+      <a href="?hint=interactive"${hint === "interactive" ? ' class="on"' : ""}>fast</a>
+      <a href="?hint=balanced"${hint === "balanced" ? ' class="on"' : ""}>balanced</a>
+      <a href="?hint=playback"${hint === "playback" ? ' class="on"' : ""}>safe</a>
+    </div>
+  </div>
 `;
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
@@ -86,16 +91,15 @@ const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(s
 function render(): void {
   const pos = engine.position();
   const pending = engine.pending();
-  const s = engine.getSong();
+  const on = engine.sectionOn(pos.section)!;
   document.querySelectorAll<HTMLButtonElement>("[data-section]").forEach((b) => {
     const i = Number(b.dataset.section);
     b.classList.toggle("on", i === pos.section);
     b.classList.toggle("pending", pending.section === i);
   });
-  const sec = s.sections[pos.section];
   document.querySelectorAll<HTMLButtonElement>("[data-inst]").forEach((b) => {
     const id = b.dataset.inst as InstrumentId;
-    b.classList.toggle("on", sec.on[id]);
+    b.classList.toggle("on", on[id]);
     b.classList.toggle("pending", pending.toggles.some((t) => t.section === pos.section && t.instrument === id));
   });
   $("#bar").textContent = pos.playing ? String(pos.bar + 1) : "–";
@@ -162,7 +166,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-section]").forEach((b) => {
 });
 document.querySelectorAll<HTMLButtonElement>("[data-inst]").forEach((b) => {
   b.addEventListener("click", () => {
-    engine.toggleInstrument(engine.position().section, b.dataset.inst as InstrumentId);
+    engine.toggleInstrumentInPlaying(b.dataset.inst as InstrumentId);
     render();
   });
 });

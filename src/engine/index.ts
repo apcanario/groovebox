@@ -7,7 +7,17 @@ import * as Tone from "tone";
 import { Graph, type MixState } from "./audio.ts";
 import type { Pending } from "./queue.ts";
 import { Sequencer, STEPS_PER_BAR, type StepResult } from "./sequencer.ts";
-import { cloneSong, defaultSong, INSTRUMENTS, type InstrumentId, type Patch, type Song, type Wave } from "./song.ts";
+import {
+  clampPatchValue,
+  cloneSong,
+  defaultSong,
+  INSTRUMENTS,
+  validateSong,
+  type InstrumentId,
+  type Patch,
+  type Song,
+  type Wave,
+} from "./song.ts";
 
 export * from "./song.ts";
 export type { Pending, PendingToggle } from "./queue.ts";
@@ -66,7 +76,10 @@ export class Engine {
     return cloneSong(this.seq.song);
   }
 
+  /** Throws, listing every problem, if the song is not valid; the playing song is then unchanged. */
   loadSong(song: Song): void {
+    const errors = validateSong(song);
+    if (errors.length) throw new Error(`invalid song: ${errors.join("; ")}`);
     this.seq.load(cloneSong(song));
     if (this.graph) {
       this.applyAll();
@@ -88,16 +101,22 @@ export class Engine {
     transport.stop();
     this.seq.stop();
     const now = Tone.now();
-    for (const id of INSTRUMENTS) this.graph.instruments[id].releaseAll(now);
+    // Drop attacks still waiting on the clock (swung steps), then release what already started.
+    for (const id of INSTRUMENTS) {
+      this.graph.instruments[id].cancel();
+      this.graph.instruments[id].releaseAll(now);
+    }
     this.graph.resetPump();
     this.emit({ playing: false, section: this.seq.section, bar: 0, step: 0 });
   }
 
-  /** Change one knob of an instrument's patch. Continuous values ramp. */
+  /** Change one knob of an instrument's patch. Continuous values ramp; values are clamped to PATCH_RANGES, unknown waves ignored. */
   setParam<K extends keyof Patch>(inst: InstrumentId, key: K, value: Patch[K]): void {
+    const v = clampPatchValue(key, value);
+    if (v === null) return;
     const patch = this.seq.song.patches[inst];
-    patch[key] = value;
-    this.graph?.instruments[inst].set(key, value as number | Wave, patch);
+    patch[key] = v;
+    this.graph?.instruments[inst].set(key, v as number | Wave, patch);
   }
 
   setMix(key: keyof MixState, value: number): void {
@@ -114,6 +133,20 @@ export class Engine {
   /** For the playing section, lands on the next bar line; other sections change at once. */
   toggleInstrument(section: number, inst: InstrumentId): void {
     this.seq.toggleInstrument(section, inst);
+  }
+
+  /**
+   * Toggle an instrument in the section the scheduler is playing. Use this rather than passing
+   * `position().section`, which lags the scheduler by the lookahead at a section switch.
+   */
+  toggleInstrumentInPlaying(inst: InstrumentId): void {
+    this.seq.toggleInstrument(this.seq.section, inst);
+  }
+
+  /** Which instruments are on in a section (a copy; cheap enough to call per step). */
+  sectionOn(index: number): Record<InstrumentId, boolean> | null {
+    const s = this.seq.song.sections[index];
+    return s ? { ...s.on } : null;
   }
 
   /** Switches waiting for the next bar line. */
@@ -153,6 +186,16 @@ export class Engine {
     return this.graph ? this.graph.level() : -Infinity;
   }
 
+  /** Peak sample after the limiter over the last ~0.37 s, in dBFS. */
+  peak(): number {
+    return this.graph ? this.graph.peak() : -Infinity;
+  }
+
+  /** Attacks started so far, over every instrument. */
+  attacks(): number {
+    return this.graph ? this.graph.attacks() : 0;
+  }
+
   info(): { sampleRate: number; baseLatencyMs: number; outputLatencyMs: number; hint: string } {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     return {
@@ -172,6 +215,8 @@ export class Engine {
   }
 
   private tick(time: number): void {
+    // transport.stop() takes effect a lookahead later; the clock keeps calling until then.
+    if (!this.seq.isRunning) return;
     const g = this.graph!;
     const r: StepResult = this.seq.next();
     const sixteenth = 60 / Tone.getTransport().bpm.value / 4;
@@ -181,23 +226,22 @@ export class Engine {
       for (const id of ["synth", "layer1", "layer2"] as const) g.instruments[id].releaseAll(time);
     }
     for (const e of r.events) {
+      const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
-        case "drums": {
-          const t = time + e.shift * sixteenth;
+        case "drums":
           g.instruments.drums.trigger(e.voice, t, e.vel);
           if (e.voice === "kick") g.pump(t);
           break;
-        }
         case "bass":
-          g.instruments.bass.trigger(e.midi, e.len * sixteenth, time, e.vel);
+          g.instruments.bass.trigger(e.midi, e.len * sixteenth, t, e.vel);
           break;
         case "synth":
-          g.instruments.synth.trigger(e.notes, e.len * sixteenth, time, e.vel);
+          g.instruments.synth.trigger(e.notes, e.len * sixteenth, t, e.vel);
           break;
         default: {
           const layer = g.instruments[e.inst];
           layer.useEnvelope(e.env);
-          layer.trigger(e.notes, e.len * sixteenth, time, e.vel);
+          layer.trigger(e.notes, e.len * sixteenth, t, e.vel);
         }
       }
     }
