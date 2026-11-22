@@ -58,7 +58,7 @@ app.innerHTML = `
     <div><span>playing for</span><b id="d-time">0:00</b></div>
   </div>
 
-  <p class="hints">If it crackles, reload with a larger buffer:
+  <p class="hints"${import.meta.env.MODE === "single" ? " hidden" : ""}>If it crackles, reload with a larger buffer:
     <a href="?hint=interactive">fast</a> · <a href="?hint=balanced">balanced</a> · <a href="?hint=playback">safe</a>
   </p>
 `;
