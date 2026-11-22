@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Headless smoke test: serve a built folder, press Play, check that audio runs.
+"""Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -12,8 +12,17 @@ import time
 
 from playwright.sync_api import sync_playwright
 
-LAYERS = ["kick", "hats", "clap", "bass", "chords", "pad", "lead"]
+LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
+
+
+def wait_for(page, expr: str, timeout: float) -> bool:
+    end = time.time() + timeout
+    while time.time() < end:
+        if page.evaluate(expr):
+            return True
+        time.sleep(0.02)
+    return False
 
 
 def main() -> int:
@@ -44,6 +53,40 @@ def main() -> int:
             )
             page.goto(f"http://localhost:{PORT}/index.html")
             page.click("#play")
+            time.sleep(0.5)
+
+            # Section B (Groove) has every instrument on. The switch waits for the bar line.
+            page.click('[data-section="1"]')
+            if page.evaluate("window.__groovebox.pending().section") != 1:
+                failures.append("section switch was not queued")
+            if not wait_for(page, "window.__groovebox.position().section === 1", 4.0):
+                failures.append("section switch did not land")
+            landed = page.evaluate("window.__groovebox.landed.slice(-1)[0]")
+            if not landed or landed["pending"]["section"] != 1:
+                failures.append("section switch did not land on a bar line")
+
+            # Three toggles tapped inside one bar land on the same bar line.
+            wait_for(page, "window.__groovebox.position().step === 1", 3.0)
+            for inst in ["bass", "synth", "layer1"]:
+                page.click(f'[data-inst="{inst}"]')
+                time.sleep(0.05)
+            n = page.evaluate("window.__groovebox.pending().toggles.length")
+            if n != 3:
+                failures.append(f"expected 3 pending toggles, got {n}")
+            if not wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0):
+                failures.append("toggles did not land")
+            last = page.evaluate("window.__groovebox.landed.slice(-1)[0]")
+            got = sorted(t["instrument"] for t in last["pending"]["toggles"]) if last else []
+            if got != ["bass", "layer1", "synth"]:
+                failures.append(f"toggles did not land together: {got}")
+            on = page.evaluate("window.__groovebox.getSong().sections[1].on")
+            if on["bass"] or on["synth"] or on["layer1"]:
+                failures.append("toggled instruments are still on")
+            print(f"three toggles landed together on bar {last['bar'] + 1 if last else '?'}")
+            # Turn them back on for the solos.
+            for inst in ["bass", "synth", "layer1"]:
+                page.click(f'[data-inst="{inst}"]')
+            wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
 
             levels = []
             for _ in range(32):

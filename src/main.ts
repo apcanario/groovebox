@@ -1,48 +1,66 @@
 import "./style.css";
-import { Engine, LAYERS, type LatencyHint, type LayerId } from "./engine";
+import { Engine, INSTRUMENTS, type InstrumentId, type LatencyHint } from "./engine/index.ts";
 
+/** G1 test screen: play, section buttons, instrument toggles. The real shell comes in G2. */
 const engine = new Engine();
 
 const params = new URLSearchParams(location.search);
 const hintParam = params.get("hint");
-const hint: LatencyHint = hintParam === "balanced" || hintParam === "playback" ? hintParam : "interactive";
+const hint: LatencyHint = hintParam === "interactive" || hintParam === "playback" ? hintParam : "balanced";
 
-const COLORS: Record<LayerId, string> = {
-  kick: "#ff6b6b",
-  hats: "#e9c46a",
-  clap: "#f4a261",
+const COLORS: Record<InstrumentId, string> = {
+  drums: "#ff6b6b",
   bass: "#2a9d8f",
-  chords: "#6aa3c9",
-  pad: "#9b5de5",
-  lead: "#ff6b6b",
+  synth: "#6aa3c9",
+  layer1: "#e9c46a",
+  layer2: "#9b5de5",
+};
+const NAMES: Record<InstrumentId, string> = {
+  drums: "Drums",
+  bass: "Bass",
+  synth: "Synth",
+  layer1: "Layer 1",
+  layer2: "Layer 2",
 };
 
+const song = engine.getSong();
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
   <header>
     <h1>Groovebox</h1>
-    <span class="tag">step 0 · sound spike</span>
+    <span class="tag">G1 · engine test</span>
   </header>
 
   <div class="top">
     <button id="play" class="play" aria-label="Play"><i></i></button>
     <div class="pill">
       <button id="bpm-down" aria-label="Slower">−</button>
-      <div><b id="bpm">122</b><span>bpm</span></div>
+      <div><b id="bpm">${song.bpm}</b><span>bpm</span></div>
       <button id="bpm-up" aria-label="Faster">+</button>
     </div>
-    <div class="pill meter"><div><b id="level">–</b><span>dB</span></div></div>
+    <div class="pill meter"><div><b id="bar">–</b><span>bar</span></div></div>
   </div>
 
-  <div class="layers">
-    ${LAYERS.map(
-      (id) => `<button class="layer on" data-layer="${id}" style="--c:${COLORS[id]}">${id}</button>`,
+  <div class="label">${song.key} ${song.mood} · section</div>
+  <div class="sections">
+    ${song.sections
+      .map(
+        (s, i) =>
+          `<button class="layer" data-section="${i}" style="--c:var(--coral)">${String.fromCharCode(65 + i)}<small>${s.name}</small></button>`,
+      )
+      .join("")}
+  </div>
+
+  <div class="label">instruments in the playing section</div>
+  <div class="insts">
+    ${INSTRUMENTS.map(
+      (id) => `<button class="layer" data-inst="${id}" style="--c:${COLORS[id]}">${NAMES[id]}</button>`,
     ).join("")}
   </div>
 
   <div id="xy" class="xy">
     <div class="hx"></div><div class="hy"></div><div class="dot"></div>
-    <div class="ly">RESONANCE ↑</div><div class="lx">CHORD CUTOFF →</div>
+    <div class="ly">RESONANCE ↑</div><div class="lx">SYNTH CUTOFF →</div>
   </div>
 
   <label class="slider">
@@ -54,8 +72,7 @@ app.innerHTML = `
     <div><span>buffer</span><b id="d-hint">${hint}</b></div>
     <div><span>sample rate</span><b id="d-sr">–</b></div>
     <div><span>output latency</span><b id="d-lat">–</b></div>
-    <div><span>worst UI stall</span><b id="d-stall">–</b></div>
-    <div><span>playing for</span><b id="d-time">0:00</b></div>
+    <div><span>level</span><b id="d-level">–</b></div>
   </div>
 
   <p class="hints"${import.meta.env.MODE === "single" ? " hidden" : ""}>If it crackles, reload with a larger buffer:
@@ -65,9 +82,28 @@ app.innerHTML = `
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
+// ---- Render ------------------------------------------------------------------
+function render(): void {
+  const pos = engine.position();
+  const pending = engine.pending();
+  const s = engine.getSong();
+  document.querySelectorAll<HTMLButtonElement>("[data-section]").forEach((b) => {
+    const i = Number(b.dataset.section);
+    b.classList.toggle("on", i === pos.section);
+    b.classList.toggle("pending", pending.section === i);
+  });
+  const sec = s.sections[pos.section];
+  document.querySelectorAll<HTMLButtonElement>("[data-inst]").forEach((b) => {
+    const id = b.dataset.inst as InstrumentId;
+    b.classList.toggle("on", sec.on[id]);
+    b.classList.toggle("pending", pending.toggles.some((t) => t.section === pos.section && t.instrument === id));
+  });
+  $("#bar").textContent = pos.playing ? String(pos.bar + 1) : "–";
+}
+engine.onPosition(render);
+
 // ---- Transport -------------------------------------------------------------
 const playBtn = $<HTMLButtonElement>("#play");
-let startedAt = 0;
 let wakeLock: WakeLockSentinel | null = null;
 
 async function keepAwake(on: boolean): Promise<void> {
@@ -87,20 +123,18 @@ playBtn.addEventListener("click", async () => {
     engine.stop();
     playBtn.classList.remove("on");
     void keepAwake(false);
+    render();
     return;
   }
   playBtn.disabled = true;
   try {
     await engine.init(hint);
     applyXY();
-    engine.setPump(Number($<HTMLInputElement>("#pump").value) / 100);
+    engine.setMix("pump", Number($<HTMLInputElement>("#pump").value) / 100);
     engine.play();
-    startedAt = performance.now();
-    worstStall = 0;
     playBtn.classList.add("on");
     void keepAwake(true);
-    const i = engine.info();
-    $("#d-sr").textContent = `${i.sampleRate} Hz`;
+    $("#d-sr").textContent = `${engine.info().sampleRate} Hz`;
   } catch (err) {
     $("#d-hint").textContent = `audio failed: ${String(err)}`;
   } finally {
@@ -113,31 +147,37 @@ document.addEventListener("visibilitychange", () => {
 });
 
 const setBpm = (delta: number): void => {
-  const current = Number($("#bpm").textContent);
-  const next = Math.max(80, Math.min(180, current + delta));
-  $("#bpm").textContent = String(next);
-  engine.bpm = next;
+  engine.bpm = engine.bpm + delta;
+  $("#bpm").textContent = String(engine.bpm);
 };
 $("#bpm-down").addEventListener("click", () => setBpm(-2));
 $("#bpm-up").addEventListener("click", () => setBpm(2));
 
-// ---- Layer mutes -----------------------------------------------------------
-document.querySelectorAll<HTMLButtonElement>(".layer").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const on = btn.classList.toggle("on");
-    engine.setLayer(btn.dataset.layer as LayerId, on);
+// ---- Sections and instruments ----------------------------------------------------
+document.querySelectorAll<HTMLButtonElement>("[data-section]").forEach((b) => {
+  b.addEventListener("click", () => {
+    engine.switchSection(Number(b.dataset.section));
+    render();
+  });
+});
+document.querySelectorAll<HTMLButtonElement>("[data-inst]").forEach((b) => {
+  b.addEventListener("click", () => {
+    engine.toggleInstrument(engine.position().section, b.dataset.inst as InstrumentId);
+    render();
   });
 });
 
-// ---- XY pad ----------------------------------------------------------------
+// ---- XY pad: Synth filter ------------------------------------------------------------
 const xy = $<HTMLDivElement>("#xy");
-let xyX = 0.6;
-let xyY = 0.2;
+const patch = song.patches.synth;
+let xyX = patch.cutoff;
+let xyY = patch.resonance;
 
 function applyXY(): void {
   xy.style.setProperty("--x", `${xyX * 100}%`);
   xy.style.setProperty("--y", `${(1 - xyY) * 100}%`);
-  engine.setFilter(xyX, xyY);
+  engine.setParam("synth", "cutoff", xyX);
+  engine.setParam("synth", "resonance", xyY);
 }
 
 function onXY(e: PointerEvent): void {
@@ -157,30 +197,19 @@ xy.style.setProperty("--x", `${xyX * 100}%`);
 xy.style.setProperty("--y", `${(1 - xyY) * 100}%`);
 
 $<HTMLInputElement>("#pump").addEventListener("input", (e) => {
-  engine.setPump(Number((e.target as HTMLInputElement).value) / 100);
+  engine.setMix("pump", Number((e.target as HTMLInputElement).value) / 100);
 });
 
-// ---- Diagnostics -----------------------------------------------------------
-// A stalled main thread is what makes scheduled notes arrive late, so track the worst gap.
-let worstStall = 0;
-let lastTick = performance.now();
-setInterval(() => {
-  const now = performance.now();
-  const stall = now - lastTick - 50;
-  lastTick = now;
-  if (engine.playing && stall > worstStall) worstStall = stall;
-}, 50);
-
+// ---- Diagnostics (display only; nothing is scheduled from here) ------------------------
 setInterval(() => {
   if (!engine.playing) return;
-  const secs = Math.floor((performance.now() - startedAt) / 1000);
-  $("#d-time").textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
-  $("#d-stall").textContent = `${Math.round(worstStall)} ms`;
   const i = engine.info();
   $("#d-lat").textContent = i.outputLatencyMs ? `${i.outputLatencyMs} ms` : `${i.baseLatencyMs} ms (base)`;
   const db = engine.level();
-  $("#level").textContent = Number.isFinite(db) ? db.toFixed(0) : "–";
+  $("#d-level").textContent = Number.isFinite(db) ? `${db.toFixed(0)} dB` : "–";
 }, 250);
+
+render();
 
 // Exposed for automated smoke tests.
 (window as unknown as { __groovebox: Engine }).__groovebox = engine;

@@ -270,3 +270,36 @@ button {
 .hints a {
   color: var(--text);
 }
+
+/* G1 test screen: sections and instrument toggles */
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.sections {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.insts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.layer.pending {
+  box-shadow: inset 0 0 0 2px var(--c);
+}
+.layer.on.pending {
+  background: var(--card);
+  color: var(--text);
+}
+.layer small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
