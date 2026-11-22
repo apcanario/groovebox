@@ -10,23 +10,8 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 
 ## By hand (Pedro)
 
-- None open. H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026. The app is at https://apcanario.github.io/groovebox/.
-
-## Bundle 1: the instrument exists
-
-### G2. Shell
-
-The screens around the engine, in Preact.
-
-- Transport bar, section strip (playing and editing states, follow by default), icon tab bar with all eight tabs.
-- Play tab grid as in spec section 5, including long-press on a column header and the pending state for queued switches.
-- Reusable `Dial` (vertical drag, large, value in the middle), `XYPad` and `SendBar` components.
-- Chords tab, easy mode: mood picker, key picker, seven degree buttons, the section's sequence with add, remove and reorder.
-- The other six tabs exist and show their instrument's name, on/off and an XY pad wired to its filter. Their full controls come in bundles 2 and 3.
-- Screen stays awake while playing.
-- Extend the smoke test: open every tab, switch section, toggle a cell in the Play grid, change a chord, with no page error.
-
-**Done when:** a whole jam (start, switch sections, mute and unmute, change the chord sequence, sweep a filter) is possible with one thumb and no test screen; nothing on screen is smaller than 48 px; `check` and `smoke` pass.
+- **H3. Hear and use the shell on the phone** (22 Nov 2026): open https://apcanario.github.io/groovebox/ and jam a whole song with one thumb; confirm whether the C1 crackle is gone. Send notes in the next starter's `Notes:` line. Open until Pedro says done.
+- H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026.
 
 ## Bundle 2: drums, bass, synth, mix
 
@@ -97,3 +82,4 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 
 - **G0. Sound spike** (22 Nov 2026). Built, deployed and heard by Pedro: it works, with a slight treble crackle carried as C1.
 - **G1. Engine** (22 Nov 2026). Built, reviewed (fix: 0 errors, 7 should-fix, 10 minor, all applied), pushed. Report in `docs/reviews/G1.md`.
+- **G2. Shell** (22 Nov 2026). Built, reviewed (fix: 1 error, 5 should-fix, 5 minor, all applied), pushed. Report in `docs/reviews/G2.md`. Bundle 1 is done.
