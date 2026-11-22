@@ -5,7 +5,7 @@
  */
 import * as Tone from "tone";
 import { Graph, type MixState } from "./audio.ts";
-import type { Pending } from "./queue.ts";
+import { InFlight, type Pending } from "./queue.ts";
 import { Sequencer, STEPS_PER_BAR, type StepResult } from "./sequencer.ts";
 import {
   clampPatchValue,
@@ -51,6 +51,8 @@ export class Engine {
   private layoutGen = 0;
   private pos: Position = { playing: false, section: 0, bar: 0, step: 0 };
   private mix: MixState = { sweep: 0, pump: 0.6, saturation: 0 };
+  /** Switches applied by the scheduler but not heard yet (the lookahead before their bar line). */
+  private inFlight = new InFlight();
   /** Every bar line at which queued switches landed, newest last (kept short). */
   readonly landed: LandedSwitch[] = [];
 
@@ -99,6 +101,7 @@ export class Engine {
   play(): void {
     if (!this.graph || this.playing) return;
     this.seq.start();
+    this.inFlight.clear();
     this.landed.length = 0;
     Tone.getTransport().start("+0.05");
   }
@@ -115,17 +118,31 @@ export class Engine {
       this.graph.instruments[id].releaseAll(now);
     }
     this.graph.resetPump();
+    this.inFlight.clear();
     this.emit({ playing: false, section: this.seq.section, bar: 0, step: 0 });
   }
 
   /** Change one knob of an instrument's patch. Continuous values ramp; values are clamped to PATCH_RANGES, unknown waves ignored. */
   setParam<K extends keyof Patch>(inst: InstrumentId, key: K, value: Patch[K]): void {
+    if (this.applyParam(inst, key, value)) this.changed();
+  }
+
+  /** Change several knobs of one patch at once (an XY pad move): listeners hear one change. */
+  setParams(inst: InstrumentId, values: Partial<Patch>): void {
+    let any = false;
+    for (const key of Object.keys(values) as (keyof Patch)[]) {
+      if (this.applyParam(inst, key, values[key] as Patch[typeof key])) any = true;
+    }
+    if (any) this.changed();
+  }
+
+  private applyParam<K extends keyof Patch>(inst: InstrumentId, key: K, value: Patch[K]): boolean {
     const v = clampPatchValue(key, value);
-    if (v === null) return;
+    if (v === null) return false;
     const patch = this.seq.song.patches[inst];
     patch[key] = v;
     this.graph?.instruments[inst].set(key, v as number | Wave, patch);
-    this.changed();
+    return true;
   }
 
   setMix(key: keyof MixState, value: number): void {
@@ -218,9 +235,18 @@ export class Engine {
     return s ? { ...s.on } : null;
   }
 
-  /** Switches waiting for the next bar line. */
+  /** Switches waiting in the queue for the next bar line the scheduler reaches. */
   pending(): Pending {
     return this.seq.pending();
+  }
+
+  /**
+   * Switches not heard yet: the queue, plus switches the scheduler already applied a lookahead
+   * ahead of a bar line the listener has not reached. The UI shows this, so a pending outline stays
+   * until the bar it lands on is heard.
+   */
+  pendingShown(): Pending {
+    return this.inFlight.shown(this.seq.pending());
   }
 
   /** What is audible now (updated in step with the sound, not with the scheduler). */
@@ -296,6 +322,8 @@ export class Engine {
     if (r.retrigger || (r.applied && r.applied.section !== null)) {
       for (const id of ["synth", "layer1", "layer2"] as const) g.instruments[id].releaseAll(time);
     }
+    // A held bass note in the old key lets go too; the sequencer restarts it at the new root.
+    if (r.retrigger) g.instruments.bass.releaseAll(time);
     for (const e of r.events) {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
@@ -317,12 +345,16 @@ export class Engine {
       }
     }
     if (r.applied) {
+      this.inFlight.land(r.bar, r.applied);
       this.landed.push({ bar: r.bar, pending: r.applied });
       if (this.landed.length > 16) this.landed.shift();
     }
     const p: Position = { playing: true, section: r.section, bar: r.bar, step: r.step };
     const gen = this.layoutGen;
-    Tone.getDraw().schedule(() => this.emit(gen === this.layoutGen ? p : { ...p, section: this.seq.section }), time);
+    Tone.getDraw().schedule(() => {
+      this.inFlight.reach(p.bar);
+      this.emit(gen === this.layoutGen ? p : { ...p, section: this.seq.section });
+    }, time);
   }
 
   /** Tell listeners the song changed; when sections moved, the position's index may have too. */

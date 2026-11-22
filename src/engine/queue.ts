@@ -66,3 +66,42 @@ export class SwitchQueue {
     this.flush();
   }
 }
+
+/** Merge two pending sets: the section of `b` wins when it has one; toggles of both, each once. */
+export function mergePending(a: Pending, b: Pending): Pending {
+  const toggles = [...a.toggles];
+  for (const t of b.toggles) {
+    if (!toggles.some((u) => u.section === t.section && u.instrument === t.instrument)) toggles.push(t);
+  }
+  return { section: b.section ?? a.section, toggles };
+}
+
+/**
+ * Switches the scheduler has already applied but the listener has not heard yet. The sequencer
+ * flushes the queue when it schedules a bar's first step, a lookahead before that bar line sounds;
+ * until the drawn position reaches that bar, the switch is still "pending" to the person playing.
+ */
+export class InFlight {
+  private items: { bar: number; pending: Pending }[] = [];
+
+  /** The scheduler applied `pending` at the start of `bar`. */
+  land(bar: number, pending: Pending): void {
+    this.items.push({ bar, pending });
+  }
+
+  /** The drawn (heard) position reached `bar`: everything landed at or before it is heard. */
+  reach(bar: number): void {
+    this.items = this.items.filter((i) => i.bar > bar);
+  }
+
+  clear(): void {
+    this.items = [];
+  }
+
+  /** What to show as pending: in-flight switches, then the live queue on top. */
+  shown(live: Pending): Pending {
+    let out: Pending = { section: null, toggles: [] };
+    for (const i of this.items) out = mergePending(out, i.pending);
+    return mergePending(out, live);
+  }
+}

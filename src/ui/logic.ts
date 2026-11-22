@@ -22,9 +22,10 @@ export function fraction(v: number, min: number, max: number): number {
   return max === min ? 0 : Math.max(0, Math.min(1, (v - min) / (max - min)));
 }
 
-/** Transport counter: bar and beat, both from 1 ("17.3"); a dash when stopped. */
+/** Transport counter: bar and beat, both from 1 ("17.3"); from bar 100 the bar alone ("100"), so it fits; a dash when stopped. */
 export function barLabel(playing: boolean, bar: number, step: number): string {
-  return playing ? `${bar + 1}.${Math.floor(step / 4) + 1}` : "–";
+  if (!playing) return "–";
+  return bar + 1 >= 100 ? `${bar + 1}` : `${bar + 1}.${Math.floor(step / 4) + 1}`;
 }
 
 export function sectionLetter(i: number): string {
@@ -40,6 +41,36 @@ export function editedSection(chosen: number | null, playing: number, count: num
 /** Tapping a section in the strip: the playing one goes back to following, any other is edited silently. */
 export function chooseSection(tapped: number, playing: number): number | null {
   return tapped === playing ? null : tapped;
+}
+
+/** A chosen section that no longer exists, or that is now the playing one, goes back to following (null). */
+export function keepChosen(chosen: number | null, playing: number, count: number): number | null {
+  return chosen !== null && (chosen >= count || chosen === playing) ? null : chosen;
+}
+
+export interface StripInput {
+  /** Section chosen for editing, or null when following. */
+  chosen: number | null;
+  /** Section heard now (or the one Play starts from). */
+  playing: number;
+  /** Section being edited (from editedSection). */
+  edit: number;
+  /** Whether the transport runs. */
+  running: boolean;
+  /** The section's name. */
+  name: string;
+}
+
+/**
+ * One button of the section strip. The edit mark shows only when editing departs from following:
+ * a chosen section, or the edited one when it is not the playing one. The label says "Playing" for
+ * the section heard while running, "Editing" for the edited one, and the name otherwise.
+ */
+export function stripState(i: number, s: StripInput): { isPlaying: boolean; isEdit: boolean; sub: string } {
+  const isPlaying = i === s.playing;
+  const isEdit = i === s.edit && (s.chosen !== null || !isPlaying);
+  const sub = isPlaying && s.running ? "Playing" : isEdit ? "Editing" : s.name;
+  return { isPlaying, isEdit, sub };
 }
 
 // ---- Chord sequence edits (each returns a new array, or the same one when refused) ----

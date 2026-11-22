@@ -9,9 +9,11 @@ import {
   editedSection,
   fraction,
   hzLabel,
+  keepChosen,
   moveChord,
   removeChord,
   replaceChord,
+  stripState,
   sweepLabel,
 } from "./logic.ts";
 import { NOTE_NAMES } from "../music/scales.ts";
@@ -43,6 +45,8 @@ describe("transport and sections", () => {
   it("bar counter reads bar.beat from 1", () => {
     expect(barLabel(true, 16, 9)).toBe("17.3");
     expect(barLabel(false, 3, 3)).toBe("–");
+    expect(barLabel(true, 98, 12)).toBe("99.4");
+    expect(barLabel(true, 99, 12)).toBe("100");
   });
   it("edited section follows the playing one unless another is chosen", () => {
     expect(editedSection(null, 2, 4)).toBe(2);
@@ -89,5 +93,32 @@ describe("labels", () => {
     expect(sweepLabel(0.25)).toBe("HP 25");
     expect(hzLabel(1800)).toBe("1.8 kHz");
     expect(hzLabel(240.4)).toBe("240 Hz");
+  });
+});
+
+describe("section strip", () => {
+  it("a chosen section goes back to following when it becomes the playing one or disappears", () => {
+    expect(keepChosen(null, 1, 4)).toBe(null);
+    expect(keepChosen(2, 1, 4)).toBe(2);
+    expect(keepChosen(2, 2, 4)).toBe(null);
+    expect(keepChosen(3, 0, 3)).toBe(null);
+  });
+  it("following: the playing section is marked playing, not edited", () => {
+    const base = { chosen: null, playing: 1, edit: 1, running: true };
+    expect(stripState(1, { ...base, name: "Groove" })).toEqual({ isPlaying: true, isEdit: false, sub: "Playing" });
+    expect(stripState(0, { ...base, name: "Intro" })).toEqual({ isPlaying: false, isEdit: false, sub: "Intro" });
+  });
+  it("a chosen section is marked editing; the playing one still says playing", () => {
+    const base = { chosen: 2, playing: 1, edit: 2, running: true };
+    expect(stripState(2, { ...base, name: "Break" })).toEqual({ isPlaying: false, isEdit: true, sub: "Editing" });
+    expect(stripState(1, { ...base, name: "Groove" })).toEqual({ isPlaying: true, isEdit: false, sub: "Playing" });
+  });
+  it("stopped: the start section shows its name, and editing another shows Editing", () => {
+    expect(stripState(0, { chosen: null, playing: 0, edit: 0, running: false, name: "Intro" })).toEqual({
+      isPlaying: true,
+      isEdit: false,
+      sub: "Intro",
+    });
+    expect(stripState(3, { chosen: 3, playing: 0, edit: 3, running: false, name: "Drop" }).sub).toBe("Editing");
   });
 });

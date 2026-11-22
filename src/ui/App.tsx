@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Engine, MOOD_TABLE, type LatencyHint, type Pending, type Position, type Song } from "../engine/index.ts";
 import { useVerticalDrag } from "./components.tsx";
-import { barLabel, chooseSection, editedSection, sectionLetter } from "./logic.ts";
+import { barLabel, chooseSection, editedSection, keepChosen, sectionLetter, stripState } from "./logic.ts";
 import { TABS, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PlayTab } from "./tabs/PlayTab.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
@@ -68,7 +68,7 @@ function useWakeLock(on: boolean): void {
 export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
   const [song, setSong] = useState<Song>(() => engine.getSong());
   const [pos, setPos] = useState<Position>(() => engine.position());
-  const [pending, setPending] = useState<Pending>(() => engine.pending());
+  const [pending, setPending] = useState<Pending>(() => engine.pendingShown());
   const [chosen, setChosen] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("play");
   const [starting, setStarting] = useState(false);
@@ -78,14 +78,14 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
     let lastSection = engine.position().section;
     const offPos = engine.onPosition((p) => {
       setPos(p);
-      setPending(engine.pending());
+      setPending(engine.pendingShown());
       // Switches land on the bar line: re-read the song there, and whenever the section changes.
       if (p.step === 0 || p.section !== lastSection || !p.playing) setSong(engine.getSong());
       lastSection = p.section;
     });
     const offChange = engine.onChange(() => {
       setSong(engine.getSong());
-      setPending(engine.pending());
+      setPending(engine.pendingShown());
       setPos(engine.position());
     });
     return () => {
@@ -101,7 +101,8 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
   const edit = editedSection(chosen, playing, count);
   // A chosen section that no longer exists, or that is now the playing one, goes back to following.
   useEffect(() => {
-    if (chosen !== null && (chosen >= count || chosen === playing)) setChosen(null);
+    const keep = keepChosen(chosen, playing, count);
+    if (keep !== chosen) setChosen(keep);
   }, [chosen, count, playing]);
 
   const togglePlay = async (): Promise<void> => {
@@ -141,7 +142,7 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
           <b>{song.bpm}</b>
           <span>bpm</span>
         </div>
-        <button class="pill" id="keymood" aria-label="Key and mood: open Chords" onClick={() => setTab("chords")}>
+        <button class="pill key" id="keymood" aria-label="Key and mood: open Chords" onClick={() => setTab("chords")}>
           <b>
             {song.key} {SCALE_SHORT[mood.scale]}
           </b>
@@ -158,10 +159,8 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
 
       <div class="secs" style={{ gridTemplateColumns: `repeat(${count}, 1fr)` }}>
         {song.sections.map((s, i) => {
-          const isPlaying = i === playing;
-          const isEdit = i === edit && (chosen !== null || !isPlaying);
+          const { isPlaying, isEdit, sub } = stripState(i, { chosen, playing, edit, running: pos.playing, name: s.name });
           const queued = pending.section === i;
-          const sub = isPlaying && pos.playing ? "Playing" : isEdit ? "Editing" : s.name;
           return (
             <button
               key={i}

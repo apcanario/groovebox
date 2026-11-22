@@ -71,6 +71,8 @@ export interface ChordPosition {
   starts: boolean;
   /** Steps left in this chord, this one included. */
   remaining: number;
+  /** Steps of this chord already played before this one. */
+  elapsed: number;
 }
 
 /** Which chord of a section plays `sectionStep` steps after the section started. */
@@ -80,7 +82,7 @@ export function chordAt(song: Song, section: Section, sectionStep: number): Chor
   let pos = sectionStep % total;
   for (let i = 0; i < lens.length; i++) {
     if (pos < lens[i]) {
-      return { chord: buildChord(song.key, song.mood, section.chords[i].degree), starts: pos === 0, remaining: lens[i] - pos };
+      return { chord: buildChord(song.key, song.mood, section.chords[i].degree), starts: pos === 0, remaining: lens[i] - pos, elapsed: pos };
     }
     pos -= lens[i];
   }
@@ -268,6 +270,17 @@ export class Sequencer {
     if (now.has("bass")) {
       for (const hit of BASS_RHYTHMS[section.bass.rhythm]) {
         if (hit.step === step) events.push({ inst: "bass", midi: pos.chord.bass, len: Math.min(hit.len, pos.remaining), vel: hit.vel, shift });
+      }
+      // A key, mood or chord edit cuts the held bass note (the engine releases it): a note that
+      // started earlier in this chord and is still sounding goes on at the new root for the rest of its hit.
+      if (retrigger) {
+        const held = BASS_RHYTHMS[section.bass.rhythm].find(
+          (h) => h.step < step && step - h.step <= pos.elapsed && h.step + h.len > step,
+        );
+        if (held) {
+          const len = Math.min(held.step + held.len - step, pos.remaining);
+          events.push({ inst: "bass", midi: pos.chord.bass, len, vel: held.vel, shift });
+        }
       }
     }
 

@@ -36,10 +36,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
         xLabel="Cutoff"
         yLabel="Resonance"
         readout={readout}
-        onChange={(x, y) => {
-          engine.setParam(inst, "cutoff", x);
-          engine.setParam(inst, "resonance", y);
-        }}
+        onChange={(x, y) => engine.setParams(inst, { cutoff: x, resonance: y })}
       />
       <div class="sends">
         <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => engine.setParam(inst, "delay", v)} />

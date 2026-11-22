@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { inScale } from "../music/scales.ts";
-import { SwitchQueue } from "./queue.ts";
+import { InFlight, SwitchQueue, type Pending } from "./queue.ts";
 import { Sequencer, chordAt, type StepResult } from "./sequencer.ts";
 import { DRUM_PATTERNS } from "../music/presets.ts";
 import {
@@ -348,6 +348,32 @@ describe("editing from the UI (G2)", () => {
     expect(seq.next().retrigger).toBe(false);
   });
 
+  it("a key change in the middle of a long bass note restarts it at the new root", () => {
+    const song = defaultSong();
+    song.sections[1].bass.rhythm = "long";
+    song.sections[1].chords = [{ degree: 0, bars: 1 }];
+    const seq = new Sequencer(song);
+    seq.switchSection(1);
+    seq.start();
+    run(seq, 3); // steps 0..2: the note from step 0 (7.5 steps) is still sounding
+    seq.setKeyMood("D", "deep");
+    const r = seq.next();
+    expect(r.step).toBe(3);
+    expect(r.retrigger).toBe(true);
+    const bass = r.events.filter((e) => e.inst === "bass") as { midi: number; len: number }[];
+    expect(bass).toHaveLength(1);
+    expect(inScale(bass[0].midi, "D", "deep")).toBe(true);
+    expect(bass[0].len).toBeCloseTo(4.5);
+    // No restart once the note is over.
+    song.sections[1].bass.rhythm = "dnbSub"; // hits at 0 (6 steps) and 10 (5.5 steps): steps 6..9 are silent
+    run(seq, 3); // steps 4..6
+    seq.setKeyMood("A", "house");
+    const gap = seq.next();
+    expect(gap.step).toBe(7);
+    expect(gap.retrigger).toBe(true);
+    expect(gap.events.some((e) => e.inst === "bass")).toBe(false);
+  });
+
   it("chord edits are validated and restart only the playing section's chords", () => {
     const seq = new Sequencer(defaultSong());
     seq.switchSection(1);
@@ -426,5 +452,64 @@ describe("editing from the UI (G2)", () => {
     expect(seq.deleteSection(1)).toBe(true);
     expect(seq.section).toBe(0);
     expect(seq.deleteSection(0)).toBe(false);
+  });
+});
+
+describe("pending shown until heard (lookahead)", () => {
+  it("at 174 bpm a toggle stays pending on every drawn step until its bar line sounds", () => {
+    // Simulate the transport: step k sounds at k * sixteenth and is scheduled 0.1 s before that
+    // (Tone's lookahead); the UI draws each step when it sounds and reads what is pending then.
+    const song = defaultSong();
+    song.bpm = 174;
+    const seq = new Sequencer(song);
+    const inFlight = new InFlight();
+    const sixteenth = 60 / song.bpm / 4;
+    const lookahead = 0.1;
+    seq.start();
+    const scheduled: StepResult[] = [];
+    const drawn: { bar: number; step: number; shown: Pending; on: boolean }[] = [];
+    const tapAt = 2 * sixteenth + 0.01; // during bar 0, step 2
+    let tapped = false;
+    let k = 0;
+    for (let t = 0; t < 2 * 16 * sixteenth; t += 0.001) {
+      if (!tapped && t >= tapAt) {
+        seq.toggleInstrument(0, "drums");
+        tapped = true;
+      }
+      while (k * sixteenth - lookahead <= t) {
+        const r = seq.next();
+        if (r.applied) inFlight.land(r.bar, r.applied);
+        scheduled.push(r);
+        k++;
+      }
+      const d = Math.floor(t / sixteenth + 1e-9);
+      if (drawn.length === d) {
+        const r = scheduled[d];
+        inFlight.reach(r.bar);
+        drawn.push({ bar: r.bar, step: r.step, shown: inFlight.shown(seq.pending()), on: sounding(r, "drums") });
+      }
+    }
+    // Bar 1's first step is scheduled before bar 0's last step sounds: the live queue is empty there.
+    const last = drawn.find((x) => x.bar === 0 && x.step === 15)!;
+    expect(seq.pending().toggles).toHaveLength(0);
+    expect(last.shown.toggles).toEqual([{ section: 0, instrument: "drums" }]);
+    for (const x of drawn.filter((x) => x.bar === 0 && x.step >= 3)) expect(x.shown.toggles).toHaveLength(1);
+    // From the bar line on it is heard: no longer pending, and the drums are off.
+    for (const x of drawn.filter((x) => x.bar === 1)) {
+      expect(x.shown.toggles).toHaveLength(0);
+      expect(x.on).toBe(false);
+    }
+  });
+
+  it("a new tap during the lookahead shows on top of what is in flight", () => {
+    const f = new InFlight();
+    f.land(4, { section: 2, toggles: [{ section: 1, instrument: "bass" }] });
+    const shown = f.shown({ section: null, toggles: [{ section: 2, instrument: "synth" }] });
+    expect(shown.section).toBe(2);
+    expect(shown.toggles).toHaveLength(2);
+    f.reach(3);
+    expect(f.shown({ section: null, toggles: [] }).toggles).toHaveLength(1);
+    f.reach(4);
+    expect(f.shown({ section: null, toggles: [] })).toEqual({ section: null, toggles: [] });
   });
 });

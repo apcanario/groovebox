@@ -30,6 +30,24 @@ SMALL = """() => {
   return bad;
 }"""
 
+# Controls whose right edge passes the viewport (clipped, or reachable only by a sideways swipe),
+# and labels wider than their own button.
+OFF_SCREEN = """() => {
+  const bad = [];
+  const w = document.documentElement.clientWidth;
+  for (const el of document.querySelectorAll('button, a, input, [role=slider], [role=switch], [role=group]')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;
+    if (r.right > w + 0.5 || r.left < -0.5)
+      bad.push(`${el.tagName.toLowerCase()}.${el.className} ${JSON.stringify(el.dataset)} at x ${r.left.toFixed(0)}..${r.right.toFixed(0)} of ${w}`);
+  }
+  for (const el of document.querySelectorAll('.tab, .pill')) {
+    if (el.scrollWidth > el.clientWidth + 1)
+      bad.push(`label overflows ${el.className} ${JSON.stringify(el.dataset)}: ${el.scrollWidth} > ${el.clientWidth}`);
+  }
+  return bad;
+}"""
+
 SONG = "window.__groovebox.getSong()"
 
 
@@ -49,6 +67,21 @@ def drag(page, selector: str, dx: float, dy: float, hold: float = 0.0) -> None:
 def check_sizes(page, where: str, failures: list) -> None:
     for b in page.evaluate(SMALL):
         failures.append(f"control under 48 px on {where}: {b}")
+    for b in page.evaluate(OFF_SCREEN):
+        failures.append(f"control off screen on {where}: {b}")
+
+
+def narrow_pass(page, failures: list, width: int = 360, height: int = 740) -> None:
+    """The smallest phone the spec plays on: every tab again, every control 48 px and on screen."""
+    page.set_viewport_size({"width": width, "height": height})
+    time.sleep(0.2)
+    for tab in TABS:
+        page.click(f'[data-tab="{tab}"]')
+        time.sleep(0.15)
+        check_sizes(page, f"tab {tab} at {width} px", failures)
+    page.click('[data-tab="play"]')
+    page.set_viewport_size({"width": 390, "height": 844})
+    print(f"all {len(TABS)} tabs checked at {width} x {height}")
 
 
 def walk_shell(page, failures: list) -> None:
@@ -128,6 +161,11 @@ def walk_shell(page, failures: list) -> None:
     if abs(sweep) > 0.02:
         failures.append(f"filter dial did not come back to open ({sweep:.2f})")
 
+    # Buffer choice reloads and resets the song: refused while playing.
+    for h in ["interactive", "playback"]:
+        if not page.locator(f'[data-hint="{h}"]').is_disabled():
+            failures.append(f"buffer choice {h} is not disabled while playing")
+
     # Tempo: drag up on the bpm pill.
     bpm = page.evaluate(f"{SONG}.bpm")
     drag(page, "#bpm", 0, -40)
@@ -159,6 +197,28 @@ def walk_shell(page, failures: list) -> None:
     if n != 4 or page.locator('[data-col="3"]').count() != 1:
         failures.append(f"add section failed: {n} sections")
     print("section menu: rename, delete, add")
+
+    # Copy section A while B plays: B moves to index 2, and positions scheduled before the copy
+    # (carrying the old index) must still name Groove once drawn.
+    drag(page, '[data-col="3"]', 0, 0, hold=0.8)
+    page.click("#section-delete")
+    drag(page, '[data-col="0"]', 0, 0, hold=0.8)
+    page.click("#section-copy")
+    names = page.evaluate(f"{SONG}.sections.map(s => s.name)")
+    if len(names) != 4 or names[1] != names[0] + " 2":
+        failures.append(f"copy did not land right after its source: {names}")
+    bad = []
+    for _ in range(20):
+        sec = page.evaluate("window.__groovebox.position().section")
+        name = page.evaluate(f"{SONG}.sections[window.__groovebox.position().section].name")
+        if name != "Groove":
+            bad.append((sec, name))
+        time.sleep(0.03)
+    if bad:
+        failures.append(f"after a copy the playing position named another section: {bad[:3]}")
+    if "playing" not in page.inner_text('[data-strip="2"]').lower():
+        failures.append(f"section strip lost the playing section after a copy: {[page.inner_text(f'[data-strip="{i}"]') for i in range(4)]}")
+    print(f"copied section A while Groove plays: {names}")
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:
@@ -283,6 +343,7 @@ def main() -> int:
             page.evaluate(solo, None)
 
             walk_shell(page, failures)
+            narrow_pass(page, failures)
             if not page.evaluate("window.__groovebox.playing"):
                 failures.append("the transport stopped during the shell walk")
 
