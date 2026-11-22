@@ -1,0 +1,64 @@
+# How a chat runs
+
+Every build chat starts from the same two lines, which also resume a chat that stopped:
+
+```
+Clone apcanario/groovebox (shallow, push access).
+Groovebox, next bundle. Thin main chat on Sonnet 5.5; every agent a fresh Opus 5.5 agent. Read docs/RUN.md and work the next open bundle of docs/BACKLOG.md in full, unattended.
+```
+
+Pedro may add a third line starting `Notes:` with what he heard on the phone.
+
+## 1. The main chat is thin
+
+- It runs on Sonnet 5.5. It records the model it actually ran as.
+- It reads `CLAUDE.md`, this file, and the rows of the bundle in `docs/BACKLOG.md`. It does not read source files, the spec or review reports.
+- It launches agents one at a time, each a fresh Agent on model `opus`, and reads only each agent's reply (six lines at most) and the output of the scripts.
+- Scripts judge the result, not the chat: `npm run check` and `npm run smoke`.
+- If the session refuses to run the repo's scripts, stop, say so in one line and ask. Never work around it.
+- Where a choice is open, take the most reasonable reading, record it under Choices in the changelog and carry on. Ask only if blocked. Pedro vetoes afterwards; he does not confirm beforehand.
+
+## 2. Notes first
+
+Before any row, handle what is waiting:
+
+1. Pedro's `Notes:` line, if there is one.
+2. The **Carried** list at the top of `docs/BACKLOG.md`.
+
+Give both to the first builder as fixes to make before the row's own work. A note that is a matter of taste (too loud, too harsh, too busy) is a fix like any other. A note that contradicts `docs/SPEC.md` changes the spec: the builder edits the spec in the same commit and the changelog says so.
+
+## 3. One row, three agents
+
+For each row of the bundle, in order:
+
+**Builder.** Prompt it with: the row id; "read `CLAUDE.md`, `docs/SPEC.md` and row <id> in `docs/BACKLOG.md`, then build the row in full"; the notes and carried items that apply; "run `npm run check` and `npm run smoke` until both pass, commit on `main` without pushing, reply in six lines or fewer: what was built, what was left out and why".
+
+**Reviewer.** A new agent that has not seen the build. Prompt it with: the row id and the commit before the builder started; "read `CLAUDE.md`, `docs/SPEC.md` and the row, then review `git diff <base>..HEAD` against them; run `npm run check` and `npm run smoke`; write `docs/reviews/<row>.md` listing every finding as error, should-fix or minor, each with file, line and the fix; end with a verdict: pass, fix or rebuild; change no source file; reply in six lines or fewer with the verdict and the counts". The reviewer looks hardest at: anything in the row's Done-when list that is not true, spec rules broken (section 7 above all), stuck notes and clicks on parameter changes, controls smaller than 48 px, logic without tests.
+
+**Fixer.** A new agent. "Read `docs/reviews/<row>.md` and apply every finding, minor ones included; where a finding is wrong, say why in the report instead; run both scripts until they pass; commit; reply in six lines or fewer."
+
+- Verdict **rebuild:** discard the builder's commits (`git reset --hard <base>`), run a new builder with the review report as extra input, then review again. One rebuild per row. A second rebuild verdict stops the chat with a report.
+- Verdict **pass** with no findings: skip the fixer.
+
+## 4. Close the row
+
+1. The chat runs `npm run check` and `npm run smoke` itself. Both must pass.
+2. Update `docs/BACKLOG.md`: move the row to Done. Add anything found but not fixed to **Carried**, with the row it belongs to.
+3. Add the row to `docs/CHANGELOG.md`: date, row, models that ran, what changed, script results, choices taken.
+4. Commit and push `main`. Check the Pages deploy if the session can see it; if it cannot, say it is unverified.
+5. Start the next row of the bundle. Each row is pushed before the next begins.
+
+## 5. The reply
+
+One reply at the end of the chat, in this order:
+
+1. **Built:** per row, three lines at most.
+2. **Review:** verdict and counts per row, and how many findings were applied.
+3. **Choices:** each open choice taken, one line each, so Pedro can veto.
+4. **Listen for:** three to five specific things to try on the phone, each a thing he can hear or feel. This is the only test that matters.
+5. **For Pedro by hand:** only what no agent can do. Repeat every open item from the backlog's By-hand list until he says it is done.
+6. **Next:** the two starter lines in a code block.
+
+## 6. When to leave this model
+
+Building a row from the spec does not need Fable. Use a Fable chat only when the spec itself has to change shape: a new instrument, a different screen model, a new way of generating notes. That chat rewrites `docs/SPEC.md` and the backlog rows, and builds nothing.

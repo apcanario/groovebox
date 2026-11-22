@@ -1,0 +1,272 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0c;
+  --card: #131316;
+  --line: #26262d;
+  --text: #f2f2f4;
+  --dim: #8d8d99;
+  --coral: #ff6b6b;
+  --orange: #f4a261;
+  --body: "DM Sans", system-ui, sans-serif;
+  --mono: "Space Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 14px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* transport */
+.top {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.play {
+  width: 72px;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--coral);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.play i {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 20px solid var(--bg);
+  border-top: 13px solid transparent;
+  border-bottom: 13px solid transparent;
+  margin-left: 5px;
+}
+.play.on i {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: var(--bg);
+  border-radius: 3px;
+  margin: 0;
+}
+.play:disabled {
+  opacity: 0.5;
+}
+.pill {
+  flex: 1;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: center;
+}
+.pill > div {
+  flex: 1;
+}
+.pill b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1.1;
+}
+.pill span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.pill button {
+  width: 48px;
+  height: 64px;
+  font-size: 26px;
+  color: var(--dim);
+}
+.pill.meter {
+  flex: none;
+  width: 76px;
+}
+
+/* layers */
+.layers {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.layer {
+  height: 60px;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background 0.06s;
+}
+.layer.on {
+  background: var(--c);
+  color: var(--bg);
+}
+
+/* xy pad */
+.xy {
+  --x: 60%;
+  --y: 80%;
+  position: relative;
+  height: 240px;
+  border-radius: 14px;
+  background: var(--card);
+  overflow: hidden;
+  touch-action: none;
+}
+.xy .hx,
+.xy .hy {
+  position: absolute;
+  background: var(--orange);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.xy .hx {
+  left: 0;
+  right: 0;
+  top: var(--y);
+  height: 2px;
+}
+.xy .hy {
+  top: 0;
+  bottom: 0;
+  left: var(--x);
+  width: 2px;
+}
+.xy .dot {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: 50%;
+  background: var(--orange);
+  pointer-events: none;
+}
+.xy .lx,
+.xy .ly {
+  position: absolute;
+  left: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--orange);
+  pointer-events: none;
+}
+.xy .lx {
+  bottom: 9px;
+}
+.xy .ly {
+  top: 10px;
+}
+
+/* pump slider */
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0 14px;
+  height: 56px;
+}
+.slider span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #2a9d8f;
+}
+.slider input {
+  flex: 1;
+  height: 40px;
+  accent-color: #2a9d8f;
+}
+
+/* diagnostics */
+.diag {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 6px 14px;
+}
+.diag div {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.diag div:first-child {
+  border-top: 0;
+}
+.diag span {
+  color: var(--dim);
+}
+.diag b {
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.hints {
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+.hints a {
+  color: var(--text);
+}

@@ -1,0 +1,22 @@
+{
+  "name": "groovebox",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "tsc --noEmit && vite build --mode single --outDir dist-single",
+    "preview": "vite preview",
+    "check": "tsc --noEmit && vite build",
+    "smoke": "vite build && python3 tools/smoke.py dist"
+  },
+  "dependencies": {
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}
