@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "preact": "^10.29.8",
     "tone": "^15.1.22"
   },
   "devDependencies": {

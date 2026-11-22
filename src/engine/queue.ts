@@ -52,6 +52,16 @@ export class SwitchQueue {
     return out;
   }
 
+  /** Re-index after sections were inserted or removed; entries mapped to null are dropped. */
+  remap(fn: (i: number) => number | null): void {
+    this.section = this.section === null ? null : fn(this.section);
+    const kept = [...this.toggles.values()]
+      .map((t) => ({ section: fn(t.section), instrument: t.instrument }))
+      .filter((t): t is PendingToggle => t.section !== null);
+    this.toggles.clear();
+    for (const t of kept) this.toggles.set(`${t.section}:${t.instrument}`, t);
+  }
+
   clear(): void {
     this.flush();
   }

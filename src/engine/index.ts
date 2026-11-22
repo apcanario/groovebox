@@ -17,9 +17,13 @@ import {
   type Patch,
   type Song,
   type Wave,
+  type ChordStep,
 } from "./song.ts";
+import type { KeyName, Mood } from "../music/scales.ts";
 
 export * from "./song.ts";
+export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
+export { degreeChords, type Chord } from "../music/chords.ts";
 export type { Pending, PendingToggle } from "./queue.ts";
 export type { MixState } from "./audio.ts";
 
@@ -42,6 +46,9 @@ export class Engine {
   private graph: Graph | null = null;
   private seq: Sequencer;
   private listeners = new Set<(p: Position) => void>();
+  private changeListeners = new Set<() => void>();
+  /** Bumped when sections are inserted or removed: positions scheduled before then carry stale indexes. */
+  private layoutGen = 0;
   private pos: Position = { playing: false, section: 0, bar: 0, step: 0 };
   private mix: MixState = { sweep: 0, pump: 0.6, saturation: 0 };
   /** Every bar line at which queued switches landed, newest last (kept short). */
@@ -86,6 +93,7 @@ export class Engine {
       Tone.getTransport().bpm.rampTo(song.bpm, 0.1);
     }
     this.emit({ ...this.pos, section: this.seq.section });
+    this.changed(true);
   }
 
   play(): void {
@@ -117,22 +125,26 @@ export class Engine {
     const patch = this.seq.song.patches[inst];
     patch[key] = v;
     this.graph?.instruments[inst].set(key, v as number | Wave, patch);
+    this.changed();
   }
 
   setMix(key: keyof MixState, value: number): void {
     this.mix[key] = value;
     this.graph?.setMix(key, value);
+    this.changed();
   }
 
   /** Lands on the next bar line while playing; tapping it again before then cancels it. */
   switchSection(index: number): void {
     this.seq.switchSection(index);
     if (!this.seq.isRunning) this.emit({ ...this.pos, section: this.seq.section });
+    this.changed();
   }
 
   /** For the playing section, lands on the next bar line; other sections change at once. */
   toggleInstrument(section: number, inst: InstrumentId): void {
     this.seq.toggleInstrument(section, inst);
+    this.changed();
   }
 
   /**
@@ -141,6 +153,63 @@ export class Engine {
    */
   toggleInstrumentInPlaying(inst: InstrumentId): void {
     this.seq.toggleInstrument(this.seq.section, inst);
+    this.changed();
+  }
+
+  /** Change key and mood at once; held chords and pads restart on the new chord. */
+  setKeyMood(key: KeyName, mood: Mood): void {
+    this.seq.setKeyMood(key, mood);
+    this.changed();
+  }
+
+  /** Replace a section's chord sequence (1..8 chords). Acts at once. Returns false if refused. */
+  setChords(section: number, chords: ChordStep[]): boolean {
+    const ok = this.seq.setChords(section, chords);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  renameSection(index: number, name: string): boolean {
+    const ok = this.seq.renameSection(index, name);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Append a section (at most four). Returns its index, or -1. */
+  addSection(): number {
+    const i = this.seq.addSection();
+    if (i >= 0) this.changed(true);
+    return i;
+  }
+
+  /** Insert a copy right after a section (at most four). Returns the copy's index, or -1. */
+  copySection(index: number): number {
+    const i = this.seq.copySection(index);
+    if (i >= 0) this.changed(true);
+    return i;
+  }
+
+  /** Delete a section; refused for the last one and for the one playing now. */
+  deleteSection(index: number): boolean {
+    const ok = this.seq.deleteSection(index);
+    if (ok) this.changed(true);
+    return ok;
+  }
+
+  /** The current mix settings (a copy). */
+  getMix(): MixState {
+    return { ...this.mix };
+  }
+
+  /** The filter frequency in Hz that a cutoff value gives on an instrument; null before audio starts. */
+  cutoffHz(inst: InstrumentId, x: number): number | null {
+    return this.graph ? this.graph.instruments[inst].channel.cutoffHz(x) : null;
+  }
+
+  /** Called after the song changed outside the transport (edits from the UI). */
+  onChange(fn: () => void): () => void {
+    this.changeListeners.add(fn);
+    return () => this.changeListeners.delete(fn);
   }
 
   /** Which instruments are on in a section (a copy; cheap enough to call per step). */
@@ -172,6 +241,7 @@ export class Engine {
     const bpm = Math.max(80, Math.min(180, Math.round(v)));
     this.seq.song.bpm = bpm;
     if (this.graph) Tone.getTransport().bpm.rampTo(bpm, 0.05);
+    this.changed();
   }
 
   // ---- Diagnostics and test hooks ------------------------------------------------
@@ -221,8 +291,9 @@ export class Engine {
     const r: StepResult = this.seq.next();
     const sixteenth = 60 / Tone.getTransport().bpm.value / 4;
     for (const id of r.stopped) g.instruments[id].releaseAll(time);
-    // A new section starts its own chords: held chords and pads of the old one let go (with their release).
-    if (r.applied && r.applied.section !== null) {
+    // A new section starts its own chords, and a key, mood or chord edit restarts them: held chords
+    // and pads let go (with their release).
+    if (r.retrigger || (r.applied && r.applied.section !== null)) {
       for (const id of ["synth", "layer1", "layer2"] as const) g.instruments[id].releaseAll(time);
     }
     for (const e of r.events) {
@@ -250,7 +321,18 @@ export class Engine {
       if (this.landed.length > 16) this.landed.shift();
     }
     const p: Position = { playing: true, section: r.section, bar: r.bar, step: r.step };
-    Tone.getDraw().schedule(() => this.emit(p), time);
+    const gen = this.layoutGen;
+    Tone.getDraw().schedule(() => this.emit(gen === this.layoutGen ? p : { ...p, section: this.seq.section }), time);
+  }
+
+  /** Tell listeners the song changed; when sections moved, the position's index may have too. */
+  private changed(reindexed = false): void {
+    if (reindexed) {
+      // Sections were inserted or removed: the scheduler's section is now the reference index.
+      this.layoutGen++;
+      this.pos = { ...this.pos, section: this.seq.section };
+    }
+    for (const fn of this.changeListeners) fn();
   }
 
   private emit(p: Position): void {

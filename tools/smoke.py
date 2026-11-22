@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar.
+"""Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar,
+then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials, section menu) with no page error
+and no control under 48 px.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -14,6 +16,149 @@ from playwright.sync_api import sync_playwright
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
+TABS = ["play", "chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
+
+# Every visible control, with its size; anything under 48 px on either side is a failure.
+SMALL = """() => {
+  const bad = [];
+  for (const el of document.querySelectorAll('button, a, input, [role=slider], [role=switch], [role=group]')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;
+    if (r.width < 47.5 || r.height < 47.5)
+      bad.push(`${el.tagName.toLowerCase()}.${el.className} ${JSON.stringify(el.dataset)} ${r.width.toFixed(0)}x${r.height.toFixed(0)}`);
+  }
+  return bad;
+}"""
+
+SONG = "window.__groovebox.getSong()"
+
+
+def drag(page, selector: str, dx: float, dy: float, hold: float = 0.0) -> None:
+    """Press in the middle of an element, move by (dx, dy) in steps, release."""
+    box = page.locator(selector).bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    if hold:
+        time.sleep(hold)
+    for i in range(1, 11):
+        page.mouse.move(x + dx * i / 10, y + dy * i / 10)
+    page.mouse.up()
+
+
+def check_sizes(page, where: str, failures: list) -> None:
+    for b in page.evaluate(SMALL):
+        failures.append(f"control under 48 px on {where}: {b}")
+
+
+def walk_shell(page, failures: list) -> None:
+    """The G2 shell, played with the mouse as one thumb would, while the transport runs."""
+    for tab in TABS:
+        page.click(f'[data-tab="{tab}"]')
+        time.sleep(0.15)
+        if not page.locator(".body section").count():
+            failures.append(f"tab {tab} shows nothing")
+        check_sizes(page, f"tab {tab}", failures)
+    print(f"opened all {len(TABS)} tabs")
+
+    # Chords, following the playing section (B): add a chord, replace one, change length, move, remove.
+    playing = page.evaluate("window.__groovebox.position().section")
+    page.click('[data-tab="chords"]')
+    before = page.evaluate(f"{SONG}.sections[{playing}].chords")
+    page.click('[data-degree="3"]')
+    after = page.evaluate(f"{SONG}.sections[{playing}].chords")
+    if len(after) != len(before) + 1 or after[-1]["degree"] != 3:
+        failures.append(f"adding a chord failed: {before} -> {after}")
+    page.click('[data-seq="0"]')
+    check_sizes(page, "chords with a chord selected", failures)
+    page.click('[data-degree="4"]')
+    page.click("#chord-length")
+    seq = page.evaluate(f"{SONG}.sections[{playing}].chords")
+    if seq[0] != {"degree": 4, "bars": 2}:
+        failures.append(f"replacing a chord or its length failed: {seq[0]}")
+    page.click("#chord-right")
+    page.click("#chord-remove")
+    seq2 = page.evaluate(f"{SONG}.sections[{playing}].chords")
+    if len(seq2) != len(seq) - 1 or seq2[0] != seq[1]:
+        failures.append(f"move and remove failed: {seq} -> {seq2}")
+    page.click('[data-mood="deep"]')
+    page.click('[data-key="D"]')
+    song = page.evaluate(SONG)
+    if song["mood"] != "deep" or song["key"] != "D":
+        failures.append("mood or key did not change")
+    page.click('[data-mood="house"]')
+    page.click('[data-key="A"]')
+    print(f"chords edited in section {playing}: {[c['degree'] for c in seq2]}")
+
+    # Section strip: edit section C silently while B plays.
+    page.click('[data-strip="2"]')
+    head = page.inner_text(".chordtab .head")
+    if "Break" not in head:
+        failures.append(f"strip did not select section C for editing: {head!r}")
+    page.click('[data-degree="1"]')
+    if page.evaluate(f"{SONG}.sections[2].chords.slice(-1)[0].degree") != 1:
+        failures.append("chord edit did not reach the edited section")
+    if page.evaluate("window.__groovebox.position().section") != playing:
+        failures.append("editing another section changed the playing one")
+
+    # Instrument tab on the edited (not playing) section: on/off acts at once; the XY pad moves the filter.
+    page.click('[data-tab="synth"]')
+    was = page.evaluate(f"{SONG}.sections[2].on.synth")
+    page.click('[data-toggle="synth"]')
+    if page.evaluate(f"{SONG}.sections[2].on.synth") == was:
+        failures.append("instrument toggle on a silent section did not act at once")
+    page.click('[data-toggle="synth"]')
+    cut = page.evaluate(f"{SONG}.patches.synth.cutoff")
+    drag(page, '[data-xy="synth"]', -80, 40)
+    p = page.evaluate(f"{SONG}.patches.synth")
+    if abs(p["cutoff"] - cut) < 0.05:
+        failures.append("XY pad did not move the synth cutoff")
+    drag(page, '[data-send="reverb"]', 30, 0)
+    print(f"synth cutoff {cut:.2f} -> {p['cutoff']:.2f}, resonance {p['resonance']:.2f}")
+    page.click('[data-strip="1"]')  # back to following
+
+    # Mix dial: vertical drag.
+    page.click('[data-tab="mix"]')
+    drag(page, '[data-dial="sweep"]', 0, 60)
+    sweep = page.evaluate("window.__groovebox.getMix().sweep")
+    if sweep > -0.2:
+        failures.append(f"dragging the filter dial down did not sweep low-pass ({sweep:.2f})")
+    drag(page, '[data-dial="sweep"]', 0, -60)
+    sweep = page.evaluate("window.__groovebox.getMix().sweep")
+    if abs(sweep) > 0.02:
+        failures.append(f"filter dial did not come back to open ({sweep:.2f})")
+
+    # Tempo: drag up on the bpm pill.
+    bpm = page.evaluate(f"{SONG}.bpm")
+    drag(page, "#bpm", 0, -40)
+    bpm2 = page.evaluate(f"{SONG}.bpm")
+    if bpm2 <= bpm:
+        failures.append(f"bpm drag did nothing ({bpm} -> {bpm2})")
+    drag(page, "#bpm", 0, 40)
+
+    # Section menu: long-press a column header, rename, delete, add back.
+    page.click('[data-tab="play"]')
+    drag(page, '[data-col="3"]', 0, 0, hold=0.8)
+    if not page.locator("#section-name").count():
+        failures.append("long-press on a column header did not open the section menu")
+        return
+    check_sizes(page, "section menu", failures)
+    page.fill("#section-name", "Drop")
+    page.click("#section-rename")
+    if page.evaluate(f"{SONG}.sections[3].name") != "Drop":
+        failures.append("rename failed")
+    if page.evaluate("window.__groovebox.pending().section") is not None:
+        failures.append("a long-press also switched section")
+    drag(page, '[data-col="3"]', 0, 0, hold=0.8)
+    page.click("#section-delete")
+    n = page.evaluate(f"{SONG}.sections.length")
+    if n != 3:
+        failures.append(f"delete failed: {n} sections")
+    page.click("#add-section")
+    n = page.evaluate(f"{SONG}.sections.length")
+    if n != 4 or page.locator('[data-col="3"]').count() != 1:
+        failures.append(f"add section failed: {n} sections")
+    print("section menu: rename, delete, add")
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:
@@ -56,7 +201,9 @@ def main() -> int:
             time.sleep(0.5)
 
             # Section B (Groove) has every instrument on. The switch waits for the bar line.
-            page.click('[data-section="1"]')
+            page.click('[data-col="1"]')
+            if "pending" not in (page.get_attribute('[data-col="1"]', "class") or ""):
+                failures.append("queued section is not shown as pending")
             if page.evaluate("window.__groovebox.pending().section") != 1:
                 failures.append("section switch was not queued")
             if not wait_for(page, "window.__groovebox.position().section === 1", 4.0):
@@ -68,8 +215,10 @@ def main() -> int:
             # Three toggles tapped inside one bar land on the same bar line.
             wait_for(page, "window.__groovebox.position().step === 1", 3.0)
             for inst in ["bass", "synth", "layer1"]:
-                page.click(f'[data-inst="{inst}"]')
+                page.click(f'[data-cell="1:{inst}"]')
                 time.sleep(0.05)
+            if "pending" not in (page.get_attribute('[data-cell="1:bass"]', "class") or ""):
+                failures.append("queued toggle is not shown as pending")
             n = page.evaluate("window.__groovebox.pending().toggles.length")
             if n != 3:
                 failures.append(f"expected 3 pending toggles, got {n}")
@@ -85,7 +234,7 @@ def main() -> int:
             print(f"three toggles landed together on bar {last['bar'] + 1 if last else '?'}")
             # Turn them back on for the solos.
             for inst in ["bass", "synth", "layer1"]:
-                page.click(f'[data-inst="{inst}"]')
+                page.click(f'[data-cell="1:{inst}"]')
             wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
 
             levels = []
@@ -132,6 +281,10 @@ def main() -> int:
                 if peak < -60:
                     failures.append(f"layer {layer} is silent ({peak:.1f} dB)")
             page.evaluate(solo, None)
+
+            walk_shell(page, failures)
+            if not page.evaluate("window.__groovebox.playing"):
+                failures.append("the transport stopped during the shell walk")
 
             if shot:
                 page.screenshot(path=shot)

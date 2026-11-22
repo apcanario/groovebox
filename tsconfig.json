@@ -9,6 +9,8 @@
     "noUnusedParameters": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
     "types": ["vite/client"]
   },
   "include": ["src", "vite.config.ts"]

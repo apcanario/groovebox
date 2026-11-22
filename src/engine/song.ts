@@ -124,6 +124,26 @@ export interface Song {
 }
 
 export const LIMITS = { bpm: [80, 180], sections: [1, 4], chords: [1, 8] } as const;
+export const CHORD_LENGTHS = [0.5, 1, 2] as const;
+export const MAX_SECTION_NAME = 12;
+
+/** A chord sequence the engine accepts: 1..8 chords, degrees 0..6, lengths of half, one or two bars. */
+export function validChords(chords: unknown): chords is ChordStep[] {
+  return (
+    Array.isArray(chords) &&
+    chords.length >= LIMITS.chords[0] &&
+    chords.length <= LIMITS.chords[1] &&
+    chords.every(
+      (c) =>
+        typeof c === "object" &&
+        c !== null &&
+        Number.isInteger(c.degree) &&
+        c.degree >= 0 &&
+        c.degree <= 6 &&
+        (CHORD_LENGTHS as readonly unknown[]).includes(c.bars),
+    )
+  );
+}
 
 // ---- Defaults ----------------------------------------------------------------
 
@@ -183,6 +203,11 @@ function section(
     layer1: defaultLayerPattern(l1, seed),
     layer2: defaultLayerPattern("pad", seed + 1),
   };
+}
+
+/** A new section: one bar of the tonic; drums, bass and synth on; Layer 1 generative, Layer 2 pad. */
+export function newSection(name: string, seed: number): Section {
+  return section(name, [true, true, true, false, false], [{ degree: 0, bars: 1 }], "fourFloor", "offbeat", "generative", seed);
 }
 
 /** The four-section default: A minor, mood House, 122 bpm. i9 VImaj9 iv9 v7. */

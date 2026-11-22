@@ -328,3 +328,103 @@ describe("sequencer", () => {
     expect(pad.len).toBe(16);
   });
 });
+
+describe("editing from the UI (G2)", () => {
+  it("a key or mood change acts on the next step and restarts held chords in the new key", () => {
+    const song = defaultSong();
+    song.sections[1].synth.rhythm = "sustained";
+    const seq = new Sequencer(song);
+    seq.switchSection(1);
+    seq.start();
+    run(seq, 5);
+    seq.setKeyMood("D", "deep");
+    const r = seq.next();
+    expect(r.retrigger).toBe(true);
+    const synth = r.events.find((e) => e.inst === "synth") as { notes: number[] } | undefined;
+    expect(synth).toBeDefined();
+    for (const n of synth!.notes) expect(inScale(n, "D", "deep")).toBe(true);
+    const pad = r.events.find((e) => e.inst === "layer2") as { notes: number[] } | undefined;
+    expect(pad).toBeDefined();
+    expect(seq.next().retrigger).toBe(false);
+  });
+
+  it("chord edits are validated and restart only the playing section's chords", () => {
+    const seq = new Sequencer(defaultSong());
+    seq.switchSection(1);
+    seq.start();
+    run(seq, 3);
+    expect(seq.setChords(1, [])).toBe(false);
+    expect(seq.setChords(1, Array.from({ length: 9 }, () => ({ degree: 0, bars: 1 as const })))).toBe(false);
+    expect(seq.setChords(1, [{ degree: 7, bars: 1 }])).toBe(false);
+    expect(seq.setChords(1, [{ degree: 2, bars: 3 as unknown as 1 }])).toBe(false);
+    expect(seq.setChords(2, [{ degree: 2, bars: 1 }])).toBe(true);
+    expect(seq.next().retrigger).toBe(false);
+    expect(seq.setChords(1, [{ degree: 3, bars: 2 }, { degree: 4, bars: 0.5 }])).toBe(true);
+    expect(seq.next().retrigger).toBe(true);
+    expect(seq.song.sections[1].chords).toEqual([{ degree: 3, bars: 2 }, { degree: 4, bars: 0.5 }]);
+    expect(validateSong(seq.song)).toEqual([]);
+  });
+
+  it("rename refuses blank names and trims long ones", () => {
+    const seq = new Sequencer(defaultSong());
+    expect(seq.renameSection(0, "   ")).toBe(false);
+    expect(seq.renameSection(0, "  Drop  ")).toBe(true);
+    expect(seq.song.sections[0].name).toBe("Drop");
+    seq.renameSection(1, "A very long section name");
+    expect(seq.song.sections[1].name.length).toBeLessThanOrEqual(12);
+  });
+
+  it("add and copy stop at four sections; a copy lands right after its source", () => {
+    const song = defaultSong();
+    song.sections = song.sections.slice(0, 2);
+    const seq = new Sequencer(song);
+    expect(seq.copySection(0)).toBe(1);
+    expect(seq.song.sections.map((s) => s.name)).toEqual(["Intro", "Intro 2", "Groove"]);
+    expect(seq.addSection()).toBe(3);
+    expect(seq.addSection()).toBe(-1);
+    expect(seq.copySection(0)).toBe(-1);
+    expect(validateSong(seq.song)).toEqual([]);
+    const seeds = seq.song.sections[3];
+    expect(seeds.layer1.gen.seed).toBeGreaterThan(102); // above every seed in use
+  });
+
+  it("a copy before the playing section keeps the same section playing and its queued switches", () => {
+    const song = defaultSong();
+    song.sections.pop();
+    const seq = new Sequencer(song);
+    seq.switchSection(2);
+    seq.start();
+    run(seq, 2);
+    seq.switchSection(1);
+    seq.toggleInstrument(2, "bass");
+    expect(seq.copySection(0)).toBe(1);
+    expect(seq.section).toBe(3);
+    expect(seq.pending()).toEqual({ section: 2, toggles: [{ section: 3, instrument: "bass" }] });
+    run(seq, 14);
+    const line = seq.next();
+    expect(line.section).toBe(2);
+    expect(seq.song.sections[3].on.bass).toBe(true); // Break had bass off
+  });
+
+  it("delete refuses the last section and the playing one, and drops switches queued to it", () => {
+    const seq = new Sequencer(defaultSong());
+    seq.switchSection(1);
+    seq.start();
+    run(seq, 2);
+    expect(seq.deleteSection(1)).toBe(false);
+    seq.switchSection(3);
+    expect(seq.deleteSection(3)).toBe(true);
+    expect(seq.pending().section).toBe(null);
+    seq.switchSection(2);
+    expect(seq.deleteSection(0)).toBe(true);
+    expect(seq.section).toBe(0);
+    expect(seq.pending().section).toBe(1);
+    expect(seq.song.sections.map((s) => s.name)).toEqual(["Groove", "Break"]);
+    run(seq, 14);
+    expect(seq.next().section).toBe(1);
+    seq.stop();
+    expect(seq.deleteSection(1)).toBe(true);
+    expect(seq.section).toBe(0);
+    expect(seq.deleteSection(0)).toBe(false);
+  });
+});

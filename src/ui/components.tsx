@@ -1,0 +1,287 @@
+/** Reusable controls: Dial, XYPad, SendBar, Toggle, and the drag and long-press hooks. No hover states. */
+import type { ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
+import { dragValue, fraction } from "./logic.ts";
+
+type PE = PointerEvent & { currentTarget: HTMLElement };
+
+/**
+ * Vertical drag from anywhere on an element: up raises, down lowers. Returns the pointer handlers.
+ * The value is read at the start of each drag, so the control stays in sync with outside changes.
+ */
+export function useVerticalDrag(
+  value: number,
+  min: number,
+  max: number,
+  onChange: (v: number) => void,
+  step = 0,
+  span?: number,
+): {
+  onPointerDown: (e: PE) => void;
+  onPointerMove: (e: PE) => void;
+  onPointerUp: (e: PE) => void;
+  onPointerCancel: (e: PE) => void;
+} {
+  const drag = useRef<{ id: number; y: number; start: number; last: number } | null>(null);
+  return {
+    onPointerDown(e) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      drag.current = { id: e.pointerId, y: e.clientY, start: value, last: value };
+    },
+    onPointerMove(e) {
+      const d = drag.current;
+      if (!d || d.id !== e.pointerId) return;
+      const v = dragValue(d.start, e.clientY - d.y, min, max, step, span);
+      if (v !== d.last) {
+        d.last = v;
+        onChange(v);
+      }
+    },
+    onPointerUp() {
+      drag.current = null;
+    },
+    onPointerCancel() {
+      drag.current = null;
+    },
+  };
+}
+
+/**
+ * Long-press (500 ms, finger held still) on an element; a short tap calls `onTap`. A press that
+ * fired the long action does not also tap.
+ */
+export function useLongPress(onTap: () => void, onLong: () => void, ms = 500) {
+  const timer = useRef<number | null>(null);
+  const fired = useRef(false);
+  const origin = useRef<[number, number]>([0, 0]);
+  const clear = (): void => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+  return {
+    onPointerDown(e: PointerEvent) {
+      fired.current = false;
+      origin.current = [e.clientX, e.clientY];
+      clear();
+      timer.current = window.setTimeout(() => {
+        fired.current = true;
+        timer.current = null;
+        onLong();
+      }, ms);
+    },
+    onPointerMove(e: PointerEvent) {
+      const [x, y] = origin.current;
+      if (Math.hypot(e.clientX - x, e.clientY - y) > 12) clear();
+    },
+    onPointerUp: clear,
+    onPointerCancel: clear,
+    onPointerLeave: clear,
+    onClick() {
+      if (fired.current) {
+        fired.current = false;
+        return;
+      }
+      clear();
+      onTap();
+    },
+    onContextMenu(e: Event) {
+      e.preventDefault();
+    },
+  };
+}
+
+// ---- Dial -------------------------------------------------------------------------
+
+const R = 32;
+const pt = (a: number): [number, number] => [39 + R * Math.cos((a * Math.PI) / 180), 39 + R * Math.sin((a * Math.PI) / 180)];
+function arc(a0: number, a1: number): string {
+  const [x0, y0] = pt(a0);
+  const [x1, y1] = pt(a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+
+export interface DialProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  /** Text in the middle; defaults to the value as 0..100. */
+  display?: string;
+  color: string;
+  onChange: (v: number) => void;
+  /** Draw the arc from the middle (for bipolar values such as the filter sweep). */
+  bipolar?: boolean;
+  id?: string;
+}
+
+/** A large dial turned by dragging up and down from anywhere on it, never by tracing a circle. */
+export function Dial({ label, value, min, max, step = 0, display, color, onChange, bipolar, id }: DialProps) {
+  const drag = useVerticalDrag(value, min, max, onChange, step);
+  const f = fraction(value, min, max);
+  const end = 135 + 270 * f;
+  const from = bipolar ? Math.min(270, end) : 135;
+  const to = bipolar ? Math.max(270, end) : end;
+  const text = display ?? String(Math.round(f * 100));
+  return (
+    <div
+      class="dial"
+      role="slider"
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={text}
+      data-dial={id ?? label.toLowerCase()}
+      {...drag}
+    >
+      <svg viewBox="0 0 78 78" aria-hidden="true">
+        <path d={arc(135, 405)} class="track" />
+        {to - from > 0.5 && <path d={arc(from, to)} style={{ stroke: color }} class="arc" />}
+      </svg>
+      <div class="val">{text}</div>
+      <label style={{ color }}>{label}</label>
+    </div>
+  );
+}
+
+// ---- XY pad -------------------------------------------------------------------------
+
+export interface XYPadProps {
+  x: number;
+  y: number;
+  onChange: (x: number, y: number) => void;
+  xLabel: string;
+  yLabel: string;
+  readout?: string;
+  id?: string;
+}
+
+/** Filter cutoff (x) and resonance (y), both 0..1. Acts at once while the finger moves. */
+export function XYPad({ x, y, onChange, xLabel, yLabel, readout, id }: XYPadProps) {
+  const active = useRef<number | null>(null);
+  const move = (e: PE): void => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const nx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    const ny = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height));
+    onChange(nx, ny);
+  };
+  return (
+    <div
+      class="xy"
+      data-xy={id}
+      role="group"
+      aria-label={`${xLabel} and ${yLabel}`}
+      style={{ "--x": `${x * 100}%`, "--y": `${(1 - y) * 100}%` }}
+      onPointerDown={(e: PE) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        active.current = e.pointerId;
+        move(e);
+      }}
+      onPointerMove={(e: PE) => {
+        if (active.current === e.pointerId) move(e);
+      }}
+      onPointerUp={() => (active.current = null)}
+      onPointerCancel={() => (active.current = null)}
+    >
+      <div class="gx" style={{ top: "33.3%" }} />
+      <div class="gx" style={{ top: "66.6%" }} />
+      <div class="gy" style={{ left: "25%" }} />
+      <div class="gy" style={{ left: "50%" }} />
+      <div class="gy" style={{ left: "75%" }} />
+      <div class="hx" />
+      <div class="hy" />
+      <div class="dot" />
+      <div class="ly">{yLabel} ↑</div>
+      <div class="lx">{xLabel} →</div>
+      {readout && <div class="rv">{readout}</div>}
+    </div>
+  );
+}
+
+// ---- Send bar -------------------------------------------------------------------------
+
+export interface SendBarProps {
+  label: string;
+  value: number; // 0..1
+  color: string;
+  onChange: (v: number) => void;
+  id?: string;
+}
+
+/** A horizontal amount: touch or drag anywhere on the bar to set it. */
+export function SendBar({ label, value, color, onChange, id }: SendBarProps) {
+  const active = useRef<number | null>(null);
+  const set = (e: PE): void => {
+    const r = e.currentTarget.getBoundingClientRect();
+    onChange(Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 100) / 100);
+  };
+  return (
+    <div
+      class="send"
+      role="slider"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value * 100)}
+      data-send={id ?? label.toLowerCase()}
+      onPointerDown={(e: PE) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        active.current = e.pointerId;
+        set(e);
+      }}
+      onPointerMove={(e: PE) => {
+        if (active.current === e.pointerId) set(e);
+      }}
+      onPointerUp={() => (active.current = null)}
+      onPointerCancel={() => (active.current = null)}
+    >
+      <div class="fill" style={{ width: `${value * 100}%`, background: color }} />
+      <span>{label}</span>
+      <b>{Math.round(value * 100)}</b>
+    </div>
+  );
+}
+
+// ---- Toggle ---------------------------------------------------------------------------
+
+export function Toggle({
+  on,
+  pending,
+  color,
+  label,
+  onToggle,
+  id,
+}: {
+  on: boolean;
+  pending: boolean;
+  color: string;
+  label: string;
+  onToggle: () => void;
+  id?: string;
+}) {
+  return (
+    <button
+      class={`tog${on ? " on" : ""}${pending ? " pending" : ""}`}
+      style={{ "--c": color }}
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      data-toggle={id}
+      onClick={onToggle}
+    >
+      <i />
+    </button>
+  );
+}
+
+/** A bottom sheet over the screen; tapping the shade closes it. */
+export function Sheet({ children, onClose }: { children: ComponentChildren; onClose: () => void }) {
+  return (
+    <div class="shade" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div class="sheet" role="dialog">
+        {children}
+      </div>
+    </div>
+  );
+}
