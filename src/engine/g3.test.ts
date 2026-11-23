@@ -7,10 +7,12 @@ import {
   DRUM_PRESETS,
   DRUM_VOICES,
   SYNTH_PRESETS,
+  SEQ_VELOCITY,
   eighthOn,
+  nextHitGap,
   toggleEighth,
 } from "../music/presets.ts";
-import { drumDecay, envDepthHz, glideSeconds, kickHz, sixteenthSeconds, detuneCents, subGain, drumLevel } from "../music/sound.ts";
+import { DRUM_RELEASE, drumDecay, envDepthHz, glideSeconds, kickHz, sixteenthSeconds, detuneCents, subGain, drumLevel } from "../music/sound.ts";
 import { Sequencer, type StepResult } from "./sequencer.ts";
 import { PATCH_KEYS, defaultPatch, defaultSong, sectionDrumGrid, validateSong, INSTRUMENTS } from "./song.ts";
 
@@ -48,26 +50,48 @@ describe("sound mappings", () => {
   });
   it("amount mappings are clamped and hit their defaults", () => {
     expect(detuneCents(2)).toBe(60);
-    expect(subGain(0.75)).toBeCloseTo(0.9);
-    expect(drumLevel(0.75)).toBe(1);
+    // Levels default to the top of their dial: the C1 trims and the G1 sub level are the ceiling.
+    expect(subGain(defaultPatch("bass").sub)).toBeCloseTo(0.9);
+    expect(subGain(2)).toBeCloseTo(0.9);
+    for (const v of DRUM_VOICES) expect(drumLevel(defaultPatch("drums")[`${v}Level`])).toBe(1);
+    expect(drumLevel(2)).toBe(1);
     expect(drumLevel(-1)).toBe(0);
   });
 });
 
 describe("presets at 118 to 128 and 170 to 176 bpm", () => {
-  it("every drum voice's tail ends before its next hit, in every preset, at every tempo", () => {
+  it("every drum voice's tail ends before its next hit, in every preset, at every tempo and decay", () => {
     for (const bpm of TEMPOS) {
       const step = sixteenthSeconds(bpm);
       for (const p of DRUM_PRESETS) {
+        const { grid, swing } = DRUM_PATTERNS[p];
+        const at = (k: number): number => k + (k % 2 === 1 ? swing : 0);
         for (const v of DRUM_VOICES) {
-          const hits = DRUM_PATTERNS[p].grid[v].flatMap((x, i) => (x > 0 ? [i] : []));
+          const hits = grid[v].flatMap((x, i) => (x > 0 ? [i] : []));
           for (let i = 0; i < hits.length; i++) {
-            const gap = ((hits[(i + 1) % hits.length] - hits[i] + 16) % 16 || 16) * step;
-            expect(drumDecay(v, 0.5, bpm), `${p} ${v} at ${bpm}`).toBeLessThan(gap);
+            const next = hits[(i + 1) % hits.length];
+            // Independent of nextHitGap: the next hit's swung time, a bar later if it wraps.
+            const gap = at(next) + (next <= hits[i] ? 16 : 0) - at(hits[i]);
+            expect(nextHitGap(grid[v], hits[i], swing), `${p} ${v} step ${hits[i]}`).toBeCloseTo(gap);
+            for (const amount of [0, 0.5, 1]) {
+              const tail = drumDecay(v, amount, bpm, gap) + DRUM_RELEASE[v];
+              expect(tail, `${p} ${v} step ${hits[i]} decay ${amount} at ${bpm}`).toBeLessThan(gap * step);
+            }
           }
         }
       }
     }
+  });
+  it("the sequencer gives each drum hit the gap to that voice's next hit", () => {
+    const song = defaultSong();
+    for (const s of song.sections) s.drums = { preset: "twoStep" };
+    const bar = run(new Sequencer(song), 16);
+    const kicks = bar.flatMap((r) => r.events.flatMap((e) => (e.inst === "drums" && e.voice === "kick" ? [e.gap] : [])));
+    const swing = DRUM_PATTERNS.twoStep.swing;
+    // Kicks on 0, 7 (swung) and 10: gaps 7 + swing, 3 - swing, then 6 to the next bar's downbeat.
+    expect(kicks[0]).toBeCloseTo(7 + swing);
+    expect(kicks[1]).toBeCloseTo(3 - swing);
+    expect(kicks[2]).toBeCloseTo(6);
   });
   it("the mono bass never holds a note into its next hit, and glide fits every note", () => {
     for (const p of BASS_PRESETS) {
@@ -109,6 +133,29 @@ describe("drum sequencer", () => {
     expect(toggleEighth(row, 2, 0.9)[4]).toBe(0.9);
     expect(toggleEighth(row, 8, 1)).toEqual(row);
     expect(row[1]).toBe(0.3); // not mutated
+  });
+  it("a step switched off and on again plays its preset's sixteenth, offbeats included", () => {
+    for (const p of DRUM_PRESETS) {
+      for (const v of DRUM_VOICES) {
+        const preset = DRUM_PATTERNS[p].grid[v];
+        for (let i = 0; i < 8; i++) {
+          if (!eighthOn(preset, i)) continue;
+          const off = toggleEighth(preset, i, SEQ_VELOCITY[v], preset);
+          const on = toggleEighth(off, i, SEQ_VELOCITY[v], preset);
+          const want = [...off];
+          const j = preset[2 * i] > 0 ? 2 * i : 2 * i + 1; // the first of the two with a hit
+          want[j] = preset[j];
+          expect(on, `${p} ${v} step ${i}`).toEqual(want);
+        }
+      }
+    }
+    // Through the sequencer: fourFloor hats sit on odd sixteenths; off then on puts one back there.
+    const song = defaultSong();
+    for (const s of song.sections) s.drums = { preset: "fourFloor" };
+    const seq = new Sequencer(song);
+    seq.toggleDrumStep(0, "hat", 2);
+    seq.toggleDrumStep(0, "hat", 2);
+    expect(song.sections[0].drums.grid!.hat).toEqual(DRUM_PATTERNS.fourFloor.grid.hat);
   });
   it("the first edit opens the preset in the sequencer without touching the preset", () => {
     const song = defaultSong();

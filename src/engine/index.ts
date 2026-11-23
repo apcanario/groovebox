@@ -341,6 +341,21 @@ export class Engine {
     return this.graph ? this.graph.attacks() : 0;
   }
 
+  /** Native value of a drum voice's level gain (its trim times its dial). */
+  drumGain(voice: DrumVoice): number | null {
+    return this.graph ? this.graph.instruments.drums.levelGain(voice) : null;
+  }
+
+  /** Voices sounding on the Synth or a layer. */
+  activeVoices(id: "synth" | "layer1" | "layer2"): number {
+    return this.graph ? this.graph.instruments[id].activeVoices() : 0;
+  }
+
+  /** Native sub-oscillator detunes, in cents, of the Synth's or a layer's sounding voices. */
+  detunes(id: "synth" | "layer1" | "layer2"): number[] {
+    return this.graph ? this.graph.instruments[id].detunes() : [];
+  }
+
   info(): { sampleRate: number; baseLatencyMs: number; outputLatencyMs: number; hint: string } {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     return {
@@ -380,7 +395,7 @@ export class Engine {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
         case "drums":
-          g.instruments.drums.trigger(e.voice, t, e.vel, bpm);
+          g.instruments.drums.trigger(e.voice, t, e.vel, bpm, e.gap);
           if (e.voice === "kick") g.pump(t);
           break;
         case "bass":

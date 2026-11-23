@@ -45,7 +45,7 @@ export interface Patch {
   glide: number;
   /** Kick pitch (drums). */
   pitch: number;
-  /** Per drum voice level and decay (drums). Levels default to 0.75, decays to 0.5. */
+  /** Per drum voice level and decay (drums). Levels default to 1 (the C1 trim; the dial only lowers it), decays to 0.5. */
   kickLevel: number;
   kickDecay: number;
   clapLevel: number;
@@ -208,16 +208,16 @@ export function defaultPatch(id: InstrumentId): Patch {
     level: 0.8,
     envAmount: 0.3,
     detune: 0.37,
-    sub: 0.75,
+    sub: 1,
     glide: 0,
     pitch: 0.4,
-    kickLevel: 0.75,
+    kickLevel: 1,
     kickDecay: 0.5,
-    clapLevel: 0.75,
+    clapLevel: 1,
     clapDecay: 0.5,
-    hatLevel: 0.75,
+    hatLevel: 1,
     hatDecay: 0.5,
-    openLevel: 0.75,
+    openLevel: 1,
     openDecay: 0.5,
   };
   switch (id) {

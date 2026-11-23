@@ -18,6 +18,7 @@ import {
   SYNTH_RHYTHMS,
   copyGrid,
   toggleEighth,
+  nextHitGap,
   type BassPreset,
   type DrumPreset,
   type DrumVoice,
@@ -49,7 +50,7 @@ export const STEPS_PER_BAR = 16;
  * instrument carries the drum pattern's swing, so bass and synth stay with the hats.
  */
 export type NoteEvent =
-  | { inst: "drums"; voice: DrumVoice; vel: number; shift: number }
+  | { inst: "drums"; voice: DrumVoice; vel: number; shift: number; gap: number }
   | { inst: "bass"; midi: number; len: number; vel: number; shift: number }
   | { inst: "synth"; notes: number[]; len: number; vel: number; shift: number }
   | {
@@ -171,7 +172,7 @@ export class Sequencer {
     if (!s || !(DRUM_VOICES as readonly string[]).includes(voice) || !Number.isInteger(step) || step < 0 || step >= SEQ_STEPS)
       return false;
     const grid = s.drums.grid ?? copyGrid(DRUM_PATTERNS[s.drums.preset].grid);
-    grid[voice] = toggleEighth(grid[voice], step, SEQ_VELOCITY[voice]);
+    grid[voice] = toggleEighth(grid[voice], step, SEQ_VELOCITY[voice], DRUM_PATTERNS[s.drums.preset].grid[voice]);
     s.drums.grid = grid;
     return true;
   }
@@ -334,13 +335,15 @@ export class Sequencer {
 
     const pos = chordAt(this.song, section, this.sectionStep);
     const chordStart = pos.starts || retrigger;
-    const shift = step % 2 === 1 ? DRUM_PATTERNS[section.drums.preset].swing : 0;
+    const swing = DRUM_PATTERNS[section.drums.preset].swing;
+    const shift = step % 2 === 1 ? swing : 0;
 
     if (now.has("drums")) {
       const grid = sectionDrumGrid(section);
       for (const voice of DRUM_VOICES) {
         const vel = grid[voice][step];
-        if (vel > 0) events.push({ inst: "drums", voice, vel, shift });
+        // `gap`: sixteenths to this voice's next hit, so its tail can end before it.
+        if (vel > 0) events.push({ inst: "drums", voice, vel, shift, gap: nextHitGap(grid[voice], step, swing) });
       }
     }
 

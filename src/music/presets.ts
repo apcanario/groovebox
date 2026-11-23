@@ -122,15 +122,37 @@ export function eighthOn(row: readonly number[], i: number): boolean {
   return (row[2 * i] ?? 0) > 0 || (row[2 * i + 1] ?? 0) > 0;
 }
 
-/** Flip one sequencer step: a lit step clears both its sixteenths; an unlit one sets the first. */
-export function toggleEighth(row: readonly number[], i: number, vel: number): number[] {
+/**
+ * Flip one sequencer step: a lit step clears both its sixteenths. An unlit one lights the sixteenth
+ * the section's preset plays there (the first of the two with a hit, at the preset's velocity), so
+ * off then on puts an offbeat hat back on its offbeat (G3 review M5); with no preset hit there, the
+ * first sixteenth at `vel`.
+ */
+export function toggleEighth(row: readonly number[], i: number, vel: number, preset?: readonly number[]): number[] {
   const out = [...row];
   if (i < 0 || i >= SEQ_STEPS) return out;
   if (eighthOn(row, i)) {
     out[2 * i] = 0;
     out[2 * i + 1] = 0;
-  } else out[2 * i] = vel;
+    return out;
+  }
+  const j = [2 * i, 2 * i + 1].find((k) => (preset?.[k] ?? 0) > 0);
+  if (j === undefined) out[2 * i] = vel;
+  else out[j] = preset![j];
   return out;
+}
+
+/**
+ * Sixteenths from the hit on `step` to the same voice's next hit in a 16-step row, wrapping into
+ * the next bar, with swing: odd steps sound `swing` of a sixteenth late. 16 for a lone hit.
+ */
+export function nextHitGap(row: readonly number[], step: number, swing: number): number {
+  const at = (k: number): number => k + (k % 2 === 1 ? swing : 0);
+  for (let d = 1; d <= 16; d++) {
+    const k = (step + d) % 16;
+    if ((row[k] ?? 0) > 0) return at(k) + (step + d >= 16 ? 16 : 0) - at(step);
+  }
+  return 16;
 }
 
 /** A deep copy of a drum grid, so an edited section never shares rows with a preset. */

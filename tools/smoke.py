@@ -254,19 +254,145 @@ def turn_all(page, where: str, failures: list) -> int:
     return len(ids)
 
 
-def solo_level(page, layer: str, seconds: float = 2.0, settle: float = 0.4) -> float:
-    """Loudest master reading with one instrument soloed, after `settle` seconds (the shared reverb tail)."""
-    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
-    page.evaluate(solo, layer)
-    time.sleep(settle)
+def read_level(page, seconds: float, settle: float) -> float:
+    """Loudest master reading over `seconds`, after `settle` seconds. The meter's RMS falls only by its
+    smoothing each time it is read, so it is read through the settle too: a reading after an unread
+    pause would still carry the level from before the change."""
+    end = time.time() + settle
+    while time.time() < end:
+        page.evaluate("window.__groovebox.level()")
+        time.sleep(0.05)
     peak = -999.0
     for _ in range(int(seconds / 0.1)):
         time.sleep(0.1)
         v = page.evaluate("window.__groovebox.level()")
         if v is not None:
             peak = max(peak, v)
+    return peak
+
+
+def solo_level(page, layer: str, seconds: float = 2.0, settle: float = 0.4) -> float:
+    """Loudest master reading with one instrument soloed, after `settle` seconds (the shared reverb tail)."""
+    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
+    page.evaluate(solo, layer)
+    peak = read_level(page, seconds, settle)
     page.evaluate(solo, None)
     return peak
+
+
+DRUM_VOICES = ["kick", "clap", "hat", "open"]
+TRIMS = {"kick": 0.95, "clap": 0.6, "hat": 0.22, "open": 0.18}  # src/engine/audio.ts Drums.trims
+
+
+def wait_for_value(page, expr: str, want: float, seconds: float = 1.0) -> float:
+    """Poll a numeric expression until it is within 1e-3 of `want`; return the last reading."""
+    end = time.time() + seconds
+    v = page.evaluate(expr)
+    while abs(v - want) > 1e-3 and time.time() < end:
+        time.sleep(0.03)
+        v = page.evaluate(expr)
+    return v
+
+
+def walk_drum_levels(page, saved: dict, failures: list) -> None:
+    """Each drum voice alone (G3 review E1): its level at 0 brings its own gain to 0, with the other
+    three at their settings, and takes that voice out of the sound; back at its setting it returns."""
+    set_level = "([v,x])=>window.__groovebox.setParam('drums', v+'Level', x)"
+    gain = "window.__groovebox.drumGain('%s')"
+    # The drums soloed for the whole walk, with no sends, the filter open and every decay at its middle,
+    # so each reading is the voice itself: no other instrument's reverb tail comes back between two
+    # readings, and a hat turned to its shortest decay does not read as silence.
+    page.evaluate("()=>window.__groovebox.setParams('drums', {delay: 0, reverb: 0, cutoff: 1, kickDecay: 0.5, clapDecay: 0.5, hatDecay: 0.5, openDecay: 0.5})")
+    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
+    page.evaluate(solo, "drums")
+    read_level(page, 0.0, settle=4.0)
+    report = []
+    for v in DRUM_VOICES:
+        others = [o for o in DRUM_VOICES if o != v]
+        # 1. Every voice at its setting, then this one to 0: its gain reaches 0, the others' stay.
+        for o in DRUM_VOICES:
+            want = TRIMS[o] * saved[o + "Level"]
+            if abs(wait_for_value(page, gain % o, want) - want) > 1e-3:
+                failures.append(f"{o}Level back to {saved[o + 'Level']} left its gain at {page.evaluate(gain % o):.3f}")
+        page.evaluate(set_level, [v, 0])
+        g = wait_for_value(page, gain % v, 0.0)
+        if abs(g) > 1e-3:
+            failures.append(f"{v}Level 0 left its gain at {g:.3f}")
+        for o in others:
+            want = TRIMS[o] * saved[o + "Level"]
+            if abs(page.evaluate(gain % o) - want) > 1e-3:
+                failures.append(f"{v}Level 0 moved the {o} gain to {page.evaluate(gain % o):.3f} (want {want:.3f})")
+        # 2. Heard alone: the other three at 0, this one at its setting, then at 0.
+        for o in others:
+            page.evaluate(set_level, [o, 0])
+        page.evaluate(set_level, [v, saved[v + "Level"]])
+        g = wait_for_value(page, gain % v, TRIMS[v] * saved[v + "Level"])
+        if abs(g - TRIMS[v] * saved[v + "Level"]) > 1e-3:
+            failures.append(f"{v}Level back to {saved[v + 'Level']} left its gain at {g:.3f}")
+        alone = read_level(page, 3.0, settle=1.0)
+        page.evaluate(set_level, [v, 0])
+        gone = read_level(page, 2.2, settle=1.0)
+        gains = [round(page.evaluate(gain % o), 4) for o in DRUM_VOICES]
+        if any(gains):
+            failures.append(f"every drum level at 0 left gains {dict(zip(DRUM_VOICES, gains))}")
+        report.append(f"{v} {alone:.1f} -> {gone:.1f}")
+        # Closed hats alone read about -45 to -65 dB (trim 0.22, velocity 0.3, high-passed); silence reads below -100.
+        if alone < -90:
+            failures.append(f"drum voice {v} alone is silent ({alone:.1f} dB)")
+        if not gone < alone - 20:
+            failures.append(f"{v}Level 0 did not silence the {v} ({alone:.1f} -> {gone:.1f} dB)")
+        for o in DRUM_VOICES:
+            page.evaluate(set_level, [o, saved[o + "Level"]])
+    page.evaluate(solo, None)
+    page.evaluate("(p)=>window.__groovebox.setParams('drums', p)", saved)
+    print("drum voices alone, level at setting -> 0 (dB): " + ", ".join(report))
+
+
+def walk_held_synth(page, sec: int, failures: list) -> None:
+    """Synth on Held: Detune ramps the sounding chord's sub-oscillators to the new spread (G3 review S1),
+    and a switch to Stabs mid-chord lets go of the held chord within a bar (G3 review M8)."""
+    S = f"{SONG}.sections[{sec}]"
+    chords = page.evaluate(f"{S}.chords")
+    patch = page.evaluate(f"{SONG}.patches.synth")
+    # Two-bar chords, so a held chord would outlast the bar if the switch did not release it; short
+    # attack and release, so the voice count follows the notes.
+    page.evaluate(f"window.__groovebox.setChords({sec}, [{{degree: 0, bars: 2}}, {{degree: 3, bars: 2}}])")
+    page.evaluate("window.__groovebox.setParams('synth', {attack: 0.005, release: 0.05})")
+    page.click('[data-rhythm="sustained"]')
+    if not wait_for(page, "window.__groovebox.activeVoices('synth') >= 3", 5.0):
+        failures.append(f"synth on Held sounds no chord ({page.evaluate('window.__groovebox.activeVoices(' + chr(39) + 'synth' + chr(39) + ')')} voices)")
+    time.sleep(0.3)
+    held = page.evaluate("window.__groovebox.activeVoices('synth')")
+
+    # Detune on the held chord: every sub-oscillator lands on +-spread/2 of the new spread.
+    before = page.evaluate("window.__groovebox.detunes('synth')")
+    turn(page, '[data-dial="synth:detune"]')
+    spread = page.evaluate(f"{SONG}.patches.synth.detune") * 60
+    time.sleep(0.25)
+    after = page.evaluate("window.__groovebox.detunes('synth')")
+    if not after:
+        failures.append("no sub-oscillator detunes read on the held chord")
+    elif any(abs(abs(d) - spread / 2) > 0.05 for d in after):
+        failures.append(f"Detune on a held chord did not land on +-{spread / 2:.1f} cents: {after}")
+    if before and after and max(map(abs, before)) == max(map(abs, after)):
+        failures.append(f"Detune did not change the held chord's spread ({before} -> {after})")
+    print(f"held chord {held} voices, detune {max(map(abs, before or [0])):.1f} -> {spread / 2:.1f} cents each way")
+
+    # Held -> Stabs mid-chord: the held chord is released, so within a bar there is a moment between
+    # two short stabs with no voice sounding. A held chord left on (two-bar chords) never lets it reach 0.
+    bar = 4 * 60 / page.evaluate(f"{SONG}.bpm")
+    page.click('[data-rhythm="stabs"]')
+    low = held
+    end = time.time() + bar + 0.3
+    while time.time() < end:
+        low = min(low, page.evaluate("window.__groovebox.activeVoices('synth')"))
+        time.sleep(0.02)
+    print(f"Held -> Stabs: synth voices {held} -> as low as {low} within a bar")
+    if low != 0:
+        failures.append(f"switching Held to Stabs kept the held chord ({held} voices, never below {low} within a bar)")
+
+    page.evaluate(f"(c)=>window.__groovebox.setChords({sec}, c)", chords)
+    page.evaluate("(p)=>window.__groovebox.setParams('synth', {attack: p.attack, release: p.release})", patch)
 
 
 def walk_g3(page, failures: list) -> None:
@@ -312,6 +438,7 @@ def walk_g3(page, failures: list) -> None:
     print(f"drums solo {loud:.1f} dB, every voice level 0: {quiet:.1f} dB")
     if not quiet < loud - 20:
         failures.append(f"drum voice levels did not silence the drums ({loud:.1f} -> {quiet:.1f} dB)")
+    walk_drum_levels(page, saved, failures)
 
     # Bass and Synth: every rhythm, every wave, every dial.
     for inst, rhythms in [("bass", ["offbeat", "rolling", "long", "dnbSub"]), ("synth", ["stabs", "offbeat", "sustained"])]:
@@ -332,6 +459,8 @@ def walk_g3(page, failures: list) -> None:
         lvl = solo_level(page, inst)
         if lvl < -60:
             failures.append(f"{inst} went silent after its controls were moved ({lvl:.1f} dB)")
+        if inst == "synth":
+            walk_held_synth(page, sec, failures)
 
     # Mix: the meter reads, both pages of dials, the levels act.
     page.click('[data-tab="mix"]')
