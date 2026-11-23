@@ -35,7 +35,9 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 - Fix every existing label that wraps today (the Play grid's "hold a column for options" tile is one).
 - The bottom-up layout of spec 8.6: header, content, section strip, transport bar, tab bar, on every tab; the Play grid sits on the strip.
 - One section strip everywhere. Tap always means play next bar; "Edit without playing" by hold, kept for Advanced.
-- The look of spec 8.12 across the whole app: 3 px corners, 2 px gaps, the on, off and next-bar states (hatched frame), square-cut dials with ticks and pointer, sentence-case labels, the dot-grid XY pad, the four square beat lights. Both fonts bundled.
+- The look of spec 8.12 across the whole app: 3 px corners, 2 px gaps, the on, off and next-bar states (hatched frame), square-cut dials with ticks and pointer, sentence-case labels, the dot-grid XY pad, the four square beat lights. DM Sans only, by the type table, bundled; Space Mono removed everywhere.
+- Icons by the spec 8.12 table: Material Symbols outlined, weight 300, bundled as SVG, always beside a word.
+- Motion by the spec 8.12 table for what exists at this row (sounding, queued, lanes, labels, dials, beat lights, record, tab marker), with reduce-motion and the off switch. DROP and Morph motion arrive with P10 and P11.
 - The lanes: the engine reports each instrument's current bar as notes; the Simple Play tab shows five lanes with one playhead; every instrument tab shows its own lane.
 - The three section states with their looks and words.
 - The Simple Play tab ("Now"): four section buttons, five instrument buttons, hold to open a tab, and room kept under them for the vibe control that P3 adds. The grid stays as the Advanced Play tab.
@@ -137,7 +139,7 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 - Simple: the button on the Play tab. Advanced: the same button and the Drop page on the Mix tab.
 - Measure the cost of the overlay's extra voices and stay inside the voice cap, raising it only with the measured load reported.
 
-**Done when:** the drop's loudness is within 1 dB of the section it came from in every vibe, and its stereo width is measurably greater (both measured in the smoke test across all 24); it stays on until the second press; the wind-down lands on a bar line in the right section (tested for same and for another section); after the wind-down the song document is identical to before the first press (tested); the master never clips; `check` and `smoke` pass. Whether it goes BAM is Pedro's call, vibe by vibe.
+**Done when:** the drop's loudness is within 1 dB of the section it came from in every vibe, and its stereo width is measurably greater (both measured in the smoke test across all 24); it stays on until the second press; the wind-down lands on a bar line in the right section (tested for same and for another section); after the wind-down the song document is identical to before the first press (tested); the button's build, on and wind-down motion follows spec 8.12; the master never clips; `check` and `smoke` pass. Whether it goes BAM is Pedro's call, vibe by vibe.
 
 ### P11. Morph
 
@@ -196,7 +198,7 @@ Spec section 9 is the brief for bundles 11 and 12. Read it in full, with section
 ### T3. Punch pads, movement and many fingers
 
 - Spec 9.4: the six punch pads (Cut, Filter, Stutter, Echo, Wash, Riser), each landing in time as the table says, several at once; on the phone as a page of the Mix tab. The DROP button of P10 placed beside them on both tablet layouts.
-- Spec 9.5: pads pulse from per-instrument meters, playing step shown, moved dials animate, one animation loop with an off switch, audio first.
+- Spec 9.5, on top of the motion of spec 8.12: pads pulse from per-instrument meters, playing step shown, moved dials animate, one animation loop with an off switch, audio first.
 - Spec 9.6: multi-touch on every control, tested with simultaneous pointers (two dials; XY pad and a pad; three pads).
 - Measure the cost: worst stall and audio load with animation on and off, on the smoke test, reported.
 

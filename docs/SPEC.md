@@ -368,7 +368,7 @@ A switch that lets the jam change by itself, slowly, so it can be left playing.
 
 ### 8.12 The look
 
-Approved by Pedro on 23 Nov 2026 from the five images in `docs/design/look/`. They are the reference for how every screen looks; the older images in `docs/design/phase2/` remain the reference only for the layout of the screens not redrawn (Simple Chords, the vibe picker, Advanced Play on a phone).
+Approved by Pedro on 23 Nov 2026 from the five images in `docs/design/look/` (the `v3` set: icons, one typeface, motion shown as single frames). They are the reference for how every screen looks; the older images in `docs/design/phase2/` remain the reference only for the layout of the screens not redrawn (Simple Chords, the vibe picker, Advanced Play on a phone).
 
 A hardware faceplate, flat, in the existing colours. One loud idea, everything else quiet.
 
@@ -384,7 +384,7 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 **Shapes**
 - Tiles, buttons, chips and pads have a 3 px corner radius. Only things that are round in the physical world are round: dials and the XY dot.
 - Tiles sit 2 px apart, so a screen reads as one panel. Groups are separated by 10 px.
-- No gradients for decoration, no shadows, no glow.
+- No shadows, no glow, and no gradients except the moving band described under Motion.
 
 **States**
 - On: the tile is filled with the instrument's colour, text in black.
@@ -393,17 +393,66 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 - Playing section: filled teal. Editing without playing: a yellow inset line and the word "Editing".
 
 **Dials**
-- A square-cut arc (no rounded ends) on a dark track, three tick marks at minimum, middle and maximum, a short white pointer at the value, the value in the mono face in the centre, the name under it in sentence case.
+- A square-cut arc (no rounded ends) on a dark track, three tick marks at minimum, middle and maximum, a short white pointer at the value, the value in the centre in weight 800, the name under it in sentence case.
 
 **Type**
-- DM Sans for names and labels, in sentence case. No all-capital labels.
-- Space Mono for numbers, readouts, section letters and the word DROP.
-- Both fonts ship with the app, so it looks the same offline.
+- One typeface for everything: DM Sans. No second face.
+- Hierarchy comes from weight, size and letter spacing:
+
+| Use | Weight | Size | Spacing |
+|---|---|---|---|
+| Large numbers (bpm, bar), section letters | 800 | 22 to 28 px | tight (-0.03em) |
+| Names (instruments, vibes, screen titles) | 800 | 16 to 22 px | tight (-0.02em) |
+| Buttons and chips | 600, 700 when on | 12.5 to 15 px | normal |
+| Small labels and dial names | 600 | 11 to 12 px | slightly open (+0.02em) |
+| The word DROP | 900 | 22 to 30 px | wide (+0.24em) |
+
+- DM Sans has no width axis, so narrow and wide cuts are not available; spacing does that job.
+- Numbers that change while playing must not shift: tabular figures, or a fixed-width box where the font lacks them.
+- Sentence case. No all-capital labels except DROP.
+- The font ships with the app.
+
+**Icons**
+- Material Symbols, outlined, weight 300, shipped with the app as SVG.
+- An icon always sits beside its word, never in place of it. The exceptions are the vibe arrows, play and stop, and record.
+- Where they go: the tab bar, instrument names, mode switches (Lead, Arp, Pad, Drone), page chips (Notes, Feel, Sound, FX), effect buttons, punch pads, New jam, Back, New idea, Morph, DROP, and group headings.
+
+| Thing | Icon |
+|---|---|
+| Play, Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix | grid_view, piano, adjust, graphic_eq, airwave, layers, stacks, tune |
+| Lead, Arp, Pad, Drone | show_chart, stairs, cloud, horizontal_rule |
+| Notes, Feel, Sound, FX | music_note, gesture, tune, bolt |
+| New jam, Back, New idea, Morph, DROP | add, undo, casino, all_inclusive, keyboard_double_arrow_down |
+| Cut, Filter, Stutter, Echo, Wash, Riser, Chorus | content_cut, filter_alt, fast_rewind, repeat, water, trending_up, blur_on |
+
+- The set has no drum icon; `adjust` (a pad seen from above) stands in. The row that builds each remaining effect and feature picks its icon from the same set and adds it to this table.
+- An icon may be drawn by hand only where the set has nothing usable, at the same line weight.
+
+**Motion**
+
+Movement shows where things are and what is about to happen. Every animation is tied to the clock or to a touch.
+
+| What | How it moves |
+|---|---|
+| Anything sounding (the playing section, an instrument that is on, the tablet pads of the playing column) | A lighter band of its own colour travels across the tile once per bar. This is the only gradient in the app. |
+| Anything queued for the next bar | The hatching marches, and a ring in its colour pulses on each beat. On the bar line the tile fills with a quick wipe. |
+| Lanes | The playhead sweeps; a note brightens as the playhead crosses it. |
+| An instrument's label | Brightens briefly on each note it plays. |
+| Dials | The arc follows the value; a dial being moved by a macro, Morph, the wobble or a punch pad shows that movement. |
+| Beat lights | Step on each beat; the first is brighter. |
+| DROP | During the build the tile fills from the left with marching stripes and the segments count down. While on, a slow wide band. On wind-down it drains. |
+| Morph, when on | Its icon turns slowly. |
+| Record, when recording | The dot pulses. |
+| Tab bar | The active marker slides to the chosen tab. |
+
+- Only transforms, opacity and background position are animated, in one loop, so it stays cheap.
+- With the system's reduce-motion setting, or the app's own switch on the Mix tab, movement stops and the states stay readable by fill and hatching alone.
+- Audio comes first: under load the animation drops frames.
 
 **Other**
 - The XY pad has a dot grid, hairline crosshairs and a readout of the value in the corner.
 - The beat indicator is four square lights.
-- DROP is a full-width yellow tile with four bar segments that count down.
+- DROP is a full-width yellow tile with its icon and four bar segments that count down.
 
 ## 9. Phase 3: tablet
 
