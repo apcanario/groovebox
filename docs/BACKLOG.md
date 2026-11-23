@@ -5,7 +5,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | Bundle | Rows | What you get |
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
-| 5 | P3 (Done), P4 (Done), P5 (Done), P6 (Done) | Eight vibes, Simple chords, five lead styles |
+| 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
@@ -49,7 +49,7 @@ All rows of this bundle are Done. The player's check of the bundle is in `docs/r
 
 ## Bundle 5: phase 2, vibes, chords and leads
 
-Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
+All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-5.md`.
 
 ## Bundle 6: phase 2, sounds, effects and all 24 vibes
 
