@@ -20,6 +20,7 @@ TypeScript, Vite, Tone.js. Preact from row G2. No other runtime dependency witho
 - Work on `main`. A push to `main` deploys to GitHub Pages.
 - Never push with `check` or `smoke` failing.
 - Every push that changes the app also updates `docs/BACKLOG.md` and `docs/CHANGELOG.md` in the same commit. Backlog: done rows leave the queue, nothing is worked that is not a row, Carried holds every known fix. Changelog: one line per row, newest first, no essays.
+- `README.md` says what the app is and does. A row that changes what the app does updates the README's "What it does today" and "Status" in the same commit, and moves anything it built out of "Where it is going".
 - The smoke test proves sound comes out. It cannot judge how it sounds. Only Pedro's ears do that, so never claim a sound is good.
 - All audio code sits behind the engine layer in `src/engine/`. UI code never imports Tone.js.
 - Every random choice comes from the seeded generator, never `Math.random()`.
