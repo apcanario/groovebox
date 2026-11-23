@@ -35,7 +35,6 @@ import {
 import type { KeyName, Mood } from "../music/scales.ts";
 import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
 import type { ArpParams } from "../music/arp.ts";
-import type { LeadStepView } from "../music/lead.ts";
 import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
 
@@ -58,9 +57,9 @@ export {
 export { ARP_DIRECTIONS, type ArpDirection, type ArpParams } from "../music/arp.ts";
 export { MACROS, type MacroDef, type MacroId, type MacroInstrument } from "../music/macros.ts";
 export { macroPosition } from "./macro.ts";
-export { LEAD_SHAPES, LEAD_STYLES, LOCK_FROZEN, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStepView, type LeadStyle, type PhraseBars } from "../music/lead.ts";
+export { LEAD_SHAPES, LEAD_STYLES, LOCK_FROZEN, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle, type PhraseBars } from "../music/lead.ts";
 export type { Pending, PendingChords, PendingToggle } from "./queue.ts";
-export type { LaneBar, LaneNote, LaneNotes } from "./sequencer.ts";
+export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { MP3_KBPS, type Take } from "./recorder.ts";
 
@@ -653,16 +652,6 @@ export class Engine {
   /** Where a macro dial stands in a section (stored, or read from its first value). */
   macroPos(section: number, inst: InstrumentId, id: MacroId): number {
     return macroPosition(this.seq.song, section, inst, id);
-  }
-
-  /**
-   * The 16 steps of a section's generative lead in the current bar: hits, and which of them play.
-   * `shownStep`: the playing step the UI shows (pass it while the section plays), so the row keeps the
-   * bar it shows until that step wraps, not the bar the scheduler has already reached (G4 review M2).
-   * No caller since P1b replaced the lead row with the lane; kept, with its tests, for P6's step row.
-   */
-  leadSteps(section: number, layer: LayerInstrument, shownStep?: number): LeadStepView[] {
-    return this.seq.leadSteps(section, layer, shownStep);
   }
 
   /** Rename the song (trimmed, at most 24 characters). Returns false for an empty name. */

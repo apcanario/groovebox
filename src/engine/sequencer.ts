@@ -5,8 +5,8 @@
  */
 import { ARP_DIRECTIONS, arpNote, type ArpParams } from "../music/arp.ts";
 import { buildChord, type Chord } from "../music/chords.ts";
-import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, nextSeed, type LeadParams, type LeadStepView } from "../music/lead.ts";
-import { Lead } from "../music/leadStyles.ts";
+import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, nextSeed, type LeadParams } from "../music/lead.ts";
+import { Lead, phraseBar } from "../music/leadStyles.ts";
 import {
   BASS_PRESETS,
   BASS_RHYTHMS,
@@ -140,6 +140,17 @@ export interface LaneBar {
   playing: boolean;
   on: Record<InstrumentId, boolean>;
   notes: LaneNotes;
+  /**
+   * Each layer in Lead mode (P6, spec 8.5's step row): which bar of its phrase this bar is (0-based) and how
+   * many bars the phrase has, with the knobs as they stand now; null for a layer in another mode.
+   */
+  phrase: Record<LayerInstrument, LanePhrase | null>;
+}
+
+/** Where a bar sits in its lead's phrase: bar `bar` (0-based) of `of`. */
+export interface LanePhrase {
+  bar: number;
+  of: number;
 }
 
 interface BarRecord {
@@ -147,6 +158,8 @@ interface BarRecord {
   section: number;
   on: Record<InstrumentId, boolean>;
   notes: LaneNotes;
+  /** Each layer's lead counter at this bar's line (Lead.barCounter); null when the layer is not in Lead mode. */
+  leadAt: Record<LayerInstrument, number | null>;
   /** The sequencer as it stood just before this bar's first step (for the off instruments' preview). */
   snap: Sequencer | null;
 }
@@ -464,15 +477,6 @@ export class Sequencer {
     return seed;
   }
 
-  /** The current bar of a section's generative lead as it stands (for P6's step row; no caller since P1b). */
-  leadSteps(section: number, id: LayerInstrument, shownStep?: number): LeadStepView[] {
-    const s = this.song.sections[section];
-    if (!s) return [];
-    const lead = this.leads.get(`${section}:${id}`);
-    const view = lead && lead.seedValue === s[id].gen.seed ? lead : new Lead(s[id].gen.seed);
-    return view.preview(s[id].gen, shownStep);
-  }
-
   /** Change the song's key and mood. Acts at once: held chords restart on the next step. */
   setKeyMood(key: KeyName, mood: Mood): void {
     this.song.key = key;
@@ -743,8 +747,14 @@ export class Sequencer {
       }
       const on = {} as Record<InstrumentId, boolean>;
       for (const id of INSTRUMENTS) on[id] = now.has(id);
+      const leadAt = {} as Record<LayerInstrument, number | null>;
+      const sec = this.song.sections[r.section];
+      for (const id of LAYER_IDS) {
+        const lead = sec?.[id].mode === "generative" ? this.leads.get(`${r.section}:${id}`) : undefined;
+        leadAt[id] = lead && lead.seedValue === sec[id].gen.seed ? lead.barCounter : null;
+      }
       this.prevRec = this.rec;
-      this.rec = { bar: r.bar, section: r.section, on, notes, snap };
+      this.rec = { bar: r.bar, section: r.section, on, notes, snap, leadAt };
     }
     const cut = new Set<InstrumentId>([...r.stopped, ...r.restarted]);
     if (r.retrigger || (r.applied && r.applied.section !== null)) for (const id of ["synth", "layer1", "layer2"] as const) cut.add(id);
@@ -786,11 +796,11 @@ export class Sequencer {
   }
 
   /** What every instrument would play from `from` (a copy at a bar line) with all of them switched on. */
-  private ghost(from: Sequencer): LaneNotes {
+  private ghost(from: Sequencer): BarRecord {
     const c = from.copy(cloneSong(this.song), false);
     for (const s of c.song.sections) for (const id of INSTRUMENTS) s.on[id] = true;
     c.rec = null;
-    return Sequencer.finish(c).notes;
+    return Sequencer.finish(c);
   }
 
   /**
@@ -818,8 +828,14 @@ export class Sequencer {
     }
     const ghost = INSTRUMENTS.some((id) => !actual.on[id]) ? this.ghost(from) : null;
     const notes = emptyNotes();
-    for (const id of INSTRUMENTS) notes[id] = cloneNotes(actual.on[id] || !ghost ? actual.notes : ghost)[id];
-    return { bar: actual.bar, section: actual.section, playing: this.running, on: { ...actual.on }, notes };
+    for (const id of INSTRUMENTS) notes[id] = cloneNotes(actual.on[id] || !ghost ? actual.notes : ghost.notes)[id];
+    const phrase = {} as Record<LayerInstrument, LanePhrase | null>;
+    const sec = this.song.sections[actual.section];
+    for (const id of LAYER_IDS) {
+      const at = (actual.on[id] || !ghost ? actual : ghost).leadAt[id];
+      phrase[id] = sec && sec[id].mode === "generative" && at !== null ? phraseBar(sec[id].gen, at) : null;
+    }
+    return { bar: actual.bar, section: actual.section, playing: this.running, on: { ...actual.on }, notes, phrase };
   }
 
   private layerEvent(

@@ -20,6 +20,9 @@ import time
 SIZES = [(360, 640), (412, 915)]
 TABS = ["play", "chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
 LAYER_MODES = ["generative", "arp", "pad"]
+# Lead styles the frame walk shows (P6): a planned style, and Pulse with its own page.
+LEAD_WALK = ["hook", "pulse"]
+LEAD_SHAPES = ["rise", "fall", "arch", "valley", "zigzag", "flat", "free"]  # src/music/lead.ts
 
 # Must match FIT_CONTROLS in src/ui/fit.ts.
 CHECK = r"""() => {
@@ -156,6 +159,22 @@ class Walk:
         if first[0] != y:
             self.failures.append(f"{size[0]}x{size[1]} {label}: strip and transport at y {y}, but {first[0]} on {first[1]}")
 
+    def lead_values(self, size: tuple, sec: int, lid: str) -> None:
+        """P6: every word a lead dial can show (each Shape, Register at low, middle and high, each Phrase) fits its
+        dial on the Notes and Feel pages; the knobs go back to what they were."""
+        keys = ["shape", "register", "range", "phrase"]
+        saved = self.page.evaluate(f"(() => {{ const g = window.__groovebox.getSong().sections[{sec}].{lid}.gen; return {keys!r}.map(k => g[k] ?? null); }})()")
+        tries = [("notes", {"shape": sh, "register": reg, "range": 1}) for sh in LEAD_SHAPES for reg in (0.1, 0.5, 0.9)]
+        tries += [("feel", {"phrase": ph}) for ph in (1, 2, 4, 8)]
+        for pg, vals in tries:
+            self.page.click(f'[data-page="{lid}:{pg}"]')
+            self.page.evaluate(f"(v) => window.__groovebox.setGen({sec}, '{lid}', v)", vals)
+            _settle(self.page)
+            for b in self.page.evaluate(CHECK):
+                self.failures.append(f"{size[0]}x{size[1]} {lid} lead {vals}: {b}")
+        self.page.evaluate(f"(v) => window.__groovebox.setGen({sec}, '{lid}', Object.fromEntries({keys!r}.map((k, i) => [k, v[i]])))", saved)
+        self.page.click(f'[data-page="{lid}:notes"]')
+
     def pages(self, size: tuple, label: str) -> None:
         keys = self.page.eval_on_selector_all(".body [data-page]", "els => els.map(e => e.dataset.page)")
         if not keys:
@@ -197,7 +216,17 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                 if tab in ("layer1", "layer2"):
                     for m in LAYER_MODES:
                         page.click(f'[data-mode="{tab}:{m}"]')
-                        w.pages(size, f"{label}-{m}")
+                        if m == "generative":
+                            # P6: Lead in a planned style (Notes and Feel pages) and in Pulse (its own page too).
+                            style = page.evaluate(f"window.__groovebox.getSong().sections[{sec}].{tab}.gen.style ?? null")
+                            for st in LEAD_WALK:
+                                page.click(f'[data-leadstyle="{st}"]')
+                                w.pages(size, f"{label}-{m}-{st}")
+                            if mode == "advanced":
+                                w.lead_values(size, sec, tab)
+                            page.evaluate(f"(s) => window.__groovebox.setGen({sec}, '{tab}', {{style: s}})", style)
+                        else:
+                            w.pages(size, f"{label}-{m}")
                     page.click(f'[data-mode="{tab}:{modes[tab]}"]')
                 else:
                     w.pages(size, label)

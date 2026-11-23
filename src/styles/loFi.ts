@@ -16,6 +16,11 @@ export default {
     layer2: { patch: "warmPad", set: { cutoff: 0.35 } },
   },
   mix: { sweep: -0.2, pump: 0.2, saturation: 0.35 },
+  // P6: a lazy, sliding line over four bars that rests between phrases; Drift in the break; the pad layer drifts.
+  leads: {
+    layer1: { style: "phrase", phrase: 4, density: 0.45, shape: "valley", range: 0.4, register: 0.5, noteLength: 0.6, slide: 0.3, accent: 0.1 },
+    layer2: { style: "drift", register: 0.4, noteLength: 0.85, density: 0.4 },
+  },
   sections: [
     {
       name: "Intro",
@@ -34,7 +39,7 @@ export default {
       beat: "boomBap",
       bass: "long",
       synth: "sustained",
-      layer1: { mode: "generative", gen: { hits: 4, length: 9, density: 0.7, tension: 0.5 } },
+      layer1: { mode: "generative", gen: { density: 0.55, tension: 0.5 } },
       layer2: { mode: "pad", pad: { brightness: 0.3 } },
     },
     {
@@ -44,7 +49,7 @@ export default {
       beat: "boomBap",
       bass: "long",
       synth: "sustained",
-      layer1: { mode: "generative", gen: { hits: 3, length: 16 } },
+      layer1: { mode: "generative", gen: { style: "drift", density: 0.4 } },
       layer2: { mode: "pad" },
     },
     {

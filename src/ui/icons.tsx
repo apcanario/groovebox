@@ -7,8 +7,8 @@ import { ICON_PATHS, type IconName } from "./icon-paths.ts";
 export type { IconName };
 
 /**
- * The spec's icon table, thing by thing. Things that do not exist yet (Drone, the Notes, Feel and FX
- * pages, Back, Morph, DROP and the effects) are listed so the rows that build them use the same icon.
+ * The spec's icon table, thing by thing. Things that do not exist yet (Drone, the FX
+ * page, Morph, DROP and the effects) are listed so the rows that build them use the same icon.
  */
 export const ICON_FOR = {
   Play: "grid_view",
@@ -27,6 +27,8 @@ export const ICON_FOR = {
   Feel: "gesture",
   Sound: "tune",
   FX: "bolt",
+  // P6: Pulse's own page (its Euclidean rhythm), from the set already shipped.
+  Pulse: "timeline",
   "New jam": "add",
   Back: "undo",
   "New idea": "casino",

@@ -4,14 +4,16 @@
  * Space, Back and New idea. Plain words only (spec 8.1). Every control writes ordinary song and patch
  * values through the engine, so Advanced shows the result of every move.
  */
-import { BASS_PRESETS, DRUM_PRESETS, LAYER_MODES, MACROS, WAVES, type InstrumentId, type LayerInstrument } from "../../engine/index.ts";
+import { BASS_PRESETS, DRUM_PRESETS, MACROS, WAVES, type InstrumentId, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Chips, Dial, GroupLabel, PagedChips, XYPad } from "../components.tsx";
+import { LeadStyles } from "./lead.tsx";
+import { ModeRow } from "./LayerTab.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
-import { LAYER_MODE_LABEL, LAYER_MODE_ORDER, MACRO_COLOR, SIMPLE_WAVE_LABEL, presetName, seedHeard, simpleXYReadout } from "../logic.ts";
+import { MACRO_COLOR, SIMPLE_WAVE_LABEL, presetName, seedHeard, simpleXYReadout } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
-import { HeadRow, InstToggle } from "./InstrumentTab.tsx";
+import { HeadRow } from "./InstrumentTab.tsx";
 
 /** The four macro dials of an instrument (spec 8.3's table), for the edited section. */
 function Macros({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
@@ -138,31 +140,23 @@ export function SeedButtons({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   );
 }
 
+/**
+ * Simple Layer (P6, docs/design/look/ phone 2): the mode switch; in Lead, the style picker (Hook, Phrase, Roll,
+ * Drift, Pulse); the lane with the phrase's bar; Busy, Evolve, Bright and Space; Back and New idea; the XY pad lowest.
+ */
 export function SimpleLayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
-  const { engine, edit, roomy } = ctx;
+  const { edit, roomy } = ctx;
   const layer = ctx.song.sections[edit][id];
   return (
-    <section class={`insttab layertab simple${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }} data-simple={id}>
+    <section
+      class={`insttab layertab simple${roomy ? " roomy" : ""}${layer.mode === "generative" ? " lead" : ""}`}
+      style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}
+      data-simple={id}
+    >
       {roomy && <HeadRow ctx={ctx} inst={id} />}
-      <div class={`modes${roomy ? "" : " withtog"}`}>
-        <div class="modegroup" role="radiogroup" aria-label="Mode">
-          {LAYER_MODE_ORDER.filter((m) => (LAYER_MODES as readonly string[]).includes(m)).map((m) => (
-            <button
-              key={m}
-              class={`mode${layer.mode === m ? " on" : ""}`}
-              data-mode={`${id}:${m}`}
-              role="radio"
-              aria-checked={layer.mode === m}
-              onClick={() => engine.setLayerMode(edit, id, m)}
-            >
-              <Icon thing={LAYER_MODE_LABEL[m]} />
-              <span>{LAYER_MODE_LABEL[m]}</span>
-            </button>
-          ))}
-        </div>
-        {!roomy && <InstToggle ctx={ctx} inst={id} />}
-      </div>
-      <Lane id={id} lanes={ctx.lanes} playhead />
+      <ModeRow ctx={ctx} id={id} toggle={!roomy} />
+      {layer.mode === "generative" && <LeadStyles ctx={ctx} id={id} />}
+      <Lane id={id} lanes={ctx.lanes} playhead section={edit} />
       <Macros ctx={ctx} inst={id} />
       <div class="seedrow">
         <SeedButtons ctx={ctx} id={id} />

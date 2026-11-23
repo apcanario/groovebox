@@ -426,6 +426,7 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 | Cut, Filter, Stutter, Echo, Wash, Riser, Chorus | content_cut, filter_alt, fast_rewind, repeat, water, trending_up, blur_on |
 | Beat, Kick · Clap, Hats, Rhythm, Key, Master, Levels, Audio | apps, radio_button_checked, grain, timeline, key, speaker, equalizer, headphones |
 | Wave, Sequencer, Motion, Direction, Rate, Octaves | waves, view_week, motion_blur, swap_vert, speed, height |
+| Pulse | timeline |
 
 - The set has no drum icon; `adjust` (a pad seen from above) stands in. The row that builds each remaining effect and feature picks its icon from the same set and adds it to this table.
 - An icon may be drawn by hand only where the set has nothing usable, at the same line weight.

@@ -3,10 +3,13 @@ import { LOCK_FROZEN } from "../music/lead.ts";
 import {
   addChord,
   chipPage,
-  GEN_KNOBS,
+  LEAD_PAGES,
+  leadDialSet,
+  leadDialText,
+  leadDialValue,
+  phraseSegments,
   LAYER_PATCH_KNOBS,
   PAD_KNOBS,
-  genText,
   barLabel,
   beatLights,
   chordName,
@@ -283,18 +286,41 @@ describe("patch knobs (G3)", () => {
 });
 
 describe("layer tab (G4)", () => {
-  it("six generative knobs, the spec's, in the design's order", () => {
-    expect(GEN_KNOBS.map((k) => k.key)).toEqual(["lock", "hits", "length", "tension", "density", "rotate"]);
+  it("the lead's pages: Notes and Feel of six (spec 8.5), Pulse's own three (P6)", () => {
+    expect(LEAD_PAGES.notes.map((k) => k.label)).toEqual(["Busy", "Lock", "Shape", "Range", "Register", "Tension"]);
+    expect(LEAD_PAGES.feel.map((k) => k.label)).toEqual(["Note length", "Phrase", "Variation", "Repeats", "Slide", "Accent"]);
+    expect(LEAD_PAGES.pulse.map((k) => k.key)).toEqual(["hits", "rotate", "length"]);
   });
-  it("whole-number knobs show their value, amounts show 0..100", () => {
-    const hits = GEN_KNOBS.find((k) => k.key === "hits")!;
-    const lock = GEN_KNOBS.find((k) => k.key === "lock")!;
-    expect(genText(hits, 7)).toBe("7");
-    expect(genText(lock, 0.82)).toBe("82");
-    expect(genText(lock, LOCK_FROZEN)).toBe("100"); // 100 on the dial is frozen
+  it("lead dials show amounts 0..100, Range in octaves, Register in words, the selectors' choice", () => {
+    const d = (key: string) => [...LEAD_PAGES.notes, ...LEAD_PAGES.feel, ...LEAD_PAGES.pulse].find((k) => k.key === key)!;
+    expect(leadDialText(d("lock"), 0.82)).toBe("82");
+    expect(leadDialText(d("lock"), LOCK_FROZEN)).toBe("100"); // 100 on the dial is frozen
+    expect(leadDialText(d("hits"), 7)).toBe("7");
+    expect(leadDialText(d("range"), 0)).toBe("0.5");
+    expect(leadDialText(d("range"), 1)).toBe("3");
+    expect(leadDialText(d("register"), 0.1)).toBe("Low");
+    expect(leadDialText(d("register"), 0.5)).toBe("Mid");
+    expect(leadDialText(d("register"), 0.9)).toBe("High");
+    expect(leadDialText(d("shape"), 2)).toBe("Arch");
+    expect(leadDialText(d("phrase"), 3)).toBe("8");
+    expect(leadDialSet(d("shape"), 4.4)).toEqual({ shape: "zigzag" });
+    expect(leadDialSet(d("phrase"), 0)).toEqual({ phrase: 1 });
+    expect(leadDialSet(d("slide"), 0.3)).toEqual({ slide: 0.3 });
+  });
+  it("an unset lead knob reads its style's default; Busy reads the stored density", () => {
+    const d = (key: string) => [...LEAD_PAGES.notes, ...LEAD_PAGES.feel].find((k) => k.key === key)!;
+    const g = { lock: 0.75, hits: 7, rotate: 0, length: 5, tension: 0.35, density: 0.6, seed: 1, style: "roll" as const };
+    expect(leadDialValue(d("density"), g)).toBe(0.6);
+    expect(leadDialText(d("shape"), leadDialValue(d("shape"), g))).toBe("Zig"); // Roll's default (Zigzag, shortened to fit)
+    expect(leadDialText(d("phrase"), leadDialValue(d("phrase"), g))).toBe("2");
+    expect(leadDialText(d("shape"), leadDialValue(d("shape"), { ...g, shape: "fall" }))).toBe("Fall");
+  });
+  it("the step row's phrase: one segment per bar, the playing one lit", () => {
+    expect(phraseSegments({ bar: 1, of: 4 })).toEqual([false, true, false, false]);
+    expect(phraseSegments(null)).toBeNull();
   });
   it("no layer page has more than six dials", () => {
-    expect(GEN_KNOBS.length).toBeLessThanOrEqual(6);
+    for (const page of Object.values(LEAD_PAGES)) expect(page.length).toBeLessThanOrEqual(6);
     expect(PAD_KNOBS.length).toBeLessThanOrEqual(6);
     expect(LAYER_PATCH_KNOBS.length).toBeLessThanOrEqual(6);
   });

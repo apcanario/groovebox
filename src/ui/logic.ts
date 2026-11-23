@@ -1,6 +1,8 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
 import type { ChordStep, InstrumentId, NumericPatchKey, Song } from "../engine/song.ts";
 import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
+import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle } from "../music/lead.ts";
+import { leadKnobs } from "../music/leadKit.ts";
 
 export const MAX_CHORDS = 8;
 const LENGTHS: ChordStep["bars"][] = [1, 2, 0.5];
@@ -414,29 +416,94 @@ export function nowTile(song: Song, target: number, pending: { toggles: { sectio
 }
 
 /** One generative knob: range, whole steps or not, and its colour token. */
-export interface GenKnob {
-  key: "lock" | "hits" | "length" | "tension" | "density" | "rotate";
+// ---- Lead (P6, spec 8.5) -------------------------------------------------------------
+
+/** The lead styles in the selector's order, by name. */
+export const LEAD_STYLE_ORDER: readonly LeadStyle[] = LEAD_STYLES;
+export const LEAD_STYLE_LABEL: Record<LeadStyle, string> = { hook: "Hook", phrase: "Phrase", roll: "Roll", drift: "Drift", pulse: "Pulse" };
+/**
+ * Shape's choices as the dial shows them. Valley is "Dip" and Zigzag "Zig": the full words do not fit inside a
+ * short phone's dial even at 10 px (spec 8.6: a label that still does not fit is shortened in the source).
+ */
+export const LEAD_SHAPE_LABEL: Record<LeadShape, string> = { rise: "Rise", fall: "Fall", arch: "Arch", valley: "Dip", zigzag: "Zig", flat: "Flat", free: "Free" };
+
+/** The lead's knobs as the song stores them (Busy is `density`). */
+export type LeadKnobKey = "density" | "lock" | "shape" | "range" | "register" | "tension" | "noteLength" | "phrase" | "variation" | "repeats" | "slide" | "accent" | "hits" | "rotate" | "length";
+
+/** One lead dial: 0..1 amounts, whole numbers (Pulse's three), or a selector turned through its choices (Shape, Phrase). */
+export interface LeadDial {
+  key: LeadKnobKey;
   label: string;
   min: number;
   max: number;
-  /** Whole numbers (hits, length, rotate) show as they are; 0..1 amounts show as 0..100. */
+  /** 1 for whole numbers and selectors (the dial snaps); 0 for amounts. */
   step: number;
   color: string;
 }
 
-/** The six generative knobs of spec section 3, in the order and colours of the design. */
-export const GEN_KNOBS: readonly GenKnob[] = [
-  { key: "lock", label: "Lock", min: 0, max: 1, step: 0, color: "var(--coral)" },
-  { key: "hits", label: "Hits", min: 1, max: 16, step: 1, color: "var(--purple)" },
-  { key: "length", label: "Length", min: 2, max: 16, step: 1, color: "var(--yellow)" },
-  { key: "tension", label: "Tension", min: 0, max: 1, step: 0, color: "var(--orange)" },
-  { key: "density", label: "Density", min: 0, max: 1, step: 0, color: "var(--teal)" },
-  { key: "rotate", label: "Rotate", min: 0, max: 15, step: 1, color: "var(--blue)" },
-];
+const amount = (key: LeadKnobKey, label: string, color: string): LeadDial => ({ key, label, min: 0, max: 1, step: 0, color });
 
-/** What a generative dial shows: whole numbers as they are, amounts as 0..100. */
-export function genText(k: GenKnob, v: number): string {
-  return k.step ? String(Math.round(v)) : String(Math.round(v * 100));
+/** The lead's pages in Advanced (spec 8.5): Notes and Feel for every style, six dials each; Pulse's own three. */
+export const LEAD_PAGES: { notes: readonly LeadDial[]; feel: readonly LeadDial[]; pulse: readonly LeadDial[] } = {
+  notes: [
+    amount("density", "Busy", "var(--purple)"),
+    amount("lock", "Lock", "var(--coral)"),
+    { key: "shape", label: "Shape", min: 0, max: LEAD_SHAPES.length - 1, step: 1, color: "var(--yellow)" },
+    amount("range", "Range", "var(--orange)"),
+    amount("register", "Register", "var(--blue)"),
+    amount("tension", "Tension", "var(--teal)"),
+  ],
+  feel: [
+    amount("noteLength", "Note length", "var(--purple)"),
+    { key: "phrase", label: "Phrase", min: 0, max: PHRASE_BARS.length - 1, step: 1, color: "var(--coral)" },
+    amount("variation", "Variation", "var(--yellow)"),
+    amount("repeats", "Repeats", "var(--orange)"),
+    amount("slide", "Slide", "var(--blue)"),
+    amount("accent", "Accent", "var(--teal)"),
+  ],
+  pulse: [
+    { key: "hits", label: "Hits", min: 1, max: 16, step: 1, color: "var(--purple)" },
+    { key: "rotate", label: "Rotate", min: 0, max: 15, step: 1, color: "var(--blue)" },
+    { key: "length", label: "Length", min: 2, max: 16, step: 1, color: "var(--yellow)" },
+  ],
+};
+
+/** Where a lead dial stands: the knob as the lead plays it, an unset knob at its style's default. */
+export function leadDialValue(d: LeadDial, p: LeadParams): number {
+  const k = leadKnobs(p);
+  if (d.key === "density") return k.busy;
+  if (d.key === "shape") return LEAD_SHAPES.indexOf(k.shape);
+  if (d.key === "phrase") return PHRASE_BARS.indexOf(k.phrase);
+  return k[d.key];
+}
+
+/** What a lead dial shows: amounts 0..100, Range in octaves, Register as Low, Mid or High, the selectors' choice. */
+export function leadDialText(d: LeadDial, v: number): string {
+  switch (d.key) {
+    case "shape":
+      return LEAD_SHAPE_LABEL[LEAD_SHAPES[Math.round(v)] ?? "free"];
+    case "phrase":
+      return String(PHRASE_BARS[Math.round(v)] ?? 4);
+    case "range":
+      return String(Math.round(((6 + 30 * v) / 12) * 10) / 10);
+    case "register":
+      return v < 1 / 3 ? "Low" : v < 2 / 3 ? "Mid" : "High";
+    default:
+      return d.step ? String(Math.round(v)) : String(Math.round(v * 100));
+  }
+}
+
+/** The setGen values a lead dial at `v` writes. */
+export function leadDialSet(d: LeadDial, v: number): Partial<Omit<LeadParams, "seed">> {
+  if (d.key === "shape") return { shape: LEAD_SHAPES[Math.max(0, Math.min(LEAD_SHAPES.length - 1, Math.round(v)))] };
+  if (d.key === "phrase") return { phrase: PHRASE_BARS[Math.max(0, Math.min(PHRASE_BARS.length - 1, Math.round(v)))] };
+  return { [d.key]: v };
+}
+
+/** A lead's phrase as a row of bar segments under its lane: the bar playing lit (null: not in Lead, or another section). */
+export function phraseSegments(phrase: { bar: number; of: number } | null): boolean[] | null {
+  if (!phrase || phrase.of < 1) return null;
+  return Array.from({ length: phrase.of }, (_, i) => i === phrase.bar);
 }
 
 /** Pad dials: attack and release in seconds on a curve, brightness and motion as amounts. */

@@ -10,6 +10,11 @@ export default {
   mood: "deep",
   patches: { drums: "punchy", bass: "round", synth: "warmStab", layer1: "bell", layer2: "warmPad" },
   mix: { sweep: 0, pump: 0.6, saturation: 0.1 },
+  // P6: a short bell hook over two bars on Layer 1; the pad layer, switched to Lead, drifts in long notes.
+  leads: {
+    layer1: { style: "hook", phrase: 2, density: 0.65, shape: "arch", range: 0.35, register: 0.6, noteLength: 0.45, slide: 0.1, accent: 0.25 },
+    layer2: { style: "drift", register: 0.4, noteLength: 0.8, density: 0.5 },
+  },
   sections: [
     {
       name: "Intro",
@@ -28,7 +33,7 @@ export default {
       beat: "houseShuffle",
       bass: "offbeat",
       synth: "stabs",
-      layer1: { mode: "generative", gen: { hits: 6, length: 7, density: 0.8 } },
+      layer1: { mode: "generative", gen: { density: 0.8, variation: 0.4 } },
       layer2: { mode: "pad" },
     },
     {

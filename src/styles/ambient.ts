@@ -16,6 +16,11 @@ export default {
     layer2: { patch: "airyPad", set: { reverb: 0.85 } },
   },
   mix: { sweep: 0, pump: 0.1, saturation: 0 },
+  // P6: both layers drift in long, sparse notes (the arp layer high, the pad layer low), when switched to Lead.
+  leads: {
+    layer1: { style: "drift", register: 0.7, range: 0.6, noteLength: 0.9, density: 0.4, slide: 0.25 },
+    layer2: { style: "drift", register: 0.45, range: 0.4, noteLength: 1, density: 0.3 },
+  },
   sections: [
     {
       name: "Intro",

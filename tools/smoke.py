@@ -11,6 +11,8 @@ in time, sentence case, the motion switch and the states without motion) with no
 48 px and no more than six dials on one screen. P3: the vibe picker opens the app, every vibe loads mid-jam on the bar line
 as a new song and plays every instrument audibly in its groove section, and the vibe arrows step on the bar.
 P5: Layer 1 sounds in each of the five lead styles, and its voice glides and accents notes.
+P6: every lead dial of every style turned while playing reaches the section, the output never clips, the lane
+counts the phrase's bars, and the layer switched off lets every voice go (no stuck note); Simple picks the style.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -1032,6 +1034,90 @@ def walk_p5(page, failures: list) -> None:
     wait_for(page, "window.__groovebox.position().section === 0", 4.0)
 
 
+# Pages of lead dials in Advanced (P6): Notes and Feel for every style, Pulse's own page for Pulse.
+LEAD_DIAL_PAGES = {"notes": 6, "feel": 6, "pulse": 3}
+OPTIONAL_GEN = ["style", "shape", "phrase", "range", "register", "noteLength", "variation", "repeats", "slide", "accent"]
+
+
+def walk_p6(page, failures: list) -> None:
+    """P6, Advanced Layer 1 in Lead while the transport runs: for each of the five styles, picked from the style row,
+    every dial of every lead page is turned and must reach the section; the output never clips; the lane's phrase bar
+    counts the phrase's bars. Then the layer is switched off on the bar line: every voice must let go (no stuck
+    note). Simple: the style picker sets the style. The layer goes back to what it was."""
+    sec = page.evaluate("window.__groovebox.position().section")
+    L = f"{SONG}.sections[{sec}].layer1"
+    saved = page.evaluate(L)
+    page.click('[data-appmode="advanced"]')
+    page.click('[data-tab="layer1"]')
+    page.click('[data-mode="layer1:generative"]')
+    peak = -999.0
+    turned = 0
+    for style in LEAD_STYLES:
+        page.click(f'[data-leadstyle="{style}"]')
+        if page.evaluate(f"{L}.gen.style") != style:
+            failures.append(f"P6: the style row did not pick {style}")
+        pages = page.eval_on_selector_all(".body [data-page]", "els => els.map(e => e.dataset.page.split(':')[1])")
+        want = ["notes", "feel"] + (["pulse"] if style == "pulse" else [])
+        if [k for k in pages if k in LEAD_DIAL_PAGES] != want:
+            failures.append(f"P6: {style} shows the lead pages {pages}, wanted {want}")
+        for k in want:
+            page.click(f'[data-page="layer1:{k}"]')
+            ids = dials_on_screen(page, f"layer1 {style} {k}", failures)
+            if len(ids) != LEAD_DIAL_PAGES[k]:
+                failures.append(f"P6: {style}'s {k} page has {len(ids)} dials, not {LEAD_DIAL_PAGES[k]}")
+            for d in ids:
+                before = page.evaluate(f"{L}.gen")
+                turn(page, f'[data-dial="{d}"]')
+                turned += 1
+                if page.evaluate(f"{L}.gen") == before:
+                    failures.append(f"P6: dial {d} ({style}) changed nothing in the section")
+                pk = page.evaluate("window.__groovebox.peak()")
+                if pk is not None:
+                    peak = max(peak, pk)
+            check_sizes(page, f"layer1 {style} {k}", failures)
+        # The step row: the lane shows which bar of the phrase plays, one segment per bar.
+        g = page.evaluate(f"{L}.gen")
+        bars = max(2, g.get("phrase", 4)) if style == "phrase" else g.get("phrase")
+        time.sleep(0.6)
+        shown = page.get_attribute('[data-lane="layer1"] .phr', "data-phrase") if page.locator('[data-lane="layer1"] .phr').count() else None
+        if not shown:
+            failures.append(f"P6: {style}: the lane shows no phrase bar")
+        elif bars is not None and shown.split("/")[1] != str(bars):
+            failures.append(f"P6: {style}: the lane shows phrase bar {shown}, the phrase has {bars} bars")
+        elif page.locator('[data-lane="layer1"] .phr i').count() != int(shown.split("/")[1]):
+            failures.append(f"P6: {style}: the phrase bar draws {page.locator('[data-lane=layer1] .phr i').count()} segments for {shown}")
+    print(f"P6: {turned} lead dials turned over five styles while playing; output peak {peak:.1f} dBFS")
+    if peak >= 0:
+        failures.append(f"P6: the output clipped while lead dials were turned ({peak:.1f} dBFS)")
+    # No stuck note: switched off on the bar line, the layer lets every voice go within its release.
+    page.evaluate(f"window.__groovebox.toggleInstrument({sec}, 'layer1')")
+    if not wait_for(page, f"!{L}.on && window.__groovebox.pending().toggles.length === 0", 4.0):
+        failures.append("P6: Layer 1 did not switch off on the bar line")
+    if not wait_for(page, "window.__groovebox.activeVoices('layer1') === 0", 6.0):
+        failures.append(f"P6: {page.evaluate(chr(119) + 'indow.__groovebox.activeVoices(' + chr(39) + 'layer1' + chr(39) + ')')} Layer 1 voices still sound after it went off (stuck notes)")
+    page.evaluate(f"window.__groovebox.toggleInstrument({sec}, 'layer1')")
+    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+    # Simple: the style picker beside Busy, Evolve, Bright and Space.
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="layer1"]')
+    page.click('[data-mode="layer1:generative"]')
+    for style in ["drift", "hook"]:
+        page.click(f'[data-leadstyle="{style}"]')
+        if page.evaluate(f"{L}.gen.style") != style:
+            failures.append(f"P6: Simple's style picker did not pick {style}")
+    for w in simple_words(page):
+        failures.append(f"P6: Simple Layer 1 in Lead: {w}")
+    page.click('[data-appmode="advanced"]')
+    gen = dict(saved["gen"])
+    gen.pop("seed", None)
+    for k in OPTIONAL_GEN:
+        gen.setdefault(k, None)
+    page.evaluate(f"(g)=>window.__groovebox.setGen({sec}, 'layer1', g)", gen)
+    page.evaluate(f"()=>window.__groovebox.setLayerMode({sec}, 'layer1', '{saved['mode']}')")
+    if page.evaluate(f"{L}.gen") != saved["gen"]:
+        failures.append(f"P6: Layer 1's lead did not go back to what it was")
+
+
 def jsround(x: float) -> int:
     """Math.round: halves go up (Python's round goes to even)."""
     return math.floor(x + 0.5)
@@ -1057,7 +1143,16 @@ def advanced_read(page, sec: int, inst: str, t: dict) -> tuple:
         return dial("drums:swing"), str(page.evaluate(f"Math.round(window.__groovebox.getSong().sections[{sec}].drums.swing * 100)"))
     if kind in ("gen", "arp", "pad"):
         page.click(f'[data-mode="{inst}:{ {"gen": "generative", "arp": "arp", "pad": "pad"}[kind] }"]')
-        go("pattern")
+        if kind == "gen" and key in ("hits", "rotate", "length"):
+            # P6: Pulse's own knobs sit on its own page, shown while the style is Pulse; the style goes back after.
+            style = page.evaluate(f"{S}.{inst}.gen.style ?? null")
+            page.click(f'[data-leadstyle="pulse"]')
+            go("pulse")
+            v = page.evaluate(f"{S}.{inst}.gen.{key}")
+            got = dial(f"{inst}:gen:{key}")
+            page.evaluate(f"(s) => window.__groovebox.setGen({sec}, '{inst}', {{style: s}})", style)
+            return got, str(jsround(v))
+        go("notes" if kind == "gen" else "pattern")
         v = page.evaluate(f"{S}.{inst}.{kind}.{key}")
         if kind == "arp":
             name = {"rate": "arprate", "octaves": "arpoct"}[key]
@@ -1989,6 +2084,7 @@ def main() -> int:
             walk_shell(page, failures)
             walk_g3(page, failures)
             walk_g4(page, failures)
+            walk_p6(page, failures)
             walk_g5_record(page, failures)
             if page.locator("#new-jam").is_disabled():
                 failures.append("New jam is disabled while playing (P3 enables it: a vibe loads as a new song)")

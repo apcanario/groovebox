@@ -1,10 +1,11 @@
 /**
- * Layer 1 and Layer 2 (G4), laid out after docs/design/look/: title and on/off, the mode switch, the
- * layer's lane (P1b), Back and New idea (P2), the mode's controls (Lead: six dials; Arp: direction,
- * rate, octaves and gate; Pad: four dials), then the filter XY pad and the sends. A second page,
- * Sound (its switch below the sends), holds the patch dials the three modes share (wave, envelope, drive).
- * Patterns belong to the edited section; the patch belongs to the instrument. Nothing scrolls (P1):
- * the page chips sit at the top, and on a short screen the XY pad and sends get a Filter page.
+ * Layer 1 and Layer 2 in Advanced (G4, laid out anew in P6 after docs/design/look/ phone 3): the name with Back and
+ * New idea, the mode switch with the on/off switch, in Lead the style selector, the layer's lane across the width
+ * (the step row: notes drawn by their length, the phrase's bar under them), then the page chips and the page (Lead:
+ * Notes and Feel of six dials, Pulse's own three while the style is Pulse; Arp: direction, rate, octaves and gate;
+ * Pad: four dials; Sound: the patch dials the modes share), and the filter XY pad and sends lowest.
+ * Patterns belong to the edited section; the patch belongs to the instrument. Nothing scrolls (P1): on a short
+ * screen the name row gives way (Back and New idea sit beside the lane) and the XY pad and sends get a Filter page.
  */
 import { useState } from "preact/hooks";
 import { ARP_DIRECTIONS, LAYER_MODES, WAVES, type ArpDirection, type LayerInstrument } from "../../engine/index.ts";
@@ -15,13 +16,11 @@ import {
   ARP_OCTAVES,
   ARP_RATES,
   ARP_RATE_LABEL,
-  GEN_KNOBS,
   LAYER_MODE_LABEL,
   LAYER_MODE_ORDER,
   LAYER_PATCH_KNOBS,
   PAD_KNOBS,
   WAVE_LABEL,
-  genText,
   knobPos,
   knobLabel,
   knobText,
@@ -36,31 +35,7 @@ import { FilterPanel, HeadRow, InstToggle } from "./InstrumentTab.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
 import { SeedButtons } from "./SimpleTab.tsx";
-
-function Generative({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
-  const { engine, song, edit } = ctx;
-  const gen = song.sections[edit][id].gen;
-  return (
-    <>
-      <div class="dials n6">
-        {GEN_KNOBS.map((k) => (
-          <Dial
-            key={k.key}
-            id={`${id}:gen:${k.key}`}
-            label={k.label}
-            value={gen[k.key]}
-            min={k.min}
-            max={k.max}
-            step={k.step}
-            display={genText(k, gen[k.key])}
-            color={k.color}
-            onChange={(v) => engine.setGen(edit, id, { [k.key]: v })}
-          />
-        ))}
-      </div>
-    </>
-  );
-}
+import { LeadDials, LeadStyles, leadStyleOf, type LeadPage } from "./lead.tsx";
 
 function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
@@ -171,50 +146,79 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
   );
 }
 
-type LayerPage = "pattern" | "sound" | "filter";
+type LayerPage = "pattern" | LeadPage | "sound" | "filter";
 
-export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
-  const { engine, edit, roomy } = ctx;
-  const [chosen, setPage] = useState<LayerPage>("pattern");
+/** The mode switch (Lead, Arp, Pad), with the layer's on/off switch at its end where `toggle` is set. */
+export function ModeRow({ ctx, id, toggle }: { ctx: Ctx; id: LayerInstrument; toggle: boolean }) {
+  const { engine, edit } = ctx;
   const layer = ctx.song.sections[edit][id];
-  const base: PageDef<LayerPage>[] = [
-    // On a short screen the name row gives way: the page chip names the edited section, as on Chords.
-    ["pattern", roomy ? LAYER_MODE_LABEL[layer.mode] : `${LAYER_MODE_LABEL[layer.mode]} · ${sectionLetter(edit)}`],
-    ["sound", "Sound"],
-  ];
-  const pages = withFilterPage(base, roomy);
-  const page = shownPage(pages, chosen);
   return (
-    <section class={`insttab layertab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}>
-      {/* On a short screen the name row gives way: the on/off switch joins the mode row. */}
-      {roomy && <HeadRow ctx={ctx} inst={id} />}
-      <div class={`modes${roomy ? "" : " withtog"}`}>
-        <div class="modegroup" role="radiogroup" aria-label="Mode">
-          {LAYER_MODE_ORDER.filter((m) => (LAYER_MODES as readonly string[]).includes(m)).map((m) => (
-            <button
-              key={m}
-              class={`mode${layer.mode === m ? " on" : ""}`}
-              data-mode={`${id}:${m}`}
-              role="radio"
-              aria-checked={layer.mode === m}
-              onClick={() => engine.setLayerMode(edit, id, m)}
-            >
-              <Icon thing={LAYER_MODE_LABEL[m]} />
-              <span>{LAYER_MODE_LABEL[m]}</span>
-            </button>
-          ))}
+    <div class={`modes${toggle ? " withtog" : ""}`}>
+      <div class="modegroup" role="radiogroup" aria-label="Mode">
+        {LAYER_MODE_ORDER.filter((m) => (LAYER_MODES as readonly string[]).includes(m)).map((m) => (
+          <button
+            key={m}
+            class={`mode${layer.mode === m ? " on" : ""}`}
+            data-mode={`${id}:${m}`}
+            role="radio"
+            aria-checked={layer.mode === m}
+            onClick={() => engine.setLayerMode(edit, id, m)}
+          >
+            <Icon thing={LAYER_MODE_LABEL[m]} />
+            <span>{LAYER_MODE_LABEL[m]}</span>
+          </button>
+        ))}
+      </div>
+      {toggle && <InstToggle ctx={ctx} inst={id} />}
+    </div>
+  );
+}
+
+/**
+ * Advanced Layer (P6, docs/design/look/ phone 3): the name with Back and New idea; the mode switch with the
+ * on/off switch; in Lead, the style selector; the lane across the whole width with the phrase's bar under it;
+ * the page chips (Lead: Notes, Feel, Pulse's own page when the style is Pulse; then Sound); the page; the XY pad
+ * and sends lowest. On a short screen the name row gives way: Back and New idea sit beside the lane, and the
+ * XY pad and sends get a Filter page.
+ */
+export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
+  const { edit, roomy } = ctx;
+  const [chosen, setPage] = useState<LayerPage>("notes");
+  const layer = ctx.song.sections[edit][id];
+  const lead = layer.mode === "generative";
+  const pulse = lead && leadStyleOf(ctx, id) === "pulse";
+  // On a short screen the first page chip names the edited section (the name row gives way), unless five chips
+  // share the row (Lead in Pulse): there the strip's Editing mark says it.
+  const short = (label: string) => (roomy || pulse ? label : `${label} · ${sectionLetter(edit)}`);
+  const base: PageDef<LayerPage>[] = lead
+    ? [["notes", short("Notes")], ["feel", "Feel"], ...(pulse ? [["pulse", "Pulse"] as PageDef<LayerPage>] : []), ["sound", "Sound"]]
+    : [["pattern", short(LAYER_MODE_LABEL[layer.mode])], ["sound", "Sound"]];
+  const pages = withFilterPage(base, roomy);
+  // The chosen page while it exists; the first page of the mode otherwise (Notes stays chosen across modes).
+  const page = shownPage(pages, chosen === "pattern" && lead ? "notes" : (chosen === "notes" || chosen === "feel" || chosen === "pulse") && !lead ? "pattern" : chosen);
+  return (
+    <section class={`insttab layertab adv${roomy ? " roomy" : ""}${lead ? " lead" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}>
+      {roomy && (
+        <HeadRow ctx={ctx} inst={id}>
+          <div class="seedpair">
+            <SeedButtons ctx={ctx} id={id} />
+          </div>
+        </HeadRow>
+      )}
+      <ModeRow ctx={ctx} id={id} toggle />
+      {lead && <LeadStyles ctx={ctx} id={id} />}
+      {roomy ? (
+        <Lane id={id} lanes={ctx.lanes} playhead section={edit} />
+      ) : (
+        <div class="lanerow">
+          <Lane id={id} lanes={ctx.lanes} playhead section={edit} />
+          <SeedButtons ctx={ctx} id={id} />
         </div>
-        {!roomy && <InstToggle ctx={ctx} inst={id} />}
-      </div>
-      {/* The layer's lane, with Back and New idea beside it (spec 8.3: in both modes). */}
-      <div class="lanerow">
-        <Lane id={id} lanes={ctx.lanes} playhead />
-        <SeedButtons ctx={ctx} id={id} />
-      </div>
+      )}
       <Pager id={id} pages={pages} page={page} onPage={setPage} />
       {page !== "filter" && (
         <div class="page" data-shown={`${id}:${page}`}>
-          {page === "pattern" && layer.mode === "generative" && <Generative ctx={ctx} id={id} />}
+          {lead && (page === "notes" || page === "feel" || page === "pulse") && <LeadDials ctx={ctx} id={id} page={page} />}
           {page === "pattern" && layer.mode === "arp" && <Arp ctx={ctx} id={id} />}
           {page === "pattern" && layer.mode === "pad" && <Pad ctx={ctx} id={id} />}
           {page === "sound" && <Sound ctx={ctx} id={id} mode={layer.mode} />}

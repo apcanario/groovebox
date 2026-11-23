@@ -10,6 +10,11 @@ export default {
   mood: "major",
   patches: { drums: "soft", bass: "round", synth: "pluck", layer1: "whistle", layer2: "airyPad" },
   mix: { sweep: 0, pump: 0.5, saturation: 0 },
+  // P6: a sliding whistle hook, high and singable; the pad layer drifts.
+  leads: {
+    layer1: { style: "hook", phrase: 2, density: 0.65, shape: "arch", range: 0.4, register: 0.7, noteLength: 0.45, slide: 0.25, accent: 0.2 },
+    layer2: { style: "drift", register: 0.6, noteLength: 0.75, density: 0.45 },
+  },
   sections: [
     {
       name: "Intro",
@@ -28,7 +33,7 @@ export default {
       beat: "tropical",
       bass: "offbeat",
       synth: "pluck",
-      layer1: { mode: "generative", gen: { hits: 5, length: 8, tension: 0.3, lock: 0.85 } },
+      layer1: { mode: "generative", gen: { tension: 0.3, lock: 0.85 } },
       layer2: { mode: "pad" },
     },
     {
@@ -38,7 +43,7 @@ export default {
       beat: "tropical",
       bass: "long",
       synth: "sustained",
-      layer1: { mode: "generative", gen: { hits: 3, length: 16, lock: 0.9 } },
+      layer1: { mode: "generative", gen: { density: 0.4, lock: 0.9, noteLength: 0.7 } },
       layer2: { mode: "pad", pad: { brightness: 0.6 } },
     },
     {

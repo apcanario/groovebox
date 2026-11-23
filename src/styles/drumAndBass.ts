@@ -10,6 +10,11 @@ export default {
   mood: "minor",
   patches: { drums: "tight", bass: "sub", synth: "softKeys", layer1: "airyPad", layer2: "bell" },
   mix: { sweep: 0, pump: 0.35, saturation: 0.1 },
+  // P6: a long bell line over four bars in call and response, floating over the breaks; the pad layer drifts.
+  leads: {
+    layer1: { style: "drift", register: 0.5, noteLength: 0.8, density: 0.45 },
+    layer2: { style: "phrase", phrase: 4, density: 0.55, shape: "arch", range: 0.45, register: 0.65, noteLength: 0.65, slide: 0.1 },
+  },
   sections: [
     {
       name: "Intro",
@@ -29,7 +34,7 @@ export default {
       bass: "dnbSub",
       synth: "stabs",
       layer1: { mode: "pad", pad: { brightness: 0.5, motion: 0.4 } },
-      layer2: { mode: "generative", gen: { hits: 4, length: 12, density: 0.75 } },
+      layer2: { mode: "generative", gen: { density: 0.65 } },
     },
     {
       name: "Break",
@@ -39,7 +44,7 @@ export default {
       bass: "long",
       synth: "sustained",
       layer1: { mode: "pad", pad: { attack: 1.5, release: 3 } },
-      layer2: { mode: "generative", gen: { hits: 3, length: 16 } },
+      layer2: { mode: "generative", gen: { density: 0.35, noteLength: 0.85 } },
     },
     {
       name: "Outro",

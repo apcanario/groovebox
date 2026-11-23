@@ -10,6 +10,11 @@ export default {
   mood: "minor",
   patches: { drums: "punchy", bass: "pluckBass", synth: "padSwell", layer1: "bell", layer2: "sawLead" },
   mix: { sweep: 0, pump: 0.55, saturation: 0.1 },
+  // P6: the saw lead rolls in sixteenths with slides and accents; the arp layer, switched to Lead, plays a high hook.
+  leads: {
+    layer1: { style: "hook", phrase: 2, register: 0.7, range: 0.3, noteLength: 0.35 },
+    layer2: { style: "roll", phrase: 2, density: 0.7, shape: "zigzag", range: 0.35, register: 0.5, noteLength: 0.4, slide: 0.2, accent: 0.35, repeats: 0.08 },
+  },
   sections: [
     {
       name: "Intro",
@@ -29,7 +34,7 @@ export default {
       bass: "rolling",
       synth: "sustained",
       layer1: { mode: "arp", arp: { direction: "up", rate: 1, octaves: 2, gate: 0.5 } },
-      layer2: { mode: "generative", gen: { hits: 5, length: 16, lock: 0.9, tension: 0.4 } },
+      layer2: { mode: "generative", gen: { lock: 0.9, tension: 0.4, density: 0.8 } },
     },
     {
       name: "Break",

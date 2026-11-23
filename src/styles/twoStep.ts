@@ -10,6 +10,11 @@ export default {
   mood: "house",
   patches: { drums: "punchy", bass: "round", synth: "organ", layer1: "bell", layer2: "warmPad" },
   mix: { sweep: 0, pump: 0.45, saturation: 0.05 },
+  // P6: a choppy one-bar hook with quick repeats, swung by the beat; the pad layer drifts.
+  leads: {
+    layer1: { style: "hook", phrase: 1, density: 0.6, shape: "zigzag", range: 0.35, register: 0.6, noteLength: 0.35, repeats: 0.15, accent: 0.3 },
+    layer2: { style: "drift", register: 0.45, noteLength: 0.8, density: 0.45 },
+  },
   sections: [
     {
       name: "Intro",
@@ -28,7 +33,7 @@ export default {
       beat: "twoStep",
       bass: "garageSkip",
       synth: "push",
-      layer1: { mode: "generative", gen: { hits: 5, length: 6, tension: 0.45 } },
+      layer1: { mode: "generative", gen: { tension: 0.45, density: 0.7 } },
       layer2: { mode: "pad" },
     },
     {

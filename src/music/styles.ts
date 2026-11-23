@@ -26,8 +26,10 @@ import {
   type StyleDef,
   type StyleFamily,
   type StyleLayer,
+  type StyleLead,
   type StylePatch,
 } from "./data.ts";
+import { LEAD_STYLES } from "./lead.ts";
 import { BASS_PRESETS, DRUM_PRESETS, SYNTH_PRESETS } from "./presets.ts";
 import { deriveSeed } from "./random.ts";
 import { MOODS, NOTE_NAMES } from "./scales.ts";
@@ -76,9 +78,10 @@ export function styleSeed(id: string): number {
   return h & 0x7fffffff;
 }
 
-function layerPattern(l: StyleLayer, seed: number): LayerPattern {
+/** A layer of one section: the defaults, the style's lead for the layer (P6), then the section's own settings. */
+function layerPattern(l: StyleLayer, lead: StyleLead | undefined, seed: number): LayerPattern {
   const d = defaultLayerPattern(l.mode, seed);
-  return { mode: l.mode, arp: { ...d.arp, ...l.arp }, pad: { ...d.pad, ...l.pad }, gen: { ...d.gen, ...l.gen, seed } };
+  return { mode: l.mode, arp: { ...d.arp, ...l.arp }, pad: { ...d.pad, ...l.pad }, gen: { ...d.gen, ...lead, ...l.gen, seed } };
 }
 
 /** The song a style starts: everything it sets (spec 8.2), its four sections, named after the style. */
@@ -93,8 +96,8 @@ export function styleSong(id: string, def: StyleDef, patches: Readonly<Record<st
       drums: def.swing === undefined ? { preset: s.beat } : { preset: s.beat, swing: def.swing },
       bass: { rhythm: s.bass },
       synth: { rhythm: s.synth },
-      layer1: layerPattern(s.layer1, deriveSeed(base, 2 * i)),
-      layer2: layerPattern(s.layer2, deriveSeed(base, 2 * i + 1)),
+      layer1: layerPattern(s.layer1, def.leads?.layer1, deriveSeed(base, 2 * i)),
+      layer2: layerPattern(s.layer2, def.leads?.layer2, deriveSeed(base, 2 * i + 1)),
     };
     return sec;
   });
@@ -121,6 +124,8 @@ export function checkStyle(def: StyleDef, id: string, patches: Readonly<Record<s
   if (!(NOTE_NAMES as readonly string[]).includes(def.key)) out.push("key: unknown");
   if (!MOODS.includes(def.mood)) out.push(`mood: unknown ${def.mood}`);
   if (!Array.isArray(def.sections) || def.sections.length !== 4) out.push("sections: must be four (intro, groove, break, outro)");
+  for (const id of ["layer1", "layer2"] as const)
+    if (!def.leads?.[id] || !(LEAD_STYLES as readonly string[]).includes(def.leads[id].style)) out.push(`leads.${id}: needs a lead style`);
   if (def.start !== undefined && !(Number.isInteger(def.start) && def.start >= 0 && def.start < 4)) out.push("start: must be 0..3");
   for (const [i, s] of (def.sections ?? []).entries()) {
     if (!DRUM_PRESETS.includes(s.beat)) out.push(`sections[${i}].beat: unknown ${s.beat}`);

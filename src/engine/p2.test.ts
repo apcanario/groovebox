@@ -4,7 +4,7 @@ import oldSongJson from "./fixtures/p1b-default-song.json?raw";
 import { MACROS, MACRO_KEYS, sectionScoped, targetPos, targetValue, type MacroInstrument, type MacroTarget } from "../music/macros.ts";
 import { PAD_TRIM } from "../music/sound.ts";
 import { loadMode, saveMode } from "../ui/mode.ts";
-import { ARP_OCTAVES, ARP_RATES, GEN_KNOBS, KNOB_PAGES, LAYER_PATCH_KNOBS, PAD_KNOBS, seedHeard } from "../ui/logic.ts";
+import { ARP_OCTAVES, ARP_RATES, LEAD_PAGES, KNOB_PAGES, LAYER_PATCH_KNOBS, PAD_KNOBS, seedHeard } from "../ui/logic.ts";
 import { Engine } from "./index.ts";
 import { targetNow } from "./macro.ts";
 import { Sequencer, type StepResult } from "./sequencer.ts";
@@ -83,7 +83,7 @@ describe("macros (spec 8.3)", () => {
       const patchDials = inst === "layer1" || inst === "layer2" ? LAYER_PATCH_KNOBS.map((k) => k.key) : (KNOB_PAGES[inst] ?? []).flatMap((p) => p.knobs.map((k) => k.key));
       const shown: Record<MacroTarget["kind"], string[]> = {
         patch: [...patchDials, ...filterPanel, ...mixLevels],
-        gen: GEN_KNOBS.map((k) => k.key),
+        gen: Object.values(LEAD_PAGES).flatMap((page) => page.map((k) => k.key)),
         arp: ["direction", "gate", ...(ARP_RATES.length ? ["rate"] : []), ...(ARP_OCTAVES.length ? ["octaves"] : [])],
         pad: PAD_KNOBS.map((k) => k.key),
         swing: inst === "drums" ? ["swing"] : [],

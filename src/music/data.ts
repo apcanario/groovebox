@@ -6,7 +6,7 @@
  */
 import type { InstrumentId, LayerMode, MixState, PadParams, Patch } from "../engine/song.ts";
 import type { ArpParams } from "./arp.ts";
-import type { LeadParams } from "./lead.ts";
+import type { LeadParams, LeadStyle } from "./lead.ts";
 import type { KeyName, ScaleName, Voicing } from "./scales.ts";
 
 /** One hit of a bass or synth rhythm. */
@@ -180,6 +180,12 @@ export interface StyleLayer {
   gen?: Partial<Omit<LeadParams, "seed">>;
 }
 
+/**
+ * A style's lead on one layer (P6): the lead style and the knobs that suit the vibe, laid under every section's
+ * own `gen`, so the layer plays it wherever it is in Lead mode and finds it when switched to Lead.
+ */
+export type StyleLead = Partial<Omit<LeadParams, "seed">> & { style: LeadStyle };
+
 /** One section of a style. `chords`: [degree, bars] pairs; `on`: the instruments playing in it. */
 export interface StyleSection {
   name: string;
@@ -207,6 +213,8 @@ export interface StyleDef {
   mood: string;
   patches: Record<InstrumentId, StylePatch>;
   mix: MixState;
+  /** Each layer's lead style and settings (P6). */
+  leads: Record<"layer1" | "layer2", StyleLead>;
   sections: [StyleSection, StyleSection, StyleSection, StyleSection];
   start?: number;
 }

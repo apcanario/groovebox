@@ -8,7 +8,7 @@
  * Pure and seeded: the same seed, knobs and chords give the same notes. Lock: before each phrase (Hook,
  * Phrase) or bar (Roll, Drift), every plan slot is rewritten with the chance Lock gives (none when frozen).
  */
-import { GenerativeLead, mutationChance, type LeadContext, type LeadParams, type LeadStepView } from "./lead.ts";
+import { GenerativeLead, mutationChance, type LeadContext, type LeadParams } from "./lead.ts";
 import { createRng, deriveSeed, type Rng } from "./random.ts";
 import { SLOTS, contour, decorate, leadKnobs, leadWindow, lengthFactor, makeRand, realize, type LeadKnobs, type Plan, type PlanNote, type Rand } from "./leadKit.ts";
 import { hookPlan } from "./leadHook.ts";
@@ -49,6 +49,19 @@ export function planFor(k: LeadKnobs, rand: Rand): Plan {
   return decorate(PLANNERS[k.style](k, rand), k, rand);
 }
 
+/** Bars in a lead's phrase as it plays: the Phrase knob, except that the Phrase style plays Phrase 1 as 2 bars. */
+export function phraseBars(p: LeadParams): number {
+  const k = leadKnobs(p);
+  return k.style === "phrase" ? phraseStyleBars(k.phrase) : k.phrase;
+}
+
+/** Which bar of its phrase (0-based) a bar is, from the lead's counter at its bar line, and how many bars there are. */
+export function phraseBar(p: LeadParams, barCounter: number): { bar: number; of: number } {
+  const of = phraseBars(p);
+  const at = ((barCounter % (16 * of)) + 16 * of) % (16 * of);
+  return { bar: Math.floor(at / 16), of };
+}
+
 /** Hook and Phrase change only at a phrase's end; Roll and Drift may change at any bar line. */
 function lockEvery(k: LeadKnobs): number {
   return k.style === "hook" ? 16 * k.phrase : k.style === "phrase" ? 16 * phraseStyleBars(k.phrase) : 16;
@@ -69,9 +82,8 @@ export class Lead {
   private glide: number | null = null;
   /** The last planned note's pitch (Drift moves by step from it). */
   private prev: number | undefined = undefined;
+  /** The counter at the last bar line: where the phrase stood when this bar began. */
   private barStart = 0;
-  private prevBarStart = 0;
-  private lastStep = -1;
 
   /** `barStep`: where in the bar the lead starts, as GenerativeLead. */
   constructor(seed: number, barStep = 0) {
@@ -106,8 +118,6 @@ export class Lead {
     this.pulse.rewind();
     this.counter = 0;
     this.barStart = 0;
-    this.prevBarStart = 0;
-    this.lastStep = -1;
     this.glide = null;
     this.prev = undefined;
   }
@@ -126,26 +136,15 @@ export class Lead {
     return this.plan;
   }
 
-  /** The current bar: which steps start a note. Pulse shows its hits and which of them play. */
-  preview(p: LeadParams, shownStep?: number): LeadStepView[] {
-    const k = leadKnobs(p);
-    if (k.style === "pulse") return this.pulse.preview(p, shownStep);
-    const plan = this.currentPlan(k);
-    const start = shownStep !== undefined && shownStep > this.lastStep ? this.prevBarStart : this.barStart;
-    return Array.from({ length: 16 }, (_, s) => {
-      const hit = this.byStep.has((start + s) % plan.steps);
-      return { hit, plays: hit };
-    });
+  /** Sixteenths since the section's top at this bar's line: with phraseBar, the bar of the phrase this bar is. */
+  get barCounter(): number {
+    return this.barStart;
   }
 
   /** Advance one sixteenth. `barStep` is the position in the bar (0..15). */
   step(barStep: number, p: LeadParams, ctx: LeadContext): LeadEvent | null {
     const k = leadKnobs(p);
-    if (barStep === 0) {
-      this.prevBarStart = this.barStart;
-      this.barStart = this.counter;
-    }
-    this.lastStep = barStep;
+    if (barStep === 0) this.barStart = this.counter;
     const c = this.counter++;
     const win = leadWindow(k.range, k.register);
     const phraseSteps = 16 * k.phrase;

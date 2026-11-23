@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import { buildChord } from "../music/chords.ts";
 import { GenerativeLead, LOCK_FROZEN, mutationChance, nextSeed } from "../music/lead.ts";
-import { euclid } from "../music/rhythm.ts";
 import { MOODS, NOTE_NAMES, inScale } from "../music/scales.ts";
 import { PAD_TOP_HZ, padBrightnessHz, padMotionCents } from "../music/sound.ts";
 import { Sequencer, type StepResult } from "./sequencer.ts";
@@ -178,25 +177,6 @@ describe("generative lock and length", () => {
     expect(validateSong(seq.song)).toEqual([]);
   });
 
-  it("the 16-step row shows this bar's hits, and which of them play", () => {
-    const song = layerSong("generative");
-    song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, lock: 1, length: 5, hits: 7, rotate: 2, density: 0.6 };
-    const seq = new Sequencer(song);
-    const g = song.sections[0].layer1.gen;
-    // Stopped: the bar the seed starts with.
-    const fresh = seq.leadSteps(0, "layer1");
-    expect(fresh.map((s) => s.hit)).toEqual(euclid(7, 16, 2));
-    seq.start();
-    for (let bar = 0; bar < 6; bar++) {
-      const first = seq.next(); // step 0 sets the bar start
-      const view = seq.leadSteps(0, "layer1");
-      const rest = run(seq, 15);
-      const plays = [first, ...rest].map((r) => r.events.some((e) => e.inst === "layer1"));
-      expect(view.map((s) => s.plays)).toEqual(plays);
-      expect(view.map((s) => s.hit)).toEqual(euclid(g.hits, 16, g.rotate));
-    }
-  });
-
   it("a new seed mid-bar (step 6) gives a loop aligned to the bar from the next bar", () => {
     const song = layerSong("generative");
     song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, lock: 1, length: 16, hits: 16, density: 1 };
@@ -220,20 +200,6 @@ describe("generative lock and length", () => {
     );
   });
 
-  it("the row keeps the bar the UI shows until its step wraps, a lookahead after the scheduler", () => {
-    const song = layerSong("generative");
-    song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, lock: 1, length: 5, hits: 16, density: 0.5 };
-    const seq = new Sequencer(song);
-    seq.start();
-    run(seq, 15);
-    const shown = seq.leadSteps(0, "layer1", 14); // bar 0, the scheduler at step 14
-    seq.next(); // step 15
-    seq.next(); // step 0 of bar 1: the scheduler crosses the bar line
-    expect(seq.leadSteps(0, "layer1", 15)).toEqual(shown); // the UI still shows bar 0
-    const next = seq.leadSteps(0, "layer1", 0); // the UI's step wrapped: bar 1
-    expect(next).toEqual(seq.leadSteps(0, "layer1"));
-    expect(next).not.toEqual(shown); // length 5 drifts, so bar 1 differs
-  });
 });
 
 describe("layer edits", () => {
@@ -317,20 +283,6 @@ describe("layer edits", () => {
     expect(seq.next().pads.layer1).toMatchObject({ brightness: 0.9, motion: 0.5 });
   });
 
-  it("a lead preview never draws from the playing lead's generator", () => {
-    const song = layerSong("generative");
-    const seq = new Sequencer(song);
-    seq.start();
-    const a = bars(seq, 2);
-    const seq2 = new Sequencer(layerSong("generative"));
-    seq2.start();
-    const b: (string | null)[][] = [];
-    for (let i = 0; i < 2; i++) {
-      seq2.leadSteps(0, "layer1");
-      b.push(bars(seq2, 1)[0]);
-    }
-    expect(b).toEqual(a);
-  });
 });
 
 describe("pad sound mappings", () => {

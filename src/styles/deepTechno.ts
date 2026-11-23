@@ -10,6 +10,11 @@ export default {
   mood: "dark",
   patches: { drums: "deep", bass: "sub", synth: "dubChord", layer1: "softSine", layer2: "darkPad" },
   mix: { sweep: -0.1, pump: 0.5, saturation: 0.15 },
+  // P6: Layer 1 keeps the hypnotic Euclidean pulse, low and clipped, rarely changing; the pad layer drifts dark.
+  leads: {
+    layer1: { style: "pulse", lock: 0.85, register: 0.45, range: 0.35, noteLength: 0.3, accent: 0.2 },
+    layer2: { style: "drift", register: 0.3, range: 0.3, noteLength: 0.75, density: 0.4 },
+  },
   sections: [
     {
       name: "Intro",

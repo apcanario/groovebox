@@ -14,6 +14,7 @@ export default {
   mood: "minor",
   patches: { drums: "punchy", bass: "round", synth: "warmStab", layer1: "bell", layer2: "warmPad" },
   mix: { sweep: 0, pump: 0.4, saturation: 0 },
+  leads: { layer1: { style: "hook" }, layer2: { style: "drift" } },
   sections: [
     { name: "Intro", on: ["drums"], chords: [[0, 1]], beat: "fourFloor", bass: "offbeat", synth: "stabs", layer1: { mode: "generative" }, layer2: { mode: "pad" } },
     {

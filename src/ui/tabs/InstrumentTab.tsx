@@ -92,8 +92,11 @@ export function InstToggle({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   );
 }
 
-/** Name of the instrument, the edited section, and its on/off switch. */
-export function HeadRow({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
+/**
+ * Name of the instrument, the edited section, and its on/off switch. `children` replace the switch on the right
+ * (the Advanced Layer tab puts Back and New idea there and its switch in the mode row, as docs/design/look/).
+ */
+export function HeadRow({ ctx, inst, children }: { ctx: Ctx; inst: InstrumentId; children?: ComponentChildren }) {
   const { song, edit, pending } = ctx;
   const on = song.sections[edit].on[inst];
   const queued = pending.toggles.some((t) => t.section === edit && t.instrument === inst);
@@ -107,7 +110,7 @@ export function HeadRow({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           {sectionLetter(edit)} · {queued ? (on ? "off at the next bar" : "on at the next bar") : song.sections[edit].name}
         </span>
       </h1>
-      <InstToggle ctx={ctx} inst={inst} />
+      {children ?? <InstToggle ctx={ctx} inst={inst} />}
     </div>
   );
 }
