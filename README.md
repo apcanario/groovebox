@@ -51,6 +51,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 - **Vibes:** 24 complete starting grooves (Deep house, Deep techno, Lo-fi, Drum and bass, Ambient, Drone, Trance and more). One tap loads tempo, chords, beat, bass, sounds, leads and four arranged sections, and it plays.
 - **Simple chords:** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting) and tap a progression. No scales or chord names needed.
 - **Four more lead styles** beside the current one: Hook, Phrase, Roll and Drift, shaped by twelve knobs (among them Shape, Range, Register, Note length, Phrase, Variation, Slide and Accent), with New idea and Back buttons.
+- **A new look** where you can see the music: every instrument shows the bar it is playing as a lane of notes, with one playhead sweeping across them.
 - **Screens that never scroll,** text that always fits its tile, one row of sections, and the most-used controls at the bottom in thumb reach.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
 - **DROP:** one large button that builds for a few bars, hangs, then brings the section back wider, with extra layers on everything, and stays there until you switch it off. Bigger by width, not volume. Each vibe has its own version.

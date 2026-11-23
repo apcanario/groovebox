@@ -252,7 +252,7 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 - A bar indicator of four beat dots sits by the play button, so it is visible when "next bar" arrives.
 
 **Play tab.**
-- **Simple, "Now":** the vibe control at the top, then five large instrument buttons for the playing section, then the DROP button (section 8.9) with the Morph switch (section 8.11) beside it, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
+- **Simple, "Now":** the vibe control at the top, then the five instrument lanes for the playing section (section 8.12), then the DROP button (section 8.9) with the Morph switch (section 8.11) beside it, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
 - **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
 
@@ -365,6 +365,45 @@ A switch that lets the jam change by itself, slowly, so it can be left playing.
 - **It is seeded and recorded,** so a saved jam replays the same journey.
 - **Touching a control takes it back:** Morph leaves a control alone for 16 bars after it is moved by hand.
 - **It never writes to the song document** except through the same recorded events a hand would make.
+
+### 8.12 The look
+
+Approved by Pedro on 23 Nov 2026 from the five images in `docs/design/look/`. They are the reference for how every screen looks; the older images in `docs/design/phase2/` remain the reference only for the layout of the screens not redrawn (Simple Chords, the vibe picker, Advanced Play on a phone).
+
+A hardware faceplate, flat, in the existing colours. One loud idea, everything else quiet.
+
+**The loud idea: the music is visible.**
+- Every instrument shows the bar it is playing as a lane: drum hits, bass notes, chord stabs, the lead's melody, the pad's long tones, drawn in the instrument's colour on a 16-step grid with a faint line every beat.
+- One playhead line sweeps across all the lanes in time.
+- On the Simple Play tab the five instruments are five lanes: a label block on the left (name and what it plays; tap to switch on or off at the next bar, hold to open its tab) and the lane to its right. This replaces the plain instrument buttons of section 8.6.
+- On every instrument tab the instrument's own lane sits above its controls.
+- On the tablet pad grid the pads of the playing section show their notes inside the pad, with the playhead through that column.
+- An instrument that is off still shows its lane, greyed.
+- The engine gives the screen each instrument's current bar as a list of notes (step, length, pitch or drum voice). Drawing them must never delay the audio.
+
+**Shapes**
+- Tiles, buttons, chips and pads have a 3 px corner radius. Only things that are round in the physical world are round: dials and the XY dot.
+- Tiles sit 2 px apart, so a screen reads as one panel. Groups are separated by 10 px.
+- No gradients for decoration, no shadows, no glow.
+
+**States**
+- On: the tile is filled with the instrument's colour, text in black.
+- Off: a dark tile with a 4 px edge of its colour.
+- Starts on the next bar: a diagonally hatched frame in the colour around a dark centre, with the words "Next bar". This replaces the dashed outline everywhere.
+- Playing section: filled teal. Editing without playing: a yellow inset line and the word "Editing".
+
+**Dials**
+- A square-cut arc (no rounded ends) on a dark track, three tick marks at minimum, middle and maximum, a short white pointer at the value, the value in the mono face in the centre, the name under it in sentence case.
+
+**Type**
+- DM Sans for names and labels, in sentence case. No all-capital labels.
+- Space Mono for numbers, readouts, section letters and the word DROP.
+- Both fonts ship with the app, so it looks the same offline.
+
+**Other**
+- The XY pad has a dot grid, hairline crosshairs and a readout of the value in the corner.
+- The beat indicator is four square lights.
+- DROP is a full-width yellow tile with four bar segments that count down.
 
 ## 9. Phase 3: tablet
 

@@ -35,13 +35,15 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 - Fix every existing label that wraps today (the Play grid's "hold a column for options" tile is one).
 - The bottom-up layout of spec 8.6: header, content, section strip, transport bar, tab bar, on every tab; the Play grid sits on the strip.
 - One section strip everywhere. Tap always means play next bar; "Edit without playing" by hold, kept for Advanced.
-- The three section states with their looks and words, and the four-dot bar indicator.
+- The look of spec 8.12 across the whole app: 3 px corners, 2 px gaps, the on, off and next-bar states (hatched frame), square-cut dials with ticks and pointer, sentence-case labels, the dot-grid XY pad, the four square beat lights. Both fonts bundled.
+- The lanes: the engine reports each instrument's current bar as notes; the Simple Play tab shows five lanes with one playhead; every instrument tab shows its own lane.
+- The three section states with their looks and words.
 - The Simple Play tab ("Now"): four section buttons, five instrument buttons, hold to open a tab, and room kept under them for the vibe control that P3 adds. The grid stays as the Advanced Play tab.
 - The last jam survives a reload.
 - Until P2 lands the mode toggle, a temporary switch on the Play tab chooses Now or Song.
 - Smoke test: at 360 x 640 and 412 x 915, on every tab and page in both modes, the document does not scroll, no control is cut off, and no tile, chip, button, dial or pill has text that wraps, clips or overflows its box; the strip and transport bar sit directly above the tab bar.
 
-**Done when:** no tab scrolls at either size (tested); there is one row of sections on every screen; a section tap means the same thing everywhere; the Now view runs a whole jam; a reload brings the jam back; `check` and `smoke` pass.
+**Done when:** no tab scrolls at either size (tested); there is one row of sections on every screen; a section tap means the same thing everywhere; the Now view runs a whole jam; a reload brings the jam back; every lane matches what the instrument is playing (tested against the engine's notes) and the playhead keeps time; a fresh reviewer agent compares screenshots of each tab with `docs/design/look/` and lists every difference; `check` and `smoke` pass. Whether it has the wow is Pedro's call.
 
 ### P2. Simple and Advanced
 
