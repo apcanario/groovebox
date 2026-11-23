@@ -1,6 +1,6 @@
 /**
  * Instrument tabs. Drums, Bass and Synth (G3): pattern choice, patch dials (at most six per page),
- * filter XY pad and sends. Layer 1 and Layer 2 get their mode controls in G4.
+ * filter XY pad and sends. Layer 1 and Layer 2 have their own tab (LayerTab, G4).
  */
 import { useState } from "preact/hooks";
 import {

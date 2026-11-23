@@ -17,7 +17,7 @@
 import * as Tone from "tone";
 import { midiToHz } from "../music/scales.ts";
 import { DRUM_VOICES, type DrumVoice } from "../music/presets.ts";
-import { DRUM_RELEASE, detuneCents, drumDecay, drumLevel, envDepthHz, glideSeconds, kickHz, subGain } from "../music/sound.ts";
+import { DRUM_RELEASE, PAD_TOP_HZ, padBrightnessHz, padMotionCents, detuneCents, drumDecay, drumLevel, envDepthHz, glideSeconds, kickHz, subGain } from "../music/sound.ts";
 import { PATCH_KEYS, type InstrumentId, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
 
 const RAMP = 0.03; // seconds; every continuous parameter change is ramped this long
@@ -300,7 +300,7 @@ export class Drums extends Instrument {
   private pitch = 0.4;
 
   constructor(buses: Buses) {
-    super(new Channel(buses.drums, buses, [200, 18000], false, 1));
+    super(new Channel(buses.drums, buses, [200, 10000], false, 1)); // C2: 10 kHz top like every other filter
     const into = (voice: DrumVoice, node: Tone.ToneAudioNode): void => {
       const g = new Tone.Gain(this.trims[voice]).connect(this.channel.input);
       node.connect(g);
@@ -473,6 +473,12 @@ export class Poly extends Instrument {
   private patchEnv: Patch | null = null;
   private padEnv: { attack: number; release: number } | null = null;
   private spread = detuneCents(0.37);
+  /**
+   * Layers only (G4): the pad filter after the voices. Open (10 kHz, the C1 top) outside Pad mode;
+   * in Pad mode Brightness sets its top and Motion sweeps it down and back by up to two octaves,
+   * one cycle in eight seconds, so it never opens past the brightness point.
+   */
+  private pad: { filter: Tone.Filter; lfo: Tone.LFO; depth: Tone.Multiply; at: string } | null = null;
 
   /**
    * `filterEnv`: the channel filter follows an envelope (the Synth's filter envelope dial); `fatAll`:
@@ -483,11 +489,21 @@ export class Poly extends Instrument {
     private readonly fat: number,
     private readonly maxPolyphony: number,
     trim: number,
-    private readonly opts: { filterEnv?: boolean; fatAll?: boolean } = {},
+    private readonly opts: { filterEnv?: boolean; fatAll?: boolean; padTone?: boolean } = {},
   ) {
     super(new Channel(buses.duck, buses, [100, 10000], true, trim));
     if (opts.filterEnv) this.channel.enableEnv();
-    this.polys = new VoiceSets(this.channel.input);
+    let dest = this.channel.input;
+    if (opts.padTone) {
+      const filter = new Tone.Filter({ frequency: PAD_TOP_HZ, type: "lowpass", rolloff: -12, Q: 0.5 }).connect(dest);
+      const depth = new Tone.Multiply(0);
+      const lfo = new Tone.LFO({ frequency: 0.125, min: -1, max: 0, type: "sine" });
+      lfo.chain(depth, filter.detune);
+      lfo.start();
+      this.pad = { filter, lfo, depth, at: "" };
+      dest = filter as unknown as Tone.Gain;
+    }
+    this.polys = new VoiceSets(dest);
     this.setWave("sawtooth");
   }
 
@@ -566,16 +582,33 @@ export class Poly extends Instrument {
     if (!this.padEnv) this.setEnv({ attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release });
   }
 
-  /** Pad mode takes its attack and release from the section's pad settings; other modes from the patch. */
-  useEnvelope(pad: { attack: number; release: number } | undefined): void {
+  /**
+   * Pad mode takes its attack and release from the section's pad settings, and its brightness and
+   * motion drive the pad filter; other modes use the patch envelope with the pad filter open.
+   * Called on every step: it does nothing unless something changed.
+   */
+  useMode(pad: { attack: number; release: number; brightness: number; motion: number } | null): void {
     if (pad) {
-      if (this.padEnv && this.padEnv.attack === pad.attack && this.padEnv.release === pad.release) return;
-      this.padEnv = pad;
-      this.setEnv({ attack: pad.attack, decay: 0.6, sustain: 0.8, release: pad.release });
+      if (!this.padEnv || this.padEnv.attack !== pad.attack || this.padEnv.release !== pad.release) {
+        this.padEnv = { attack: pad.attack, release: pad.release };
+        this.setEnv({ attack: pad.attack, decay: 0.6, sustain: 0.8, release: pad.release });
+      }
     } else if (this.padEnv) {
       this.padEnv = null;
       if (this.patchEnv) this.setEnvelope(this.patchEnv);
     }
+    const t = this.pad;
+    if (!t) return;
+    const at = pad ? `${pad.brightness}:${pad.motion}` : "open";
+    if (at === t.at) return;
+    t.at = at;
+    ramp(t.filter.frequency, pad ? padBrightnessHz(pad.brightness) : PAD_TOP_HZ);
+    ramp(t.depth.factor, pad ? padMotionCents(pad.motion) : 0);
+  }
+
+  /** The pad filter's resting frequency now, in Hz (for the smoke test); null on the Synth. */
+  padHz(): number | null {
+    return this.pad ? nativeValue(this.pad.filter.frequency) : null;
   }
 
   trigger(notes: number[], dur: number, time: number, vel: number): void {
@@ -628,8 +661,8 @@ export class Graph {
       bass: new Bass(buses),
       synth: new Poly(buses, 2, 16, 0.5, { filterEnv: true, fatAll: true }),
       // Either layer can be a pad: 4 notes times 2 overlapping chords, plus headroom.
-      layer1: new Poly(buses, 2, 10, 0.5),
-      layer2: new Poly(buses, 2, 10, 0.5),
+      layer1: new Poly(buses, 2, 10, 0.5, { padTone: true }),
+      layer2: new Poly(buses, 2, 10, 0.5, { padTone: true }),
     };
   }
 

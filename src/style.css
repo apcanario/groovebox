@@ -859,3 +859,76 @@ button:disabled {
   font-family: var(--mono);
   font-size: 13px;
 }
+
+/* ---- Layer tabs (G4), after docs/design/layer1-tab.jpg ---- */
+.modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mode {
+  min-height: var(--hit);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dim);
+}
+.mode.on {
+  background: var(--c);
+  color: var(--bg);
+}
+.leadrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* The 16-step lead row is a display, not a control: the sequencer plays every note. */
+.steps {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 3px;
+}
+.st {
+  height: 28px;
+  border-radius: 4px;
+  background: var(--card);
+}
+.st.h {
+  background: var(--c);
+}
+.st.h.lo {
+  opacity: 0.45;
+}
+.st.now {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+.btn.seed {
+  flex: none;
+  width: var(--hit);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn.seed svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--c);
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.arprow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.arprow .label {
+  margin-bottom: 6px;
+}
+.layertab .chip.on {
+  background: var(--c);
+}

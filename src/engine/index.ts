@@ -12,8 +12,12 @@ import {
   cloneSong,
   defaultSong,
   INSTRUMENTS,
+  LAYER_IDS,
   validateSong,
   type InstrumentId,
+  type LayerInstrument,
+  type LayerMode,
+  type PadParams,
   type Patch,
   type Song,
   type Wave,
@@ -21,6 +25,8 @@ import {
 } from "./song.ts";
 import type { KeyName, Mood } from "../music/scales.ts";
 import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
+import type { ArpParams } from "../music/arp.ts";
+import type { LeadParams, LeadStepView } from "../music/lead.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
@@ -38,6 +44,8 @@ export {
   type DrumVoice,
   type SynthPreset,
 } from "../music/presets.ts";
+export { ARP_DIRECTIONS, type ArpDirection, type ArpParams } from "../music/arp.ts";
+export { LOCK_FROZEN, type LeadParams, type LeadStepView } from "../music/lead.ts";
 export type { Pending, PendingToggle } from "./queue.ts";
 export type { MixState } from "./audio.ts";
 
@@ -235,6 +243,48 @@ export class Engine {
     return ok;
   }
 
+  // ---- Layers (G4): patterns live with the section and act at once ----------------------
+
+  /** Switch a layer's mode (Arp, Pad, Generative) in a section. In the playing section held notes let go. */
+  setLayerMode(section: number, layer: LayerInstrument, mode: LayerMode): boolean {
+    const ok = this.seq.setLayerMode(section, layer, mode);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Arp direction, rate (steps per note: 1, 2, 4), octaves (1..3), gate (0.1..1). */
+  setArp(section: number, layer: LayerInstrument, values: Partial<ArpParams>): boolean {
+    const ok = this.seq.setArp(section, layer, values);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Pad attack and release (seconds), brightness and motion (0..1). */
+  setPad(section: number, layer: LayerInstrument, values: Partial<PadParams>): boolean {
+    const ok = this.seq.setPad(section, layer, values);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** The six generative knobs. The lead keeps its notes; only Lock rewrites them. */
+  setGen(section: number, layer: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
+    const ok = this.seq.setGen(section, layer, values);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** New notes: the next seed of the layer's lead (from the seeded generator). */
+  newSeed(section: number, layer: LayerInstrument): number | null {
+    const seed = this.seq.newSeed(section, layer);
+    if (seed !== null) this.changed();
+    return seed;
+  }
+
+  /** The 16 steps of a section's generative lead in the current bar: hits, and which of them play. */
+  leadSteps(section: number, layer: LayerInstrument): LeadStepView[] {
+    return this.seq.leadSteps(section, layer);
+  }
+
   renameSection(index: number, name: string): boolean {
     const ok = this.seq.renameSection(index, name);
     if (ok) this.changed();
@@ -356,6 +406,11 @@ export class Engine {
     return this.graph ? this.graph.instruments[id].detunes() : [];
   }
 
+  /** Resting frequency of a layer's pad filter, in Hz (10 kHz outside Pad mode); null before audio starts. */
+  padHz(id: LayerInstrument): number | null {
+    return this.graph ? this.graph.instruments[id].padHz() : null;
+  }
+
   info(): { sampleRate: number; baseLatencyMs: number; outputLatencyMs: number; hint: string } {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     return {
@@ -391,6 +446,8 @@ export class Engine {
     }
     // A held bass note in the old key lets go too; the sequencer restarts it at the new root.
     if (r.retrigger) g.instruments.bass.releaseAll(time);
+    // Pad mode's envelope and filter follow the playing section's pad dials (they act at once).
+    for (const id of LAYER_IDS) g.instruments[id].useMode(r.pads[id]);
     for (const e of r.events) {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
@@ -404,11 +461,8 @@ export class Engine {
         case "synth":
           g.instruments.synth.trigger(e.notes, e.len * sixteenth, t, e.vel);
           break;
-        default: {
-          const layer = g.instruments[e.inst];
-          layer.useEnvelope(e.env);
-          layer.trigger(e.notes, e.len * sixteenth, t, e.vel);
-        }
+        default:
+          g.instruments[e.inst].trigger(e.notes, e.len * sixteenth, t, e.vel);
       }
     }
     if (r.applied) {

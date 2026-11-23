@@ -11,6 +11,7 @@ import { PlayTab } from "./tabs/PlayTab.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
 import { InstrumentTab } from "./tabs/InstrumentTab.tsx";
 import { MixTab } from "./tabs/MixTab.tsx";
+import { LayerTab } from "./tabs/LayerTab.tsx";
 
 /** What every tab gets: the engine, a fresh copy of the song, the position and the edited section. */
 export interface Ctx {
@@ -182,7 +183,8 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
         {tab === "play" && <PlayTab ctx={ctx} />}
         {tab === "chords" && <ChordsTab ctx={ctx} />}
         {tab === "mix" && <MixTab ctx={ctx} />}
-        {tab !== "play" && tab !== "chords" && tab !== "mix" && <InstrumentTab ctx={ctx} inst={tab} key={tab} />}
+        {(tab === "layer1" || tab === "layer2") && <LayerTab ctx={ctx} id={tab} key={tab} />}
+        {(tab === "drums" || tab === "bass" || tab === "synth") && <InstrumentTab ctx={ctx} inst={tab} key={tab} />}
       </main>
 
       <nav class="tabs">

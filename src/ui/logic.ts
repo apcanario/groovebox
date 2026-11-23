@@ -248,3 +248,64 @@ export function meterFraction(db: number): number {
   if (!Number.isFinite(db)) return 0;
   return Math.max(0, Math.min(1, (db + 60) / 60));
 }
+
+// ---- Layers (G4) -----------------------------------------------------------------------
+
+/** Mode switch order and names, as in docs/design/layer1-tab.jpg; the title names the mode's role. */
+export const LAYER_MODE_ORDER = ["arp", "generative", "pad"] as const;
+export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Generative", pad: "Pad" };
+export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Lead", pad: "Pad" };
+
+/** One generative knob: range, whole steps or not, and its colour token. */
+export interface GenKnob {
+  key: "lock" | "hits" | "length" | "tension" | "density" | "rotate";
+  label: string;
+  min: number;
+  max: number;
+  /** Whole numbers (hits, length, rotate) show as they are; 0..1 amounts show as 0..100. */
+  step: number;
+  color: string;
+}
+
+/** The six generative knobs of spec section 3, in the order and colours of the design. */
+export const GEN_KNOBS: readonly GenKnob[] = [
+  { key: "lock", label: "Lock", min: 0, max: 1, step: 0, color: "var(--coral)" },
+  { key: "hits", label: "Hits", min: 1, max: 16, step: 1, color: "var(--purple)" },
+  { key: "length", label: "Length", min: 2, max: 16, step: 1, color: "var(--yellow)" },
+  { key: "tension", label: "Tension", min: 0, max: 1, step: 0, color: "var(--orange)" },
+  { key: "density", label: "Density", min: 0, max: 1, step: 0, color: "var(--teal)" },
+  { key: "rotate", label: "Rotate", min: 0, max: 15, step: 1, color: "var(--blue)" },
+];
+
+/** What a generative dial shows: whole numbers as they are, amounts as 0..100. */
+export function genText(k: GenKnob, v: number): string {
+  return k.step ? String(Math.round(v)) : String(Math.round(v * 100));
+}
+
+/** Pad dials: attack and release in seconds on a curve, brightness and motion as amounts. */
+export const PAD_KNOBS: readonly { key: "attack" | "release" | "brightness" | "motion"; label: string; seconds?: [number, number] }[] = [
+  { key: "attack", label: "Attack", seconds: [0.005, 4] },
+  { key: "release", label: "Release", seconds: [0.05, 8] },
+  { key: "brightness", label: "Bright" },
+  { key: "motion", label: "Motion" },
+];
+
+/** Patch dials shared by the three layer modes (the wave is a chip row above them). */
+export const LAYER_PATCH_KNOBS: readonly KnobSpec[] = [
+  { key: "attack", label: "Attack", seconds: [0.002, 2] },
+  { key: "decay", label: "Decay", seconds: [0.02, 2] },
+  { key: "sustain", label: "Sustain" },
+  { key: "release", label: "Release", seconds: [0.02, 4] },
+  { key: "drive", label: "Drive" },
+];
+
+export const ARP_DIRECTION_LABEL: Record<string, string> = { up: "Up", down: "Down", updown: "Up-down", random: "Random" };
+/** Arp rate: steps per note. */
+export const ARP_RATES = [1, 2, 4] as const;
+export const ARP_RATE_LABEL: Record<number, string> = { 1: "1/16", 2: "1/8", 4: "1/4" };
+export const ARP_OCTAVES = [1, 2, 3] as const;
+
+/** Class of one cell of the 16-step lead row: a hit that plays, a hit its density skips, the playing step. */
+export function leadCellClass(hit: boolean, plays: boolean, now: boolean): string {
+  return `st${hit ? " h" : ""}${hit && !plays ? " lo" : ""}${now ? " now" : ""}`;
+}

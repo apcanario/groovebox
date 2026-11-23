@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar,
 then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials, section menu) and every G3 control
-(drum presets and sequencer, bass and synth rhythms, waves and dials, mix levels and meter, DnB at 174 bpm) with no
+(drum presets and sequencer, bass and synth rhythms, waves and dials, mix levels and meter, DnB at 174 bpm) and
+every G4 layer control (three modes, lead row, new seed, pattern and sound dials) with no
 page error, no control under 48 px and no more than six dials on one screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
@@ -511,6 +512,112 @@ def walk_g3(page, failures: list) -> None:
     page.evaluate(f"()=>{{const e=window.__groovebox;e.bpm={bpm};e.setDrumPreset({sec},'fourFloor');e.setBassRhythm({sec},'offbeat')}}")
 
 
+def walk_g4(page, failures: list) -> None:
+    """G4: Layer 1 and Layer 2 while the transport runs: every mode makes sound, every pattern dial and
+    chip reaches the section, the lead row follows the playing step, new seed, the Sound page's patch dials."""
+    sec = page.evaluate("window.__groovebox.position().section")
+    for lid in ["layer1", "layer2"]:
+        L = f"{SONG}.sections[{sec}].{lid}"
+        page.click(f'[data-tab="{lid}"]')
+        saved_mode = page.evaluate(f"{L}.mode")
+
+        # Generative: the 16-step row, the six dials, new seed.
+        page.click(f'[data-mode="{lid}:generative"]')
+        time.sleep(0.1)
+        if page.evaluate(f"{L}.mode") != "generative":
+            failures.append(f"{lid}: generative mode did not take")
+        cells = page.eval_on_selector_all(f"#steps-{lid} .st", "els => els.length")
+        if cells != 16:
+            failures.append(f"{lid}: lead row has {cells} cells, not 16")
+        seen = set()
+        for _ in range(12):
+            time.sleep(0.07)
+            now = page.eval_on_selector_all(f"#steps-{lid} .st", "els => els.findIndex(e => e.classList.contains('now'))")
+            seen.add(now)
+        if len(seen - {-1}) < 3:
+            failures.append(f"{lid}: lead row does not follow the playing step ({sorted(seen)})")
+        ids = dials_on_screen(page, f"{lid} generative", failures)
+        if len(ids) != 6:
+            failures.append(f"{lid}: generative page has {len(ids)} dials, not 6")
+        for d in ids:
+            before = page.evaluate(f"{L}.gen")
+            turn(page, f'[data-dial="{d}"]')
+            if page.evaluate(f"{L}.gen") == before:
+                failures.append(f"dial {d} changed nothing in the section")
+        seed = page.evaluate(f"{L}.gen.seed")
+        page.click(f'[data-seed="{lid}"]')
+        if page.evaluate(f"{L}.gen.seed") == seed:
+            failures.append(f"{lid}: new seed did not change the seed")
+        check_sizes(page, f"{lid} generative", failures)
+        page.evaluate(f"()=>window.__groovebox.setGen({sec}, '{lid}', {{hits: 9, density: 1, lock: 0.5}})")
+        lvl = solo_level(page, lid)
+        print(f"{lid} generative: {lvl:.1f} dB")
+        if lvl < -60:
+            failures.append(f"{lid} generative is silent ({lvl:.1f} dB)")
+
+        # Arp: direction, rate, octaves chips and the gate dial.
+        page.click(f'[data-mode="{lid}:arp"]')
+        for d in ["down", "updown", "random", "up"]:
+            page.click(f'[data-arpdir="{d}"]')
+        for r in ["1", "4", "2"]:
+            page.click(f'[data-arprate="{r}"]')
+        for o in ["3", "1", "2"]:
+            page.click(f'[data-arpoct="{o}"]')
+        arp = page.evaluate(f"{L}.arp")
+        if (arp["direction"], arp["rate"], arp["octaves"]) != ("up", 2, 2):
+            failures.append(f"{lid}: arp chips did not take: {arp}")
+        for d in dials_on_screen(page, f"{lid} arp", failures):
+            if turn(page, f'[data-dial="{d}"]') < 0.05:
+                failures.append(f"dial {d} did not move")
+        if page.evaluate(f"{L}.arp.gate") == arp["gate"]:
+            failures.append(f"{lid}: arp gate did not change")
+        check_sizes(page, f"{lid} arp", failures)
+        lvl = solo_level(page, lid)
+        print(f"{lid} arp: {lvl:.1f} dB")
+        if lvl < -60:
+            failures.append(f"{lid} arp is silent ({lvl:.1f} dB)")
+
+        # Pad: four dials; brightness moves the pad filter at once; it opens again outside Pad mode.
+        page.click(f'[data-mode="{lid}:pad"]')
+        ids = dials_on_screen(page, f"{lid} pad", failures)
+        if len(ids) != 4:
+            failures.append(f"{lid}: pad page has {len(ids)} dials, not 4")
+        for d in ids:
+            before = page.evaluate(f"{L}.pad")
+            turn(page, f'[data-dial="{d}"]')
+            if page.evaluate(f"{L}.pad") == before:
+                failures.append(f"dial {d} changed nothing in the section")
+        page.evaluate(f"()=>window.__groovebox.setPad({sec}, '{lid}', {{brightness: 0.2, attack: 0.05}})")
+        want = 300 * (10000 / 300) ** 0.2
+        got = wait_for_value(page, f"window.__groovebox.padHz('{lid}')", want, 1.5)
+        if abs(got - want) > 1:
+            failures.append(f"{lid}: pad brightness did not reach the filter ({got:.0f} Hz, wanted {want:.0f})")
+        check_sizes(page, f"{lid} pad", failures)
+        lvl = solo_level(page, lid, settle=1.0)
+        print(f"{lid} pad: {lvl:.1f} dB, pad filter {got:.0f} Hz")
+        if lvl < -60:
+            failures.append(f"{lid} pad is silent ({lvl:.1f} dB)")
+
+        # Sound page: wave chips and the shared patch dials.
+        page.click(f'[data-page="{lid}:1"]')
+        for w in ["square", "sine", "sawtooth", "triangle"]:
+            page.click(f'[data-wave="{w}"]')
+            time.sleep(0.1)
+            if page.evaluate(f"{SONG}.patches.{lid}.wave") != w:
+                failures.append(f"{lid} wave {w} did not take")
+        k = turn_all(page, f"{lid} sound", failures)
+        if k != 5:
+            failures.append(f"{lid}: sound page has {k} dials, not 5")
+        page.click(f'[data-page="{lid}:0"]')
+
+        page.click(f'[data-mode="{lid}:{saved_mode}"]')
+        if saved_mode != "pad":
+            got = wait_for_value(page, f"window.__groovebox.padHz('{lid}')", 10000, 1.5)
+            if abs(got - 10000) > 1:
+                failures.append(f"{lid}: pad filter did not open again outside Pad mode ({got:.0f} Hz)")
+        print(f"{lid}: three modes walked, back to {saved_mode}")
+
+
 def wait_for(page, expr: str, timeout: float) -> bool:
     end = time.time() + timeout
     while time.time() < end:
@@ -634,11 +741,15 @@ def main() -> int:
 
             walk_shell(page, failures)
             walk_g3(page, failures)
+            walk_g4(page, failures)
             narrow_pass(page, failures)
             if not page.evaluate("window.__groovebox.playing"):
                 failures.append("the transport stopped during the shell walk")
 
             if shot:
+                page.click('[data-tab="layer1"]')
+                page.click('[data-mode="layer1:generative"]')
+                time.sleep(0.3)
                 page.screenshot(path=shot)
             # Stop just after a bar line: nothing scheduled in the lookahead may start after Stop.
             wait_for(page, "window.__groovebox.position().step === 0", 3.0)

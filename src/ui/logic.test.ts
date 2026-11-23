@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { LOCK_FROZEN } from "../music/lead.ts";
 import {
   addChord,
+  GEN_KNOBS,
+  LAYER_PATCH_KNOBS,
+  PAD_KNOBS,
+  genText,
+  leadCellClass,
   barLabel,
   chooseSection,
   chordName,
@@ -166,5 +172,34 @@ describe("patch knobs (G3)", () => {
     expect(meterFraction(-Infinity)).toBe(0);
     expect(meterFraction(-30)).toBe(0.5);
     expect(meterFraction(3)).toBe(1);
+  });
+});
+
+describe("layer tab (G4)", () => {
+  it("six generative knobs, the spec's, in the design's order", () => {
+    expect(GEN_KNOBS.map((k) => k.key)).toEqual(["lock", "hits", "length", "tension", "density", "rotate"]);
+  });
+  it("whole-number knobs show their value, amounts show 0..100", () => {
+    const hits = GEN_KNOBS.find((k) => k.key === "hits")!;
+    const lock = GEN_KNOBS.find((k) => k.key === "lock")!;
+    expect(genText(hits, 7)).toBe("7");
+    expect(genText(lock, 0.82)).toBe("82");
+    expect(genText(lock, LOCK_FROZEN)).toBe("100"); // 100 on the dial is frozen
+  });
+  it("no layer page has more than six dials", () => {
+    expect(GEN_KNOBS.length).toBeLessThanOrEqual(6);
+    expect(PAD_KNOBS.length).toBeLessThanOrEqual(6);
+    expect(LAYER_PATCH_KNOBS.length).toBeLessThanOrEqual(6);
+  });
+  it("lead row cells: hit, skipped hit, playing step", () => {
+    expect(leadCellClass(false, false, false)).toBe("st");
+    expect(leadCellClass(true, true, false)).toBe("st h");
+    expect(leadCellClass(true, false, true)).toBe("st h lo now");
+  });
+  it("pad times map both ways on their curve", () => {
+    for (const k of PAD_KNOBS) {
+      const spec = { key: "attack" as const, label: k.label, seconds: k.seconds };
+      for (const p of [0, 0.3, 1]) expect(knobPos(spec, knobValue(spec, p))).toBeCloseTo(p);
+    }
   });
 });

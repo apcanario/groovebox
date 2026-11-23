@@ -57,3 +57,14 @@ export function envDepthHz(baseHz: number, amount: number, maxHz: number): numbe
   const peak = Math.min(maxHz, baseHz * Math.pow(2, clamp01(amount) * 5));
   return Math.max(0, peak - baseHz);
 }
+
+/** Top of the layers' pad filter: the C1 ceiling every filter shares. */
+export const PAD_TOP_HZ = 10000;
+
+/** Pad brightness: the pad filter's top, 300 Hz at 0 to 10 kHz at 1 (about 1.2 kHz at the default 0.4). */
+export function padBrightnessHz(v: number): number {
+  return 300 * Math.pow(PAD_TOP_HZ / 300, clamp01(v));
+}
+
+/** Pad motion: how far the slow sweep closes the pad filter below its top, 0 to two octaves (in cents). */
+export const padMotionCents = (v: number): number => clamp01(v) * 2400;

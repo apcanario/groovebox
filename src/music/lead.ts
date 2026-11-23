@@ -37,10 +37,24 @@ interface Slot {
 
 export const LEAD_RANGE = { lo: 69, hi: 88 } as const; // A4..E6
 
+/** Lock at or above this is frozen: the dial shows 100 from here. */
+export const LOCK_FROZEN = 0.995;
+
+/** A new seed from the current one: the new-seed button. Seeded, never Math.random(). */
+export function nextSeed(seed: number): number {
+  return deriveSeed(seed, 11) + 1;
+}
+
+/** One step of the bar as the lead would play it: a rhythm hit, and whether its slot plays (density). */
+export interface LeadStepView {
+  hit: boolean;
+  plays: boolean;
+}
+
 /** Chance that a hit rewrites its slot, by lock position. */
 export function mutationChance(lock: number): number {
   const l = Math.max(0, Math.min(1, lock));
-  if (l >= 0.999) return 0;
+  if (l >= LOCK_FROZEN) return 0;
   return Math.pow(1 - l, 3);
 }
 
@@ -49,6 +63,8 @@ export class GenerativeLead {
   private mutate: Rng;
   private seed: number;
   private counter = 0;
+  /** The counter at the last bar line: where the loop stood when this bar began. */
+  private barStart = 0;
 
   constructor(seed: number) {
     this.seed = seed;
@@ -67,11 +83,32 @@ export class GenerativeLead {
     this.slots = fresh.slots;
     this.mutate = fresh.mutate;
     this.counter = 0;
+    this.barStart = 0;
+  }
+
+  /**
+   * Back to the start of the loop, keeping the notes (slots) as they are now: a section entered
+   * again picks up its loop, mutations and all, aligned to the bar.
+   */
+  rewind(): void {
+    this.counter = 0;
+    this.barStart = 0;
+  }
+
+  /**
+   * The current bar as it stands: which steps are hits, and which of those play with the slots as
+   * they are now. Mutations still to come are not foreseen.
+   */
+  preview(p: LeadParams): LeadStepView[] {
+    const length = Math.max(2, Math.min(16, Math.round(p.length)));
+    const rhythm = euclid(p.hits, 16, p.rotate);
+    return rhythm.map((hit, s) => ({ hit, plays: hit && this.slots[(this.barStart + s) % length].roll < p.density }));
   }
 
   /** Advance one sixteenth. `barStep` is the position in the bar (0..15). */
   step(barStep: number, p: LeadParams, ctx: LeadContext): LeadNote | null {
     const length = Math.max(2, Math.min(16, Math.round(p.length)));
+    if (barStep === 0) this.barStart = this.counter;
     const index = this.counter % length;
     this.counter++;
     if (!euclid(p.hits, 16, p.rotate)[barStep]) return null;

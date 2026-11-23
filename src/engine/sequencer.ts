@@ -3,9 +3,9 @@
  * switches on the bar line. Pure: no audio dependency, so it is unit-tested. The Tone layer only
  * renders what this returns, at audio-clock times computed ahead.
  */
-import { arpNote } from "../music/arp.ts";
+import { ARP_DIRECTIONS, arpNote, type ArpParams } from "../music/arp.ts";
 import { buildChord, type Chord } from "../music/chords.ts";
-import { GenerativeLead } from "../music/lead.ts";
+import { GenerativeLead, nextSeed, type LeadParams, type LeadStepView } from "../music/lead.ts";
 import {
   BASS_PRESETS,
   BASS_RHYTHMS,
@@ -30,6 +30,7 @@ import { SwitchQueue, type Pending } from "./queue.ts";
 import {
   INSTRUMENTS,
   LAYER_IDS,
+  LAYER_MODES,
   LIMITS,
   MAX_SECTION_NAME,
   newSection,
@@ -39,6 +40,7 @@ import {
   type InstrumentId,
   type LayerInstrument,
   type LayerMode,
+  type PadParams,
   type Section,
   type Song,
 } from "./song.ts";
@@ -60,7 +62,6 @@ export type NoteEvent =
       len: number;
       vel: number;
       shift: number;
-      env?: { attack: number; release: number };
     };
 
 export interface StepResult {
@@ -85,6 +86,18 @@ export interface StepResult {
    * notes should let go, and this step restarts any note the new rhythm holds now.
    */
   restarted: InstrumentId[];
+  /**
+   * Per layer, the pad settings when the playing section has it in Pad mode, else null: the engine
+   * sets the layer's envelope and pad filter from this on every step, so pad dials act at once.
+   */
+  pads: Record<LayerInstrument, PadParams | null>;
+}
+
+/** Clamp a number into [lo, hi]; null for anything that is not a finite number. */
+function num(v: unknown, lo: number, hi: number, int = false): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const x = Math.max(lo, Math.min(hi, v));
+  return int ? Math.round(x) : x;
 }
 
 export interface ChordPosition {
@@ -118,7 +131,11 @@ export class Sequencer {
   private current = 0;
   private globalStep = 0;
   private sectionStep = 0;
-  private leads = new Map<LayerInstrument, GenerativeLead>();
+  /**
+   * Generative leads by section and layer ("2:layer1"). A section entered again keeps its notes
+   * (rewound to the bar); Play, a load and a section insert or delete start every lead from its seed.
+   */
+  private leads = new Map<string, GenerativeLead>();
   private arpIndex = new Map<LayerInstrument, number>();
   private arpRng = new Map<LayerInstrument, Rng>();
   /** Instruments that were sounding at the previous step. */
@@ -126,7 +143,7 @@ export class Sequencer {
   /** Set by a key, mood or chord change; consumed by the next step. */
   private retrigger = false;
   /** Bass or synth rhythm changed in the playing section; consumed by the next step. */
-  private restart = new Set<"bass" | "synth">();
+  private restart = new Set<"bass" | "synth" | LayerInstrument>();
 
   constructor(song: Song) {
     this.song = song;
@@ -145,6 +162,7 @@ export class Sequencer {
     this.applyPending(this.queue.flush());
     this.running = true;
     this.globalStep = 0;
+    this.leads.clear();
     this.enterSection(this.current);
   }
 
@@ -205,6 +223,104 @@ export class Sequencer {
     return true;
   }
 
+  // ---- Layers (G4) ------------------------------------------------------------------
+
+  /** Switch a layer's mode in a section. Acts at once; in the playing section held notes let go. */
+  setLayerMode(section: number, id: LayerInstrument, mode: LayerMode): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id) || !(LAYER_MODES as readonly string[]).includes(mode)) return false;
+    if (s[id].mode === mode) return true;
+    s[id].mode = mode;
+    if (this.running && section === this.current) this.restart.add(id);
+    return true;
+  }
+
+  /** Change arp settings. Acts from the next step; unknown or out-of-range values are refused. */
+  setArp(section: number, id: LayerInstrument, values: Partial<ArpParams>): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
+    const a = { ...s[id].arp };
+    if (values.direction !== undefined) {
+      if (!(ARP_DIRECTIONS as readonly string[]).includes(values.direction)) return false;
+      a.direction = values.direction;
+    }
+    if (values.rate !== undefined) {
+      if (![1, 2, 4].includes(values.rate)) return false;
+      a.rate = values.rate;
+    }
+    if (values.octaves !== undefined) {
+      if (![1, 2, 3].includes(values.octaves)) return false;
+      a.octaves = values.octaves;
+    }
+    if (values.gate !== undefined) {
+      const g = num(values.gate, 0.1, 1);
+      if (g === null) return false;
+      a.gate = g;
+    }
+    s[id].arp = a;
+    return true;
+  }
+
+  /** Change pad settings. Attack and release reach the held chord at once; brightness and motion ramp. */
+  setPad(section: number, id: LayerInstrument, values: Partial<PadParams>): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
+    const ranges: Record<keyof PadParams, [number, number]> = { attack: [0.001, 8], release: [0.01, 8], brightness: [0, 1], motion: [0, 1] };
+    const pad = { ...s[id].pad };
+    for (const k of Object.keys(values) as (keyof PadParams)[]) {
+      if (!(k in ranges)) return false;
+      const v = num(values[k], ...ranges[k]);
+      if (v === null) return false;
+      pad[k] = v;
+    }
+    s[id].pad = pad;
+    return true;
+  }
+
+  /**
+   * Change the generative knobs (not the seed). The lead keeps its notes: only Lock rewrites them,
+   * so moving Hits, Rotate, Length, Tension or Density never draws a new melody.
+   */
+  setGen(section: number, id: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
+    const ranges: Record<Exclude<keyof LeadParams, "seed">, [number, number, boolean]> = {
+      lock: [0, 1, false],
+      hits: [1, 16, true],
+      rotate: [0, 15, true],
+      length: [2, 16, true],
+      tension: [0, 1, false],
+      density: [0, 1, false],
+    };
+    const g = { ...s[id].gen };
+    for (const k of Object.keys(values) as (keyof typeof ranges)[]) {
+      if (!(k in ranges)) return false;
+      const [lo, hi, int] = ranges[k];
+      const v = num(values[k], lo, hi, int);
+      if (v === null) return false;
+      g[k] = v;
+    }
+    s[id].gen = g;
+    return true;
+  }
+
+  /** A new seed for a layer's generative lead: new notes from the next step. Returns the seed. */
+  newSeed(section: number, id: LayerInstrument): number | null {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return null;
+    s[id].gen = { ...s[id].gen, seed: nextSeed(s[id].gen.seed) };
+    return s[id].gen.seed;
+  }
+
+  /** The current bar of a section's generative lead as it stands (for the 16-step row). */
+  leadSteps(section: number, id: LayerInstrument): LeadStepView[] {
+    const s = this.song.sections[section];
+    if (!s) return [];
+    const lead = this.leads.get(`${section}:${id}`);
+    const view = lead && lead.seedValue === s[id].gen.seed ? lead : new GenerativeLead(s[id].gen.seed);
+    return view.preview(s[id].gen);
+  }
+
   /** Change the song's key and mood. Acts at once: held chords restart on the next step. */
   setKeyMood(key: KeyName, mood: Mood): void {
     this.song.key = key;
@@ -239,6 +355,7 @@ export class Sequencer {
     if (sections.length >= LIMITS.sections[1]) return -1;
     const seed = 1 + sections.reduce((m, s) => Math.max(m, s.layer1.gen.seed, s.layer2.gen.seed), 0);
     sections.push(newSection(`Section ${String.fromCharCode(65 + sections.length)}`, seed));
+    this.leads.clear();
     return sections.length - 1;
   }
 
@@ -265,6 +382,7 @@ export class Sequencer {
     sections.splice(index, 1);
     if (!this.running && index === this.current) {
       this.current = Math.min(index, sections.length - 1);
+      this.leads.clear();
       this.enterSection(this.current);
       this.queue.clear();
       return true;
@@ -275,12 +393,14 @@ export class Sequencer {
 
   /** Move the playing index and every queued switch after sections were inserted or removed. */
   private remap(fn: (i: number) => number | null): void {
+    this.leads.clear();
     this.current = fn(this.current) ?? this.current;
     this.queue.remap(fn);
   }
 
   load(song: Song): void {
     this.song = song;
+    this.leads.clear();
     this.queue.clear();
     this.current = Math.min(this.current, song.sections.length - 1);
     this.enterSection(this.current);
@@ -324,7 +444,7 @@ export class Sequencer {
     const retrigger = this.retrigger;
     this.retrigger = false;
     // A section switch on this step starts its own rhythms; a restart queued before it is moot.
-    const restart = applied?.section != null ? new Set<"bass" | "synth">() : new Set(this.restart);
+    const restart = applied?.section != null ? new Set<"bass" | "synth" | LayerInstrument>() : new Set(this.restart);
     this.restart.clear();
     const section = this.song.sections[this.current];
     const events: NoteEvent[] = [];
@@ -377,14 +497,16 @@ export class Sequencer {
 
     for (const id of LAYER_IDS) {
       if (!now.has(id)) continue;
-      const ev = this.layerEvent(id, section, step, pos, chordStart || entered.has(id), shift);
+      const ev = this.layerEvent(id, section, step, pos, chordStart || entered.has(id) || restart.has(id), shift);
       if (ev) events.push(ev);
     }
 
     this.globalStep++;
     this.sectionStep++;
     const restarted = [...restart].filter((id) => now.has(id));
-    return { bar, step, section: this.current, events, applied, stopped, retrigger, restarted };
+    const pads = {} as Record<LayerInstrument, PadParams | null>;
+    for (const id of LAYER_IDS) pads[id] = section[id].mode === "pad" ? { ...section[id].pad } : null;
+    return { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads };
   }
 
   private layerEvent(
@@ -405,7 +527,6 @@ export class Sequencer {
         len: pos.remaining,
         vel: 0.7,
         shift,
-        env: { attack: p.pad.attack, release: p.pad.release },
       };
     }
     if (p.mode === "arp") {
@@ -415,10 +536,11 @@ export class Sequencer {
       const midi = arpNote(pos.chord.notes, p.arp, i, this.arpRng.get(id)!);
       return { inst: id, mode: "arp", notes: [midi], len: p.arp.rate * p.arp.gate, vel: i % 4 === 0 ? 0.8 : 0.6, shift };
     }
-    let lead = this.leads.get(id);
+    const key = `${this.current}:${id}`;
+    let lead = this.leads.get(key);
     if (!lead || lead.seedValue !== p.gen.seed) {
       lead = new GenerativeLead(p.gen.seed);
-      this.leads.set(id, lead);
+      this.leads.set(key, lead);
     }
     const note = lead.step(step, p.gen, {
       chordTones: pos.chord.tones,
@@ -439,12 +561,15 @@ export class Sequencer {
     }
   }
 
-  /** A section starts from its first chord, and its layers restart from their seeds. */
+  /**
+   * A section starts from its first chord; its arps restart from their seeds, and its generative
+   * leads go back to the top of their loops with the notes they have now (Play starts them from the seed).
+   */
   private enterSection(index: number): void {
     this.current = index;
     this.sectionStep = 0;
     const s = this.song.sections[index];
-    this.leads.clear();
+    for (const id of LAYER_IDS) this.leads.get(`${index}:${id}`)?.rewind();
     for (const id of LAYER_IDS) {
       this.arpIndex.set(id, 0);
       this.arpRng.set(id, createRng(deriveSeed(s[id].gen.seed, 7)));
