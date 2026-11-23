@@ -597,6 +597,7 @@ def walk_g4(page, failures: list) -> None:
         print(f"{lid} pad: {lvl:.1f} dB, pad filter {got:.0f} Hz")
         if lvl < -60:
             failures.append(f"{lid} pad is silent ({lvl:.1f} dB)")
+        walk_pad_to_arp(page, sec, lid, failures)
 
         # Sound page: wave chips and the shared patch dials.
         page.click(f'[data-page="{lid}:1"]')
@@ -612,10 +613,74 @@ def walk_g4(page, failures: list) -> None:
 
         page.click(f'[data-mode="{lid}:{saved_mode}"]')
         if saved_mode != "pad":
-            got = wait_for_value(page, f"window.__groovebox.padHz('{lid}')", 10000, 1.5)
+            got = wait_for_value(page, f"window.__groovebox.padHz('{lid}')", 10000, 6.0)
             if abs(got - 10000) > 1:
                 failures.append(f"{lid}: pad filter did not open again outside Pad mode ({got:.0f} Hz)")
         print(f"{lid}: three modes walked, back to {saved_mode}")
+
+
+def walk_pad_to_arp(page, sec: int, lid: str, failures: list) -> None:
+    """Pad to Arp just after a bar line (G4 review S1, M6): the pad filter holds the brightness value
+    until the switch's step time on the audio clock, then opens over the pad's release; the held pad
+    voices let go within the pad release plus a bar. Leaves the layer in Arp mode."""
+    release = 0.3
+    page.evaluate(f"()=>window.__groovebox.setPad({sec}, '{lid}', {{brightness: 0.2, release: {release}}})")
+    page.evaluate(f"()=>window.__groovebox.setArp({sec}, '{lid}', {{rate: 4, gate: 0.25}})")
+    want = 300 * (10000 / 300) ** 0.2
+    wait_for_value(page, f"window.__groovebox.padHz('{lid}')", want, 1.5)
+    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
+    page.evaluate(solo, lid)
+    if not wait_for(page, f"window.__groovebox.activeVoices('{lid}') >= 3", 5.0):
+        failures.append(f"{lid}: pad sounds no chord before the switch")
+    held = page.evaluate(f"window.__groovebox.activeVoices('{lid}')")
+    # In the page, so the reading falls inside the lookahead: wait for a bar line, switch, then read
+    # the pad filter as soon as the scheduler has placed its move, while the audio clock is still before it.
+    r = page.evaluate(
+        """async ([sec, lid]) => {
+          const e = window.__groovebox;
+          const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+          let last = e.position().step;
+          for (let i = 0; i < 2000; i++) {
+            const s = e.position().step;
+            if (s < last) break;
+            last = s;
+            await sleep(2);
+          }
+          const before = e.padMove(lid).at;
+          e.setLayerMode(sec, lid, 'arp');
+          for (let i = 0; i < 1000; i++) {
+            const m = e.padMove(lid);
+            if (m.at !== before) {
+              // Wait until just before the step time, so a move made at once would have shown by now.
+              while (e.padMove(lid).now < m.at - 0.015) await sleep(1);
+              const hz = e.padHz(lid);
+              return { at: m.at, now: e.padMove(lid).now, hz, step: e.position().step };
+            }
+            await sleep(1);
+          }
+          return null;
+        }""",
+        [sec, lid],
+    )
+    if r is None:
+        failures.append(f"{lid}: Pad to Arp never moved the pad filter")
+    else:
+        ahead = (r["at"] - r["now"]) * 1000
+        print(f"{lid} Pad -> Arp: read {ahead:.0f} ms before the filter's move (step {r['step']}): {r['hz']:.0f} Hz")
+        if ahead <= 0:
+            failures.append(f"{lid}: pad filter read after the switch's step time ({ahead:.0f} ms); the check could not run")
+        elif abs(r["hz"] - want) > 1:
+            failures.append(f"{lid}: pad filter left the brightness value before the switch's step time ({r['hz']:.0f} Hz, wanted {want:.0f})")
+    bar = 4 * 60 / page.evaluate(f"{SONG}.bpm")
+    low = held
+    end = time.time() + release + bar
+    while time.time() < end:
+        low = min(low, page.evaluate(f"window.__groovebox.activeVoices('{lid}')"))
+        time.sleep(0.02)
+    print(f"{lid} Pad -> Arp: voices {held} -> as low as {low} within the pad release plus a bar")
+    if low >= min(held, 3):
+        failures.append(f"{lid}: switching Pad to Arp kept the pad voices ({held}, never below {low})")
+    page.evaluate(solo, None)
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:

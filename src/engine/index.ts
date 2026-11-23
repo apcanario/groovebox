@@ -280,9 +280,13 @@ export class Engine {
     return seed;
   }
 
-  /** The 16 steps of a section's generative lead in the current bar: hits, and which of them play. */
-  leadSteps(section: number, layer: LayerInstrument): LeadStepView[] {
-    return this.seq.leadSteps(section, layer);
+  /**
+   * The 16 steps of a section's generative lead in the current bar: hits, and which of them play.
+   * `shownStep`: the playing step the UI shows (pass it while the section plays), so the row keeps the
+   * bar it shows until that step wraps, not the bar the scheduler has already reached (G4 review M2).
+   */
+  leadSteps(section: number, layer: LayerInstrument, shownStep?: number): LeadStepView[] {
+    return this.seq.leadSteps(section, layer, shownStep);
   }
 
   renameSection(index: number, name: string): boolean {
@@ -411,6 +415,14 @@ export class Engine {
     return this.graph ? this.graph.instruments[id].padHz() : null;
   }
 
+  /**
+   * For the smoke test (G4 review S1): the audio time from which a layer's pad filter last moved, and
+   * the audio clock now; null before audio starts.
+   */
+  padMove(id: LayerInstrument): { at: number; now: number } | null {
+    return this.graph ? { at: this.graph.instruments[id].padMoveTime(), now: Tone.getContext().currentTime } : null;
+  }
+
   info(): { sampleRate: number; baseLatencyMs: number; outputLatencyMs: number; hint: string } {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     return {
@@ -446,8 +458,8 @@ export class Engine {
     }
     // A held bass note in the old key lets go too; the sequencer restarts it at the new root.
     if (r.retrigger) g.instruments.bass.releaseAll(time);
-    // Pad mode's envelope and filter follow the playing section's pad dials (they act at once).
-    for (const id of LAYER_IDS) g.instruments[id].useMode(r.pads[id]);
+    // Pad mode's envelope and filter follow the playing section's pad dials, from this step's time.
+    for (const id of LAYER_IDS) g.instruments[id].useMode(r.pads[id], time);
     for (const e of r.events) {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {

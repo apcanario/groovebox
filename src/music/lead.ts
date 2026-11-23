@@ -65,9 +65,18 @@ export class GenerativeLead {
   private counter = 0;
   /** The counter at the last bar line: where the loop stood when this bar began. */
   private barStart = 0;
+  /** The bar before: the UI shows it until its own step wraps, a lookahead after the scheduler (G4 review M2). */
+  private prevBarStart = 0;
+  /** The last bar step computed (-1 before the first). */
+  private lastStep = -1;
 
-  constructor(seed: number) {
+  /**
+   * `barStep`: where in the bar the lead starts. A lead made mid-bar (a new seed while playing) starts
+   * its loop as if it had begun at the bar line, so slot 0 lands on step 0 from the next bar (G4 review M1).
+   */
+  constructor(seed: number, barStep = 0) {
     this.seed = seed;
+    this.counter = Math.max(0, Math.min(15, Math.round(barStep)));
     const init = createRng(deriveSeed(seed, 1));
     for (let i = 0; i < 16; i++) this.slots.push({ pitch: init.next(), pool: init.next(), roll: init.next() });
     this.mutate = createRng(deriveSeed(seed, 2));
@@ -84,6 +93,8 @@ export class GenerativeLead {
     this.mutate = fresh.mutate;
     this.counter = 0;
     this.barStart = 0;
+    this.prevBarStart = 0;
+    this.lastStep = -1;
   }
 
   /**
@@ -93,22 +104,31 @@ export class GenerativeLead {
   rewind(): void {
     this.counter = 0;
     this.barStart = 0;
+    this.prevBarStart = 0;
+    this.lastStep = -1;
   }
 
   /**
    * The current bar as it stands: which steps are hits, and which of those play with the slots as
-   * they are now. Mutations still to come are not foreseen.
+   * they are now. Mutations still to come are not foreseen. `shownStep`: the step the UI shows as
+   * playing; past the last step computed, the scheduler has already crossed the bar line and the UI
+   * is still in the bar before, so that bar is shown.
    */
-  preview(p: LeadParams): LeadStepView[] {
+  preview(p: LeadParams, shownStep?: number): LeadStepView[] {
     const length = Math.max(2, Math.min(16, Math.round(p.length)));
     const rhythm = euclid(p.hits, 16, p.rotate);
-    return rhythm.map((hit, s) => ({ hit, plays: hit && this.slots[(this.barStart + s) % length].roll < p.density }));
+    const start = shownStep !== undefined && shownStep > this.lastStep ? this.prevBarStart : this.barStart;
+    return rhythm.map((hit, s) => ({ hit, plays: hit && this.slots[(start + s) % length].roll < p.density }));
   }
 
   /** Advance one sixteenth. `barStep` is the position in the bar (0..15). */
   step(barStep: number, p: LeadParams, ctx: LeadContext): LeadNote | null {
     const length = Math.max(2, Math.min(16, Math.round(p.length)));
-    if (barStep === 0) this.barStart = this.counter;
+    if (barStep === 0) {
+      this.prevBarStart = this.barStart;
+      this.barStart = this.counter;
+    }
+    this.lastStep = barStep;
     const index = this.counter % length;
     this.counter++;
     if (!euclid(p.hits, 16, p.rotate)[barStep]) return null;

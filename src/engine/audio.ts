@@ -50,6 +50,18 @@ function ramp(param: unknown, value: number): void {
   p.setTargetAtTime(value, t, RAMP / 4);
 }
 
+/**
+ * Move a parameter to `value` from audio time `time` (a step's time, ahead of now), with time
+ * constant `tau` (G4 review S1). Like `ramp`, a setTargetAtTime that starts from whatever value the
+ * parameter has at `time`, so it needs no hold point; anything scheduled from `time` on is dropped.
+ */
+function rampAt(param: unknown, value: number, time: number, tau = RAMP / 4): void {
+  const p = nativeParam(param);
+  const t = Math.max(time, Tone.getContext().currentTime);
+  p.cancelScheduledValues(t);
+  p.setTargetAtTime(value, t, tau);
+}
+
 /** Current native value of a parameter ramped with `ramp`, for the smoke test. */
 function nativeValue(param: unknown): number {
   return nativeParam(param).value;
@@ -479,6 +491,8 @@ export class Poly extends Instrument {
    * one cycle in eight seconds, so it never opens past the brightness point.
    */
   private pad: { filter: Tone.Filter; lfo: Tone.LFO; depth: Tone.Multiply; at: string } | null = null;
+  /** Audio time of the last pad filter move, for the smoke test (G4 review S1). */
+  private padMoveAt = -1;
 
   /**
    * `filterEnv`: the channel filter follows an envelope (the Synth's filter envelope dial); `fatAll`:
@@ -585,9 +599,12 @@ export class Poly extends Instrument {
   /**
    * Pad mode takes its attack and release from the section's pad settings, and its brightness and
    * motion drive the pad filter; other modes use the patch envelope with the pad filter open.
-   * Called on every step: it does nothing unless something changed.
+   * Called on every step with the step's audio time: it does nothing unless something changed, and
+   * the filter moves at `time`, on the audio clock, not a lookahead early (G4 review S1). Leaving Pad
+   * mode, the filter opens over the pad's release, so the released chord fades at its own brightness.
    */
-  useMode(pad: { attack: number; release: number; brightness: number; motion: number } | null): void {
+  useMode(pad: { attack: number; release: number; brightness: number; motion: number } | null, time: number): void {
+    const leaving = !pad && this.padEnv ? this.padEnv.release : null;
     if (pad) {
       if (!this.padEnv || this.padEnv.attack !== pad.attack || this.padEnv.release !== pad.release) {
         this.padEnv = { attack: pad.attack, release: pad.release };
@@ -602,8 +619,15 @@ export class Poly extends Instrument {
     const at = pad ? `${pad.brightness}:${pad.motion}` : "open";
     if (at === t.at) return;
     t.at = at;
-    ramp(t.filter.frequency, pad ? padBrightnessHz(pad.brightness) : PAD_TOP_HZ);
-    ramp(t.depth.factor, pad ? padMotionCents(pad.motion) : 0);
+    const tau = leaving !== null ? Math.min(leaving, 1) / 3 : RAMP / 4;
+    rampAt(t.filter.frequency, pad ? padBrightnessHz(pad.brightness) : PAD_TOP_HZ, time, tau);
+    rampAt(t.depth.factor, pad ? padMotionCents(pad.motion) : 0, time, tau);
+    this.padMoveAt = Math.max(time, Tone.getContext().currentTime);
+  }
+
+  /** Audio time from which the pad filter last moved (-1 before the first move). */
+  padMoveTime(): number {
+    return this.padMoveAt;
   }
 
   /** The pad filter's resting frequency now, in Hz (for the smoke test); null on the Synth. */

@@ -197,9 +197,6 @@ describe("layer tab (G4)", () => {
     expect(leadCellClass(true, false, true)).toBe("st h lo now");
   });
   it("pad times map both ways on their curve", () => {
-    for (const k of PAD_KNOBS) {
-      const spec = { key: "attack" as const, label: k.label, seconds: k.seconds };
-      for (const p of [0, 0.3, 1]) expect(knobPos(spec, knobValue(spec, p))).toBeCloseTo(p);
-    }
+    for (const k of PAD_KNOBS) for (const p of [0, 0.3, 1]) expect(knobPos(k, knobValue(k, p))).toBeCloseTo(p);
   });
 });

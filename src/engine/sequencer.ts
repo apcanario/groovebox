@@ -313,12 +313,12 @@ export class Sequencer {
   }
 
   /** The current bar of a section's generative lead as it stands (for the 16-step row). */
-  leadSteps(section: number, id: LayerInstrument): LeadStepView[] {
+  leadSteps(section: number, id: LayerInstrument, shownStep?: number): LeadStepView[] {
     const s = this.song.sections[section];
     if (!s) return [];
     const lead = this.leads.get(`${section}:${id}`);
     const view = lead && lead.seedValue === s[id].gen.seed ? lead : new GenerativeLead(s[id].gen.seed);
-    return view.preview(s[id].gen);
+    return view.preview(s[id].gen, shownStep);
   }
 
   /** Change the song's key and mood. Acts at once: held chords restart on the next step. */
@@ -539,7 +539,7 @@ export class Sequencer {
     const key = `${this.current}:${id}`;
     let lead = this.leads.get(key);
     if (!lead || lead.seedValue !== p.gen.seed) {
-      lead = new GenerativeLead(p.gen.seed);
+      lead = new GenerativeLead(p.gen.seed, step); // aligned to the bar even when made mid-bar (G4 review M1)
       this.leads.set(key, lead);
     }
     const note = lead.step(step, p.gen, {

@@ -6,20 +6,26 @@ import { euclid } from "../music/rhythm.ts";
 import { MOODS, NOTE_NAMES, inScale } from "../music/scales.ts";
 import { PAD_TOP_HZ, padBrightnessHz, padMotionCents } from "../music/sound.ts";
 import { Sequencer, type StepResult } from "./sequencer.ts";
-import { LAYER_MODES, defaultSong, validateSong, type LayerMode, type Song } from "./song.ts";
+import { LAYER_IDS, LAYER_MODES, defaultSong, validateSong, type LayerInstrument, type LayerMode, type Song } from "./song.ts";
 
 const run = (seq: Sequencer, steps: number): StepResult[] => Array.from({ length: steps }, () => seq.next());
 
-/** A one-section song with only Layer 1 on, in `mode`, over `chords` (one bar each). */
-function layerSong(mode: LayerMode, degrees = [0], key: Song["key"] = "A", mood: Song["mood"] = "house"): Song {
+/** A one-section song with only one layer on (Layer 1 by default), in `mode`, over `chords` (one bar each). */
+function layerSong(
+  mode: LayerMode,
+  degrees = [0],
+  key: Song["key"] = "A",
+  mood: Song["mood"] = "house",
+  layer: LayerInstrument = "layer1",
+): Song {
   const song = defaultSong();
   song.key = key;
   song.mood = mood;
   song.sections = [song.sections[1]];
   const s = song.sections[0];
-  s.on = { drums: false, bass: false, synth: false, layer1: true, layer2: false };
+  s.on = { drums: false, bass: false, synth: false, layer1: layer === "layer1", layer2: layer === "layer2" };
   s.chords = degrees.map((degree) => ({ degree, bars: 1 as const }));
-  s.layer1.mode = mode;
+  s[layer].mode = mode;
   return song;
 }
 
@@ -34,40 +40,49 @@ function bars(seq: Sequencer, n: number): (string | null)[][] {
 }
 
 describe("each layer mode plays in key", () => {
-  it("over every chord of every mood, in every key, for Arp, Pad and Generative", () => {
-    for (const mood of MOODS)
-      for (const key of NOTE_NAMES)
-        for (const mode of LAYER_MODES) {
-          const song = layerSong(mode, [0, 1, 2, 3, 4, 5, 6], key, mood);
-          const l = song.sections[0].layer1;
-          l.gen = { ...l.gen, lock: 0, hits: 16, density: 1, tension: 1 };
-          l.arp = { ...l.arp, direction: "random", octaves: 3, rate: 1 };
+  it("over every chord of every mood, in every key, for Arp, Pad and Generative, on both layers", () => {
+    for (const layer of LAYER_IDS)
+      for (const mood of MOODS)
+        for (const key of NOTE_NAMES)
+          for (const mode of LAYER_MODES) {
+            const song = layerSong(mode, [0, 1, 2, 3, 4, 5, 6], key, mood, layer);
+            const l = song.sections[0][layer];
+            l.gen = { ...l.gen, lock: 0, hits: 16, density: 1, tension: 1 };
+            l.arp = { ...l.arp, direction: "random", octaves: 3, rate: 1 };
+            const seq = new Sequencer(song);
+            seq.start();
+            let notes = 0;
+            for (const r of run(seq, 16 * 7)) {
+              for (const e of r.events) {
+                if (e.inst !== layer) continue;
+                for (const n of e.notes) {
+                  notes++;
+                  expect(inScale(n, key, mood), `${layer} ${mode} ${key} ${mood} ${n}`).toBe(true);
+                }
+              }
+            }
+            expect(notes, `${layer} ${mode} ${key} ${mood}`).toBeGreaterThan(6);
+          }
+  });
+
+  it("tension in the middle and right stays in key too (generative, every degree, both layers)", () => {
+    for (const layer of LAYER_IDS)
+      for (const mood of MOODS)
+        for (const tension of [0, 0.5, 1]) {
+          const song = layerSong("generative", [0, 1, 2, 3, 4, 5, 6], "C", mood, layer);
+          song.sections[0][layer].gen = { ...song.sections[0][layer].gen, lock: 0, hits: 16, density: 1, tension };
           const seq = new Sequencer(song);
           seq.start();
           let notes = 0;
-          for (const r of run(seq, 16 * 7)) {
-            for (const e of r.events) {
-              if (e.inst !== "layer1") continue;
-              for (const n of e.notes) {
-                notes++;
-                expect(inScale(n, key, mood), `${mode} ${key} ${mood} ${n}`).toBe(true);
-              }
-            }
-          }
+          for (const r of run(seq, 16 * 14))
+            for (const e of r.events)
+              if (e.inst === layer)
+                for (const n of e.notes) {
+                  notes++;
+                  expect(inScale(n, "C", mood)).toBe(true);
+                }
           expect(notes).toBeGreaterThan(6);
         }
-  });
-
-  it("tension in the middle and right stays in key too (generative, every degree)", () => {
-    for (const mood of MOODS)
-      for (const tension of [0, 0.5, 1]) {
-        const song = layerSong("generative", [0, 1, 2, 3, 4, 5, 6], "C", mood);
-        song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, lock: 0, hits: 16, density: 1, tension };
-        const seq = new Sequencer(song);
-        seq.start();
-        for (const r of run(seq, 16 * 14))
-          for (const e of r.events) if (e.inst === "layer1") for (const n of e.notes) expect(inScale(n, "C", mood)).toBe(true);
-      }
   });
 });
 
@@ -180,6 +195,44 @@ describe("generative lock and length", () => {
       expect(view.map((s) => s.plays)).toEqual(plays);
       expect(view.map((s) => s.hit)).toEqual(euclid(g.hits, 16, g.rotate));
     }
+  });
+
+  it("a new seed mid-bar (step 6) gives a loop aligned to the bar from the next bar", () => {
+    const song = layerSong("generative");
+    song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, lock: 1, length: 16, hits: 16, density: 1 };
+    const seq = new Sequencer(song);
+    seq.start();
+    bars(seq, 1);
+    run(seq, 6);
+    seq.newSeed(0, "layer1"); // steps 6..15 of this bar play the new seed
+    const rest = run(seq, 10);
+    const after = bars(seq, 3);
+    // The same seed started at a bar line.
+    const ref = layerSong("generative");
+    ref.sections[0].layer1.gen = { ...song.sections[0].layer1.gen };
+    const seq2 = new Sequencer(ref);
+    seq2.start();
+    const aligned = bars(seq2, 1)[0];
+    for (const bar of after) expect(bar).toEqual(aligned);
+    // The rest of the bar plays the slots of steps 6..15, and the row shows them.
+    expect(rest.map((r) => (r.events.find((e) => e.inst === "layer1") as { notes: number[] } | undefined)?.notes.join(",") ?? null)).toEqual(
+      aligned.slice(6),
+    );
+  });
+
+  it("the row keeps the bar the UI shows until its step wraps, a lookahead after the scheduler", () => {
+    const song = layerSong("generative");
+    song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, lock: 1, length: 5, hits: 16, density: 0.5 };
+    const seq = new Sequencer(song);
+    seq.start();
+    run(seq, 15);
+    const shown = seq.leadSteps(0, "layer1", 14); // bar 0, the scheduler at step 14
+    seq.next(); // step 15
+    seq.next(); // step 0 of bar 1: the scheduler crosses the bar line
+    expect(seq.leadSteps(0, "layer1", 15)).toEqual(shown); // the UI still shows bar 0
+    const next = seq.leadSteps(0, "layer1", 0); // the UI's step wrapped: bar 1
+    expect(next).toEqual(seq.leadSteps(0, "layer1"));
+    expect(next).not.toEqual(shown); // length 5 drifts, so bar 1 differs
   });
 });
 

@@ -34,8 +34,8 @@ import { INST_COLOR, INST_NAME } from "../theme.tsx";
 function Generative({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit, pos, playing } = ctx;
   const gen = song.sections[edit][id].gen;
-  const steps = engine.leadSteps(edit, id);
   const live = pos.playing && edit === playing;
+  const steps = engine.leadSteps(edit, id, live ? pos.step : undefined);
   return (
     <>
       <div class="leadrow">
@@ -128,22 +128,19 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const pad = song.sections[edit][id].pad;
   return (
     <div class="dials">
-      {PAD_KNOBS.map((k) => {
-        const spec = { key: "attack" as const, label: k.label, seconds: k.seconds };
-        return (
-          <Dial
-            key={k.key}
-            id={`${id}:pad:${k.key}`}
-            label={k.label}
-            value={knobPos(spec, pad[k.key])}
-            min={0}
-            max={1}
-            display={knobText(spec, pad[k.key])}
-            color={INST_COLOR[id]}
-            onChange={(p) => engine.setPad(edit, id, { [k.key]: knobValue(spec, p) })}
-          />
-        );
-      })}
+      {PAD_KNOBS.map((k) => (
+        <Dial
+          key={k.key}
+          id={`${id}:pad:${k.key}`}
+          label={k.label}
+          value={knobPos(k, pad[k.key])}
+          min={0}
+          max={1}
+          display={knobText(k, pad[k.key])}
+          color={INST_COLOR[id]}
+          onChange={(p) => engine.setPad(edit, id, { [k.key]: knobValue(k, p) })}
+        />
+      ))}
     </div>
   );
 }

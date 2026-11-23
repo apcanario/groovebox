@@ -130,23 +130,27 @@ export function hzLabel(hz: number): string {
 
 // ---- Patch knobs (G3) ----------------------------------------------------------------
 
-/** One dial on an instrument tab: which patch key, and how its 0..1 dial position maps to the value. */
-export interface KnobSpec {
-  key: NumericPatchKey;
+/** How a dial's 0..1 position maps to its value: all `knobPos`, `knobValue` and `knobText` need (G4 review M5). */
+export interface KnobCurve {
   label: string;
   /** Seconds on an exponential curve from lo to hi; absent for plain 0..1 amounts. */
   seconds?: [number, number];
 }
 
+/** One dial on an instrument tab: which patch key, and how its 0..1 dial position maps to the value. */
+export interface KnobSpec extends KnobCurve {
+  key: NumericPatchKey;
+}
+
 /** Dial position 0..1 of a patch value. */
-export function knobPos(k: KnobSpec, v: number): number {
+export function knobPos(k: KnobCurve, v: number): number {
   if (!k.seconds) return Math.max(0, Math.min(1, v));
   const [lo, hi] = k.seconds;
   return Math.max(0, Math.min(1, Math.log(Math.max(lo, v) / lo) / Math.log(hi / lo)));
 }
 
 /** Patch value at a dial position 0..1. */
-export function knobValue(k: KnobSpec, pos: number): number {
+export function knobValue(k: KnobCurve, pos: number): number {
   const p = Math.max(0, Math.min(1, pos));
   if (!k.seconds) return p;
   const [lo, hi] = k.seconds;
@@ -159,7 +163,7 @@ export function secondsLabel(s: number): string {
 }
 
 /** What the dial shows: seconds for times, 0..100 for amounts. */
-export function knobText(k: KnobSpec, v: number): string {
+export function knobText(k: KnobCurve, v: number): string {
   return k.seconds ? secondsLabel(v) : String(Math.round(v * 100));
 }
 
