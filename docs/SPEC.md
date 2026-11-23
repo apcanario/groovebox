@@ -175,6 +175,7 @@ Each instrument tab in Simple shows one picker and four large dials, on one scre
 - **A macro dial moves several ordinary values at once** (Bright: cutoff and filter envelope; Space: both sends; Punch: attack, decay and drive; Weight: sub and low drive; Evolve: the inverse of Lock). The mapping is data, next to the patch definitions.
 - **Each macro's position is stored in the song** so the dial shows where it was left. Editing the underlying values in Advanced does not move the macro dial.
 - **The XY pad stays** on every instrument tab in both modes.
+- **Two effect buttons** sit on every Simple instrument tab: on or off, nothing else (section 8.8).
 - **Layers also get two buttons in both modes:** New idea (a new seed) and Back (the previous seed). The last eight seeds per layer per section are kept.
 
 ### 8.4 Chords
@@ -272,8 +273,36 @@ Everything here is data that pickers list, apart from the engine additions at th
 - Drum presets on 16 steps with repeats (hat rolls), and a 16-step switch on the Advanced sequencer. Simple shows only the beat picker.
 - A noise oscillator and a two-operator FM wave for patches (airy pads, bells, glassy keys).
 - A tempo-synced LFO on the filter, for Wobble bass and pad motion.
-- Chorus on the shared sends, and a lo-fi master option (bit-crush, slow pitch wobble, a noise layer), each switchable off. This brings forward part of row L8.
+- A lo-fi master option (bit-crush, slow pitch wobble, a noise layer), switchable off. Chorus and the other effects are section 8.8.
 - All within the phone CPU budget of section 4: voice cap unchanged, every addition switchable off.
+
+### 8.8 Effects
+
+Things that make a sound weird and fun. All synthesized, all switchable while playing without a click.
+
+**Two effect slots per instrument.** Each slot holds one effect from this list:
+
+| Effect | What it does | Advanced knobs |
+|---|---|---|
+| Chorus | Thickens and widens. | Mix, Rate, Depth |
+| Phaser | A slow sweeping whoosh. | Mix, Rate, Depth |
+| Flanger | A metallic jet sweep. | Mix, Rate, Feedback |
+| Fuzz | Hard distortion, beyond the patch's Drive. | Amount, Tone, Mix |
+| Crush | Bit-crush and sample-rate reduction: gritty, digital. | Bits, Rate, Mix |
+| Tremolo | Volume pulsing in time. | Depth, Rate, Shape |
+| Pan | Moves the sound left and right in time. | Depth, Rate, Shape |
+| Gate | Chops the sound into a rhythm, in time. | Pattern, Depth, Smooth |
+| Ring | Ring modulation: bell-like, robotic. | Mix, Pitch, Follow |
+| Vowel | A formant filter that makes it talk. | Mix, Vowel, Rate |
+| Shifter | Frequency shift: detuned, alien. | Mix, Shift, Feedback |
+| Echo | A ping-pong delay of the instrument's own. | Mix, Time, Feedback |
+
+- **Simple:** each instrument tab shows its two slots as two large on/off buttons carrying the effect's name. The vibe decides which two effects are in the slots and how they are set. Nothing else to adjust.
+- **Advanced:** an FX page on each instrument tab: per slot, a picker for the effect, an on/off, and its three knobs.
+- **Rates are tempo-synced** where the effect moves in time (Tremolo, Pan, Gate, and Phaser and Flanger when set to a note value).
+- **Master effects** stay on the Mix tab: the filter sweep, pump, saturation, and the lo-fi master of 8.7. Simple shows the lo-fi master as one on/off.
+- **Cost:** a slot that is off is disconnected and costs nothing. At most two effects per instrument. The row that builds this measures the phone load with all ten slots on and reports it; if that is too much, the cap drops to six active slots across the app and the spec says so.
+- **Each vibe sets its slots,** so Lo-fi can arrive with Crush and Chorus on the keys and Dub techno with Echo on the chords.
 
 ## 9. Phase 3: tablet
 
@@ -302,6 +331,7 @@ Two halves, both always on screen.
   - Layers: mode and lead style, the phrase row, the Notes and Feel groups of six knobs side by side, the XY pad and the Sound group.
   - Drums: every voice by 16 steps as one grid, with the voice controls beside it.
   - Bass and Synth: all patch knobs, the rhythm picker and the XY pad.
+  - Every instrument panel also shows its two effect slots with their knobs.
   - Mix: a fader and meter per instrument, the master controls and the lo-fi master.
   - Chords: the editor and the progression library side by side.
 - **Simple panels** are the picker, the four macro dials at a large size, and the XY pad.

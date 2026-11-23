@@ -92,24 +92,38 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** every lead knob can be turned while playing with no stuck note or click; both modes fit without scrolling; `check` and `smoke` pass. Whether the leads now have enough variety is Pedro's call.
 
-## Bundle 7: phase 2, sounds and the other vibes
+## Bundle 7: phase 2, sounds and effects
 
 ### P7. Sound additions
 
-- Spec 8.7, engine additions: Perc and Shaker drum voices; 16-step drum presets with repeats and the 16-step switch on the Advanced sequencer; noise oscillator and two-operator FM wave; tempo-synced filter LFO; chorus on the sends; the lo-fi master option. Each switchable off.
+- Spec 8.7, engine additions: Perc and Shaker drum voices; 16-step drum presets with repeats and the 16-step switch on the Advanced sequencer; noise oscillator and two-operator FM wave; tempo-synced filter LFO; the lo-fi master option. Each switchable off. (Chorus and the other effects are P9.)
 - Measure the cost: report the smoke test's worst stall and audio load with everything on, against the same measure before the row.
 
 **Done when:** each addition is audible and can be turned off; nothing clicks when one is switched while playing; the voice cap holds; `check` and `smoke` pass.
+
+### P9. Effects
+
+- Spec 8.8: the twelve effects, two slots per instrument, tempo-synced where the table says.
+- Simple: two on/off buttons per instrument tab, named after the effects in the slots; the lo-fi master as one on/off on the Mix tab.
+- Advanced: the FX page per instrument (picker, on/off and three knobs per slot).
+- An off slot is disconnected. Switching a slot on or off, or changing its effect, while playing makes no click.
+- Give the eight vibes of P3 their two effects per instrument.
+- Measure the cost with all ten slots on against all off, on the smoke test, and report it. If it is too much, apply the six-slot cap and write it into the spec.
+
+**Done when:** every effect is audible on every instrument and can be switched mid-jam without a click (tested by level continuity); Simple needs no knob to use them; the cost is reported; `check` and `smoke` pass. Whether they are weird and fun is Pedro's call.
+
+## Bundle 8: phase 2, the other vibes
 
 ### P8. The other sixteen vibes and the library
 
 - The remaining styles of spec 8.2: Progressive, Acid house, Afro house, Minimal techno, Dub techno, Detroit techno, Breakbeat, Dubstep, Future garage, Downtempo, Synthwave, Trap, IDM, EDM, Trance, Electro.
 - The full lists of spec 8.7: at least 24 beats, 14 bass rhythms, 10 synth rhythms and 8 patches per instrument, all as data, all with names of 14 characters or fewer.
+- Every one of the 24 styles sets its two effects per instrument.
 - Revisit the first eight styles where the new sounds serve them (Lo-fi gets the lo-fi master, Ambient the airy pads).
 
 **Done when:** all 24 styles load and play (smoke test loops them); every list meets its count; every name fits its tile (tested); `check` and `smoke` pass. Whether each vibe sounds like its name is Pedro's call.
 
-## Bundle 8: keep it and install it
+## Bundle 9: keep it and install it
 
 ### G5. Save and record
 
@@ -129,9 +143,9 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
 
-## Bundle 9: phase 3, the tablet layouts
+## Bundle 10: phase 3, the tablet layouts
 
-Spec section 9 is the brief for bundles 9 and 10. Read it in full, with section 8, before any row.
+Spec section 9 is the brief for bundles 10 and 11. Read it in full, with section 8, before any row.
 
 ### T1. Three layouts and the docked pads
 
@@ -152,7 +166,7 @@ Spec section 9 is the brief for bundles 9 and 10. Read it in full, with section 
 
 **Done when:** on 1280 x 800 no Advanced panel has pages; every control is at least 48 px; `check` and `smoke` pass.
 
-## Bundle 10: phase 3, performance
+## Bundle 11: phase 3, performance
 
 ### T3. Punch pads, movement and many fingers
 
@@ -163,11 +177,11 @@ Spec section 9 is the brief for bundles 9 and 10. Read it in full, with section 
 
 **Done when:** each punch pad starts and ends on the beat or bar the spec names (tested on the audio clock); two controls can be moved at once (tested); animation can be turned off; `check` and `smoke` pass. Whether it makes you want to jam for hours is Pedro's call.
 
-## Bundle 11: retouch
+## Bundle 12: retouch
 
 ### G7. Retouch
 
-Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P8, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P9, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
 
 **Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
 
@@ -180,7 +194,6 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **L4.** Offline re-render of the event log, in chunks.
 - **L6.** Knob snapshots per section.
 - **L7.** Morph between two saved generative patterns.
-- **L8.** One effect slot per instrument (chorus, phaser, bit-crush, tape wobble), all synthesized. The shared chorus and the lo-fi master come earlier, in P7.
 - **L9.** Automatic transitions on a section switch (drum fill, filter drop), chosen per style. The manual Build pad comes earlier, in T3.
 - **L12.** Autopilot: the jam slowly changes itself (leads evolve, sections rotate) when left alone.
 - **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch.
