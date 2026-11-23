@@ -173,10 +173,11 @@ button:disabled {
   background-position: calc(var(--p) * 300% - 100%) 0;
   pointer-events: none;
 }
-.still .sec.playing::before,
-.still .tile.on::before,
-.still .cell.on::before,
-.still .tog.on::before {
+/* Motion off: no band. Only the band: a queued tile's ::before is its hatched frame, which stays (P1b review E1). */
+.still .sec.playing:not(.pending)::before,
+.still .tile.on:not(.pending)::before,
+.still .cell.on:not(.pending)::before,
+.still .tog.on:not(.pending)::before {
   display: none;
 }
 
@@ -502,8 +503,9 @@ button:disabled {
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--dim);
+  min-width: 0;
   overflow: hidden;
-  text-overflow: clip;
+  text-overflow: ellipsis;
 }
 .head em {
   font-style: normal;
@@ -535,6 +537,22 @@ button:disabled {
 }
 .roomy .glabel {
   margin-top: 4px;
+}
+/* Its icon beside the word, at the heading's size (P1b review M2). */
+.glabel:not(.split) {
+  display: flex;
+  align-items: center;
+}
+.glabel .gl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.glabel .ic,
+.dial label .ic {
+  width: 14px;
+  height: 14px;
 }
 .glabel.split {
   display: flex;
@@ -625,9 +643,16 @@ button:disabled {
   background: var(--text);
 }
 /* On instrument tabs the lane sits above the controls. */
+/* 40 px tall, so the drum lane's three rows read (P1b review M5). */
 .insttab > .lane {
   flex: none;
-  height: 30px;
+  height: 40px;
+}
+/* On a short phone the drums' Beat page (chips, heading, step grid) needs the room: there it is 32 px. */
+@media (max-height: 700px) {
+  .insttab:has(.drumseq) > .lane {
+    height: 32px;
+  }
 }
 .roomy > .lane,
 .roomy .lanerow .lane {
@@ -979,13 +1004,13 @@ button:disabled {
   max-width: 100%;
   aspect-ratio: 1;
 }
-.dial svg {
+.dial .knob svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-.dial path {
+.dial .knob path {
   fill: none;
   stroke-linecap: butt;
 }
@@ -998,7 +1023,7 @@ button:disabled {
 }
 .dial .ticks {
   stroke: var(--dim);
-  stroke-width: 1.5;
+  stroke-width: 2;
 }
 .dial .pointer {
   stroke: var(--text);
@@ -1007,7 +1032,8 @@ button:disabled {
 /* The value sits inside the ring: its box is the ring's inner square, and text is fitted to it. */
 .dial .val {
   position: absolute;
-  inset: 14%;
+  /* Across: inside the ring's hole at the text's height (P1b review S2); down: room for the line. */
+  inset: 14% 21%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1020,6 +1046,11 @@ button:disabled {
 }
 .dial label {
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1186,9 +1217,12 @@ button:disabled {
 .pager button {
   font-size: 14px;
 }
+.pager button {
+  gap: 4px;
+}
 .pager button .ic {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 /* ---- Tab bar: icon over word; the marker slides to the chosen tab ---- */

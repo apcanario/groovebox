@@ -46,9 +46,12 @@ export function overflows(c: HTMLElement, ls: HTMLElement[] = leaves(c)): boolea
   return false;
 }
 
-/** What a control was last fitted for: its size and its text. Read without walking its tree. */
+/**
+ * What a control was last fitted for: its size, its class (a chip that turns on is set bolder, so wider)
+ * and its text. Read without walking its tree.
+ */
 function keyOf(c: HTMLElement): string {
-  return `${c.clientWidth}x${c.clientHeight}|${c.textContent ?? ""}`;
+  return `${c.clientWidth}x${c.clientHeight}|${c.className}|${c.textContent ?? ""}`;
 }
 
 function fit(c: HTMLElement): void {

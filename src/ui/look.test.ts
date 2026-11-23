@@ -105,6 +105,19 @@ describe("lane geometry (spec 8.12)", () => {
     expect(clap.y).toBeLessThan(kick.y);
     expect(kick.y + kick.h).toBeLessThanOrEqual(100);
   });
+
+  it("pitched notes are a fifth of the lane tall and stay inside it", () => {
+    const r = laneRects([
+      { step: 0, len: 1, shift: 0, pitch: 48 },
+      { step: 4, len: 1, shift: 0, pitch: 72 },
+    ]);
+    for (const n of r) {
+      expect(n.h).toBe(20);
+      expect(n.y).toBeGreaterThanOrEqual(0);
+      expect(n.y + n.h).toBeLessThanOrEqual(100);
+    }
+    expect(r.map((n) => n.k)).toEqual(["48", "72"]);
+  });
 });
 
 describe("the playhead keeps time", () => {

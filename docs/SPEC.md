@@ -415,7 +415,7 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 **Icons**
 - Material Symbols, outlined, weight 300, shipped with the app as SVG.
 - An icon always sits beside its word, never in place of it. The exceptions are the vibe arrows, play and stop, and record.
-- Where they go: the tab bar, instrument names, mode switches (Lead, Arp, Pad, Drone), page chips (Notes, Feel, Sound, FX), effect buttons, punch pads, New jam, Back, New idea, Morph, DROP, and group headings.
+- Where they go: the tab bar, instrument names (dial names included), mode switches (Lead, Arp, Pad, Drone), page chips (Notes, Feel, Sound, FX, and every other page chip), effect buttons, punch pads, New jam, Back, New idea, Morph, DROP, and group headings.
 
 | Thing | Icon |
 |---|---|
@@ -424,6 +424,8 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 | Notes, Feel, Sound, FX | music_note, gesture, tune, bolt |
 | New jam, Back, New idea, Morph, DROP | add, undo, casino, all_inclusive, keyboard_double_arrow_down |
 | Cut, Filter, Stutter, Echo, Wash, Riser, Chorus | content_cut, filter_alt, fast_rewind, repeat, water, trending_up, blur_on |
+| Beat, Kick · Clap, Hats, Rhythm, Key, Master, Levels, Audio | apps, radio_button_checked, grain, timeline, key, speaker, equalizer, headphones |
+| Wave, Sequencer, Motion, Direction, Rate, Octaves | waves, view_week, motion_blur, swap_vert, speed, height |
 
 - The set has no drum icon; `adjust` (a pad seen from above) stands in. The row that builds each remaining effect and feature picks its icon from the same set and adds it to this table.
 - An icon may be drawn by hand only where the set has nothing usable, at the same line weight.

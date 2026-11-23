@@ -117,6 +117,49 @@ describe("lanes (P1b)", () => {
     for (const id of ["bass", "synth", "layer1"] as const) expect(view.notes[id].length, id).toBeGreaterThan(0);
   });
 
+  it("an off lane equals what the instrument plays when it is switched on for that bar (generative, arp, pad)", () => {
+    // Section 1: the generative Layer 1 and the arp on Layer 2 off; section 2: the pad on Layer 1 off.
+    const song = (): Song => {
+      const s = busySong();
+      s.sections[1].on.layer1 = false;
+      s.sections[1].on.layer2 = false;
+      s.sections[2].on.layer1 = false;
+      return s;
+    };
+    const cases: [number, "layer1" | "layer2", string][] = [
+      [1, "layer1", "generative"],
+      [1, "layer2", "arp"],
+      [2, "layer1", "pad"],
+    ];
+    let compared = 0;
+    for (const [section, id, mode] of cases) {
+      for (let bar = 1; bar <= 5; bar++) {
+        const ghost = new Sequencer(song());
+        const twin = new Sequencer(song());
+        for (const s of [ghost, twin]) {
+          s.switchSection(section);
+          s.start();
+        }
+        expect(song().sections[section][id].mode).toBe(mode);
+        // Both play the same bars up to `bar`; the twin's toggle is queued in the bar before, so it lands on bar's line.
+        for (let i = 0; i < bar * STEPS_PER_BAR; i++) {
+          if (i === (bar - 1) * STEPS_PER_BAR + 3) twin.toggleInstrument(section, id);
+          expect(ghost.next().events).toEqual(twin.next().events);
+        }
+        ghost.next();
+        const view = ghost.lanes(bar);
+        expect(view.on[id], `${mode} bar ${bar}`).toBe(false);
+        const heardBar = [twin.next()];
+        for (let i = 1; i < STEPS_PER_BAR; i++) heardBar.push(twin.next());
+        const heard = played(heardBar)[id];
+        expect(heard.length, `${mode} bar ${bar}: the twin plays`).toBeGreaterThan(0);
+        expect(starts(view.notes[id]), `${mode} bar ${bar}`).toEqual(starts(heard));
+        compared += heard.length;
+      }
+    }
+    expect(compared).toBeGreaterThan(20);
+  });
+
   it("when stopped, the lanes are the first bar Play starts with", () => {
     const song = busySong();
     const seq = new Sequencer(song);

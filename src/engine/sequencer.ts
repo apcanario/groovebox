@@ -379,7 +379,7 @@ export class Sequencer {
     return s[id].gen.seed;
   }
 
-  /** The current bar of a section's generative lead as it stands (for the 16-step row). */
+  /** The current bar of a section's generative lead as it stands (for P6's step row; no caller since P1b). */
   leadSteps(section: number, id: LayerInstrument, shownStep?: number): LeadStepView[] {
     const s = this.song.sections[section];
     if (!s) return [];

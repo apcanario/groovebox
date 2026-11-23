@@ -602,14 +602,17 @@ LANE_MATCH = """([sel, id]) => {
   const e = window.__groovebox, p = e.position(), l = e.lanes(p.playing ? p.bar : undefined);
   const el = document.querySelector(sel);
   if (!el) return {missing: true};
-  const want = l.notes[id].filter(n => n.step + n.shift < 16).length;
-  return {got: Number(el.dataset.notes), drawn: el.querySelectorAll('.n').length, want, on: l.on[id],
+  // Each note by where it starts and what it is (pitch or drum voice), in the order the lane draws them.
+  const want = l.notes[id].filter(n => n.step + n.shift < 16).map(n => `${n.step + n.shift}:${n.voice ?? n.pitch}`);
+  const drawn = [...el.querySelectorAll('.n')].map(n => `${n.dataset.s}:${n.dataset.k}`);
+  return {got: Number(el.dataset.notes), drawn, want, on: l.on[id],
           cls: el.classList.contains('on'), bar: p.bar, step: p.step};
 }"""
 
 
 def check_lane(page, sel: str, inst: str, failures: list, where: str) -> None:
-    """A lane draws exactly the notes the engine reports for its instrument this bar, greyed when off."""
+    """A lane draws exactly the notes the engine reports for its instrument this bar, each at its step with
+    its pitch or voice, greyed when off."""
     for attempt in range(6):
         r = page.evaluate(LANE_MATCH, [sel, inst])
         if r.get("missing"):
@@ -619,11 +622,11 @@ def check_lane(page, sel: str, inst: str, failures: list, where: str) -> None:
         if r["step"] >= 14 or r["step"] <= 1:
             time.sleep(0.15)
             continue
-        if r["got"] != r["want"] or r["drawn"] != r["want"]:
+        if r["got"] != len(r["want"]) or r["drawn"] != r["want"]:
             if attempt < 5:
                 time.sleep(0.15)
                 continue
-            failures.append(f"{where}: {inst} lane draws {r['drawn']} notes, the engine plays {r['want']} (bar {r['bar']})")
+            failures.append(f"{where}: {inst} lane draws {r['drawn']}, the engine plays {r['want']} (bar {r['bar']})")
         if r["on"] != r["cls"]:
             failures.append(f"{where}: {inst} lane shows {'on' if r['cls'] else 'off'}, the engine has it {'on' if r['on'] else 'off'}")
         return
@@ -637,7 +640,7 @@ PLAYHEAD = """(sel) => {
   const m = new DOMMatrixReadOnly(getComputedStyle(ph).transform);
   const p = window.__groovebox.position();
   return {at: (m.m41 / w) * 16, step: p.step, playing: p.playing,
-          p16: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--p16'))};
+          p16: parseFloat(getComputedStyle(ph).getPropertyValue('--p16'))};
 }"""
 
 
@@ -722,6 +725,16 @@ CAPS = r"""() => {
 }"""
 
 
+BARE = """() => [...document.querySelectorAll('.pager button, .glabel, .dials.n5 .dial label')]
+  .filter(e => e.getClientRects().length && !e.querySelector('[data-icon]')).map(e => e.textContent.trim())"""
+
+
+def check_bare(page, failures: list, where: str) -> None:
+    """Every page chip, group heading and instrument dial name on screen carries its icon (P1b review M1 to M3)."""
+    for t in page.evaluate(BARE):
+        failures.append(f"{where}: {t!r} has no icon")
+
+
 def check_icons(page, places: list, failures: list, where: str) -> None:
     for sel, icon in places:
         got = page.eval_on_selector_all(f"{sel} [data-icon]", "els => els.map(e => e.dataset.icon)")
@@ -733,18 +746,108 @@ def check_icons(page, places: list, failures: list, where: str) -> None:
             failures.append(f"{where}: {sel} has an icon but no word")
 
 
-STATES = """() => {
-  const css = (sel, pseudo) => { const el = document.querySelector(sel); return el ? getComputedStyle(el, pseudo) : null; };
-  const on = css('[data-now].on'), off = css('[data-now].off:not(.pending)'), next = css('[data-now].pending');
-  const nextHatch = css('[data-now].pending', '::before');
-  const band = css('.sec.playing', '::before');
-  return {
-    on: on && on.backgroundPosition, off: off && [off.backgroundPosition, off.boxShadow],
-    next: next && next.backgroundPosition, hatch: nextHatch && nextHatch.backgroundImage,
-    march: nextHatch && nextHatch.backgroundPosition, band: band && band.display,
-    still: document.documentElement.classList.contains('still'),
-  };
+PROBE = """(sel) => {
+  // The colours a tile draws, resolved (--c and --card may be var() chains), and its hatch layer.
+  const el = document.querySelector(sel);
+  if (!el) return null;
+  const probe = (v) => { const i = document.createElement('i'); i.style.color = v; el.appendChild(i);
+    const c = getComputedStyle(i).color; i.remove(); return c.match(/[\\d.]+/g).slice(0, 3).map(Number); };
+  const b = getComputedStyle(el, '::before');
+  return {c: probe('var(--c)'), card: probe('var(--card)'), cls: el.className,
+          before: b.display, hatch: b.backgroundImage, march: b.backgroundPosition};
 }"""
+
+# Hide words and icons while a tile is photographed, so only its fill and frame are read.
+HIDE_TEXT = "[data-probe], [data-probe] * { color: transparent !important; text-shadow: none !important; }"
+
+
+def read_tile(page, sel: str) -> dict | None:
+    """What a tile shows, from its pixels: `fill`, the share of its centre in its colour; `frame`, the share
+    of its top edge in its colour; `turns`, how often that edge changes between colour and dark (hatching);
+    `edge`, whether its left 3 px are in its colour. Plus the hatch layer's computed style."""
+    import io
+    from PIL import Image
+
+    st = page.evaluate(PROBE, sel)
+    if not st:
+        return None
+    page.evaluate("(sel) => document.querySelector(sel).setAttribute('data-probe', '')", sel)
+    try:
+        img = Image.open(io.BytesIO(page.locator(sel).first.screenshot(animations="disabled"))).convert("RGB")
+    finally:
+        page.evaluate("(sel) => document.querySelector(sel).removeAttribute('data-probe')", sel)
+    w, h = img.size
+    c, card = st["c"], st["card"]
+
+    def mine(x: int, y: int) -> bool:
+        p = img.getpixel((x, y))
+        dc = sum((a - b) ** 2 for a, b in zip(p, c))
+        dk = sum((a - b) ** 2 for a, b in zip(p, card))
+        return dc < dk
+
+    inner = [mine(x, y) for x in range(9, w - 9) for y in range(9, h - 9)]
+    top = [mine(x, 2) for x in range(9, w - 9)]
+    turns = sum(1 for a, b in zip(top, top[1:]) if a != b)
+    st.update(fill=sum(inner) / max(len(inner), 1), frame=sum(top) / max(len(top), 1), turns=turns,
+              edge=all(mine(1, y) for y in range(9, h - 9)))
+    return st
+
+
+def tile_state(t: dict) -> str:
+    """on, off or next, as a person reads it: filled; dark with an edge of its colour (a section not playing:
+    dark); a hatched frame round a dark centre."""
+    if t["fill"] > 0.8:
+        return "on"
+    if t["fill"] < 0.2 and 0.2 < t["frame"] < 0.8 and t["turns"] >= 4:
+        return "next"
+    if t["fill"] < 0.2 and t["frame"] < 0.2:
+        return "off" if t["edge"] else "dark"
+    return f"unreadable (fill {t['fill']:.2f}, frame {t['frame']:.2f}, {t['turns']} turns, edge {t['edge']})"
+
+
+def check_tile(page, sel: str, want: str, failures: list, where: str) -> dict | None:
+    t = read_tile(page, sel)
+    if not t:
+        failures.append(f"{where}: no {sel}")
+        return None
+    got = tile_state(t)
+    if got != want:
+        failures.append(f"{where}: {sel} reads as {got}, it is {want} ({t['cls']})")
+    if want == "next":
+        if t["before"] == "none" or "repeating-linear-gradient" not in (t["hatch"] or ""):
+            failures.append(f"{where}: {sel} is queued but its hatched frame is hidden ({t['before']}, {t['hatch']})")
+    return t
+
+
+def queued_tile(page, sel: str, want_now: str, undo, failures: list, where: str) -> None:
+    """Read a tile before and after a tap queues it, then tap again to cancel. Reads early in a bar so the
+    queue cannot land between tap and read; if it lands anyway, `undo` puts the song back."""
+    page.evaluate(f"document.head.insertAdjacentHTML('beforeend', '<style id=probe-style>{HIDE_TEXT}</style>')")
+    try:
+        for attempt in range(3):
+            wait_for(page, "window.__groovebox.position().step === 1", 3.0)
+            before = page.evaluate("JSON.stringify([window.__groovebox.getSong().sections.map(s => s.on), window.__groovebox.position().section])")
+            check_tile(page, sel, want_now, failures, where)
+            page.click(sel)
+            time.sleep(0.05)
+            check_tile(page, sel, "next", failures, where)
+            m1 = (read_tile(page, sel) or {}).get("march")
+            time.sleep(0.25)
+            m2 = (read_tile(page, sel) or {}).get("march")
+            if m1 != m2:
+                failures.append(f"{where}: {sel} hatching still marches ({m1} -> {m2})")
+            page.click(sel)
+            time.sleep(0.05)
+            after = page.evaluate("JSON.stringify([window.__groovebox.getSong().sections.map(s => s.on), window.__groovebox.position().section])")
+            p = page.evaluate("window.__groovebox.pending()")
+            if after == before and not p["toggles"] and p["section"] is None:
+                return
+            wait_for(page, "window.__groovebox.pending().toggles.length === 0 && window.__groovebox.pending().section === null", 4.0)
+            undo()
+            wait_for(page, "window.__groovebox.pending().toggles.length === 0 && window.__groovebox.pending().section === null", 4.0)
+        failures.append(f"{where}: {sel}: a bar line kept passing between tap and read")
+    finally:
+        page.evaluate("document.getElementById('probe-style')?.remove()")
 
 
 def walk_look(page, failures: list) -> None:
@@ -767,46 +870,70 @@ def walk_look(page, failures: list) -> None:
         check_icons(page, [(".headrow .head", {"drums": "adjust", "bass": "graphic_eq", "synth": "airwave"}[tab])], failures, f"{tab} tab")
         for b in page.evaluate(CAPS):
             failures.append(f"all-capital text on the {tab} tab: {b!r}")
+        check_bare(page, failures, f"{tab} tab")
     page.click('[data-tab="layer1"]')
     sec = page.evaluate("window.__groovebox.position().section")
     mode = page.evaluate(f"{SONG}.sections[{sec}].layer1.mode")
     page.click('[data-mode="layer1:generative"]')
     time.sleep(0.15)
     check_icons(page, LAYER_ICONS, failures, "Layer 1 tab")
+    check_bare(page, failures, "Layer 1 tab")
     check_lane(page, '[data-lane="layer1"]', "layer1", failures, "layer1 tab")
     page.click(f'[data-mode="layer1:{mode}"]')
 
     # The motion switch: off, nothing moves; the states still read by fill and hatching.
     page.click('[data-tab="mix"]')
+    page.click('[data-page="mix:levels"]')
+    check_bare(page, failures, "Mix tab, Levels")
     page.click('[data-page="mix:audio"]')
+    check_bare(page, failures, "Mix tab, Audio")
     page.click('[data-motion="off"]')
     page.click('[data-tab="play"]')
     time.sleep(0.2)
-    wait_for(page, "window.__groovebox.position().step === 2", 3.0)
-    page.click('[data-now="layer2"]')  # queued: Next bar
-    time.sleep(0.05)
-    st = page.evaluate(STATES)
-    if not st["still"]:
+    if not page.evaluate("document.documentElement.classList.contains('still')"):
         failures.append("motion off: the root is not still")
-    if st["band"] != "none":
-        failures.append(f"motion off: the moving band still shows ({st['band']})")
-    if not st["hatch"] or "repeating-linear-gradient" not in st["hatch"]:
-        failures.append(f"motion off: Next bar is not hatched ({st['hatch']})")
-    if st["on"] == st["off"][0] if st["off"] else False:
-        failures.append("motion off: on and off tiles have the same fill")
-    if st["off"] and "inset" not in st["off"][1]:
-        failures.append(f"motion off: an off tile has no edge of its colour ({st['off'][1]})")
-    if st["next"] == st["on"]:
-        failures.append("motion off: a Next bar tile is filled like an on tile")
-    m1 = st["march"]
-    time.sleep(0.3)
-    m2 = page.evaluate(STATES)["march"]
-    if m1 != m2:
-        failures.append(f"motion off: the hatching still marches ({m1} -> {m2})")
+    band = page.evaluate("getComputedStyle(document.querySelector('.sec.playing'), '::before').display")
+    if band != "none":
+        failures.append(f"motion off: the moving band still shows ({band})")
+    sec = page.evaluate("window.__groovebox.schedulerSection()")
+    on = page.evaluate(f"{SONG}.sections[{sec}].on")
+    going_off = next(i for i in LAYERS if on[i])
+    going_on = next((i for i in LAYERS if not on[i]), None)
+    if going_on is None:
+        page.evaluate(f"()=>{{window.__groovebox.toggleInstrumentInPlaying('layer2')}}")
+        wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+        going_on = "layer2"
+        on = page.evaluate(f"{SONG}.sections[{sec}].on")
+
+    def toggle_back(inst):
+        return lambda: page.evaluate(f"()=>window.__groovebox.toggleInstrumentInPlaying('{inst}')")
+
+    # Simple: a Now tile going off, one going on, a section tile.
+    queued_tile(page, f'[data-now="{going_off}"]', "on", toggle_back(going_off), failures, "motion off, Now tile")
+    queued_tile(page, f'[data-now="{going_on}"]', "off", toggle_back(going_on), failures, "motion off, Now tile")
+    other = (sec + 1) % page.evaluate(f"{SONG}.sections.length")
+    queued_tile(page, f'[data-strip="{other}"]', "dark", lambda: page.evaluate(f"()=>window.__groovebox.switchSection({sec})"),
+                failures, "motion off, section tile")
     check_playhead(page, ".phcol .ph", failures, "Now view, motion off", still=True)
-    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
-    page.click('[data-now="layer2"]')
-    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+    # Advanced: a cell of the playing section going off and one going on.
+    page.click('[data-appmode="advanced"]')
+    time.sleep(0.15)
+    queued_tile(page, f'[data-cell="{sec}:{going_off}"]', "on", toggle_back(going_off), failures, "motion off, Song cell")
+    queued_tile(page, f'[data-cell="{sec}:{going_on}"]', "off", toggle_back(going_on), failures, "motion off, Song cell")
+    page.click('[data-appmode="simple"]')
+    # The instrument tab's switch, on and off.
+    tab = going_off if going_off in ("drums", "bass", "synth") else "drums"
+    if on[tab]:
+        page.click(f'[data-tab="{tab}"]')
+        time.sleep(0.15)
+        queued_tile(page, f'[data-toggle="{tab}"]', "on", toggle_back(tab), failures, f"motion off, {tab} switch")
+    if going_on in ("drums", "bass", "synth"):
+        page.click(f'[data-tab="{going_on}"]')
+        time.sleep(0.15)
+        queued_tile(page, f'[data-toggle="{going_on}"]', "off", toggle_back(going_on), failures, f"motion off, {going_on} switch")
+    if page.evaluate(f"{SONG}.sections[{sec}].on") != on:
+        failures.append("motion off: the walk left the playing section's instruments changed")
+    page.click('[data-tab="play"]')
     page.click('[data-tab="mix"]')
     page.click('[data-page="mix:audio"]')
     page.click('[data-motion="on"]')

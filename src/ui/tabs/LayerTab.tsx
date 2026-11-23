@@ -9,7 +9,7 @@
 import { useState } from "preact/hooks";
 import { ARP_DIRECTIONS, LAYER_MODES, WAVES, type ArpDirection, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, Pager } from "../components.tsx";
+import { Chips, Dial, GroupLabel, Pager } from "../components.tsx";
 import {
   ARP_DIRECTION_LABEL,
   ARP_OCTAVES,
@@ -23,6 +23,7 @@ import {
   WAVE_LABEL,
   genText,
   knobPos,
+  knobLabel,
   knobText,
   knobValue,
   sectionLetter,
@@ -67,7 +68,7 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const octs = ARP_OCTAVES.map(String);
   return (
     <>
-      <div class="glabel">Direction</div>
+      <GroupLabel thing="Direction" />
       <Chips
         name="arpdir"
         options={ARP_DIRECTIONS}
@@ -77,7 +78,7 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
       />
       <div class="arprow">
         <div class="group">
-          <div class="glabel">Rate</div>
+          <GroupLabel thing="Rate" />
           <Chips
             name="arprate"
             options={rates}
@@ -87,7 +88,7 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
           />
         </div>
         <div class="group">
-          <div class="glabel">Octaves</div>
+          <GroupLabel thing="Octaves" />
           <Chips
             name="arpoct"
             options={octs}
@@ -122,7 +123,7 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
         <Dial
           key={k.key}
           id={`${id}:pad:${k.key}`}
-          label={k.label}
+          label={knobLabel(k)}
           value={knobPos(k, pad[k.key])}
           min={0}
           max={1}
@@ -142,10 +143,7 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
   const patch = song.patches[id];
   return (
     <>
-      <div class="glabel split">
-        <span>Wave</span>
-        {roomy && mode === "pad" && <span>Attack and release: the Pad page</span>}
-      </div>
+      <GroupLabel thing="Wave" split={roomy && mode === "pad" ? "Attack and release: the Pad page" : undefined} />
       <Chips
         name="wave"
         options={WAVES}
@@ -158,7 +156,7 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
           <Dial
             key={k.key}
             id={`${id}:${k.key}`}
-            label={k.label}
+            label={knobLabel(k)}
             value={knobPos(k, patch[k.key])}
             min={0}
             max={1}

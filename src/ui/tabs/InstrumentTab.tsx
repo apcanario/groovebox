@@ -19,8 +19,8 @@ import {
   type InstrumentId,
 } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
-import { KNOB_PAGES, PRESET_LABEL, WAVE_LABEL, hzLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
+import { Chips, Dial, GroupLabel, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
+import { KNOB_PAGES, PRESET_LABEL, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 
@@ -34,7 +34,7 @@ function Knobs({ ctx, inst, knobs }: { ctx: Ctx; inst: InstrumentId; knobs: read
         <Dial
           key={k.key}
           id={`${inst}:${k.key}`}
-          label={k.label}
+          label={knobLabel(k)}
           value={knobPos(k, patch[k.key])}
           min={0}
           max={1}
@@ -112,7 +112,7 @@ export function HeadRow({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
 function Waves({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   return (
     <>
-      <div class="glabel">Wave</div>
+      <GroupLabel thing="Wave" />
       <Chips
         name="wave"
         options={WAVES}
@@ -139,9 +139,9 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
         label={(p) => PRESET_LABEL[p]}
         onPick={(p) => engine.setDrumPreset(edit, p)}
       />
-      <div class="glabel">
+      <GroupLabel thing="Sequencer">
         Sequencer · {edited ? "edited" : "8 steps"} · {DRUM_PATTERNS[drums.preset].swing > 0 ? "swung" : "straight"}
-      </div>
+      </GroupLabel>
       <div class="chips" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
         {DRUM_VOICES.map((v) => (
           <button key={v} class={`chip${voice === v ? " on" : ""}`} data-voice={v} aria-pressed={voice === v} onClick={() => setVoice(v)}>
@@ -205,7 +205,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           {page === "beat" && <DrumBeat ctx={ctx} />}
           {page === "kick" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
           {page === "hats" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs} />}
-          {page === "rhythm" && <div class="glabel">Rhythm</div>}
+          {page === "rhythm" && <GroupLabel thing="Rhythm" />}
           {page === "rhythm" && inst === "bass" && (
             <Chips
               name="rhythm"

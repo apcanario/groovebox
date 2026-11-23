@@ -227,15 +227,17 @@ export function knobValue(k: KnobCurve, pos: number): number {
   return lo * Math.pow(hi / lo, p);
 }
 
-/** "4ms", "120ms", "1.2 s". */
-export function secondsLabel(s: number): string {
-  // No space before "ms": a three-digit time fits the smallest dial at 10 px (spec 8.6: shortened in the source).
-  return s < 1 ? `${Math.round(s * 1000)}ms` : `${s.toFixed(1)} s`;
+/**
+ * What the dial shows: milliseconds for times, 0..100 for amounts. The unit goes in the dial's name
+ * (knobLabel), so the value fits inside the ring's hole on the smallest dial (P1b review S2).
+ */
+export function knobText(k: KnobCurve, v: number): string {
+  return k.seconds ? String(Math.round(v * 1000)) : String(Math.round(v * 100));
 }
 
-/** What the dial shows: seconds for times, 0..100 for amounts. */
-export function knobText(k: KnobCurve, v: number): string {
-  return k.seconds ? secondsLabel(v) : String(Math.round(v * 100));
+/** The dial's name: a time carries its unit ("Decay ms"). */
+export function knobLabel(k: KnobCurve & { label: string }): string {
+  return k.seconds ? `${k.label} ms` : k.label;
 }
 
 /** At most six dials per screen (spec section 5): split a list into pages of `size`. */
@@ -462,6 +464,8 @@ export interface LaneRect {
   /** Start and end in sixteenths (the note brightens while the playhead is between them). */
   s: number;
   e: number;
+  /** The note's pitch (MIDI) or drum voice, so a test can compare the lane with the engine's notes. */
+  k: string;
 }
 
 /** Drum voices top to bottom: hats over clap over kick. */
@@ -495,11 +499,12 @@ export function laneRects(
       y = 12 + row * 28 + (row === 0 ? 3 : 0);
       w = Math.min(unit * 0.32, w);
     } else {
-      h = 12;
-      y = hi === lo ? 44 : 10 + ((hi - n.pitch!) / span) * 72;
+      // A fifth of the lane tall (P1b review M8), tops spread over 10..80 % so the lowest ends at the edge.
+      h = 20;
+      y = hi === lo ? 40 : 10 + ((hi - n.pitch!) / span) * 70;
       w = Math.max(unit * 0.5, w - unit * 0.12);
     }
-    out.push({ x: s * unit + unit * 0.06, w, y, h, s, e: n.voice !== undefined ? s + 1 : e });
+    out.push({ x: s * unit + unit * 0.06, w, y, h, s, e: n.voice !== undefined ? s + 1 : e, k: String(n.voice ?? n.pitch) });
   }
   return out;
 }

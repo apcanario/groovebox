@@ -521,6 +521,7 @@ export class Engine {
    * The 16 steps of a section's generative lead in the current bar: hits, and which of them play.
    * `shownStep`: the playing step the UI shows (pass it while the section plays), so the row keeps the
    * bar it shows until that step wraps, not the bar the scheduler has already reached (G4 review M2).
+   * No caller since P1b replaced the lead row with the lane; kept, with its tests, for P6's step row.
    */
   leadSteps(section: number, layer: LayerInstrument, shownStep?: number): LeadStepView[] {
     return this.seq.leadSteps(section, layer, shownStep);

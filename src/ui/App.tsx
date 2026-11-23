@@ -238,10 +238,21 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   // One loop for every movement on screen (spec 8.12, Motion).
   useEffect(() => startMotion(engine), [engine]);
 
-  // The lanes: read from the engine when the bar shown or the song changes, never per frame.
+  // The lanes: read from the engine when the bar shown changes, and after a song change at most once per
+  // animation frame (a dial drag changes the song on every event; P1b review M9), never per frame otherwise.
+  const [songRev, setSongRev] = useState(0);
+  const revFrame = useRef(0);
+  useEffect(() => {
+    if (revFrame.current) return;
+    revFrame.current = requestAnimationFrame(() => {
+      revFrame.current = 0;
+      setSongRev((r) => r + 1);
+    });
+  }, [song]);
+  useEffect(() => () => cancelAnimationFrame(revFrame.current), []);
   const lanes = useMemo(
     () => engine.lanes(pos.playing ? pos.bar : undefined),
-    [engine, song, pos.bar, pos.playing, pos.section],
+    [engine, songRev, pos.bar, pos.playing, pos.section],
   );
   useEffect(() => showLanes(lanes), [lanes]);
 

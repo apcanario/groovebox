@@ -25,7 +25,7 @@ import {
   knobValue,
   meterFraction,
   paginate,
-  secondsLabel,
+  knobLabel,
   moveChord,
   removeChord,
   replaceChord,
@@ -253,8 +253,10 @@ describe("patch knobs (G3)", () => {
     const a = { key: "drive" as const, label: "D" };
     expect(knobValue(a, 0.3)).toBe(0.3);
     expect(knobText(a, 0.42)).toBe("42");
-    expect(knobText(k, 0.004)).toBe("4ms");
-    expect(secondsLabel(1.25)).toBe("1.3 s");
+    expect(knobText(k, 0.004)).toBe("4");
+    expect(knobText(k, 1.25)).toBe("1250");
+    expect(knobLabel({ ...k, label: "Decay" })).toBe("Decay ms");
+    expect(knobLabel(a)).toBe("D");
   });
   it("no page holds more than six dials, and every dial names a patch key", () => {
     for (const [inst, pages] of Object.entries(KNOB_PAGES)) {

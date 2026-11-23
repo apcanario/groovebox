@@ -47,6 +47,8 @@ export function Lane({ id, lanes, playhead = false }: { id: InstrumentId; lanes:
           key={i}
           class="n"
           data-n={i}
+          data-s={r.s}
+          data-k={r.k}
           style={{ left: `${r.x}%`, width: `${r.w}%`, top: `${r.y}%`, height: `${r.h}%`, "--s": r.s, "--e": r.e }}
         />
       ))}

@@ -1,11 +1,9 @@
 /** Reusable controls: Dial, XYPad, SendBar, Toggle, and the drag and long-press hooks. No hover states. */
 import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
-import { Icon, type IconThing } from "./icons.tsx";
+import { Icon, iconThing, type IconThing } from "./icons.tsx";
 import { dragValue, fraction } from "./logic.ts";
 
-/** Page chips that carry an icon (spec 8.12's table), and mode switches named by their mode. */
-const PAGE_ICONS = new Set(["Notes", "Feel", "Sound", "FX", "Lead", "Arp", "Pad", "Drone"]);
 
 type PE = PointerEvent & { currentTarget: HTMLElement };
 
@@ -112,7 +110,7 @@ function tick(a: number, r0: number, r1: number): string {
   return `M${x0.toFixed(2)} ${y0.toFixed(2)}L${x1.toFixed(2)} ${y1.toFixed(2)}`;
 }
 /** The three tick marks (minimum, middle, maximum), outside the ring. */
-const TICKS = [135, 270, 405].map((a) => tick(a, R + 6, R + 9)).join("");
+const TICKS = [135, 270, 405].map((a) => tick(a, R + 5, R + 9)).join("");
 
 export interface DialProps {
   label: string;
@@ -127,6 +125,8 @@ export interface DialProps {
   /** Draw the arc from the middle (for bipolar values such as the filter sweep). */
   bipolar?: boolean;
   id?: string;
+  /** The name under the dial when it is more than its label's words (an instrument's icon and name). */
+  name?: ComponentChildren;
 }
 
 /**
@@ -134,7 +134,7 @@ export interface DialProps {
  * spec 8.12 says: a square-cut arc on a dark track, three ticks, a short white pointer at the value,
  * the value in the middle and the name under it.
  */
-export function Dial({ label, value, min, max, step = 0, display, color, onChange, bipolar, id }: DialProps) {
+export function Dial({ label, value, min, max, step = 0, display, color, onChange, bipolar, id, name }: DialProps) {
   const drag = useVerticalDrag(value, min, max, onChange, step);
   const f = fraction(value, min, max);
   const end = 135 + 270 * f;
@@ -162,7 +162,7 @@ export function Dial({ label, value, min, max, step = 0, display, color, onChang
         </svg>
         <div class="val">{text}</div>
       </div>
-      <label>{label}</label>
+      <label>{name ?? label}</label>
     </div>
   );
 }
@@ -347,6 +347,25 @@ export function Chips<T extends string>({
   );
 }
 
+/** A page chip's icon: every page chip carries one (spec 8.12's table; P1b review M1). */
+function PageIcon({ label }: { label: string }) {
+  const t = iconThing(label);
+  return t ? <Icon thing={t} /> : null;
+}
+
+/** A group heading over a chip row, with its icon beside the word (spec 8.12; P1b review M2). */
+export function GroupLabel({ thing, children, split }: { thing: IconThing; children?: ComponentChildren; split?: ComponentChildren }) {
+  return (
+    <div class={`glabel${split ? " split" : ""}`}>
+      <span class="gl">
+        <Icon thing={thing} />
+        {children ?? thing}
+      </span>
+      {split && <span>{split}</span>}
+    </div>
+  );
+}
+
 /** Page chips at the top of a tab (spec 8.6): where a tab holds more than fits one screen. */
 export function Pager<K extends string>({
   pages,
@@ -363,7 +382,7 @@ export function Pager<K extends string>({
     <div class="seg pager" style={{ gridTemplateColumns: `repeat(${pages.length}, minmax(0, 1fr))` }}>
       {pages.map(([k, label]) => (
         <button key={k} class={k === page ? "on" : ""} data-page={`${id}:${k}`} aria-pressed={k === page} onClick={() => onPage(k)}>
-          {PAGE_ICONS.has(label.split(" ")[0]) && <Icon thing={label.split(" ")[0] as IconThing} />}
+          <PageIcon label={label} />
           <span>{label}</span>
         </button>
       ))}

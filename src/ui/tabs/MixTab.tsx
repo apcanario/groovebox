@@ -5,10 +5,10 @@
 import { useEffect, useState } from "preact/hooks";
 import { INSTRUMENTS, type Engine, type LatencyHint, type MixState } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Dial, Meter, Pager } from "../components.tsx";
+import { Dial, GroupLabel, Meter, Pager } from "../components.tsx";
 import { meterFraction, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
-import { INST_COLOR, INST_NAME } from "../theme.tsx";
+import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 
 /** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
 function MasterMeter({ engine }: { engine: Engine }) {
@@ -32,11 +32,21 @@ function MasterMeter({ engine }: { engine: Engine }) {
 
 /** The app's own motion switch (spec 8.12): off, nothing moves and every state reads by fill and hatching. */
 function MotionSwitch() {
-  const [on, setOn] = useState(motionWanted);
-  useEffect(() => onMotionPref(() => setOn(motionWanted())), []);
+  const [wanted, setWanted] = useState(motionWanted);
+  useEffect(() => onMotionPref(() => setWanted(motionWanted())), []);
+  // The phone's reduce-motion setting holds everything still whatever the switch says: show Still (P1b review M10).
+  const [system, setSystem] = useState(() => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const fn = (): void => setSystem(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  const on = wanted && !system;
   return (
     <>
-      <div class="glabel">Motion</div>
+      <GroupLabel thing="Motion" />
       <div class="seg two">
         {([true, false] as const).map((v) => (
           <button key={String(v)} class={on === v ? "on" : ""} data-motion={v ? "on" : "off"} aria-pressed={on === v} onClick={() => setMotionOn(v)}>
@@ -44,6 +54,7 @@ function MotionSwitch() {
           </button>
         ))}
       </div>
+      {system && <p class="note" id="motion-system">The phone's setting is on.</p>}
       <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>
     </>
   );
@@ -93,6 +104,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
               key={id}
               id={`level:${id}`}
               label={INST_NAME[id]}
+              name={<InstName id={id} />}
               value={ctx.song.patches[id].level}
               min={0}
               max={1}

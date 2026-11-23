@@ -121,7 +121,7 @@ export class GenerativeLead {
    * The current bar as it stands: which steps are hits, and which of those play with the slots as
    * they are now. Mutations still to come are not foreseen. `shownStep`: the step the UI shows as
    * playing; past the last step computed, the scheduler has already crossed the bar line and the UI
-   * is still in the bar before, so that bar is shown.
+   * is still in the bar before, so that bar is shown. No UI caller since P1b; kept for P6's step row.
    */
   preview(p: LeadParams, shownStep?: number): LeadStepView[] {
     const length = Math.max(2, Math.min(16, Math.round(p.length)));

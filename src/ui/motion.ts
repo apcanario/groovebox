@@ -1,7 +1,9 @@
 /**
  * Motion (spec 8.12): one requestAnimationFrame loop drives every clock-tied movement by setting a few
- * custom properties on the root element; the CSS turns them into transforms, opacity and background
- * position only. Display only: nothing here schedules sound, and under load the loop simply drops frames.
+ * custom properties on the containers that use them (MOVERS), not on the root, so a frame restyles those
+ * subtrees and not the whole page (P1b review M7); the CSS turns them into transforms, opacity and
+ * background position only. Display only: nothing here schedules sound, and under load the loop simply
+ * drops frames. The root's own values (style.css) are the stopped ones.
  *
  * Properties set every frame:
  * - `--p16`: the playhead in sixteenths of the bar (0..16), -1 when stopped
@@ -59,6 +61,13 @@ export function showLanes(l: LaneBar): void {
   lanes = l;
 }
 
+/**
+ * Every element that reads the motion properties, by its outermost container: the Now view (tiles, lanes,
+ * playhead, flashes), the Song grid's cells, the section strip, the switches on the instrument and layer
+ * tabs, a lane outside the Now view, and the record button's dot.
+ */
+export const MOVERS = ".nowlist, .grid, .secs, .tog, .rec, .lane:not(.nowlist .lane)";
+
 /** Start the loop. Returns a function that stops it. */
 export function startMotion(engine: Engine, root: HTMLElement = document.documentElement): () => void {
   const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -69,6 +78,7 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
   let raf = 0;
   let wasStill: boolean | null = null;
   let prev = "";
+  let targets: HTMLElement[] = [];
   const frame = (now: number): void => {
     raf = requestAnimationFrame(frame);
     const still = !wanted() || !!reduce?.matches;
@@ -87,14 +97,23 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
       flashes.push(f);
       parts.push(f.toFixed(2));
     }
+    // A container that appeared since the last frame gets the values even when they have not changed.
+    const movers = root.querySelectorAll<HTMLElement>(MOVERS);
+    const same = movers.length === targets.length && targets.every((t, i) => t === movers[i]);
     const key = parts.join(",");
-    if (key === prev) return;
+    if (key === prev && same) return;
     prev = key;
-    const s = root.style;
-    s.setProperty("--p16", p16.toFixed(3));
-    s.setProperty("--p", playing ? (p16 / 16).toFixed(4) : "0");
-    s.setProperty("--beat", playing && !still ? ((p16 % 4) / 4).toFixed(3) : "0");
-    INSTRUMENTS.forEach((id, i) => s.setProperty(`--f-${id}`, flashes[i].toFixed(2)));
+    if (!same) targets = [...movers];
+    const p = p16.toFixed(3);
+    const bar = playing ? (p16 / 16).toFixed(4) : "0";
+    const beat = playing && !still ? ((p16 % 4) / 4).toFixed(3) : "0";
+    for (const t of targets) {
+      const s = t.style;
+      s.setProperty("--p16", p);
+      s.setProperty("--p", bar);
+      s.setProperty("--beat", beat);
+      INSTRUMENTS.forEach((id, i) => s.setProperty(`--f-${id}`, flashes[i].toFixed(2)));
+    }
     root.classList.toggle("running", playing);
   };
   raf = requestAnimationFrame(frame);
