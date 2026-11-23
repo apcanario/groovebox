@@ -26,9 +26,11 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, 22 and 23 Nov 2026):
+Built and live on the link above (rows G0 to G5 and P1, 22 and 23 Nov 2026):
 
-- **Play tab:** a grid of instruments by sections. Tap a section to switch to it, tap a cell to turn an instrument on or off in that section, hold a section to rename, copy, add or delete it.
+- **One frame on every tab (P1):** header (New jam, Songs, Simple/Advanced), content, one row of sections, a transport bar with four beat lights and the bar counter, then the tab bar. Tapping a section plays it from the next bar; holding one opens its sheet. Nothing scrolls, and text shrinks to fit its tile.
+
+- **Play tab:** in Advanced, a grid of instruments by sections on top of the section row: tap a cell to turn an instrument on or off in that section, hold a section to rename, copy, add or delete it or edit it without playing. In Simple (for now the header switch), five on/off tiles; tap to switch at the next bar, hold to open the tab.
 - **Chords tab:** choose a key and a mood (Major, Minor, House, Deep, Dark), then build a sequence of up to eight chords from seven in-key buttons, with lengths of half a bar, one bar or two.
 - **Drums tab:** five beats (including 2-step and drum and bass), an 8-step sequencer per drum voice, level and decay per voice, kick pitch and drive.
 - **Bass and Synth tabs:** rhythm and wave pickers, envelope, filter, drive, sub level and glide for the bass; detune, attack, decay, release and filter envelope for the synth.
@@ -39,7 +41,7 @@ Built and live on the link above (rows G0 to G5, 22 and 23 Nov 2026):
 - **An XY pad on every instrument** for filter cutoff and resonance, and delay and reverb sends into one shared delay and one shared reverb.
 - **Mix tab:** a one-knob filter sweep over the whole mix, sidechain pump on the kick, saturation, a level per instrument and a master meter.
 - **The screen stays awake while playing.**
-- **Songs:** jams are saved on the phone automatically and the last one reopens on launch. A Songs sheet on the Play tab opens, renames, creates and deletes them.
+- **Songs:** jams are saved on the phone automatically and the last one reopens on launch. A Songs sheet, opened from the header, opens, renames, creates and deletes them.
 - **Record:** the record button arms with Play or starts a take at once, shows the elapsed time, and logs every knob move, mute and section switch with the song.
 - **MP3 export:** a take is encoded while you play (160 kbps) and saved or shared from the phone. A ten-minute take was measured with memory flat.
 
@@ -78,8 +80,8 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5 | Sound spike, engine, shell, instrument tabs, layers, save and record | Done |
-| P1 to P11 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
+| G0 to G5, P1 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame | Done |
+| P1b to P11 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |

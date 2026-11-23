@@ -39,19 +39,6 @@ All rows of this bundle are Done.
 
 Spec section 8 is the brief for bundles 4 to 7, and `docs/design/look/` shows where it is going. Read sections 8.1, 8.3, 8.6 and 8.12 in full before any row of this bundle.
 
-### P1. The frame
-
-- Spec 8.6: the bottom-up order on every tab (header, content, section strip, transport bar, tab bar); the mode switch and New jam in the header.
-- One section strip everywhere; a tap always means play from the next bar; "Edit without playing" by hold, kept for Advanced; the Play grid sits on the strip.
-- Nothing scrolls: Advanced uses pages with large chips, Simple shows everything or pages by a visible button. Text always fits its tile (never wraps, clips or overflows; drawn smaller down to 10 px, then shortened). Fix every label that wraps today (the Play grid's "hold a column for options" tile is one).
-- The four beat lights and the bar counter in the transport bar.
-- The last jam surviving a reload is already built (G5: autosave and reopen). Keep it working through the new frame; the smoke test already covers it.
-- G5 put the Songs sheet on the Play tab because the tab bar had no room. Move its entry to the header, beside New jam, on every tab.
-- Until P2 lands the mode switch, a temporary switch on the Play tab chooses the Now or Song view; the Now view here is five plain on/off tiles, which P1b turns into lanes.
-- `tools/shots.py`: saves a screenshot of every tab and page, in both modes, at 360 x 640 and 412 x 915, into `shots/` (not committed). The smoke test uses the same walk to check that the document does not scroll, no control is cut off, and no tile, chip, button, dial or pill has text that wraps, clips or overflows.
-
-**Done when:** nothing scrolls and all text fits at both sizes on every tab and page (tested); there is one row of sections on every screen and a tap means the same thing everywhere; the strip and transport bar sit directly above the tab bar; a reload brings the jam back; `check` and `smoke` pass.
-
 ### P1b. The look
 
 - Spec 8.12 in full, across the whole app: 3 px corners and 2 px gaps; the on, off and next-bar states (hatched frame); square-cut dials with ticks and pointer; the dot-grid XY pad; sentence case.
@@ -65,7 +52,7 @@ Spec section 8 is the brief for bundles 4 to 7, and `docs/design/look/` shows wh
 
 ### P2. Simple and Advanced
 
-- Spec 8.1 and 8.3: the app-wide toggle in the header, remembered; Simple as the first-run default.
+- Spec 8.1 and 8.3: the app-wide toggle in the header, remembered (P1 left the switch unremembered and doubling as the temporary Now/Song switch; this row replaces that); Simple as the first-run default.
 - Simple instrument tabs: one picker and four macro dials each, as in the 8.3 table, plus the XY pad. Macro mappings as data; macro positions stored in the song.
 - Advanced tabs are the tabs built in G2 to G4, re-laid to the no-scroll rule.
 - Simple uses plain words only: check every visible string in Simple against 8.1.
@@ -85,6 +72,7 @@ Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
 - Bpm range 60 to 180.
 - The vibe control on the Simple Play tab (spec 8.6): current vibe with an arrow each side, arrows step on the next bar, the middle opens the picker.
 - The vibe picker as the opening screen: a two-column grid that fits all 24 tiles on one screen without scrolling (unbuilt styles are not shown until they exist), Continue last jam first; New jam from style in the header; loading lands on the next bar; a vibe loads as a new song, so the jam it replaces stays in Songs.
+- New jam is disabled while playing since P1 (review M1); this row enables it, since a vibe loads as a new song.
 - Move the existing presets (moods, drum presets, bass and synth rhythms) to data files in the same way, with pickers that list whatever exists.
 
 **Done when:** each of the eight styles loads and plays with every instrument audible in its groove section (smoke test loops all of them); adding another style is one new file and no other change (shown by a test fixture); loading a style mid-jam lands on the bar; `check` and `smoke` pass. Whether each style sounds like its name is Pedro's call.
@@ -249,3 +237,4 @@ Kept here so no row disappears without a record.
 - **G3. Drums, Bass, Synth and Mix tabs** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 9 minor, all applied), pushed. Report in `docs/reviews/G3.md`. Bundle 2 is done.
 - **G4. Layer 1 and Layer 2** (23 Nov 2026). Built, reviewed (fix: 0 errors, 1 should-fix, 6 minor, 5 minor and the should-fix applied, loudness minor carried as C4 as a listen item), pushed. Report in `docs/reviews/G4.md`. Bundle 3 is done.
 - **G5. Save and record** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 8 minor, all applied; the error was a Tone oscillator leak), pushed. Report in `docs/reviews/G5.md`. Ten-minute take: valid MP3, 600.11 s for 600.01 s, heap +0.6 MB.
+- **P1. The frame** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 5 minor, all applied except M1 and M2, which belong to P3 and P2 and stay in those rows), pushed. Report in `docs/reviews/P1.md`.
