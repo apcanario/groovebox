@@ -1,7 +1,7 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
 import type { ChordStep, InstrumentId, NumericPatchKey, Song } from "../engine/song.ts";
 import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
-import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle } from "../music/lead.ts";
+import { LEAD_SHAPES, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle } from "../music/lead.ts";
 import { leadKnobs } from "../music/leadKit.ts";
 
 export const MAX_CHORDS = 8;
@@ -418,8 +418,6 @@ export function nowTile(song: Song, target: number, pending: { toggles: { sectio
 /** One generative knob: range, whole steps or not, and its colour token. */
 // ---- Lead (P6, spec 8.5) -------------------------------------------------------------
 
-/** The lead styles in the selector's order, by name. */
-export const LEAD_STYLE_ORDER: readonly LeadStyle[] = LEAD_STYLES;
 export const LEAD_STYLE_LABEL: Record<LeadStyle, string> = { hook: "Hook", phrase: "Phrase", roll: "Roll", drift: "Drift", pulse: "Pulse" };
 /**
  * Shape's choices as the dial shows them. Valley is "Dip" and Zigzag "Zig": the full words do not fit inside a

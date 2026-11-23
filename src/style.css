@@ -654,8 +654,7 @@ button:disabled {
     height: 32px;
   }
 }
-.roomy > .lane,
-.roomy .lanerow .lane {
+.roomy > .lane {
   height: 52px;
 }
 .lanerow {
@@ -1774,9 +1773,10 @@ button:disabled {
   gap: 2px;
   pointer-events: none;
 }
+/* Unlit segments in --dim, so the row of the phrase's bars reads as a row, not one beat marker (P6 review M2). */
 .lane .phr i {
   flex: 1 1 0;
-  background: var(--line);
+  background: var(--dim);
 }
 .lane .phr i.on {
   background: var(--text);
@@ -1801,16 +1801,17 @@ button:disabled {
   width: 16px;
   height: 16px;
 }
-.layertab.adv.roomy > .lane {
-  flex: none;
-  height: 52px;
-}
 /* Lead dials: two rows of three, shorter on a short phone so the style row fits above them. */
 .dials.lead {
   grid-auto-rows: minmax(64px, 100px);
 }
 .dials.lead.n3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* Pulse's three on a short phone: their row fills the page (P6 review M4). */
+.layertab:not(.roomy) .dials.lead.n3 {
+  grid-auto-rows: minmax(64px, 1fr);
+  align-content: stretch;
 }
 /* With the style row on a short phone: the XY pad gives up some height (still twice the dot), the macro row a little. */
 .layertab.adv.lead .xy {

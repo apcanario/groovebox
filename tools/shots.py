@@ -22,7 +22,6 @@ TABS = ["play", "chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
 LAYER_MODES = ["generative", "arp", "pad"]
 # Lead styles the frame walk shows (P6): a planned style, and Pulse with its own page.
 LEAD_WALK = ["hook", "pulse"]
-LEAD_SHAPES = ["rise", "fall", "arch", "valley", "zigzag", "flat", "free"]  # src/music/lead.ts
 
 # Must match FIT_CONTROLS in src/ui/fit.ts.
 CHECK = r"""() => {
@@ -164,7 +163,8 @@ class Walk:
         dial on the Notes and Feel pages; the knobs go back to what they were."""
         keys = ["shape", "register", "range", "phrase"]
         saved = self.page.evaluate(f"(() => {{ const g = window.__groovebox.getSong().sections[{sec}].{lid}.gen; return {keys!r}.map(k => g[k] ?? null); }})()")
-        tries = [("notes", {"shape": sh, "register": reg, "range": 1}) for sh in LEAD_SHAPES for reg in (0.1, 0.5, 0.9)]
+        shapes = self.page.evaluate("window.__groovebox.leadLists().shapes")  # read from the app, never copied (P6 review M6)
+        tries = [("notes", {"shape": sh, "register": reg, "range": 1}) for sh in shapes for reg in (0.1, 0.5, 0.9)]
         tries += [("feel", {"phrase": ph}) for ph in (1, 2, 4, 8)]
         for pg, vals in tries:
             self.page.click(f'[data-page="{lid}:{pg}"]')

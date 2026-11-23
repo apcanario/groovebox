@@ -7,6 +7,8 @@ import * as Tone from "tone";
 import { Graph } from "./audio.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
+import { JumpWatch, type Jumps } from "./continuity.ts";
+import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
 import { Sequencer, STEPS_PER_BAR, type GenValues, type LaneBar, type StepResult } from "./sequencer.ts";
 import {
@@ -836,6 +838,28 @@ export class Engine {
   /** One instrument's own level in dB, without the shared sends (P3 review S2); -Infinity before audio starts. */
   instrumentLevel(id: InstrumentId): number {
     return this.graph ? this.graph.instrumentLevel(id) : -Infinity;
+  }
+
+  /** The lead's shapes and styles in their order, so the test tools read them instead of copying them (P6 review M6). */
+  leadLists(): { shapes: readonly string[]; styles: readonly string[] } {
+    return { shapes: SHAPES, styles: STYLES };
+  }
+
+  private jumpWatches = new Map<InstrumentId, JumpWatch>();
+
+  /**
+   * For the smoke test (P6 review S2): the largest sample-to-sample jump and the largest sample of one
+   * instrument's own output since the last call (the first call starts the watch); null before audio starts.
+   */
+  async jumps(id: InstrumentId): Promise<Jumps | null> {
+    if (!this.graph) return null;
+    let w = this.jumpWatches.get(id);
+    if (!w) {
+      w = await JumpWatch.make(Tone.getContext());
+      this.graph.instruments[id].channel.level.connect(w.node);
+      this.jumpWatches.set(id, w);
+    }
+    return w.read();
   }
 
   info(): { sampleRate: number; baseLatencyMs: number; outputLatencyMs: number; hint: string } {

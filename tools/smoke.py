@@ -1039,11 +1039,49 @@ LEAD_DIAL_PAGES = {"notes": 6, "feel": 6, "pulse": 3}
 OPTIONAL_GEN = ["style", "shape", "phrase", "range", "register", "noteLength", "variation", "repeats", "slide", "accent"]
 
 
+# A click: a window whose largest sample-to-sample jump, over its largest sample, is this many times the steady
+# sound's. Measured on a sine (a saw's own edge is as large as a click): there the wave's own jump is 2 pi f / rate
+# of its peak, under a tenth for a lead's notes, and a step in level is up to the whole peak.
+CLICK_FACTOR = 2.5
+
+
+def read_jumps(page, inst: str) -> tuple:
+    """Largest sample-to-sample jump and largest sample of one instrument's own output since the last read, and
+    the jump over the peak (0 when silent). The first read starts the watch."""
+    r = page.evaluate(f"window.__groovebox.jumps({inst!r})") or {"jump": 0.0, "peak": 0.0}
+    return r["jump"], r["peak"], (r["jump"] / r["peak"] if r["peak"] > 1e-3 else 0.0)
+
+
+def steady_jumps(page, inst: str, seconds: float) -> float:
+    """The steady sound's own jump over peak: the largest of its quarter-second reads over `seconds`."""
+    read_jumps(page, inst)
+    best = 0.0
+    for _ in range(int(seconds / 0.25)):
+        time.sleep(0.25)
+        best = max(best, read_jumps(page, inst)[2])
+    return best
+
+
+def check_continuity(page, inst: str, steady: float, where: str, failures: list, read: tuple | None = None) -> float:
+    """Level continuity (P6 review S2; P9 reuses it): since the last read (or in `read`), no jump well above the
+    steady sound's own. Returns the jump over peak as a multiple of the steady one."""
+    jump, pk, ratio = read or read_jumps(page, inst)
+    if steady > 0 and ratio > CLICK_FACTOR * steady:
+        failures.append(f"{where}: a click on {inst} (jump {jump:.4f} at peak {pk:.3f}: {ratio / steady:.1f} times the steady sound's)")
+    return ratio / steady if steady > 0 else 0.0
+
+
 def walk_p6(page, failures: list) -> None:
     """P6, Advanced Layer 1 in Lead while the transport runs: for each of the five styles, picked from the style row,
     every dial of every lead page is turned and must reach the section; the output never clips; the lane's phrase bar
-    counts the phrase's bars. Then the layer is switched off on the bar line: every voice must let go (no stuck
-    note). Simple: the style picker sets the style. The layer goes back to what it was."""
+    counts the phrase's bars. From Drift with long notes and Busy high, the layer's output must stay continuous
+    (no click) while each dial turns and each style is picked. Then Busy goes to 0 in Pulse (no new note): every
+    voice must end on its own within the longest note and the release (no stuck note); then the layer is switched
+    off on the bar line and must fall silent. Simple: the style picker sets the style. The layer goes back to what
+    it was."""
+    lists = page.evaluate("window.__groovebox.leadLists()")
+    if lists["styles"] != LEAD_STYLES:
+        failures.append(f"P6: smoke's LEAD_STYLES {LEAD_STYLES} differ from the app's {lists['styles']}")
     sec = page.evaluate("window.__groovebox.position().section")
     L = f"{SONG}.sections[{sec}].layer1"
     saved = page.evaluate(L)
@@ -1052,10 +1090,22 @@ def walk_p6(page, failures: list) -> None:
     page.click('[data-mode="layer1:generative"]')
     peak = -999.0
     turned = 0
+    # Long notes sounding, so a step in level would land inside a note; a sine, so a step stands out from the wave.
+    wave = page.evaluate(f"{SONG}.patches.layer1.wave")
+    page.evaluate("window.__groovebox.setParam('layer1', 'wave', 'sine')")
+    page.evaluate(f"()=>window.__groovebox.setGen({sec}, 'layer1', {{style: 'drift', noteLength: 1, density: 0.9}})")
+    steady = steady_jumps(page, "layer1", 3.0)
+    worst = 0.0
     for style in LEAD_STYLES:
+        read_jumps(page, "layer1")
         page.click(f'[data-leadstyle="{style}"]')
         if page.evaluate(f"{L}.gen.style") != style:
             failures.append(f"P6: the style row did not pick {style}")
+        time.sleep(0.3)
+        switched = read_jumps(page, "layer1")
+        # The steady sound grows by this style's own (a style can sit higher than the one before).
+        steady = max(steady, steady_jumps(page, "layer1", 1.5))
+        worst = max(worst, check_continuity(page, "layer1", steady, f"P6: picking {style}", failures, switched))
         pages = page.eval_on_selector_all(".body [data-page]", "els => els.map(e => e.dataset.page.split(':')[1])")
         want = ["notes", "feel"] + (["pulse"] if style == "pulse" else [])
         if [k for k in pages if k in LEAD_DIAL_PAGES] != want:
@@ -1067,8 +1117,11 @@ def walk_p6(page, failures: list) -> None:
                 failures.append(f"P6: {style}'s {k} page has {len(ids)} dials, not {LEAD_DIAL_PAGES[k]}")
             for d in ids:
                 before = page.evaluate(f"{L}.gen")
+                read_jumps(page, "layer1")
                 turn(page, f'[data-dial="{d}"]')
                 turned += 1
+                time.sleep(0.1)
+                worst = max(worst, check_continuity(page, "layer1", steady, f"P6: turning {d} ({style})", failures))
                 if page.evaluate(f"{L}.gen") == before:
                     failures.append(f"P6: dial {d} ({style}) changed nothing in the section")
                 pk = page.evaluate("window.__groovebox.peak()")
@@ -1086,15 +1139,26 @@ def walk_p6(page, failures: list) -> None:
             failures.append(f"P6: {style}: the lane shows phrase bar {shown}, the phrase has {bars} bars")
         elif page.locator('[data-lane="layer1"] .phr i').count() != int(shown.split("/")[1]):
             failures.append(f"P6: {style}: the phrase bar draws {page.locator('[data-lane=layer1] .phr i').count()} segments for {shown}")
-    print(f"P6: {turned} lead dials turned over five styles while playing; output peak {peak:.1f} dBFS")
+    print(f"P6: {turned} lead dials turned over five styles while playing; output peak {peak:.1f} dBFS; "
+          f"largest jump {worst:.2f} times the steady sound's (a click above {CLICK_FACTOR:.1f})")
     if peak >= 0:
         failures.append(f"P6: the output clipped while lead dials were turned ({peak:.1f} dBFS)")
-    # No stuck note: switched off on the bar line, the layer lets every voice go within its release.
+    # No stuck note: with the layer still on and no new note (Pulse at Busy 0), every voice ends on its own
+    # within the longest note (8 bars) and the release.
+    page.evaluate(f"()=>window.__groovebox.setGen({sec}, 'layer1', {{style: 'pulse', density: 0}})")
+    bpm = page.evaluate(f"{SONG}.bpm")
+    release = page.evaluate(f"{SONG}.patches.layer1.release")
+    voices = "window.__groovebox.activeVoices('layer1')"
+    if not wait_for(page, f"{voices} === 0", 8 * 4 * 60 / bpm + release + 1.0):
+        left = page.evaluate(voices)
+        failures.append(f"P6: {left} Layer 1 voices still sound with no new note past the longest note and release (stuck notes)")
+    # Switched off on the bar line, the layer falls silent.
     page.evaluate(f"window.__groovebox.toggleInstrument({sec}, 'layer1')")
     if not wait_for(page, f"!{L}.on && window.__groovebox.pending().toggles.length === 0", 4.0):
         failures.append("P6: Layer 1 did not switch off on the bar line")
-    if not wait_for(page, "window.__groovebox.activeVoices('layer1') === 0", 6.0):
-        failures.append(f"P6: {page.evaluate(chr(119) + 'indow.__groovebox.activeVoices(' + chr(39) + 'layer1' + chr(39) + ')')} Layer 1 voices still sound after it went off (stuck notes)")
+    if not wait_for(page, f"{voices} === 0", 6.0):
+        left = page.evaluate(voices)
+        failures.append(f"P6: {left} Layer 1 voices still sound after it went off (stuck notes)")
     page.evaluate(f"window.__groovebox.toggleInstrument({sec}, 'layer1')")
     wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
     # Simple: the style picker beside Busy, Evolve, Bright and Space.
@@ -1114,6 +1178,7 @@ def walk_p6(page, failures: list) -> None:
         gen.setdefault(k, None)
     page.evaluate(f"(g)=>window.__groovebox.setGen({sec}, 'layer1', g)", gen)
     page.evaluate(f"()=>window.__groovebox.setLayerMode({sec}, 'layer1', '{saved['mode']}')")
+    page.evaluate(f"window.__groovebox.setParam('layer1', 'wave', {wave!r})")
     if page.evaluate(f"{L}.gen") != saved["gen"]:
         failures.append(f"P6: Layer 1's lead did not go back to what it was")
 
