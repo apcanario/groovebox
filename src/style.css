@@ -970,22 +970,18 @@ button:disabled {
 .feels {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--gap);
   margin-top: calc(var(--group) - var(--gap));
 }
+/* Two rows of three at every size, as groovebox-3 (P4 review M5). */
 .feels .chip {
   padding: 0 2px;
-  font-size: 13px;
+  font-size: 14px;
 }
-/* Room for two rows of three (as groovebox-3) on a taller screen. */
-@media (min-height: 760px) {
-  .feels {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .feels .chip {
-    font-size: 14px;
-  }
+/* The feel and page over the cards (groovebox-3's "Dreamy · 1 of 2"). */
+.glabel.cardline {
+  margin-top: var(--gap);
 }
 /* On a phone of 640 to 759 px the four cards sit two by two; taller, one under another as in groovebox-3. */
 .cards {

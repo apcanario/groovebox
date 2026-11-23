@@ -17,6 +17,7 @@ It checks that sound is produced and nothing throws. It cannot judge how it soun
 """
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -1632,6 +1633,22 @@ def walk_p3(page, failures: list) -> None:
     print("vibe arrows: next and previous landed on the bar")
 
 
+# What Simple Chords must not show (P4 Done when: no scale or degree name). Scale names and the mood words that
+# are not also a feel or part of a vibe or card name ("Warm", "Dark", "Deep" and "House" are; they are checked
+# by the mood's own words "Major", "Minor" and "Sad"); roman numerals, either case, with or without a degree sign;
+# note names as words.
+NO_THEORY = [
+    re.compile(r"\b(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian|pentatonic|scale|degree|key)\b", re.I),
+    re.compile(r"\bSad\b"),
+    re.compile(r"(?<![\w-])(VII|VI|IV|V|III|II|I|vii|vi|iv|v|iii|ii|i)°?(?![\w-])"),
+    re.compile(r"(?<![\w-])[A-G][#b♯♭]?(?![\w-])"),
+]
+
+
+def theory_words(text: str) -> list:
+    return sorted({m.group(0) for r in NO_THEORY for m in r.finditer(text)})
+
+
 def walk_p4(page, failures: list) -> None:
     """P4: Simple Chords while playing. Every feel shows four cards for the vibe; a tapped card plays from the next
     bar line (mood and chords together, nothing before it), and is then shown playing; a card tapped twice cancels;
@@ -1650,6 +1667,9 @@ def walk_p4(page, failures: list) -> None:
     landings = 0
     for feel in feels:
         page.click(f'[data-feel="{feel}"]')
+        bad = theory_words(page.inner_text(".chordtab.simple"))
+        if bad:
+            failures.append(f"Simple Chords ({feel}) shows scale or degree words: {bad}")
         cards = page.eval_on_selector_all("[data-prog]", "els => els.map(e => e.dataset.prog)")
         if len(cards) != 4:
             failures.append(f"{style}/{feel}: {len(cards)} cards, not four")

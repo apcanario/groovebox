@@ -22,6 +22,11 @@ const chords: ChordStep[] = progressionChords(card);
 
 function playing(): Sequencer {
   const song = defaultSong();
+  // Bass and synth on, so the bar-line assertions below have events to check (P4 review S3).
+  song.sections[1].on.bass = true;
+  song.sections[1].on.synth = true;
+  song.sections[1].bass.rhythm = "dub"; // a hit on the bar line
+  song.sections[1].synth.rhythm = "sustained"; // held: the chord starts on the bar line
   const seq = new Sequencer(song);
   seq.switchSection(1);
   seq.start();
@@ -47,9 +52,8 @@ describe("setProgression (P4)", () => {
     expect(seq.song.sections[1].chords).toEqual(chords);
     // The first chord of the card, in the song's key, on the bar line.
     const first = buildChord(seq.song.key, card.mood, chords[0].degree);
-    expect(bassNote(line) ?? first.bass).toBe(first.bass);
-    const held = synthNotes(line);
-    if (held) expect(held).toEqual(first.notes);
+    expect(bassNote(line)).toBe(first.bass);
+    expect(synthNotes(line)).toEqual(first.notes);
     expect(seq.pending().chords).toBeUndefined();
   });
 
@@ -102,6 +106,20 @@ describe("setProgression (P4)", () => {
     expect(line.section).toBe(2);
     expect(line.applied?.section).toBe(2);
     expect(seq.song.sections[2].chords).toEqual(chords);
+  });
+
+  it("is refused while a vibe waits for the bar line, which would replace the song and drop the card (P4 review S5)", () => {
+    const seq = playing();
+    run(seq, 3);
+    const next = defaultSong();
+    next.name = "Next";
+    seq.queueSong(next, 0);
+    expect(seq.setProgression(1, card.mood, chords)).toBe(false);
+    expect(seq.pending().chords).toBeUndefined();
+    run(seq, 14); // through the bar line
+    expect(seq.song.name).toBe("Next");
+    expect(seq.songQueued).toBe(false);
+    expect(seq.setProgression(1, card.mood, chords)).toBe(true);
   });
 
   it("refuses an unknown mood or section and a bad sequence, changing nothing", () => {

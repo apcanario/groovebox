@@ -463,11 +463,12 @@ export class Sequencer {
    * Play a progression (P4, a Simple Chords card): the song's mood and a section's chords, together. While
    * running it waits for the next bar line, where the section starts it from its first chord if it is playing;
    * the same progression tapped again before then cancels it, another replaces it. Stopped, it acts at once.
-   * Returns false (and changes nothing) for an unknown mood or section or a sequence that is not 1..8 valid chords.
+   * Returns false (and changes nothing) for an unknown mood or section or a sequence that is not 1..8 valid chords,
+   * and while a song waits for the bar line (it would replace the song there, so the progression could never play).
    */
   setProgression(section: number, mood: Mood, chords: ChordStep[]): boolean {
     const s = this.song.sections[section];
-    if (!s || !MOODS.includes(mood) || !validChords(chords)) return false;
+    if (this.nextSong || !s || !MOODS.includes(mood) || !validChords(chords)) return false;
     const p = { section, mood, chords: chords.map((c) => ({ degree: c.degree, bars: c.bars })) };
     if (this.running) this.queue.queueChords(p);
     else this.landChords(p);

@@ -49,7 +49,8 @@ export type Feel = (typeof FEELS)[number];
  * mood (which sets the scale) and the voicing it is written for, the feels it has and the vibes (style ids) it
  * suits. Stored as degrees, so it transposes to any key and stays in it. `name` is plain and neutral: no artist,
  * song or label. Until row L1 adds per-chord voicings, a mood sets the voicing (spec section 3), so `voicing` must
- * be its mood's.
+ * be its mood's. Every chord is in the mood's scale because only degrees 0..6 are stored; when L1 adds borrowed
+ * chords, it adds a `borrowed` mark here and the library test's "or marked as borrowing" branch.
  */
 export interface ProgressionDef {
   order: number;

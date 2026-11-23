@@ -16,8 +16,8 @@ import {
   progressionsFor,
   readProgressions,
 } from "./progressions.ts";
-import { MOOD_TABLE, NOTE_NAMES, scalePitchClasses } from "./scales.ts";
-import { STYLE_IDS } from "./styles.ts";
+import { MOOD_TABLE, NOTE_NAMES, scalePitchClasses, type Mood } from "./scales.ts";
+import { STYLES, STYLE_IDS } from "./styles.ts";
 
 const all = PROGRESSION_IDS.map((id) => [id, PROGRESSIONS[id]] as const);
 
@@ -46,8 +46,10 @@ describe("the progression library", () => {
     expect(p.name.length).toBeLessThanOrEqual(14);
   });
 
-  it.each(all)("%s is in its mood's scale and transposes to all twelve keys inside the instruments' ranges", (_id, p) => {
-    // No progression marks a borrowed chord: the song model has none until row L1, so every chord tone is in the scale.
+  it.each(all)("%s is in its mood's scale (it holds by construction: only degrees 0..6 are stored) and transposes to all twelve keys inside the instruments' ranges", (_id, p) => {
+    // These scale assertions cannot fail while only degrees are stored: buildChord builds every chord from the scale.
+    // The real guard is checkProgression refusing a degree outside 0..6 (tested below). When row L1 adds borrowed
+    // chords, ProgressionDef gets a `borrowed` mark and this test its "or marked as borrowing" branch.
     for (const key of NOTE_NAMES) {
       const scale = scalePitchClasses(key, p.mood);
       for (const [degree] of p.chords) {
@@ -64,6 +66,20 @@ describe("the progression library", () => {
         expect((c.bass - NOTE_NAMES.indexOf(key) + 120) % 12).toBe((buildChord("C", p.mood, degree).bass + 120) % 12);
       }
     }
+  });
+
+  it("holds every section progression of every vibe, tagged with that vibe, so Simple shows it Playing and can go back to it", () => {
+    const missing: string[] = [];
+    for (const id of STYLE_IDS) {
+      const style = STYLES[id];
+      style.sections.forEach((s, i) => {
+        const chords = s.chords.map(([degree, bars]) => ({ degree, bars }));
+        const found = findProgression(style.mood as Mood, chords);
+        if (!found) missing.push(`${id} section ${i}: ${style.mood} ${JSON.stringify(s.chords)} not in the library`);
+        else if (!PROGRESSIONS[found].vibes.includes(id)) missing.push(`${id} section ${i}: ${found} is not tagged ${id}`);
+      });
+    }
+    expect(missing).toEqual([]);
   });
 
   it("has no two progressions alike, and names neutral and unique", () => {

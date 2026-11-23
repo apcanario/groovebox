@@ -22,7 +22,7 @@ import {
 import { NOTE_NAMES, type ChordStep } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Icon } from "../icons.tsx";
-import { CHORD_COLOR, sectionLetter } from "../logic.ts";
+import { CHORD_COLOR } from "../logic.ts";
 import { BorrowPicker, vibeName } from "../vibes.tsx";
 
 /** What the tab shows, kept while the app runs so a trip to another tab comes back to the same cards. */
@@ -41,7 +41,7 @@ function blockHeight(degree: number): string {
   return `${40 + degree * 10}%`;
 }
 
-function Card({ id, state, onTap }: { id: string; state: "playing" | "pending" | null; onTap: () => void }) {
+function Card({ id, state, locked, onTap }: { id: string; state: "playing" | "pending" | null; locked: boolean; onTap: () => void }) {
   const p = PROGRESSIONS[id];
   const word = state === "pending" ? "Next bar" : state === "playing" ? "Playing" : null;
   return (
@@ -50,6 +50,7 @@ function Card({ id, state, onTap }: { id: string; state: "playing" | "pending" |
       style={{ "--c": "var(--yellow)" }}
       data-prog={id}
       aria-pressed={state === "playing"}
+      disabled={locked}
       aria-label={`${p.name}${word ? `, ${word.toLowerCase()}` : ""}: play from the next bar`}
       onClick={onTap}
     >
@@ -87,6 +88,8 @@ export function SimpleChords({ ctx }: { ctx: Ctx }) {
   const vibe = view.vibe ?? song.style;
   const list = progressionsFor(vibe, view.feel);
   const { shown, page, pages } = cardPage(list, view.page);
+  // A vibe waiting for the bar line replaces the whole song there, so a card tapped now could never play (P4 review S5).
+  const loading = engine.pendingLoad() !== null;
   const waiting = pending.chords && pending.chords.section === edit ? pending.chords : null;
 
   const pickFeel = (feel: Feel): void => setView({ ...view, feel, page: pageOf(progressionsFor(vibe, feel), playingId) });
@@ -112,9 +115,6 @@ export function SimpleChords({ ctx }: { ctx: Ctx }) {
             <Icon name="piano" />
             Chords
           </em>
-          <span class="sub" id="chord-where">
-            {sectionLetter(edit)} · {FEEL_LABEL[view.feel]} · {page + 1} of {pages}
-          </span>
         </h1>
         <button
           class={`btn cvibe${borrowed ? " borrowed" : ""}`}
@@ -133,9 +133,14 @@ export function SimpleChords({ ctx }: { ctx: Ctx }) {
           </button>
         ))}
       </div>
+      {/* The feel and the page on their own line over the cards (groovebox-3), never cut at 360 px. No section
+          letter: beside chords a lone "B" reads as a key (P4 review M3); the strip shows the section. */}
+      <div class="glabel cardline" id="chord-where">
+        {FEEL_LABEL[view.feel]} · {page + 1} of {pages}
+      </div>
       <div class="cards">
         {shown.map((id) => (
-          <Card key={id} id={id} state={stateOf(id)} onTap={() => play(id)} />
+          <Card key={id} id={id} state={stateOf(id)} locked={loading} onTap={() => play(id)} />
         ))}
       </div>
       <div class="row3 cardtools">
