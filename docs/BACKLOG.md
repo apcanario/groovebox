@@ -5,7 +5,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | Bundle | Rows | What you get |
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
-| 5 | P3 (Done), P4 (Done), P5 (Done), P6 | Eight vibes, Simple chords, five lead styles |
+| 5 | P3 (Done), P4 (Done), P5 (Done), P6 (Done) | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
@@ -26,6 +26,8 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C9. 24-tile picker does not fit at 360 x 640** (P3 review, 23 Nov 2026), for P8: 12 rows of 48 px with gaps plus Continue last jam needs at least 648 px, so the spec's no-scroll rule and 48 px rule conflict at 24 tiles. Reviewer's proposal: no title or Close row, 1 px gap only under 648 px screen height (636 px total). P8 edits spec 8.6 accordingly and adds a smoke check at 24 tiles.
 - **C10. P4 review M2, for P8** (23 Nov 2026): the library's vibe tags are six blanket groups; when P8 adds the sixteen vibes, retag each progression per vibe by choice, not by group.
 - **C11. P5 listen items** (23 Nov 2026): Drift is sparse after the review fix (4 notes in 8 bars at seed 1234, whole bars of silence), say in the notes if it is too sparse; an accent brightens every sounding note of the layer, a lead-is-monophonic approximation (review M3); Pulse slides do not hold the previous note over the next as the other styles do.
+- **C12. P6 review S1, not fixable at 360 x 640** (23 Nov 2026): the Advanced lane stays beside Back and New idea (171 px wide, up from about 135) on short screens; a full-width lane needs about 44 px more height than the dial rows free. Full width at 412 x 915. A fix needs a layout change (spec 8.6); T1 or G7 revisits it.
+- **C13. P6 listen item** (23 Nov 2026): the continuity check cannot reliably catch small clicks from knob turns or style switches; and a steady Drift sound (long notes, Busy 0.9) shows jumps of 0.43 of its peak on a sine in the worklet, cause unexplained (voice stealing is one candidate). Listen on Drift for clicks and say so in the notes.
 
 ## By hand (Pedro)
 
@@ -48,16 +50,6 @@ All rows of this bundle are Done. The player's check of the bundle is in `docs/r
 ## Bundle 5: phase 2, vibes, chords and leads
 
 Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
-
-### P6. Lead screens
-
-- P1b kept `leadSteps` and `preview` in the engine for this row's step row; use them or remove them, and say which in the changelog.
-- From the bundle 4 player: the Advanced Layer lane is squeezed beside Back and New idea; give it room in the new layout.
-- Advanced Layer tab: style selector, the Notes and Feel pages of six knobs, Pulse's own three knobs on a third page, the step row showing phrase bar and note lengths, New idea and Back.
-- Simple Layer tab: style picker, Busy, Evolve, Bright, Space, New idea, Back.
-- Each launch style of P3 gets a fitting lead style and settings on its layers.
-
-**Done when:** every lead knob can be turned while playing with no stuck note or click; both modes fit without scrolling; `check` and `smoke` pass. Whether the leads now have enough variety is Pedro's call.
 
 ## Bundle 6: phase 2, sounds, effects and all 24 vibes
 
@@ -202,3 +194,4 @@ Kept here so no row disappears without a record.
 - **P3. Styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 8 minor, all applied; the error was a vibe's sounds and mix landing 0.1 s before the bar line), pushed. Report in `docs/reviews/P3.md`.
 - **P4. Simple chords** (23 Nov 2026). Built, reviewed (fix: 0 errors, 5 should-fix, 6 minor, all applied except M2, carried as C10 for P8), pushed. Report in `docs/reviews/P4.md`.
 - **P5. Lead styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 3 should-fix, 5 minor, all applied), pushed. Report in `docs/reviews/P5.md`, printed patterns in `docs/reviews/P5-patterns.md`.
+- **P6. Lead screens** (23 Nov 2026). Built, reviewed (fix: 0 errors, 3 should-fix, 7 minor, all applied except S1, carried as C12, and S2 applied in part, see C13), pushed. Report in `docs/reviews/P6.md`.

@@ -26,9 +26,11 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4 and P5, 22 and 23 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5 and P6, 22 and 23 Nov 2026):
 
-- **Lead styles (P5, engine only, no screen yet):** Hook, Phrase, Roll and Drift beside Pulse, seeded and always in key, shaped by twelve shared knobs, with varied velocity and per-note glide, accent and quick repeats in the layer voice. Screens for choosing them come in P6; until then only Pulse is reachable from the UI and the eight vibes are unchanged.
+- **Lead screens (P6):** the Advanced Layer tab has a style row (Hook, Phrase, Roll, Drift, Pulse), the Notes and Feel pages of six knobs each, a Pulse page with its own three knobs (shown only for Pulse), and the lane with a phrase bar showing which bar of the phrase is playing. Simple Layer has a style picker beside Busy, Evolve, Bright and Space. Every vibe sets a fitting lead style on both layers (Hook in Deep house, Tropical house and 2-step; Roll in Melodic techno; Phrase in Drum and bass and Lo-fi; Pulse in Deep techno; Drift in Ambient and on the pads). The Shape dial reads Dip and Zig for Valley and Zigzag, which do not fit a dial at 360 px.
+
+- **Lead styles (P5):** Hook, Phrase, Roll and Drift beside Pulse, seeded and always in key, shaped by twelve shared knobs, with varied velocity and per-note glide, accent and quick repeats in the layer voice. Screens for them are P6, above.
 
 - **Simple chords (P4):** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting), then one of four cards, each a progression shown as colour blocks with a name; a tapped card plays from the next bar and sets the mood for the song. More chords brings the next four, Lower and Higher move the pitch, and the vibe button borrows another vibe's progressions without loading it. A library of 137 progressions, one data file each, tagged by feel and vibe. No scale or chord names in Simple; Advanced is the chord editor.
 
@@ -56,9 +58,8 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4 and P5, 22 
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
-**Phase 2** (rows P6 to P11)
+**Phase 2** (rows P7 to P11)
 - **Sixteen more vibes** (P8), to make 24: Drone, Trance, Acid house, Dubstep and more.
-- **Lead screens** (P6) for the four new lead styles: style selector, twelve knobs, New idea and Back.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
 - **DROP:** one large button that builds for a few bars, hangs, then brings the section back wider, with extra layers on everything, and stays there until you switch it off. Bigger by width, not volume. Each vibe has its own version.
 - **Ambient and Drone:** two vibes for coasting, with drones, swooping pads and very slow movement.
@@ -83,8 +84,8 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b, P2, P3, P4, P5 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead style generators | Done |
-| P6 to P11 | Phase 2: vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
+| G0 to G5, P1, P1b, P2, P3, P4, P5, P6 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens | Done |
+| P7 to P11 | Phase 2: vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
