@@ -18,7 +18,7 @@ import * as Tone from "tone";
 import { midiToHz } from "../music/scales.ts";
 import { DRUM_VOICES, type DrumVoice } from "../music/presets.ts";
 import { DRUM_RELEASE, PAD_TOP_HZ, padBrightnessHz, padMotionCents, detuneCents, drumDecay, drumLevel, envDepthHz, glideSeconds, kickHz, subGain } from "../music/sound.ts";
-import { PATCH_KEYS, type InstrumentId, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
+import { PATCH_KEYS, type InstrumentId, type MixState, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
 
 const RAMP = 0.03; // seconds; every continuous parameter change is ramped this long
 const MAX_Q = 6; // resonance cap (the spike went to 14, G1 shipped 8)
@@ -648,11 +648,7 @@ export class Poly extends Instrument {
   }
 }
 
-export interface MixState {
-  sweep: number; // -1..1: left low-pass, right high-pass, 0 open
-  pump: number; // 0..0.95
-  saturation: number; // 0..1
-}
+export type { MixState } from "./song.ts";
 
 /** Shared sends, the ducked music bus, the drum bus and the master chain. */
 export class Graph {
@@ -664,6 +660,8 @@ export class Graph {
   private lp: Tone.Filter;
   private hp: Tone.Filter;
   private sat: Tone.Distortion;
+  /** The limiter: the master output, which the recorder taps (G5). */
+  private out: Tone.Compressor;
   pumpDepth = 0.6;
 
   private constructor(
@@ -673,7 +671,9 @@ export class Graph {
     lp: Tone.Filter,
     hp: Tone.Filter,
     sat: Tone.Distortion,
+    out: Tone.Compressor,
   ) {
+    this.out = out;
     this.buses = buses;
     this.meter = meter;
     this.scope = scope;
@@ -713,7 +713,16 @@ export class Graph {
     reverb.connect(duck);
     const delay = new Tone.FeedbackDelay({ delayTime: "8n.", feedback: 0.36, wet: 1 });
     delay.connect(duck);
-    return new Graph({ duck, drums, delay, reverb }, meter, scope, lp, hp, sat);
+    return new Graph({ duck, drums, delay, reverb }, meter, scope, lp, hp, sat, limiter);
+  }
+
+  /** Feed the master output (after the limiter, what the headphones hear) into a native node. */
+  tap(node: AudioNode): void {
+    this.out.connect(node);
+  }
+
+  untap(node: AudioNode): void {
+    this.out.disconnect(node);
   }
 
   /** Duck the music bus on a kick: an 8 ms ramp down, then a swell back. Never a step. */

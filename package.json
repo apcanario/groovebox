@@ -10,9 +10,11 @@
     "preview": "vite preview",
     "check": "tsc --noEmit && vitest run && vite build",
     "smoke": "vite build && python3 tools/smoke.py dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "record-test": "vite build && python3 tools/record_long.py dist 10"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "preact": "^10.29.8",
     "tone": "^15.1.22"
   },

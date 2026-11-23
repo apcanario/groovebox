@@ -13,6 +13,7 @@ import {
   type SynthPreset,
 } from "../music/presets.ts";
 import { MOODS, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
+import { checkEvents, type LogEvent } from "./eventlog.ts";
 
 export const INSTRUMENTS = ["drums", "bass", "synth", "layer1", "layer2"] as const;
 export type InstrumentId = (typeof INSTRUMENTS)[number];
@@ -159,6 +160,27 @@ export interface Section {
   layer2: LayerPattern;
 }
 
+/** The Mix tab's master knobs. Saved with the song (G5) so a reload keeps them. */
+export interface MixState {
+  sweep: number; // -1..1: left low-pass, right high-pass, 0 open
+  pump: number; // 0..0.95
+  saturation: number; // 0..1
+}
+export const DEFAULT_MIX: MixState = { sweep: 0, pump: 0.6, saturation: 0 };
+
+/** The last take's event log (spec section 6): the song as it stood at the start, then every edit. */
+export interface EventLog {
+  /** When the take started (ISO time). */
+  recorded: string;
+  /** Length of the take in seconds. */
+  seconds: number;
+  /** The section playing when the take started. */
+  section: number;
+  /** The song and mix at the start of the take (without a log of its own). */
+  start: Song;
+  events: LogEvent[];
+}
+
 export interface Song {
   version: 1;
   name: string;
@@ -167,6 +189,10 @@ export interface Song {
   bpm: number;
   patches: Record<InstrumentId, Patch>;
   sections: Section[];
+  /** Optional (G5): the master knobs. Missing means the defaults. */
+  mix?: MixState;
+  /** Optional (G5): the event log of the last take. */
+  log?: EventLog;
 }
 
 export const LIMITS = { bpm: [80, 180], sections: [1, 4], chords: [1, 8] } as const;
@@ -373,10 +399,29 @@ function checkSection(s: unknown, at: string, errors: string[]): void {
   checkLayer(s.layer2, `${at}.layer2`, errors);
 }
 
+function checkMix(m: unknown, at: string, errors: string[]): void {
+  if (!isObj(m)) return void errors.push(`${at}: not an object`);
+  if (!inRange(m.sweep, -1, 1)) errors.push(`${at}.sweep: must be -1..1`);
+  if (!inRange(m.pump, 0, 0.95)) errors.push(`${at}.pump: must be 0..0.95`);
+  if (!inRange(m.saturation, 0, 1)) errors.push(`${at}.saturation: must be 0..1`);
+}
+
+function checkLog(l: unknown, at: string, errors: string[]): void {
+  if (!isObj(l)) return void errors.push(`${at}: not an object`);
+  if (typeof l.recorded !== "string") errors.push(`${at}.recorded: must be a time`);
+  if (!isNum(l.seconds) || l.seconds < 0) errors.push(`${at}.seconds: must be 0 or more`);
+  if (!Number.isInteger(l.section) || !inRange(l.section, 0, 3)) errors.push(`${at}.section: must be 0..3`);
+  if (isObj(l.start) && l.start.log !== undefined) errors.push(`${at}.start: must not hold a log`);
+  else for (const e of validateSong(l.start)) errors.push(`${at}.start.${e}`);
+  checkEvents(l.events, `${at}.events`, errors);
+}
+
 /** Every problem with a would-be song document; empty when it is valid. */
 export function validateSong(doc: unknown): string[] {
   const errors: string[] = [];
   if (!isObj(doc)) return ["song: not an object"];
+  if (doc.mix !== undefined) checkMix(doc.mix, "mix", errors);
+  if (doc.log !== undefined) checkLog(doc.log, "log", errors);
   if (doc.version !== 1) errors.push("version: must be 1");
   if (typeof doc.name !== "string") errors.push("name: must be a string");
   if (!oneOf(doc.key, NOTE_NAMES)) errors.push("key: unknown key");

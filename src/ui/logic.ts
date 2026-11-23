@@ -313,3 +313,29 @@ export const ARP_OCTAVES = [1, 2, 3] as const;
 export function leadCellClass(hit: boolean, plays: boolean, now: boolean): string {
   return `st${hit ? " h" : ""}${hit && !plays ? " lo" : ""}${now ? " now" : ""}`;
 }
+
+// ---- Recording and songs (G5) ------------------------------------------------------
+
+/** Elapsed time of a take: "0:07", "12:34", "1:02:03" from an hour. */
+export function clockLabel(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+/** A file size: "820 KB", "9.6 MB". */
+export function sizeLabel(bytes: number): string {
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** What the record button says to a screen reader. */
+export function recordLabel(state: "off" | "armed" | "recording" | "finishing"): string {
+  return {
+    off: "Record: arm",
+    armed: "Record armed, starts with Play; tap to disarm",
+    recording: "Recording; tap to stop the take",
+    finishing: "Finishing the take",
+  }[state];
+}

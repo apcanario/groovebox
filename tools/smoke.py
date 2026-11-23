@@ -2,7 +2,8 @@
 """Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar,
 then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials, section menu) and every G3 control
 (drum presets and sequencer, bass and synth rhythms, waves and dials, mix levels and meter, DnB at 174 bpm) and
-every G4 layer control (three modes, lead row, new seed, pattern and sound dials) with no
+every G4 layer control (three modes, lead row, new seed, pattern and sound dials), and G5 (two takes saved as MP3
+and walked frame by frame, the event log, songs surviving a reload, new and delete) with no
 page error, no control under 48 px and no more than six dials on one screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
@@ -15,6 +16,9 @@ import sys
 import time
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mp3check import mp3_info  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -683,6 +687,141 @@ def walk_pad_to_arp(page, sec: int, lid: str, failures: list) -> None:
     page.evaluate(solo, None)
 
 
+REC = "window.__groovebox.recordInfo()"
+
+
+def save_take(page, failures: list, want: float, where: str) -> dict | None:
+    """Wait for the take sheet, save the MP3 through its Save button and walk every frame."""
+    if not wait_for(page, "!!document.querySelector('#take-save')", 10.0):
+        failures.append(f"{where}: the take sheet did not open")
+        return None
+    check_sizes(page, f"take sheet ({where})", failures)
+    with page.expect_download() as dl:
+        page.click("#take-save")
+    path = dl.value.path()
+    name = dl.value.suggested_filename
+    with open(path, "rb") as f:
+        info = mp3_info(f.read())
+    print(f"{where}: {name}: {info['frames']} frames, {info['sample_rate']} Hz, {info['kbps']} kbps, "
+          f"{info['seconds']:.2f} s, {info['bytes']} bytes")
+    if info["error"]:
+        failures.append(f"{where}: MP3 not valid: {info['error']}")
+    if not name.endswith(".mp3"):
+        failures.append(f"{where}: saved file is not named .mp3: {name}")
+    # LAME pads the start and end by under 0.1 s; the timer may lead the audio by a block.
+    if abs(info["seconds"] - want) > 0.35:
+        failures.append(f"{where}: MP3 lasts {info['seconds']:.2f} s, expected about {want:.2f} s")
+    page.click("#take-close")
+    return info
+
+
+def walk_g5_record(page, failures: list) -> None:
+    """G5 while playing: a take with the indicator and timer, knob moves in its log, saved as MP3."""
+    page.click('[data-tab="mix"]')
+    page.click("#rec")
+    if page.evaluate(REC)["state"] != "recording":
+        failures.append("record while playing did not start a take")
+        return
+    t0 = time.time()
+    if "recording" not in (page.get_attribute("#rec", "class") or ""):
+        failures.append("record button does not show the take")
+    drag(page, '[data-dial="pump"]', 0, 30)
+    drag(page, '[data-dial="pump"]', 0, -30)
+    page.click('[data-tab="play"]')
+    page.click('[data-cell="1:layer2"]')
+    time.sleep(2.0)
+    shown = page.inner_text("#rec-time")
+    if shown not in ("0:02", "0:03"):
+        failures.append(f"record timer shows {shown!r} after about 2 s")
+    narrow_pass(page, failures)  # the wider record button must still fit at 360 px
+    page.click('[data-cell="1:layer2"]')
+    while time.time() - t0 < 6.0:
+        time.sleep(0.1)
+    secs = page.evaluate(REC)["seconds"]
+    page.click("#rec")
+    info = save_take(page, failures, secs, "take while playing")
+    log = page.evaluate("window.__groovebox.getLog()")
+    if not log:
+        failures.append("no event log after the take")
+        return
+    ops = [e["op"] for e in log["events"]]
+    print(f"take log: {len(ops)} events {sorted(set(ops))}, {log['seconds']:.2f} s")
+    if "setMix" not in ops or ops.count("toggleInstrument") != 2:
+        failures.append(f"take log is missing the knob moves or mutes: {ops}")
+    if info and abs(log["seconds"] - info["seconds"]) > 0.35:
+        failures.append(f"log says {log['seconds']:.2f} s, MP3 {info['seconds']:.2f} s")
+    if page.evaluate(REC)["state"] != "off":
+        failures.append("record did not return to off after the take")
+
+
+def walk_g5_songs(page, failures: list, url: str) -> None:
+    """G5 stopped: rename, survive a reload, new and delete, armed record starting with Play and a Stop tail."""
+    page.click('[data-tab="play"]')
+    page.click("#songs-open")
+    check_sizes(page, "songs sheet", failures)
+    page.fill("#song-name", "Smoke jam")
+    page.click("#song-rename")
+    page.click('[data-tab="mix"]')
+    drag(page, '[data-dial="saturation"]', 0, -40)
+    before = page.evaluate("window.__groovebox.getDocument()")
+    time.sleep(0.8)  # the save follows edits after 0.4 s
+    page.goto(url)
+    if not wait_for(page, "!!window.__groovebox", 5.0):
+        failures.append("the app did not come back after a reload")
+        return
+    after = page.evaluate("window.__groovebox.getDocument()")
+    for k in ["name", "bpm", "key", "mood", "sections", "patches", "mix"]:
+        if after.get(k) != before.get(k):
+            failures.append(f"reload lost the song's {k}")
+    if (after.get("log") or {}).get("events") != (before.get("log") or {}).get("events"):
+        failures.append("reload lost the event log")
+    print(f"reload kept {after['name']!r}: {len(after['sections'])} sections, mix {after['mix']}, "
+          f"log of {len((after.get('log') or {}).get('events', []))} events")
+    if "Smoke jam" not in page.inner_text("#songs-open"):
+        failures.append("the song bar does not show the reopened song")
+
+    page.click("#songs-open")
+    page.click("#song-new")
+    time.sleep(0.3)
+    name = page.evaluate("window.__groovebox.getSong().name")
+    n = page.evaluate("window.__keeper.list().then(l => l.length)")
+    if n != 2 or name == "Smoke jam" or page.evaluate("window.__groovebox.getLog()") is not None:
+        failures.append(f"new song failed: {n} songs, open {name!r}")
+    page.click("#songs-open")
+    page.click("#song-delete")
+    page.click("#song-delete")
+    time.sleep(0.3)
+    n = page.evaluate("window.__keeper.list().then(l => l.length)")
+    if n != 1 or page.evaluate("window.__groovebox.getSong().name") != "Smoke jam":
+        failures.append(f"delete did not go back to the other song ({n} songs)")
+    page.goto(url)
+    wait_for(page, "!!window.__groovebox", 5.0)
+    if page.evaluate("window.__groovebox.getSong().name") != "Smoke jam":
+        failures.append("the last song did not reopen on launch")
+
+    # Armed while stopped: the take starts with Play, and Stop keeps a tail.
+    page.click("#rec")
+    if page.evaluate(REC)["state"] != "armed" or "armed" not in (page.get_attribute("#rec", "class") or ""):
+        failures.append("record while stopped did not arm")
+    page.click("#play")
+    if not wait_for(page, "window.__groovebox.recordInfo().state === 'recording'", 3.0):
+        failures.append("an armed take did not start with Play")
+        return
+    time.sleep(2.0)
+    page.click("#play")
+    if page.evaluate(REC)["state"] != "finishing":
+        failures.append("Stop did not keep a tail")
+    page.click("#songs-open")
+    if not page.locator("#song-new").is_disabled():
+        failures.append("new song is allowed while a take finishes")
+    page.click("#songs-close")
+    wait_for(page, "!!document.querySelector('#take-save')", 6.0)
+    secs = page.evaluate("window.__groovebox.getLog().seconds")
+    if not 3.2 <= secs <= 4.2:
+        failures.append(f"armed take with tail lasts {secs:.2f} s, expected about 3.5")
+    save_take(page, failures, secs, "armed take")
+
+
 def wait_for(page, expr: str, timeout: float) -> bool:
     end = time.time() + timeout
     while time.time() < end:
@@ -719,6 +858,7 @@ def main() -> int:
                 else None,
             )
             page.goto(f"http://localhost:{PORT}/index.html")
+            wait_for(page, "!!window.__groovebox", 5.0)
             page.click("#play")
             time.sleep(0.5)
 
@@ -807,6 +947,7 @@ def main() -> int:
             walk_shell(page, failures)
             walk_g3(page, failures)
             walk_g4(page, failures)
+            walk_g5_record(page, failures)
             narrow_pass(page, failures)
             if not page.evaluate("window.__groovebox.playing"):
                 failures.append("the transport stopped during the shell walk")
@@ -828,6 +969,7 @@ def main() -> int:
                 print("no attacks after Stop")
             if page.evaluate("window.__groovebox.playing"):
                 failures.append("transport did not stop")
+            walk_g5_songs(page, failures, f"http://localhost:{PORT}/index.html")
             browser.close()
     finally:
         server.terminate()

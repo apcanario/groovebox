@@ -37,12 +37,12 @@ const BUFFERS = [
 
 export function MixTab({ ctx }: { ctx: Ctx }) {
   const { engine, hint, pos } = ctx;
-  // Changing the buffer reloads the page and the song resets (nothing is saved until G5): refused
-  // while playing, and asks for a second tap when stopped.
+  // Changing the buffer reloads the page; the song is saved first and reopens (G5). Refused while
+  // playing, and asks for a second tap when stopped.
   const [armed, setArmed] = useState<LatencyHint | null>(null);
   const choose = (h: LatencyHint): void => {
     if (h === hint) return;
-    if (armed === h) location.href = `?hint=${h}`;
+    if (armed === h) void ctx.keeper.flush().then(() => (location.href = `?hint=${h}`));
     else setArmed(h);
   };
   const [page, setPage] = useState(0);
@@ -78,7 +78,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
         </div>
       )}
       <div class="label">
-        Audio buffer · if it crackles, try a larger one. {pos.playing ? "Stop to change it: " : ""}The page reloads and the song resets.
+        Audio buffer · if it crackles, try a larger one. {pos.playing ? "Stop to change it: " : ""}The page reloads; the song is kept.
       </div>
       <div class="seg">
         {BUFFERS.map(([h, name]) => (
@@ -94,7 +94,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
           </button>
         ))}
       </div>
-      {armed && !pos.playing && <p class="note">Tap again to reload; your edits are lost.</p>}
+      {armed && !pos.playing && <p class="note">Tap again to reload.</p>}
     </section>
   );
 }

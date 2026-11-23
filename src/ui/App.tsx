@@ -3,9 +3,10 @@
  * and the position from the engine and calls the engine for every change; it never touches audio.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { Engine, MOOD_TABLE, type LatencyHint, type Pending, type Position, type Song } from "../engine/index.ts";
-import { useVerticalDrag } from "./components.tsx";
-import { barLabel, chooseSection, editedSection, keepChosen, sectionLetter, stripState } from "./logic.ts";
+import { Engine, MOOD_TABLE, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
+import type { Keeper } from "../store/keeper.ts";
+import { Sheet, useVerticalDrag } from "./components.tsx";
+import { barLabel, chooseSection, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
 import { TABS, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PlayTab } from "./tabs/PlayTab.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
@@ -25,6 +26,7 @@ export interface Ctx {
   playing: number;
   goTab: (t: Tab) => void;
   hint: LatencyHint;
+  keeper: Keeper;
 }
 
 const SCALE_SHORT = { major: "maj", minor: "min", dorian: "dor", phrygian: "phr" } as const;
@@ -66,7 +68,68 @@ function useWakeLock(on: boolean): void {
   }, [on]);
 }
 
-export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
+/** The record state, re-read on every engine change and four times a second while a take runs (display only). */
+function useRecordInfo(engine: Engine): RecordInfo {
+  const [info, setInfo] = useState<RecordInfo>(() => engine.recordInfo());
+  useEffect(() => engine.onChange(() => setInfo(engine.recordInfo())), [engine]);
+  const running = info.state === "recording" || info.state === "finishing";
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setInfo(engine.recordInfo()), 250);
+    return () => clearInterval(t);
+  }, [engine, running]);
+  return info;
+}
+
+type NamedTake = Take & { name: string };
+
+/** A finished take: save it to the phone or share it. */
+function TakeSheet({ take, onClose }: { take: NamedTake; onClose: () => void }) {
+  const file = new File([take.file], take.name, { type: "audio/mpeg" });
+  const canShare = typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+  const [msg, setMsg] = useState("");
+  const save = (): void => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = take.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    setMsg("Saved to Downloads.");
+  };
+  const share = async (): Promise<void> => {
+    try {
+      await navigator.share({ files: [file], title: take.name });
+    } catch {
+      // Cancelled by the user, or refused: the Save button still works.
+    }
+  };
+  return (
+    <Sheet onClose={onClose}>
+      <h2>Take recorded</h2>
+      <p class="note" id="take-info">
+        {take.name} · {clockLabel(take.seconds)} · {sizeLabel(take.bytes)} MP3
+      </p>
+      <div class="menu">
+        <button class="btn" id="take-save" onClick={save}>
+          Save MP3
+        </button>
+        <button class="btn" id="take-share" disabled={!canShare} onClick={() => void share()}>
+          Share
+        </button>
+        <button class="btn" id="take-close" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      {msg && <p class="note">{msg}</p>}
+      <p class="note">The event log of this take is saved with the song.</p>
+    </Sheet>
+  );
+}
+
+export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHint; keeper: Keeper }) {
   const [song, setSong] = useState<Song>(() => engine.getSong());
   const [pos, setPos] = useState<Position>(() => engine.position());
   const [pending, setPending] = useState<Pending>(() => engine.pendingShown());
@@ -74,6 +137,11 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
   const [tab, setTab] = useState<Tab>("play");
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [take, setTake] = useState<NamedTake | null>(null);
+  const [saveFailed, setSaveFailed] = useState(keeper.failed);
+  const rec = useRecordInfo(engine);
+  useEffect(() => engine.onTake(setTake), [engine]);
+  useEffect(() => keeper.onChange(() => setSaveFailed(keeper.failed)), [keeper]);
 
   useEffect(() => {
     let lastSection = engine.position().section;
@@ -124,7 +192,8 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
   };
 
   const bpmDrag = useVerticalDrag(song.bpm, 80, 180, (v) => (engine.bpm = v), 1, 400);
-  const ctx: Ctx = { engine, song, pos, pending, edit, playing, goTab: setTab, hint };
+  const ctx: Ctx = { engine, song, pos, pending, edit, playing, goTab: setTab, hint, keeper };
+  const taking = rec.state === "recording" || rec.state === "finishing";
   const mood = MOOD_TABLE[song.mood];
 
   return (
@@ -153,8 +222,16 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
           <b id="bar">{barLabel(pos.playing, pos.bar, pos.step)}</b>
           <span>bar</span>
         </div>
-        <button class="rec" aria-label="Record (arrives in G5)" disabled>
+        <button
+          id="rec"
+          class={`rec ${rec.state}`}
+          aria-label={recordLabel(rec.state)}
+          aria-pressed={rec.state !== "off"}
+          disabled={rec.state === "finishing"}
+          onClick={() => engine.record()}
+        >
           <i />
+          {taking && <b id="rec-time">{clockLabel(rec.seconds)}</b>}
         </button>
       </div>
 
@@ -180,12 +257,15 @@ export function App({ engine, hint }: { engine: Engine; hint: LatencyHint }) {
 
       <main class="body">
         {error && <p class="err">{error}</p>}
+        {saveFailed && <p class="err">The song could not be saved on this phone (storage full or blocked).</p>}
         {tab === "play" && <PlayTab ctx={ctx} />}
         {tab === "chords" && <ChordsTab ctx={ctx} />}
         {tab === "mix" && <MixTab ctx={ctx} />}
         {(tab === "layer1" || tab === "layer2") && <LayerTab ctx={ctx} id={tab} key={tab} />}
         {(tab === "drums" || tab === "bass" || tab === "synth") && <InstrumentTab ctx={ctx} inst={tab} key={tab} />}
       </main>
+
+      {take && <TakeSheet take={take} onClose={() => setTake(null)} />}
 
       <nav class="tabs">
         {TABS.map((t) => (

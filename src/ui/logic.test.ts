@@ -200,3 +200,18 @@ describe("layer tab (G4)", () => {
     for (const k of PAD_KNOBS) for (const p of [0, 0.3, 1]) expect(knobPos(k, knobValue(k, p))).toBeCloseTo(p);
   });
 });
+
+import { clockLabel, sizeLabel } from "./logic.ts";
+describe("record labels (G5)", () => {
+  it("shows elapsed time as m:ss, then h:mm:ss", () => {
+    expect(clockLabel(0)).toBe("0:00");
+    expect(clockLabel(7.9)).toBe("0:07");
+    expect(clockLabel(754)).toBe("12:34");
+    expect(clockLabel(3723)).toBe("1:02:03");
+  });
+  it("shows sizes in KB under a megabyte, else MB", () => {
+    expect(sizeLabel(500)).toBe("1 KB");
+    expect(sizeLabel(820 * 1024)).toBe("820 KB");
+    expect(sizeLabel(9.6 * 1024 * 1024)).toBe("9.6 MB");
+  });
+});

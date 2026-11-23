@@ -1,5 +1,6 @@
 /** Play tab (spec section 5): instruments by sections. Switches land on the next bar line. */
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
+import { MAX_SONG_NAME, type SongEntry } from "../../store/library.ts";
 import { INSTRUMENTS, LIMITS, MAX_SECTION_NAME, type InstrumentId } from "../../engine/song.ts";
 import type { Ctx } from "../App.tsx";
 import { Sheet, useLongPress } from "../components.tsx";
@@ -100,14 +101,104 @@ function SectionMenu({ ctx, index, onClose }: { ctx: Ctx; index: number; onClose
   );
 }
 
+/** Songs kept on the phone (G5): rename the open one, open another, start a new one, delete. */
+function SongsSheet({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
+  const { engine, keeper, song } = ctx;
+  const [name, setName] = useState(song.name);
+  const [list, setList] = useState<SongEntry[] | null>(null);
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const read = (): void => void keeper.list().then((l) => live && setList(l));
+    read();
+    const off = keeper.onChange(read);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [keeper]);
+  const idle = keeper.idle();
+  const act = async (fn: () => Promise<boolean>): Promise<void> => {
+    setBusy(true);
+    try {
+      if (await fn()) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet onClose={onClose}>
+      <h2>Songs</h2>
+      <form
+        class="rename"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (engine.renameSong(name)) void keeper.flush().then(onClose);
+        }}
+      >
+        <input
+          id="song-name"
+          value={name}
+          maxLength={MAX_SONG_NAME}
+          aria-label="Song name"
+          onInput={(e) => setName((e.target as HTMLInputElement).value)}
+        />
+        <button type="submit" class="btn" id="song-rename" disabled={!name.trim()}>
+          Rename
+        </button>
+      </form>
+      <div class="songlist">
+        {(list ?? []).map((e) => (
+          <button
+            key={e.id}
+            class={`btn song${e.id === keeper.id ? " on" : ""}`}
+            data-song={e.id}
+            aria-current={e.id === keeper.id}
+            disabled={busy || (!idle && e.id !== keeper.id)}
+            onClick={() => (e.id === keeper.id ? onClose() : void act(() => keeper.open(e.id)))}
+          >
+            <span>{e.id === keeper.id ? song.name : e.name}</span>
+            <small>{new Date(e.updated).toLocaleDateString()}</small>
+          </button>
+        ))}
+      </div>
+      <div class="menu">
+        <button class="btn" id="song-new" disabled={busy || !idle} onClick={() => void act(() => keeper.create())}>
+          New song
+        </button>
+        <button
+          class="btn danger"
+          id="song-delete"
+          disabled={busy || !idle}
+          onClick={() => (sure ? void act(() => keeper.remove(keeper.id)) : setSure(true))}
+        >
+          {sure ? "Tap to delete" : "Delete song"}
+        </button>
+        <button class="btn" id="songs-close" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      {!idle && <p class="note">Stop to open, add or delete a song.</p>}
+      {sure && idle && <p class="note">Deletes “{song.name}” and its last take's log. The MP3s you saved stay.</p>}
+      {!keeper.persistent && <p class="note">This browser cannot keep songs: they are lost when the page closes.</p>}
+    </Sheet>
+  );
+}
+
 export function PlayTab({ ctx }: { ctx: Ctx }) {
   const { engine, song, pending, playing } = ctx;
   const [menu, setMenu] = useState<number | null>(null);
+  const [songs, setSongs] = useState(false);
   const cols = song.sections.length;
   const isPending = (sec: number, id: InstrumentId): boolean =>
     pending.toggles.some((t) => t.section === sec && t.instrument === id);
   return (
     <section class="playtab">
+      <button class="btn songbar" id="songs-open" aria-label={`Song ${song.name}: open the song list`} onClick={() => setSongs(true)}>
+        <span>Song</span>
+        <b>{song.name}</b>
+      </button>
       <div class="grid" style={{ gridTemplateColumns: `76px repeat(${cols}, 1fr)` }}>
         <div class="corner">hold a column for options</div>
         {song.sections.map((_, i) => (
@@ -138,6 +229,7 @@ export function PlayTab({ ctx }: { ctx: Ctx }) {
           + Add section
         </button>
       )}
+      {songs && <SongsSheet ctx={ctx} onClose={() => setSongs(false)} />}
       {menu !== null && <SectionMenu ctx={ctx} index={menu} onClose={() => setMenu(null)} key={menu} />}
     </section>
   );
