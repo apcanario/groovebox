@@ -26,9 +26,10 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, P1 and P1b, 22 and 23 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1, P1b and P2, 22 and 23 Nov 2026):
 
 - **One frame on every tab (P1):** header (New jam, Songs, Simple/Advanced), content, one row of sections, a transport bar with four beat lights and the bar counter, then the tab bar. Tapping a section plays it from the next bar; holding one opens its sheet. Nothing scrolls, and text shrinks to fit its tile.
+- **Simple and Advanced (P2):** one switch in the header, remembered, Simple on first launch. Simple instrument tabs have one picker, four macro dials and the XY pad, in plain words; Simple Layer tabs have Busy, Evolve, Bright and Space. Advanced has every control, and every Simple move shows there. Switching changes nothing you hear. New idea and Back on both layers keep the last eight seeds, and Back restores the earlier lead note for note.
 - **The look (P1b):** flat, 3 px corners, a hatched frame on anything queued for the next bar, square-cut dials with ticks, a dot-grid XY pad, DM Sans only, Material line icons beside the words. Each instrument shows the bar it is playing as a lane of notes under one playhead, five lanes together in Simple's Now view and one above the controls on each instrument tab. Motion marks what sounds and what is queued; it stops with the phone's reduce-motion setting or the Moving/Still switch on the Mix tab, and every state still reads by fill and hatching.
 
 - **Play tab:** in Advanced, a grid of instruments by sections on top of the section row: tap a cell to turn an instrument on or off in that section, hold a section to rename, copy, add or delete it or edit it without playing. In Simple (for now the header switch), five on/off tiles; tap to switch at the next bar, hold to open the tab.
@@ -51,7 +52,6 @@ Built and live on the link above (rows G0 to G5, P1 and P1b, 22 and 23 Nov 2026)
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 **Phase 2: Simple and Advanced** (rows P1 to P11)
-- **One switch for the whole app.** Simple uses plain words and a few large controls. Advanced has every control. The switch changes what is shown, never what is heard, and every Simple move is visible in Advanced.
 - **Vibes:** 24 complete starting grooves (Deep house, Deep techno, Lo-fi, Drum and bass, Ambient, Drone, Trance and more). One tap loads tempo, chords, beat, bass, sounds, leads and four arranged sections, and it plays.
 - **Simple chords:** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting) and tap a progression. No scales or chord names needed.
 - **Four more lead styles** beside the current one: Hook, Phrase, Roll and Drift, shaped by twelve knobs (among them Shape, Range, Register, Note length, Phrase, Variation, Slide and Accent), with New idea and Back buttons.
@@ -80,8 +80,8 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame | Done |
-| P2 to P11 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
+| G0 to G5, P1, P1b, P2 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame | Done |
+| P3 to P11 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |

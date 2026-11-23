@@ -4,7 +4,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 
 | Bundle | Rows | What you get |
 |---|---|---|
-| 4 | P1, P1b, P2 | The new screens, the look, Simple and Advanced |
+| 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
 | 5 | P3, P4, P5, P6 | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
@@ -19,7 +19,6 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 
 - **C2. G3 listen items for C1** (23 Nov 2026): the bass lost its second filter (listen for crackle on a saw bass with Env amt high); the drum filter still tops at 18 kHz, not the 10 kHz of the other filters. If C1 crackle persists, these are the next suspects after buffer size.
 - **C3. G3 sound defaults changed** (23 Nov 2026): default bass cutoff 0.3 with env amount 0.45, kick now about 0.2 s, drum level and sub dials max out at the C1 trims, defaults moved up the dial. Pedro's ears judge them.
-- **C4. G4 listen items** (23 Nov 2026): Layer 1 in Pad mode measures about 12 dB louder than the other modes (solo about -14 dB against -30 dB for the synth), and Layer 2 sits 10 to 16 dB under Layer 1. Levels untouched, no spec rule; Pedro's ears judge them. Pad filter now opens slowly over the pad's release when leaving Pad: listen for a smooth tail.
 - **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
 
@@ -38,18 +37,8 @@ All rows of this bundle are Done.
 
 ## Bundle 4: phase 2, the screens, the look and the two modes
 
-Spec section 8 is the brief for bundles 4 to 7, and `docs/design/look/` shows where it is going. Read sections 8.1, 8.3, 8.6 and 8.12 in full before any row of this bundle.
+All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-4.md`.
 
-### P2. Simple and Advanced
-
-- Spec 8.1 and 8.3: the app-wide toggle in the header, remembered (P1 left the switch unremembered and doubling as the temporary Now/Song switch; this row replaces that); Simple as the first-run default.
-- Simple instrument tabs: one picker and four macro dials each, as in the 8.3 table, plus the XY pad. Macro mappings as data; macro positions stored in the song.
-- Advanced tabs are the tabs built in G2 to G4, re-laid to the no-scroll rule.
-- Simple uses plain words only: check every visible string in Simple against 8.1. The P1b review also leaves for this row: the Simple Layer tab's macro dials, Back, the XY pad and the lane row.
-- New idea and Back on both layers, with the eight-seed history, in both modes.
-- Clear C4 (layer level balance) here, since the Level and Space macros expose it.
-
-**Done when:** switching mode changes no sound (tested: the song document is identical before and after); every Simple move is visible in Advanced; each macro at minimum and maximum changes the values it maps (tested); Back restores the previous lead note for note (tested); `check` and `smoke` pass.
 
 ## Bundle 5: phase 2, vibes, chords and leads
 
@@ -230,3 +219,4 @@ Kept here so no row disappears without a record.
 - **G5. Save and record** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 8 minor, all applied; the error was a Tone oscillator leak), pushed. Report in `docs/reviews/G5.md`. Ten-minute take: valid MP3, 600.11 s for 600.01 s, heap +0.6 MB.
 - **P1. The frame** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 5 minor, all applied except M1 and M2, which belong to P3 and P2 and stay in those rows), pushed. Report in `docs/reviews/P1.md`.
 - **P1b. The look** (23 Nov 2026). Built, reviewed (fix: 1 error, 4 should-fix, 11 minor, all applied), pushed. Report in `docs/reviews/P1b.md`. Whether it has the wow is Pedro's call.
+- **P2. Simple and Advanced** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 8 minor, all applied except Busy silent in Pad and bass Punch without drive, kept as choices), pushed. Report in `docs/reviews/P2.md`. C4 cleared. Bundle 4 is done.
