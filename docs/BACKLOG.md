@@ -19,6 +19,7 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 
 - **C2. G3 listen items for C1** (23 Nov 2026): the bass lost its second filter (listen for crackle on a saw bass with Env amt high); the drum filter still tops at 18 kHz, not the 10 kHz of the other filters. If C1 crackle persists, these are the next suspects after buffer size.
 - **C3. G3 sound defaults changed** (23 Nov 2026): default bass cutoff 0.3 with env amount 0.45, kick now about 0.2 s, drum level and sub dials max out at the C1 trims, defaults moved up the dial. Pedro's ears judge them.
+- **C7. Bundle 4 listen item** (23 Nov 2026): the drum lane is about 32 px high at 640 px screen height (recorded choice); say in the notes if it is hard to read.
 - **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
 
@@ -58,6 +59,7 @@ Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
 
 ### P4. Simple chords
 
+- From the bundle 4 player: Simple Chords shows colour blocks with no words; the cards here carry the feel and progression words.
 - Spec 8.4: the Simple Chords tab (feel, four cards, More chords, Lower and Higher, the vibe button) and the progression library: at least 120, tagged by feel and by the vibes they suit, at least four per feel for every one of the 24 vibes, stored as degrees with mood and voicing.
 - The Advanced Chords tab is the G2 editor.
 - A test walks the whole library: every progression is in its mood's scale or marked as borrowing, has 2 to 8 chords, and transposes to all twelve keys inside the instruments' ranges.
@@ -74,6 +76,7 @@ Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
 ### P6. Lead screens
 
 - P1b kept `leadSteps` and `preview` in the engine for this row's step row; use them or remove them, and say which in the changelog.
+- From the bundle 4 player: the Advanced Layer lane is squeezed beside Back and New idea; give it room in the new layout.
 - Advanced Layer tab: style selector, the Notes and Feel pages of six knobs, Pulse's own three knobs on a third page, the step row showing phrase bar and note lengths, New idea and Back.
 - Simple Layer tab: style picker, Busy, Evolve, Bright, Space, New idea, Back.
 - Each launch style of P3 gets a fitting lead style and settings on its layers.
