@@ -170,7 +170,7 @@ Each instrument tab in Simple shows one picker and four large dials, on one scre
 | Drums | Beat | Punch, Hats, Swing, Level |
 | Bass | Rhythm | Bright, Weight, Punch, Level |
 | Synth | Sound | Bright, Punch, Space, Level |
-| Layer 1 and 2 | Lead style (or Arp, Pad) | Busy, Evolve, Bright, Space |
+| Layer 1 and 2 | Mode (Lead, Arp, Pad, Drone), and the lead style when the mode is Lead | Busy, Evolve, Bright, Space |
 
 - **A macro dial moves several ordinary values at once** (Bright: cutoff and filter envelope; Space: both sends; Punch: attack, decay and drive; Weight: sub and low drive; Evolve: the inverse of Lock). The mapping is data, next to the patch definitions.
 - **Each macro's position is stored in the song** so the dial shows where it was left. Editing the underlying values in Advanced does not move the macro dial.
@@ -221,7 +221,7 @@ The generative mode gets a style selector. Each style is its own pure, seeded ge
 
 ### 8.6 Screens
 
-The six images in `docs/design/phase2/` are the reference for these screens: Simple Play, Simple Layer, Simple Chords, the vibe picker, Advanced Play, Advanced Layer. Names and values in them are placeholders.
+The images in `docs/design/look/` are the reference for how screens look (section 8.12) and for the layout of Simple Play, Simple Layer, Advanced Layer and both tablet layouts. The older images in `docs/design/phase2/` are the reference only for the layout of Simple Chords (`groovebox-3`), the vibe picker (`groovebox-6`) and Advanced Play on a phone (`groovebox-4`); their rounded corners, dashed outlines, plain instrument buttons and second typeface are superseded. Names and values in all of them are placeholders.
 
 **Simple never scrolls and never swipes, in any direction.**
 - Every Simple screen shows everything it has at 360 x 640 CSS px and up. Where there is more than fits (progressions), a visible button pages to the next set.
@@ -239,7 +239,7 @@ The six images in `docs/design/phase2/` are the reference for these screens: Sim
 1. Header: New jam and the Simple / Advanced switch.
 2. The tab's own content. Within it, the control touched most (the XY pad, the instrument buttons, the grid) sits lowest.
 3. The section strip.
-4. The transport bar: play and stop, bpm, vibe or key, the beat dots, record.
+4. The transport bar: play and stop, bpm, the bar counter, the four beat lights, record. The vibe is shown in the vibe control; key and mood are on the Chords tab.
 5. The tab bar.
 
 The strip and the transport bar are in the same place on every tab. On the Advanced Play tab the strip is indented to line up under the grid's four columns, so the strip is the grid's column labels.
@@ -247,13 +247,13 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 **One row of sections.**
 - The section strip appears once on every screen, above the transport bar. On the Play tab the grid sits directly on top of it and uses it as its column labels; there is no second row.
 - Tapping a section always means the same thing: play it from the next bar line. The edited section follows the playing one.
-- Editing a section that is not playing is Advanced only: hold a section and choose "Edit without playing". It then carries a pencil mark until it is played or released.
-- Three states, each with its own look and a word under the letter the first times it appears: playing (filled), next (outlined, pulsing), editing (pencil).
-- A bar indicator of four beat dots sits by the play button, so it is visible when "next bar" arrives.
+- Editing a section that is not playing is Advanced only: hold a section and choose "Edit without playing". It then shows as Editing until it is played or released.
+- Three states, each with its own look and a word under the letter: Playing (filled, with the moving band), Next bar (hatched frame, marching and pulsing), Editing (a yellow inset line). Section 8.12 has the detail.
+- Four square beat lights sit in the transport bar, so it is visible when "next bar" arrives.
 
 **Play tab.**
 - **Simple, "Now":** the vibe control at the top, then the five instrument lanes for the playing section (section 8.12), then the DROP button (section 8.9) with the Morph switch (section 8.11) beside it, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
-- **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
+- **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
 
 **The last jam survives a reload** (kept on the phone automatically), ahead of the full save screen of row G5.
@@ -456,7 +456,7 @@ Movement shows where things are and what is about to happen. Every animation is 
 
 ## 9. Phase 3: tablet
 
-Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad controller you want to jam on for hours: more on screen at once, fewer taps, things that move with the music. Sections 1 to 8 still hold; this section says what changes when the screen is larger. `docs/design/phase2/groovebox-7-tablet-landscape.jpg` and `groovebox-8-tablet-portrait.jpg` are the reference.
+Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad controller you want to jam on for hours: more on screen at once, fewer taps, things that move with the music. Sections 1 to 8 still hold; this section says what changes when the screen is larger. `docs/design/look/groovebox-v3-tablet-1-landscape-advanced.jpg` and `groovebox-v3-tablet-2-portrait-simple.jpg` are the reference.
 
 ### 9.1 Three layouts
 
@@ -475,7 +475,7 @@ Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad con
 
 Two halves, both always on screen.
 
-- **Left: the pads.** The punch pads and the DROP button on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument, what it is playing and a level meter; then the section strip as the grid's column labels; then the transport bar.
+- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument and what it is playing, the pads of the playing section showing their notes; then the section strip as the grid's column labels; then the DROP button and the transport bar side by side.
 - **Right: one instrument.** A rail of seven buttons (Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix) and the chosen one's panel under it.
 - **Advanced panels show everything at once, with no pages:**
   - Layers: mode and lead style, the phrase row, the Notes and Feel groups of six knobs side by side, the XY pad and the Sound group.
@@ -490,7 +490,7 @@ Two halves, both always on screen.
 ### 9.3 Tablet portrait
 
 - **Top:** the chosen instrument's panel, laid out as in landscape where it fits, otherwise in two rows.
-- **Bottom dock, always on screen:** the punch pads and the DROP button; the five instrument buttons in one row (Simple) or the pad grid (Advanced); the section strip; the transport bar; the tab bar.
+- **Bottom dock, always on screen:** the punch pads; the five instrument lanes (Simple) or the pad grid (Advanced); the DROP button with Morph; the section strip; the transport bar; the tab bar.
 
 ### 9.4 Punch pads
 
@@ -508,7 +508,7 @@ Six momentary performance effects, all synthesized, all landing in time.
 - Several can be held at once.
 - On a phone they are a page of the Mix tab.
 - Stutter replaces row L5.
-- The DROP button of section 8.9 sits beside the punch pads on both tablet layouts, larger than a pad.
+- The DROP button of section 8.9 is on both tablet layouts: beside the transport bar in landscape, above the section strip in portrait.
 
 ### 9.5 It moves with the music
 
