@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groovebox Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* single dark theme by choice; one column; rows carry a colour stripe by bundle; screens in a sideways gallery */
+  color-scheme:dark;
+  --bg:#0a0a0c; --card:#131316; --line:#26262d; --text:#f2f2f4; --dim:#a3a3ae;
+  --coral:#ff6b6b; --orange:#f4a261; --teal:#2a9d8f; --blue:#6aa3c9; --violet:#9b5de5; --yellow:#e9c46a;
+  --body:'DM Sans',system-ui,sans-serif; --mono:'Space Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.5}
+main{max-width:640px;margin:0 auto;padding:28px 16px 56px;display:flex;flex-direction:column;gap:36px}
+header h1{font-size:30px;line-height:1.15;font-weight:700;letter-spacing:-.02em;text-wrap:balance}
+header p{color:var(--dim);margin-top:10px}
+section{display:flex;flex-direction:column;gap:12px}
+h2{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--coral)}
+.card{background:var(--card);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.card h3{font-size:17px;font-weight:700;line-height:1.3}
+.card p,.card li{color:var(--dim);font-size:15px}
+.card b{color:var(--text);font-weight:500}
+ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+li{padding-left:16px;position:relative}
+li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--line)}
+.status{display:flex;flex-direction:column}
+.status>div{display:grid;grid-template-columns:92px 1fr;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:15px;color:var(--dim)}
+.status>div:first-child{border-top:0;padding-top:0}.status>div:last-child{padding-bottom:0}
+.status>div>span{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding-top:3px}
+.status b{color:var(--text);font-weight:500}
+.gallery{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px}
+.gallery figure{flex:none;width:72%;max-width:300px;scroll-snap-align:center;display:flex;flex-direction:column;gap:8px}
+.gallery img{width:100%;height:auto;border-radius:14px;border:1px solid var(--line);display:block}
+.gallery figcaption{font-size:13px;color:var(--dim)}
+.gallery figcaption b{display:block;color:var(--text);font-weight:700;font-size:14px}
+.gallery figure.wide{width:92%;max-width:560px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px 8px 0;border-top:1px solid var(--line);vertical-align:top;color:var(--dim)}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--yellow);border-top:0;font-weight:400}
+td:first-child{color:var(--text);font-weight:500;white-space:nowrap}
+.phase{border-left:4px solid var(--c);border-radius:4px 14px 14px 4px}
+.phase .top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.phase .n{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--c)}
+.phase .size{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--dim)}
+.done{font-size:14px;color:var(--text);border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.done span{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--c);margin-right:6px}
+.bundle{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:8px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Groovebox build plan</h1>
+  <p>Phase 2: a Simple mode that plays from one tap, an Advanced mode with every control, more ways to shape a lead, and screens that never scroll. Phase 3: tablet layouts that turn it into a pad controller and synth on one screen.</p>
+</header>
+
+<section>
+  <h2>Where it stands</h2>
+  <div class="card">
+    <div class="status">
+      <div><span style="color:var(--teal)">Done</span><div><b>Sound spike, engine, shell, drums, bass, synth, mix, both layers.</b> Live on the Pages URL.</div></div>
+      <div><span style="color:var(--yellow)">Running</span><div><b>Save and record.</b> Songs kept on the phone, record, MP3 export.</div></div>
+      <div><span style="color:var(--coral)">Next</span><div><b>Phase 2</b>, eight rows in four chats. The plan waits on a side branch until save and record closes.</div></div>
+      <div><span>After</span><div><b>APK</b>, then <b>phase 3</b> (tablet, three rows in two chats), then <b>retouch</b> from your notes.</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>What you said after playing it</h2>
+  <div class="card">
+    <ul>
+      <li><b>Chords and pads sound great.</b> Kept as they are.</li>
+      <li><b>The lead lacks variety.</b> Today it is one generator: every note the same length, one register, no phrase.</li>
+      <li><b>Chords still feel advanced.</b> You should never need to know a scale or a progression.</li>
+      <li><b>Scrolling is hard</b> because the whole screen is controls.</li>
+      <li><b>The main tab's two rows of sections are confusing.</b></li>
+      <li><b>You want one app-wide switch</b> between a plain Simple mode and an Advanced mode.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>The screens</h2>
+  <div class="gallery">
+    <figure><img src="img/1.jpg" alt="Simple mode Play tab" width="780" height="1688"><figcaption><b>Simple · Play</b>Vibe at the top, five instruments, then sections and play at the bottom. C and Layer 1 start on the next bar.</figcaption></figure>
+    <figure><img src="img/6.jpg" alt="Vibe picker" width="780" height="1688"><figcaption><b>Vibe picker</b>All 24 on one screen, coloured by family. Also the opening screen.</figcaption></figure>
+    <figure><img src="img/2.jpg" alt="Simple mode Layer 1 tab" width="780" height="1688"><figcaption><b>Simple · Layer 1</b>A lead style, four big dials, New idea and Back.</figcaption></figure>
+    <figure><img src="img/3.jpg" alt="Simple mode Chords tab" width="780" height="1688"><figcaption><b>Simple · Chords</b>Pick a feel, tap one of four progressions, More chords for the next four.</figcaption></figure>
+    <figure><img src="img/4.jpg" alt="Advanced mode Play tab" width="780" height="1688"><figcaption><b>Advanced · Play</b>The grid sits on the one row of sections, which labels its columns.</figcaption></figure>
+    <figure><img src="img/5.jpg" alt="Advanced mode Layer 1 tab" width="780" height="1688"><figcaption><b>Advanced · Layer 1</b>Lead style, pages of six knobs, the phrase with note lengths.</figcaption></figure>
+  </div>
+  <p style="color:var(--dim);font-size:13px">Mockups, not the app. Swipe sideways. Progression names and dial values are placeholders.</p>
+</section>
+
+<section>
+  <h2>What phase 2 adds</h2>
+  <div class="card">
+    <h3>Simple and Advanced</h3>
+    <ul>
+      <li><b>One switch in the header</b>, remembered between launches.</li>
+      <li><b>It changes what is shown, never what is heard.</b> Switching mid-jam is silent and loses nothing.</li>
+      <li><b>Every Simple move shows up in Advanced.</b> Start simple, then go deeper on the same jam.</li>
+      <li><b>Simple uses plain words only.</b></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Vibes</h3>
+    <ul>
+      <li><b>24 complete starting grooves</b> in five families.</li>
+      <li><b>One tap sets everything:</b> tempo, chords, beat, bass, sounds, leads and four arranged sections.</li>
+      <li><b>The app opens on the vibe picker</b>, with Continue last jam first.</li>
+      <li><b>The vibe control sits on the Simple Play tab:</b> arrows step to the previous or next vibe, the middle opens the picker. A new vibe starts on the next bar and the old jam stays as Previous jam.</li>
+      <li><b>Each vibe is one data file.</b> Adding one later needs no other change.</li>
+    </ul>
+    <div class="tw"><table>
+      <tr><th>Family</th><th>Vibes</th></tr>
+      <tr><td>House</td><td>Deep house, Tropical house, Progressive, Acid house, Afro house</td></tr>
+      <tr><td>Techno</td><td>Deep techno, Melodic techno, Minimal techno, Dub techno, Detroit techno</td></tr>
+      <tr><td>Breaks</td><td>Drum and bass, 2-step, Breakbeat, Dubstep, Future garage</td></tr>
+      <tr><td>Slow</td><td>Lo-fi, Ambient, Downtempo, Synthwave, Trap</td></tr>
+      <tr><td>Other</td><td>IDM, EDM, Trance, Electro</td></tr>
+    </table></div>
+  </div>
+  <div class="card">
+    <h3>Simple controls</h3>
+    <div class="tw"><table>
+      <tr><th>Instrument</th><th>Picker</th><th>Four dials</th></tr>
+      <tr><td>Drums</td><td>Beat</td><td>Punch, Hats, Swing, Level</td></tr>
+      <tr><td>Bass</td><td>Rhythm</td><td>Bright, Weight, Punch, Level</td></tr>
+      <tr><td>Synth</td><td>Sound</td><td>Bright, Punch, Space, Level</td></tr>
+      <tr><td>Layers</td><td>Lead style</td><td>Busy, Evolve, Bright, Space</td></tr>
+    </table></div>
+  </div>
+  <div class="card">
+    <h3>Simple chords</h3>
+    <ul>
+      <li><b>Pick a feel</b> (Bright, Warm, Dreamy, Dark, Tense, Uplifting), tap one of four progressions. More chords shows the next four.</li>
+      <li><b>At least 120 progressions</b>, four or more per feel for every vibe.</li>
+      <li><b>Higher and Lower</b> move the whole song up or down, with no note names.</li>
+      <li><b>Advanced</b> keeps the chord editor you have now.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Lead styles</h3>
+    <div class="tw"><table>
+      <tr><th>Style</th><th>What it plays</th></tr>
+      <tr><td>Hook</td><td>A short motif with a clear shape, repeated.</td></tr>
+      <tr><td>Phrase</td><td>A line over 4 or 8 bars that calls, answers and resolves.</td></tr>
+      <tr><td>Roll</td><td>Driving sixteenths with slides, accents and octave jumps.</td></tr>
+      <tr><td>Drift</td><td>Sparse long notes that move by step.</td></tr>
+      <tr><td>Pulse</td><td>The lead you have now.</td></tr>
+    </table></div>
+    <p><b>Twelve knobs shared by every style:</b> Busy, Lock, Shape, Range, Register, Tension, Note length, Phrase, Variation, Repeats, Slide, Accent.</p>
+    <p><b>New idea and Back</b> on both layers. Back restores the previous lead note for note.</p>
+  </div>
+  <div class="card">
+    <h3>Screens</h3>
+    <ul>
+      <li><b>Simple never scrolls or swipes,</b> in any direction. Everything it has is on the screen, and it is enough for a whole jam.</li>
+      <li><b>Advanced never scrolls up and down.</b> A tab that needs more room gets pages with large chips. This is where the fine control lives.</li>
+      <li><b>Text always fits its tile:</b> it never wraps, gets cut off or spills over the edge. Text that is too wide is drawn smaller; only if that fails is the label shortened.</li>
+      <li><b>The most-used controls sit at the bottom, in thumb reach:</b> the section strip, then play and record, then the tabs. They are in the same place on every tab.</li>
+      <li><b>One row of sections</b> on every screen. A tap always means: play it from the next bar.</li>
+      <li><b>Three states:</b> playing (filled), next (dashed), editing without playing (pencil, Advanced only).</li>
+      <li><b>Four beat dots</b> in the play bar show when the next bar arrives.</li>
+      <li><b>The last jam survives a reload.</b></li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Phase 3: tablet</h2>
+  <div class="gallery">
+    <figure class="wide"><img src="img/7.jpg" alt="Tablet landscape, Advanced" width="1600" height="1000"><figcaption><b>Tablet landscape · Advanced</b>Pads on the left, one instrument on the right with every knob at once. No tabs to switch, no pages.</figcaption></figure>
+    <figure><img src="img/8.jpg" alt="Tablet portrait, Simple" width="800" height="1280"><figcaption><b>Tablet portrait · Simple</b>The instrument on top; punch pads, instruments, sections and play docked at the bottom.</figcaption></figure>
+  </div>
+  <div class="card">
+    <h3>Three layouts</h3>
+    <ul>
+      <li><b>Phone, tablet portrait, tablet landscape,</b> chosen by screen size. Rotating mid-jam leaves the music running.</li>
+      <li><b>Extra space shows more at once.</b> It is not the phone layout made bigger.</li>
+      <li><b>Nothing scrolls on a tablet,</b> in Simple or Advanced.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Landscape: the desk</h3>
+    <ul>
+      <li><b>Left half, always there:</b> punch pads, the instruments-by-sections grid as large pads with a level meter per instrument, the sections, play and record.</li>
+      <li><b>Right half:</b> seven buttons to choose Chords, Drums, Bass, Synth, Layer 1, Layer 2 or Mix, and that panel in full.</li>
+      <li><b>Advanced shows every knob at once:</b> a lead's twelve knobs, its sound and its XY pad together; drums as one grid of every voice by 16 steps; the mix as faders.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Punch pads</h3>
+    <div class="tw"><table>
+      <tr><th>Pad</th><th>What it does</th></tr>
+      <tr><td>Drop</td><td>Drums and bass cut while held, back on the next bar.</td></tr>
+      <tr><td>Filter</td><td>The whole mix sweeps dark while held, opens on the next beat.</td></tr>
+      <tr><td>Stutter</td><td>The last half beat repeats while held.</td></tr>
+      <tr><td>Echo</td><td>One tap throws the mix into the delay for a bar.</td></tr>
+      <tr><td>Wash</td><td>One tap throws it into the reverb for a bar.</td></tr>
+      <tr><td>Build</td><td>An eight-bar rise that lands on a bar line.</td></tr>
+    </table></div>
+    <p>Several can be held at once. On a phone they are a page of the Mix tab.</p>
+  </div>
+  <div class="card">
+    <h3>It moves with the music</h3>
+    <ul>
+      <li><b>Pads pulse</b> when their instrument sounds, and step rows show the playing step.</li>
+      <li><b>Dials move</b> when a macro, the filter wobble or a punch pad moves them.</li>
+      <li><b>Many fingers:</b> two dials, the XY pad and a pad, several pads, all at once.</li>
+      <li><b>Audio comes first.</b> The animation drops frames under load and can be switched off.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Sounds, beats and rhythms</h2>
+  <div class="card">
+    <ul>
+      <li><b>24 beats or more:</b> Four on the floor, House shuffle, Techno, Minimal, Dub, Acid, Afro, Tropical, Progressive, 2-step, Garage shuffle, Breakbeat, DnB two-step, DnB roller, Halftime, Dubstep, Boom bap, Trap, Electro, Trance, EDM, Downtempo, Synthwave, Glitch.</li>
+      <li><b>14 bass rhythms:</b> Offbeat, Rolling, Long notes, DnB sub, Octave bounce, Acid line, Dub, Reese hold, Wobble, 808 glide, Arp bass, Pedal, Garage skip, Walking.</li>
+      <li><b>10 synth rhythms:</b> Stabs, Offbeat, Sustained, Dub chord, Pluck eighths, Gate, Skank, Swell, Broken chord, Push.</li>
+      <li><b>8 or more sounds per instrument,</b> such as Sub, Acid, Reese, Wobble and 808 for bass; Warm stab, Dub chord, Supersaw, Soft keys and Glass for synth; Bell, Whistle and Airy for leads.</li>
+    </ul>
+    <p><b>What the engine gains to make them:</b> two more drum voices (Perc, Shaker), 16-step beats with hat rolls, a noise and an FM oscillator, a tempo-synced filter wobble, chorus, and a lo-fi master (crush, wobble, noise). All synthesized, each switchable off.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Rows</h2>
+
+  <p class="bundle">Chat 1 · the screens</p>
+  <div class="card phase" style="--c:var(--coral)">
+    <div class="top"><span class="n">P1</span><h3>One row of sections, no scrolling, the Now view</h3></div>
+    <p class="done"><span>Done when</span>Nothing scrolls and no label wraps at two phone sizes; a section tap means the same thing everywhere; a reload brings the jam back.</p>
+  </div>
+  <div class="card phase" style="--c:var(--coral)">
+    <div class="top"><span class="n">P2</span><h3>Simple and Advanced</h3></div>
+    <p class="done"><span>Done when</span>Switching mode changes no sound; every Simple move is visible in Advanced; Back restores the previous lead.</p>
+  </div>
+
+  <p class="bundle">Chat 2 · vibes and chords</p>
+  <div class="card phase" style="--c:var(--yellow)">
+    <div class="top"><span class="n">P3</span><h3>Vibes</h3></div>
+    <p>The format, the picker, the vibe control, and the first eight: Deep house, Tropical house, Deep techno, Melodic techno, Drum and bass, 2-step, Lo-fi, Ambient.</p>
+    <p class="done"><span>Done when</span>All eight load and play with every instrument audible; another is one new file. Whether each sounds like its name is your call.</p>
+  </div>
+  <div class="card phase" style="--c:var(--yellow)">
+    <div class="top"><span class="n">P4</span><h3>Simple chords</h3></div>
+    <p class="done"><span>Done when</span>A progression can be chosen and changed without seeing a scale or degree; the whole library passes its in-key test.</p>
+  </div>
+
+  <p class="bundle">Chat 3 · the leads</p>
+  <div class="card phase" style="--c:var(--violet)">
+    <div class="top"><span class="n">P5</span><h3>Lead styles</h3></div>
+    <p class="done"><span>Done when</span>Each style passes its own tests and the five give clearly different patterns from the same seed.</p>
+  </div>
+  <div class="card phase" style="--c:var(--violet)">
+    <div class="top"><span class="n">P6</span><h3>Lead screens</h3></div>
+    <p class="done"><span>Done when</span>Every lead knob turns mid-jam with no stuck note; both modes fit without scrolling. Whether there is enough variety is your call.</p>
+  </div>
+
+  <p class="bundle">Chat 4 · sounds and the other vibes</p>
+  <div class="card phase" style="--c:var(--teal)">
+    <div class="top"><span class="n">P7</span><h3>Sound additions</h3></div>
+    <p class="done"><span>Done when</span>Each addition is audible, can be turned off, and the phone load is measured before and after.</p>
+  </div>
+  <div class="card phase" style="--c:var(--teal)">
+    <div class="top"><span class="n">P8</span><h3>The other sixteen vibes and the library</h3></div>
+    <p class="done"><span>Done when</span>All 24 load and play; every list meets its count; every name fits its tile.</p>
+  </div>
+
+  <p class="bundle">Between the phases</p>
+  <div class="card phase" style="--c:var(--blue)">
+    <div class="top"><span class="n">G6</span><h3>APK</h3></div>
+    <p class="done"><span>Done when</span>GitHub builds an APK you can install; it works offline.</p>
+  </div>
+  <p class="bundle">Phase 3 · chat 1 · tablet layouts</p>
+  <div class="card phase" style="--c:var(--orange)">
+    <div class="top"><span class="n">T1</span><h3>Three layouts and the docked pads</h3></div>
+    <p class="done"><span>Done when</span>Four tablet sizes pass in both modes; rotating while playing keeps the music going; the phone layout is unchanged.</p>
+  </div>
+  <div class="card phase" style="--c:var(--orange)">
+    <div class="top"><span class="n">T2</span><h3>Advanced without pages</h3></div>
+    <p class="done"><span>Done when</span>On a landscape tablet no Advanced panel has pages.</p>
+  </div>
+
+  <p class="bundle">Phase 3 · chat 2 · performance</p>
+  <div class="card phase" style="--c:var(--orange)">
+    <div class="top"><span class="n">T3</span><h3>Punch pads, movement and many fingers</h3></div>
+    <p class="done"><span>Done when</span>Each punch pad starts and ends on the beat or bar it should; two controls move at once; animation can be turned off. Whether you want to jam on it for hours is your call.</p>
+  </div>
+
+  <p class="bundle">Always open</p>
+  <div class="card phase" style="--c:var(--line)">
+    <div class="top"><span class="n" style="color:var(--dim)">G7</span><h3>Retouch</h3></div>
+    <p>Runs on your notes, as often as you send them.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Later</h2>
+  <div class="card">
+    <ul>
+      <li><b>Effect slot per instrument:</b> chorus, phaser, bit-crush, tape wobble.</li>
+      <li><b>Automatic transitions</b> on a section switch: fill, filter drop.</li>
+      <li><b>Autopilot:</b> the jam slowly changes itself when left alone.</li>
+      <li><b>A play pad</b> that plays in-key notes by touch.</li>
+      <li><b>One part from another vibe:</b> only its drums, chords or sounds.</li>
+      <li><b>Advanced chords:</b> 7ths, 9ths, borrowed chords, inversions.</li>
+      <li><b>Knob snapshots per section,</b> morph between two leads, offline re-render.</li>
+    </ul>
+    <p>Never: samples. Every sound stays synthesized.</p>
+  </div>
+</section>
+
+<section>
+  <h2>How a chat runs</h2>
+  <div class="card">
+    <ul>
+      <li><b>A Sonnet 5.5 chat runs each bundle</b> and stays thin. Fable only designs, as here.</li>
+      <li><b>Three fresh Opus 5.5 agents per row:</b> builder, a reviewer that never saw the build, fixer.</li>
+      <li><b>Scripts judge the result;</b> your ears judge the sound.</li>
+      <li><b>Every chat ends with the next starter.</b> The starter text never changes.</li>
+      <li><b>The repo holds the detail:</b> spec section 8 and the backlog, on branch phase2-design until save and record closes.</li>
+    </ul>
+  </div>
+</section>
+</main>
+</body>
+</html>

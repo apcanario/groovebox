@@ -44,9 +44,10 @@ For each row of the bundle, in order:
 
 1. The chat runs `npm run check` and `npm run smoke` itself. Both must pass.
 2. Update `docs/BACKLOG.md`: move the row to Done. Add anything found but not fixed to **Carried**, with the row it belongs to.
-3. Add the row to `docs/CHANGELOG.md`: date, row, models that ran, what changed, script results, choices taken.
-4. Commit and push `main`. Check the Pages deploy if the session can see it; if it cannot, say it is unverified.
-5. Start the next row of the bundle. Each row is pushed before the next begins.
+3. Update `README.md` as `CLAUDE.md` says: what the app does today, and the status table.
+4. Add the row to `docs/CHANGELOG.md`: date, row, models that ran, what changed, script results, choices taken.
+5. Commit and push `main`. Check the Pages deploy if the session can see it; if it cannot, say it is unverified.
+6. Start the next row of the bundle. Each row is pushed before the next begins.
 
 ## 5. The reply
 
