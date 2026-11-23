@@ -63,7 +63,7 @@ export function checkProgression(p: ProgressionDef): string[] {
   if (!MOODS.includes(p.mood)) return [...out, `mood: unknown ${p.mood}`];
   if (p.voicing !== MOOD_TABLE[p.mood].voicing) out.push(`voicing: the mood ${p.mood} plays ${MOOD_TABLE[p.mood].voicing}`);
   if (!Array.isArray(p.chords) || p.chords.length < 2 || p.chords.length > 8) out.push("chords: 2 to 8");
-  else if (!validChords(progressionChords(p))) out.push("chords: degrees 0..6, lengths of half, one or two bars");
+  else if (!validChords(progressionChords(p))) out.push("chords: degrees 0..6, lengths of half, one, two, four or eight bars");
   return out;
 }
 

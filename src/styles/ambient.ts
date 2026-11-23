@@ -1,22 +1,26 @@
 import type { StyleDef } from "../music/data.ts";
 
-/** Ambient: slow, major, long chords on a swelling pad, a slow arp, a sparse pulse only in the groove. */
+/**
+ * Ambient (P7 rework, spec 8.10): slow and major, chords of four and eight bars, a drone on Layer 2 that glides
+ * from chord to chord, a pad on Layer 1 that swoops between them, long attacks and releases, slow drift on the
+ * pads, a 12-second reverb and the air layer. A sparse halftime pulse only in the groove.
+ */
 export default {
   order: 2,
   name: "Ambient",
   family: "slow",
-  bpm: 70,
+  bpm: 64,
   key: "E",
   mood: "major",
   patches: {
     drums: "soft",
     bass: "sub",
-    synth: "padSwell",
-    layer1: "softSine",
-    layer2: { patch: "airyPad", set: { reverb: 0.85 } },
+    synth: { patch: "padSwell", set: { attack: 3, release: 8, drift: 0.35, driftRate: 0.2 } },
+    layer1: { patch: "driftPad", set: { level: 0.5 } },
+    layer2: { patch: "airyPad", set: { reverb: 0.85, drift: 0.5, driftRate: 0.1 } },
   },
-  mix: { sweep: 0, pump: 0.1, saturation: 0 },
-  // P6: both layers drift in long, sparse notes (the arp layer high, the pad layer low), when switched to Lead.
+  mix: { sweep: 0, pump: 0.1, saturation: 0, air: 0.5, reverbDecay: 12 },
+  // P6: both layers drift in long, sparse notes (the pad layer high, the drone layer low), when switched to Lead.
   leads: {
     layer1: { style: "drift", register: 0.7, range: 0.6, noteLength: 0.9, density: 0.4, slide: 0.25 },
     layer2: { style: "drift", register: 0.45, range: 0.4, noteLength: 1, density: 0.3 },
@@ -25,42 +29,42 @@ export default {
     {
       name: "Intro",
       on: ["synth", "layer2"],
-      chords: [[0, 2], [3, 2]],
+      chords: [[0, 8], [3, 8]],
       beat: "none",
       bass: "pedal",
       synth: "sustained",
-      layer1: { mode: "arp", arp: { direction: "up", rate: 4, octaves: 2, gate: 1 } },
-      layer2: { mode: "pad", pad: { attack: 3, release: 6, motion: 0.5 } },
+      layer1: { mode: "pad", pad: { attack: 8, release: 12, motion: 0.4, swoop: 0.6 } },
+      layer2: { mode: "drone", drone: { fifth: true }, pad: { attack: 10, release: 14, motion: 0.5, swoop: 0.7 } },
     },
     {
       name: "Groove",
       on: ["drums", "bass", "synth", "layer1", "layer2"],
-      chords: [[0, 2], [3, 2], [5, 2], [4, 2]],
+      chords: [[0, 4], [3, 4], [5, 4], [4, 4]],
       beat: "halftime",
       bass: "pedal",
       synth: "sustained",
-      layer1: { mode: "arp", arp: { direction: "updown", rate: 4, octaves: 2, gate: 1 } },
-      layer2: { mode: "pad", pad: { attack: 3, release: 6, motion: 0.5 } },
+      layer1: { mode: "pad", pad: { attack: 3, release: 10, motion: 0.4, swoop: 0.5 } },
+      layer2: { mode: "drone", drone: { fifth: true }, pad: { attack: 4, release: 12, motion: 0.5, swoop: 0.6 } },
     },
     {
       name: "Break",
       on: ["layer1", "layer2"],
-      chords: [[5, 2], [3, 2]],
+      chords: [[5, 8], [3, 8]],
       beat: "none",
       bass: "pedal",
       synth: "sustained",
       layer1: { mode: "arp", arp: { direction: "random", rate: 4, octaves: 3, gate: 1 } },
-      layer2: { mode: "pad", pad: { attack: 4, release: 8, motion: 0.7 } },
+      layer2: { mode: "drone", drone: { fifth: false }, pad: { attack: 10, release: 16, motion: 0.7, swoop: 0.8 } },
     },
     {
       name: "Outro",
       on: ["synth", "layer2"],
-      chords: [[0, 2], [3, 2]],
+      chords: [[0, 8], [3, 8]],
       beat: "none",
       bass: "pedal",
       synth: "sustained",
-      layer1: { mode: "arp", arp: { direction: "up", rate: 4, octaves: 2, gate: 1 } },
-      layer2: { mode: "pad", pad: { attack: 3, release: 8 } },
+      layer1: { mode: "pad", pad: { attack: 8, release: 16, swoop: 0.6 } },
+      layer2: { mode: "drone", drone: { fifth: true }, pad: { attack: 10, release: 20, swoop: 0.7 } },
     },
   ],
 } satisfies StyleDef;

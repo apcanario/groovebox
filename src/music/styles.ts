@@ -81,7 +81,9 @@ export function styleSeed(id: string): number {
 /** A layer of one section: the defaults, the style's lead for the layer (P6), then the section's own settings. */
 function layerPattern(l: StyleLayer, lead: StyleLead | undefined, seed: number): LayerPattern {
   const d = defaultLayerPattern(l.mode, seed);
-  return { mode: l.mode, arp: { ...d.arp, ...l.arp }, pad: { ...d.pad, ...l.pad }, gen: { ...d.gen, ...lead, ...l.gen, seed } };
+  const out: LayerPattern = { mode: l.mode, arp: { ...d.arp, ...l.arp }, pad: { ...d.pad, ...l.pad }, gen: { ...d.gen, ...lead, ...l.gen, seed } };
+  if (l.drone) out.drone = { ...l.drone };
+  return out;
 }
 
 /** The song a style starts: everything it sets (spec 8.2), its four sections, named after the style. */

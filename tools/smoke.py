@@ -496,7 +496,8 @@ def walk_g3(page, failures: list) -> None:
         if page.evaluate(f"{S}.drums.preset") != preset:
             failures.append(f"drum preset {preset} did not take")
     pick_chip(page, "preset", "fourFloor")
-    for voice in ["kick", "clap", "hat", "open"]:
+    page.click('[data-page="drums:steps"]')  # P7: the sequencer has its own page
+    for voice in ["kick", "clap", "hat", "open", "perc", "shaker"]:
         page.click(f'[data-voice="{voice}"]')
         before = page.evaluate(f"{S}.drums.grid ? {S}.drums.grid.{voice} : null")
         page.click(f'[data-step="{voice}:5"]')
@@ -1383,11 +1384,11 @@ def walk_g4(page, failures: list) -> None:
         if lvl < -60:
             failures.append(f"{lid} arp is silent ({lvl:.1f} dB)")
 
-        # Pad: four dials; brightness moves the pad filter at once; it opens again outside Pad mode.
+        # Pad: five dials (P7 adds Swoop); brightness moves the pad filter at once; it opens again outside Pad mode.
         page.click(f'[data-mode="{lid}:pad"]')
         ids = dials_on_screen(page, f"{lid} pad", failures)
-        if len(ids) != 4:
-            failures.append(f"{lid}: pad page has {len(ids)} dials, not 4")
+        if len(ids) != 5:
+            failures.append(f"{lid}: pad page has {len(ids)} dials, not 5")
         for d in ids:
             before = page.evaluate(f"{L}.pad")
             turn(page, f'[data-dial="{d}"]')
@@ -1406,12 +1407,16 @@ def walk_g4(page, failures: list) -> None:
         walk_pad_to_arp(page, sec, lid, failures)
 
         # Sound page: wave chips and the shared patch dials.
-        page.click(f'[data-page="{lid}:sound"]')
+        page.click(f'[data-page="{lid}:mod"]')  # P7: the wave chips sit on the Mod page
         for w in ["square", "sine", "sawtooth", "triangle"]:
             page.click(f'[data-wave="{w}"]')
             time.sleep(0.1)
             if page.evaluate(f"{SONG}.patches.{lid}.wave") != w:
                 failures.append(f"{lid} wave {w} did not take")
+        k = turn_all(page, f"{lid} mod", failures)
+        if k != 6:
+            failures.append(f"{lid}: mod page has {k} dials, not 6")
+        page.click(f'[data-page="{lid}:sound"]')
         k = turn_all(page, f"{lid} sound", failures)
         if k != 5:
             failures.append(f"{lid}: sound page has {k} dials, not 5")
@@ -1998,6 +2003,171 @@ def walk_p4(page, failures: list) -> None:
     page.click('[data-tab="play"]')
 
 
+# P7: the cost of everything on. The scene the base had (every instrument on, synth held, Layer 1 arp, Layer 2
+# pad, drive, saturation and both sends up) plus, where the engine has them, every P7 addition (Perc and Shaker
+# with hat rolls, FM and noise waves, the synced filter LFO, the drone with swoop and slow drift, the air layer,
+# a 20 s reverb, the lo-fi master). Read from Chrome's trace of the audio thread: load is the share of wall time
+# spent rendering; the worst stall is the longest single render callback against the callback's period.
+COST_SCENE = """async (extras) => {
+  const e = window.__groovebox;
+  const s = e.getSong();
+  const sec = e.position().section;
+  for (const id of ['drums', 'bass', 'synth', 'layer1', 'layer2']) if (!s.sections[sec].on[id]) e.toggleInstrumentInPlaying(id);
+  e.setSynthRhythm(sec, 'sustained');
+  e.setLayerMode(sec, 'layer1', 'arp');
+  e.setLayerMode(sec, 'layer2', 'pad');
+  e.setArp(sec, 'layer1', { rate: 1, octaves: 3 });
+  for (const id of ['bass', 'synth', 'layer1', 'layer2']) { e.setParam(id, 'drive', 0.5); e.setParam(id, 'delay', 0.5); e.setParam(id, 'reverb', 0.5); }
+  e.setMix('saturation', 0.5);
+  if (!extras || !e.p7) return false;
+  const all = extras === true;
+  const want = (k) => all || extras.includes(k);
+  if (want('drums')) { e.setDrumPreset(sec, 'trap'); for (const k of [3, 6, 11, 14]) e.toggleDrumStep(sec, 'perc', k, true); }
+  if (want('fm')) e.setParam('synth', 'wave', 'fm');
+  if (want('noise')) e.setParam('layer1', 'wave', 'noise');
+  if (want('lfo')) e.setParam('bass', 'lfoDepth', 0.7);
+  if (want('drone')) { e.setLayerMode(sec, 'layer2', 'drone'); e.setPad(sec, 'layer2', { swoop: 0.5 }); }
+  if (want('drift')) for (const id of ['synth', 'layer1', 'layer2']) e.setParam(id, 'drift', 0.8);
+  if (want('air')) e.setMix('air', 0.6);
+  if (want('reverb')) e.setMix('reverbDecay', 20);
+  if (!all && extras.includes('reverb8')) e.setMix('reverbDecay', 8);
+  if (!all && extras.includes('reverb12')) e.setMix('reverbDecay', 12);
+  if (want('lofi')) e.setMix('lofi', 1);
+  return true;
+}"""
+
+
+def measure_cost(browser, page, label: str, extras) -> dict:
+    """Play the cost scene for six seconds under Chrome's webaudio trace and read the audio thread's load."""
+    import json as _json
+    import tempfile
+    had = page.evaluate(COST_SCENE, extras)
+    time.sleep(3.0)  # every change has landed and the reverb has been built
+    path = os.path.join(tempfile.mkdtemp(), "trace.json")
+    browser.start_tracing(page=page, path=path, categories=["webaudio"])
+    time.sleep(6.0)
+    browser.stop_tracing()
+    data = _json.load(open(path))
+    ev = data["traceEvents"] if isinstance(data, dict) else data
+    renders = [x for x in ev if x.get("name") == "AudioDestination::Render" and x.get("ph") == "X"]
+    out = {"label": label, "extras": had, "callbacks": len(renders)}
+    if len(renders) > 2:
+        t0 = min(x["ts"] for x in renders)
+        t1 = max(x["ts"] + x["dur"] for x in renders)
+        busy = sum(x["dur"] for x in renders)
+        starts = sorted(x["ts"] for x in renders)
+        period = (starts[-1] - starts[0]) / (len(starts) - 1)
+        out.update(load=100.0 * busy / (t1 - t0), worst_ms=max(x["dur"] for x in renders) / 1000.0, period_ms=period / 1000.0,
+                   mean_ms=busy / len(renders) / 1000.0)
+    print(f"cost {label}: audio load {out.get('load', float('nan')):.1f}%, worst stall {out.get('worst_ms', float('nan')):.2f} ms "
+          f"(callback every {out.get('period_ms', float('nan')):.2f} ms, mean {out.get('mean_ms', float('nan')):.2f} ms), "
+          f"{out['callbacks']} callbacks, P7 additions {'on' if had else 'absent'}")
+    return out
+
+
+
+def walk_p7(page, failures: list) -> None:
+    """P7 (spec 8.7, 8.10), on the first song's groove while playing: each addition is audible or running when on and
+    stops when off; switching each while a steady drone sounds makes no click (level continuity, on the layer and on
+    the master output); the drone holds, glides at chord changes and stays inside the voice cap."""
+    E = "window.__groovebox"
+    page.evaluate("(s) => window.__groovebox.loadSong(s)", FIRST_SONG[0])
+    if not page.evaluate(f"{E}.playing"):
+        page.click("#play")
+    page.evaluate(f"{E}.switchSection(1)")
+    wait_for(page, f"{E}.position().section === 1", 4.0)
+    sec = 1
+    st = lambda: page.evaluate(f"{E}.p7State()")  # noqa: E731
+    # Perc and Shaker alone: the four G1 voices at level 0, Afro's perc and shaker still sound.
+    page.evaluate(f"{E}.setDrumPreset({sec}, 'afro')")
+    page.evaluate("()=>{for(const v of ['kick','clap','hat','open'])window.__groovebox.setParam('drums', v+'Level', 0)}")
+    lvl = solo_level(page, "drums", settle=1.0)
+    print(f"P7 Perc and Shaker alone: {lvl:.1f} dB")
+    if lvl < -60:
+        failures.append(f"P7: Perc and Shaker are silent ({lvl:.1f} dB)")
+    page.evaluate("()=>{for(const v of ['kick','clap','hat','open'])window.__groovebox.setParam('drums', v+'Level', 1)}")
+    page.evaluate(f"{E}.setDrumPreset({sec}, 'trap')")
+    # The FM and noise waves sound.
+    for inst, wave, mode in [("synth", "fm", None), ("layer1", "noise", "pad"), ("layer1", "fm", "pad")]:
+        if mode:
+            page.evaluate(f"{E}.setLayerMode({sec}, '{inst}', '{mode}')")
+        page.evaluate(f"{E}.setParam('{inst}', 'wave', '{wave}')")
+        lvl = solo_level(page, inst, settle=1.0)
+        print(f"P7 {inst} {wave} wave: {lvl:.1f} dB")
+        if lvl < -60:
+            failures.append(f"P7: the {wave} wave on {inst} is silent ({lvl:.1f} dB)")
+    page.evaluate(f"{E}.setParam('layer1', 'wave', 'triangle')")
+    page.evaluate(f"{E}.setParam('synth', 'wave', 'sawtooth')")
+    # A steady drone on Layer 2 (a sine, long notes): the continuity reference.
+    page.evaluate(f"{E}.setLayerMode({sec}, 'layer2', 'drone')")
+    page.evaluate(f"{E}.setPad({sec}, 'layer2', {{attack: 0.3, release: 2, swoop: 0.3}})")
+    page.evaluate(f"{E}.setParam('layer2', 'wave', 'sine')")
+    page.evaluate(f"{E}.setChords({sec}, [{{degree: 0, bars: 1}}, {{degree: 3, bars: 1}}])")
+    time.sleep(2.5)
+    s0 = st()
+    if s0["held"]["layer2"] != 2:
+        failures.append(f"P7: the drone holds {s0['held']['layer2']} notes, not root and fifth")
+    time.sleep(2.5)
+    s1 = st()
+    if s1["swoops"]["layer2"] <= s0["swoops"]["layer2"]:
+        failures.append("P7: the drone did not glide at a chord change")
+    lvl = solo_level(page, "layer2", settle=0.5)
+    print(f"P7 drone: {s1['held']['layer2']} notes held, {s1['swoops']['layer2']} glides, {lvl:.1f} dB")
+    if lvl < -60:
+        failures.append(f"P7: the drone is silent ({lvl:.1f} dB)")
+    steady = steady_jumps(page, "layer2", 2.0)
+    msteady = steady_jumps(page, "master", 2.0)
+    worst = 0.0
+    switches = [
+        ("drift", "layer2", f"{E}.setParam('layer2', 'drift', 1)", f"{E}.setParam('layer2', 'drift', 0)", lambda s: s["drift"]["layer2"]),
+        ("synced LFO", "layer2", f"{E}.setParam('layer2', 'lfoDepth', 1)", f"{E}.setParam('layer2', 'lfoDepth', 0)", lambda s: s["lfo"]["layer2"]),
+        ("lo-fi", "master", f"{E}.setMix('lofi', 1)", f"{E}.setMix('lofi', 0)", lambda s: s["lofi"]),
+        ("air", "master", f"{E}.setMix('air', 1)", f"{E}.setMix('air', 0)", lambda s: s["air"]),
+        ("reverb 20 s", "master", f"{E}.setMix('reverbDecay', 20)", f"{E}.setMix('reverbDecay', 3.2)", lambda s: s["reverbDecay"] > 19),
+        ("swoop", "layer2", f"{E}.setPad({sec}, 'layer2', {{swoop: 1}})", f"{E}.setPad({sec}, 'layer2', {{swoop: 0.3}})", None),
+        ("fifth", "layer2", f"{E}.setDrone({sec}, 'layer2', {{fifth: false}})", f"{E}.setDrone({sec}, 'layer2', {{fifth: true}})", None),
+    ]
+    for name, where, on, off, running in switches:
+        ref = steady if where == "layer2" else msteady
+        read_jumps(page, where)
+        page.evaluate(on)
+        time.sleep(1.2)
+        worst = max(worst, check_continuity(page, where, ref, f"P7: {name} on", failures))
+        if running and not running(st()):
+            failures.append(f"P7: {name} is not running when switched on")
+        page.evaluate(off)
+        time.sleep(1.2)
+        worst = max(worst, check_continuity(page, where, ref, f"P7: {name} off", failures))
+        if running and running(st()):
+            failures.append(f"P7: {name} still runs when switched off")
+    s2 = st()
+    for inst in ["synth", "layer1", "layer2"]:
+        if s2["voices"][inst] > 2 * s2["cap"][inst]:
+            failures.append(f"P7: {inst} has {s2['voices'][inst]} voices, over twice its cap of {s2['cap'][inst]} (live and ringing sets)")
+    act = page.evaluate(f"{E}.activeVoices('layer2')")
+    if act > s2["cap"]["layer2"]:
+        failures.append(f"P7: layer2 sounds {act} voices, over its cap {s2['cap']['layer2']}")
+    print(f"P7: seven switches made while a drone sounds; largest jump {worst:.2f} times the steady sound's; voices {s2['voices']}, caps {s2['cap']}")
+    page.click("#play")
+
+
+FIRST_SONG: list = []
+
+
+def walk_cost(browser, page, failures: list) -> None:
+    """P7: the cost with everything on, on a fresh default song in its groove."""
+    page.evaluate("(s) => window.__groovebox.loadSong(s)", FIRST_SONG[0])
+    if not page.evaluate("window.__groovebox.playing"):
+        page.click("#play")
+    page.evaluate("window.__groovebox.switchSection(1)")
+    wait_for(page, "window.__groovebox.position().section === 1", 4.0)
+    out = measure_cost(browser, page, "everything on", True)
+    # Reported, not judged: the headless trace already shows callbacks longer than their period before P7.
+    if out.get("worst_ms") is None:
+        failures.append("cost: no audio render callbacks traced")
+    page.click("#play")
+
+
 def wait_for(page, expr: str, timeout: float) -> bool:
     end = time.time() + timeout
     while time.time() < end:
@@ -2038,6 +2208,7 @@ def main() -> int:
             # P3: the vibe picker opens the app; on a first launch there is no jam to continue.
             walk_picker_open(page, failures, first=True)
             page.click("#vibe-close")
+            FIRST_SONG.append(page.evaluate(SONG))
             if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
                 failures.append("the app does not start in Simple")
             page.click("#play")
@@ -2168,6 +2339,8 @@ def main() -> int:
             walk_g5_songs(page, failures, f"http://localhost:{PORT}/index.html")
             walk_p3(page, failures)
             walk_p4(page, failures)
+            walk_p7(page, failures)
+            walk_cost(browser, page, failures)
             browser.close()
     finally:
         server.terminate()

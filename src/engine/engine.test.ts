@@ -55,7 +55,7 @@ describe("song schema", () => {
     const s = defaultSong();
     s.patches.synth.cutoff = 2;
     s.sections[1].layer1.gen.length = 1;
-    s.sections[2].drums.grid = { kick: [1], clap: [], hat: [], open: [] };
+    s.sections[2].drums.grid = { kick: [1], clap: [], hat: [], open: [] } as never;
     const errs = validateSong(s);
     expect(errs.some((e) => e.includes("patches.synth.cutoff"))).toBeTruthy();
     expect(errs.some((e) => e.includes("gen.length"))).toBeTruthy();
@@ -76,14 +76,15 @@ describe("patch values", () => {
     expect(clampPatchValue("release", 1.5)).toBe(1.5);
     expect(clampPatchValue("resonance", Number.NaN)).toBe(null);
     expect(clampPatchValue("wave", "square")).toBe("square");
-    expect(clampPatchValue("wave", "noise" as never)).toBe(null);
+    expect(clampPatchValue("wave", "noise")).toBe("noise"); // P7
+    expect(clampPatchValue("wave", "plink" as never)).toBe(null);
   });
 });
 
 describe("drum grids", () => {
   it("a section plays its edited grid instead of the preset's", () => {
     const song = defaultSong();
-    const grid = { kick: Array(16).fill(0), clap: Array(16).fill(0), hat: Array(16).fill(0), open: Array(16).fill(0) };
+    const grid = { kick: Array(16).fill(0), clap: Array(16).fill(0), hat: Array(16).fill(0), open: Array(16).fill(0), perc: Array(16).fill(0), shaker: Array(16).fill(0) };
     grid.kick[3] = 1;
     song.sections[0].drums.grid = grid;
     expect(validateSong(song)).toEqual([]);

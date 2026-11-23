@@ -250,7 +250,7 @@ describe("layer edits", () => {
     const song = defaultSong();
     const seq = new Sequencer(song);
     const before = JSON.stringify(seq.song);
-    expect(seq.setLayerMode(0, "layer1", "drone" as LayerMode)).toBe(false);
+    expect(seq.setLayerMode(0, "layer1", "chant" as LayerMode)).toBe(false);
     expect(seq.setArp(0, "layer1", { rate: 3 as 1 })).toBe(false);
     expect(seq.setArp(0, "layer1", { octaves: 4 as 1 })).toBe(false);
     expect(seq.setArp(0, "layer1", { direction: "sideways" as "up" })).toBe(false);
@@ -269,7 +269,7 @@ describe("layer edits", () => {
     seq.setArp(0, "layer1", { gate: 0 });
     const l = seq.song.sections[0].layer1;
     expect(l.gen).toMatchObject({ hits: 16, rotate: 8, length: 2, lock: 1, density: 0 });
-    expect(l.pad).toMatchObject({ attack: 8, motion: 1 });
+    expect(l.pad).toMatchObject({ attack: 20, motion: 1 }); // P7: up to 20 s (spec 8.10)
     expect(l.arp.gate).toBe(0.1);
     expect(validateSong(seq.song)).toEqual([]);
   });

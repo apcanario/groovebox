@@ -1109,6 +1109,10 @@ button:disabled {
 .insttab .dials.n5 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
+/* P7: the layers' Mod page, one row of six under the wave chips. */
+.insttab .dials.n6.row {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
 .dial {
   background: var(--card);
   border-radius: var(--r);
@@ -1499,14 +1503,14 @@ button:disabled {
 .modes {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--gap);
 }
 .modegroup {
   display: contents;
 }
 .modes.withtog {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
 }
 .mode {
   min-height: var(--hit);

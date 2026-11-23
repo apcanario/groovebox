@@ -4,7 +4,7 @@
  * only the formats and the reader that turns a folder of files into a list; it imports nothing that reads a
  * folder, so a data file can import its types from here without a cycle. No audio dependency.
  */
-import type { InstrumentId, LayerMode, MixState, PadParams, Patch } from "../engine/song.ts";
+import type { DroneParams, InstrumentId, LayerMode, MixState, PadParams, Patch } from "../engine/song.ts";
 import type { ArpParams } from "./arp.ts";
 import type { LeadParams, LeadStyle } from "./lead.ts";
 import type { KeyName, ScaleName, Voicing } from "./scales.ts";
@@ -16,12 +16,20 @@ export interface RhythmHit {
   vel: number; // 0..1
 }
 
-/** The four drum voices the engine has. */
-export const DRUM_VOICES = ["kick", "clap", "hat", "open"] as const;
+/** The four drum voices of G1; every beat file has a row for each. */
+export const CORE_DRUM_VOICES = ["kick", "clap", "hat", "open"] as const;
+/** Every drum voice the engine has: P7 adds Perc (a tuned tom or conga-like hit) and Shaker (spec 8.7). */
+export const DRUM_VOICES = [...CORE_DRUM_VOICES, "perc", "shaker"] as const;
 export type DrumVoice = (typeof DRUM_VOICES)[number];
 
 /** Velocity per step (0 = off), 16 steps per voice. */
 export type DrumGrid = Record<DrumVoice, number[]>;
+
+/** A beat file's grid: the four core rows, Perc and Shaker where it plays them. */
+export type BeatGrid = Record<(typeof CORE_DRUM_VOICES)[number], number[]> & Partial<Record<"perc" | "shaker", number[]>>;
+
+/** Most hits a roll puts in one sixteenth (P7: hat rolls). */
+export const MAX_ROLL = 4;
 
 /** Shared by every picker entry: its name in Advanced, its name in Simple (plain words) and its place in the list. */
 export interface Named {
@@ -59,14 +67,16 @@ export interface ProgressionDef {
   vibes: string[];
   mood: string;
   voicing: Voicing;
-  chords: [number, 0.5 | 1 | 2][];
+  chords: [number, 0.5 | 1 | 2 | 4 | 8][];
 }
 
 /** A drum beat: 16 steps per voice and its swing. */
 export interface BeatDef extends Named {
   /** Delay of odd sixteenths, as a fraction of a step (0 = straight). */
   swing: number;
-  grid: DrumGrid;
+  grid: BeatGrid;
+  /** P7 (spec 8.7): repeats inside a sixteenth, by voice and step: 2, 3 or 4 quick hits (hat rolls). */
+  rolls?: Partial<Record<DrumVoice, Record<number, number>>>;
 }
 
 /** A bass rhythm: when the root plays. */
@@ -149,8 +159,24 @@ export function checkGrid(grid: unknown, out: string[]): void {
   if (!grid || typeof grid !== "object") return void out.push("grid: not an object");
   for (const v of DRUM_VOICES) {
     const r = (grid as Record<string, unknown>)[v];
+    if (r === undefined && !(CORE_DRUM_VOICES as readonly string[]).includes(v)) continue;
     if (!Array.isArray(r) || r.length !== 16 || !r.every((x) => typeof x === "number" && x >= 0 && x <= 1))
       out.push(`grid.${v}: must be 16 values 0..1`);
+  }
+}
+
+/** A beat's rolls: each must sit on a step the voice plays, with 2..MAX_ROLL hits. */
+export function checkRolls(rolls: unknown, grid: BeatGrid, out: string[]): void {
+  if (rolls === undefined) return;
+  if (!rolls || typeof rolls !== "object") return void out.push("rolls: not an object");
+  for (const [v, steps] of Object.entries(rolls as Record<string, Record<string, number>>)) {
+    if (!(DRUM_VOICES as readonly string[]).includes(v)) out.push(`rolls.${v}: unknown voice`);
+    for (const [k, n] of Object.entries(steps ?? {})) {
+      const i = Number(k);
+      const row = (grid as Record<string, number[] | undefined>)[v];
+      if (!(Number.isInteger(n) && n >= 2 && n <= MAX_ROLL)) out.push(`rolls.${v}.${k}: must be 2..${MAX_ROLL} hits`);
+      if (!(Number.isInteger(i) && i >= 0 && i < 16 && (row?.[i] ?? 0) > 0)) out.push(`rolls.${v}.${k}: not a step the voice plays`);
+    }
   }
 }
 
@@ -177,6 +203,7 @@ export interface StyleLayer {
   mode: LayerMode;
   arp?: Partial<ArpParams>;
   pad?: Partial<PadParams>;
+  drone?: DroneParams;
   gen?: Partial<Omit<LeadParams, "seed">>;
 }
 
@@ -190,7 +217,7 @@ export type StyleLead = Partial<Omit<LeadParams, "seed">> & { style: LeadStyle }
 export interface StyleSection {
   name: string;
   on: InstrumentId[];
-  chords: [number, 0.5 | 1 | 2][];
+  chords: [number, 0.5 | 1 | 2 | 4 | 8][];
   beat: string;
   bass: string;
   synth: string;

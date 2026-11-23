@@ -97,7 +97,7 @@ describe("patch files (P3 review M2)", () => {
     for (const id of PATCH_IDS) expect(checkPatchDef(PATCHES[id])).toEqual([]);
     const bad: PatchDef = { order: 9, name: "Bad", instrument: "synth", values: { cutoff: 5 } };
     expect(checkPatchDef(bad)).toEqual(["values.cutoff: must be 0..1"]);
-    expect(checkPatchDef({ ...bad, instrument: "layer", values: { wave: "noise" as never } })).toEqual(["values.wave: unknown wave"]);
+    expect(checkPatchDef({ ...bad, instrument: "layer", values: { wave: "plink" as never } })).toEqual(["values.wave: unknown wave"]);
   });
 });
 

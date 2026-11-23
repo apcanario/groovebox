@@ -1,11 +1,14 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
-import type { ChordStep, InstrumentId, NumericPatchKey, Song } from "../engine/song.ts";
+import type { ChordStep, InstrumentId, NumericPatchKey, Patch, Song } from "../engine/song.ts";
+import { PATCHES, patchFor, resolvePatch } from "../music/styles.ts";
+import { FM_RATIOS, LFO_RATE_LABEL, driftPeriod, fmRatio, lfoRateIndex } from "../music/sound.ts";
 import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
 import { LEAD_SHAPES, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle } from "../music/lead.ts";
 import { leadKnobs } from "../music/leadKit.ts";
 
 export const MAX_CHORDS = 8;
-const LENGTHS: ChordStep["bars"][] = [1, 2, 0.5];
+/** The Length button cycles these (P7 adds 4 and 8 bars, spec 8.10). */
+const LENGTHS: ChordStep["bars"][] = [1, 2, 4, 8, 0.5];
 
 /** Pixels of vertical drag that sweep a dial over its whole range. */
 export const DRAG_SPAN_PX = 220;
@@ -183,7 +186,7 @@ export function cycleLength(seq: ChordStep[], i: number): ChordStep[] {
 }
 
 export function lengthLabel(bars: ChordStep["bars"]): string {
-  return bars === 0.5 ? "½ bar" : bars === 1 ? "1 bar" : "2 bars";
+  return bars === 0.5 ? "½ bar" : bars === 1 ? "1 bar" : `${bars} bars`;
 }
 
 /** Chord name from its root pitch class and roman label: "A", "Am", "Bdim". */
@@ -211,6 +214,8 @@ export interface KnobCurve {
   label: string;
   /** Seconds on an exponential curve from lo to hi; absent for plain 0..1 amounts. */
   seconds?: [number, number];
+  /** P7: what the dial shows when it is neither a time nor an amount (a note value, a ratio). */
+  text?: (v: number) => string;
 }
 
 /** One dial on an instrument tab: which patch key, and how its 0..1 dial position maps to the value. */
@@ -238,13 +243,17 @@ export function knobValue(k: KnobCurve, pos: number): number {
  * (knobLabel), so the value fits inside the ring's hole on the smallest dial (P1b review S2).
  */
 export function knobText(k: KnobCurve, v: number): string {
+  if (k.text) return k.text(v);
   return k.seconds ? String(Math.round(v * 1000)) : String(Math.round(v * 100));
 }
 
 /** The dial's name: a time carries its unit ("Decay ms"). */
 export function knobLabel(k: KnobCurve & { label: string }): string {
-  return k.seconds ? `${k.label} ms` : k.label;
+  return k.seconds && !k.text ? `${k.label} ms` : k.label;
 }
+
+/** P7: a time of up to 20 s, shown in seconds with one decimal (the unit is in the dial's name). */
+export const secondsText = (v: number): string => (v < 10 ? v.toFixed(1) : String(Math.round(v)));
 
 /** At most six dials per screen (spec section 5): split a list into pages of `size`. */
 export function paginate<T>(items: readonly T[], size = 6): T[][] {
@@ -335,12 +344,12 @@ export function presetName(kind: PresetKind, id: string, simple = false): string
   return n ? (simple ? n.simple : n.name) : id;
 }
 
-export const WAVE_LABEL: Record<string, string> = { sawtooth: "Saw", square: "Square", triangle: "Tri", sine: "Sine" };
+export const WAVE_LABEL: Record<string, string> = { sawtooth: "Saw", square: "Square", triangle: "Tri", sine: "Sine", fm: "FM", noise: "Noise" };
 
 // ---- Simple (P2): plain words only (spec 8.1) ------------------------------------------
 
 /** The synth's Sound picker in Simple: the four waves by how they sound. */
-export const SIMPLE_WAVE_LABEL: Record<string, string> = { sawtooth: "Buzzy", square: "Hollow", triangle: "Soft", sine: "Pure" };
+export const SIMPLE_WAVE_LABEL: Record<string, string> = { sawtooth: "Buzzy", square: "Hollow", triangle: "Soft", sine: "Pure", fm: "Bell", noise: "Breathy" };
 
 /** Each macro dial's colour, as in docs/design/look/ (Busy purple, Evolve yellow, Bright orange, Space teal). */
 export const MACRO_COLOR: Record<string, string> = {
@@ -381,10 +390,10 @@ export function meterFraction(db: number): number {
 
 // ---- Layers (G4) -----------------------------------------------------------------------
 
-/** Mode switch order and names, as in docs/design/look/ (Lead, Arp, Pad; Drone comes later). */
-export const LAYER_MODE_ORDER = ["generative", "arp", "pad"] as const;
-export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], "Arp" | "Lead" | "Pad"> = { arp: "Arp", generative: "Lead", pad: "Pad" };
-export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Lead", pad: "Pad" };
+/** Mode switch order and names, as in docs/design/look/ (Lead, Arp, Pad; P7 adds Drone, spec 8.10). */
+export const LAYER_MODE_ORDER = ["generative", "arp", "pad", "drone"] as const;
+export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], "Arp" | "Lead" | "Pad" | "Drone"> = { arp: "Arp", generative: "Lead", pad: "Pad", drone: "Drone" };
+export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Lead", pad: "Pad", drone: "Drone" };
 
 /** What an instrument plays in a section, in a word or two (the Now tile's second line, a Simple screen). */
 export function plays(song: Song, sec: number, id: InstrumentId): string {
@@ -505,12 +514,58 @@ export function phraseSegments(phrase: { bar: number; of: number } | null): bool
 }
 
 /** Pad dials: attack and release in seconds on a curve, brightness and motion as amounts. */
-export const PAD_KNOBS: readonly { key: "attack" | "release" | "brightness" | "motion"; label: string; seconds?: [number, number] }[] = [
-  { key: "attack", label: "Attack", seconds: [0.005, 4] },
-  { key: "release", label: "Release", seconds: [0.05, 8] },
+export const PAD_KNOBS: readonly (KnobCurve & { key: "attack" | "release" | "brightness" | "motion" | "swoop" })[] = [
+  // P7 (spec 8.10): attack and release up to 20 seconds, shown in seconds; Swoop glides the held chord to the next.
+  { key: "attack", label: "Attack s", seconds: [0.005, 20], text: secondsText },
+  { key: "release", label: "Release s", seconds: [0.05, 20], text: secondsText },
   { key: "brightness", label: "Bright" },
   { key: "motion", label: "Motion" },
+  { key: "swoop", label: "Swoop" },
 ];
+
+/** P7: the modulation dials of Bass, Synth and the layers (the Mod page): the FM wave, the synced LFO and the drift. */
+export const MOD_KNOBS: readonly KnobSpec[] = [
+  { key: "fmRatio", label: "FM ratio", text: (v) => String(fmRatio(v)) },
+  { key: "fmIndex", label: "FM depth" },
+  { key: "lfoRate", label: "LFO rate", text: (v) => LFO_RATE_LABEL[lfoRateIndex(v)] },
+  { key: "lfoDepth", label: "LFO" },
+  { key: "drift", label: "Drift" },
+  { key: "driftRate", label: "Drift s", text: (v) => String(Math.round(driftPeriod(v))) },
+];
+export { FM_RATIOS };
+
+/** P7: Perc and Shaker (the drums' Kit page). */
+export const KIT_KNOBS: readonly KnobSpec[] = [
+  { key: "percLevel", label: "Perc" },
+  { key: "percDecay", label: "P decay" },
+  { key: "percPitch", label: "P pitch" },
+  { key: "shakerLevel", label: "Shaker" },
+  { key: "shakerDecay", label: "S decay" },
+];
+
+// ---- Sound picker (C8, P7) ----------------------------------------------------------------
+
+/** A patch file's word: its name in Advanced, its plain word in Simple. */
+export function patchName(id: string, simple = false): string {
+  const p = PATCHES[id];
+  return p ? (simple ? (p.simple ?? p.name) : p.name) : id;
+}
+
+/**
+ * The patch an instrument's sound matches, for the picker's lit chip: every value of the patch file but the level
+ * (the Level dial is the mix) within a hair. Null once a dial moved off every patch.
+ */
+export function patchOf(inst: InstrumentId, patch: Patch, ids: readonly string[]): string | null {
+  for (const id of ids) {
+    if (PATCHES[id]?.instrument !== patchFor(inst)) continue;
+    const want = resolvePatch(inst, id);
+    const same = (Object.keys(want) as (keyof Patch)[]).every(
+      (k) => k === "level" || (typeof want[k] === "number" ? Math.abs((patch[k] as number) - (want[k] as number)) < 1e-6 : patch[k] === want[k]),
+    );
+    if (same) return id;
+  }
+  return null;
+}
 
 /** Patch dials shared by the three layer modes (the wave is a chip row above them). */
 export const LAYER_PATCH_KNOBS: readonly KnobSpec[] = [

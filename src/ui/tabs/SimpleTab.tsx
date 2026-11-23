@@ -4,14 +4,14 @@
  * Space, Back and New idea. Plain words only (spec 8.1). Every control writes ordinary song and patch
  * values through the engine, so Advanced shows the result of every move.
  */
-import { BASS_PRESETS, DRUM_PRESETS, MACROS, WAVES, type InstrumentId, type LayerInstrument } from "../../engine/index.ts";
+import { BASS_PRESETS, DRUM_PRESETS, MACROS, type InstrumentId, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, GroupLabel, PagedChips, XYPad } from "../components.tsx";
+import { Dial, GroupLabel, PagedChips, XYPad } from "../components.tsx";
 import { LeadStyles } from "./lead.tsx";
 import { ModeRow } from "./LayerTab.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
-import { MACRO_COLOR, SIMPLE_WAVE_LABEL, presetName, seedHeard, simpleXYReadout } from "../logic.ts";
+import { MACRO_COLOR, patchName, patchOf, presetName, seedHeard, simpleXYReadout } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
 import { HeadRow } from "./InstrumentTab.tsx";
 
@@ -94,10 +94,24 @@ function Picker({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
         />
       </>
     );
+  // C8 (P7): the Sound picker lists the synth's patch files (spec 8.2: pickers list whatever exists).
+  return <SoundPicker ctx={ctx} inst="synth" simple />;
+}
+
+/** The Sound picker of an instrument (C8, P7): every patch file for it, a page at a time; the lit chip is the patch it matches. */
+export function SoundPicker({ ctx, inst, simple = false }: { ctx: Ctx; inst: InstrumentId; simple?: boolean }) {
+  const ids = ctx.engine.patchIds(inst);
   return (
     <>
       <GroupLabel thing="Sound" />
-      <Chips name="wave" options={WAVES} value={song.patches.synth.wave} label={(w) => SIMPLE_WAVE_LABEL[w]} onPick={(w) => engine.setParam("synth", "wave", w)} />
+      <PagedChips
+        name="patch"
+        what="sounds"
+        options={ids}
+        value={patchOf(inst, ctx.song.patches[inst], ids)}
+        label={(id) => patchName(id, simple)}
+        onPick={(id) => ctx.engine.setPatch(inst, id)}
+      />
     </>
   );
 }

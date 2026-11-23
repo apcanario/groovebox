@@ -5,11 +5,14 @@ import {
   BASS_PRESETS,
   DRUM_PATTERNS,
   DRUM_PRESETS,
+  CORE_DRUM_VOICES,
   DRUM_VOICES,
   SYNTH_PRESETS,
   type BassPreset,
+  fullGrid,
   type DrumGrid,
   type DrumPreset,
+  type DrumVoice,
   type SynthPreset,
 } from "../music/presets.ts";
 import { MOODS, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
@@ -21,7 +24,8 @@ export type InstrumentId = (typeof INSTRUMENTS)[number];
 export const LAYER_IDS = ["layer1", "layer2"] as const;
 export type LayerInstrument = (typeof LAYER_IDS)[number];
 
-export const WAVES = ["sawtooth", "square", "triangle", "sine"] as const;
+/** P7 (spec 8.7): `fm`, a two-operator FM voice (bells, glassy keys); `noise`, a sine body with a band of breathy noise. */
+export const WAVES = ["sawtooth", "square", "triangle", "sine", "fm", "noise"] as const;
 export type Wave = (typeof WAVES)[number];
 
 /** Every knob of an instrument. Numbers are 0..1 unless noted. Shared by all sections. */
@@ -56,6 +60,22 @@ export interface Patch {
   hatDecay: number;
   openLevel: number;
   openDecay: number;
+  // ---- P7 (spec 8.7, 8.10). Optional in a saved song (validation), filled from P7_PATCH_DEFAULTS by migrateSong. ----
+  /** FM wave: the modulator's ratio (a step of FM_RATIOS) and its index, 0..1. */
+  fmRatio: number;
+  fmIndex: number;
+  /** The tempo-synced filter LFO: its rate (a step of LFO_RATES) and depth (0 = off). It only closes the filter. */
+  lfoRate: number;
+  lfoDepth: number;
+  /** The free-running slow LFO (spec 8.10) on filter, pitch, pan and sends: depth (0 = off) and rate. */
+  drift: number;
+  driftRate: number;
+  /** Perc (a tuned tom or conga-like hit) and Shaker (drums). */
+  percLevel: number;
+  percDecay: number;
+  percPitch: number;
+  shakerLevel: number;
+  shakerDecay: number;
 }
 export type NumericPatchKey = Exclude<keyof Patch, "wave">;
 export const PATCH_KEYS: readonly NumericPatchKey[] = [
@@ -82,13 +102,41 @@ export const PATCH_KEYS: readonly NumericPatchKey[] = [
   "hatDecay",
   "openLevel",
   "openDecay",
+  "fmRatio",
+  "fmIndex",
+  "lfoRate",
+  "lfoDepth",
+  "drift",
+  "driftRate",
+  "percLevel",
+  "percDecay",
+  "percPitch",
+  "shakerLevel",
+  "shakerDecay",
 ];
+/** The keys P7 added: a song saved before may lack them; migrateSong fills them from these values. */
+export const P7_PATCH_DEFAULTS = {
+  fmRatio: 0.25,
+  fmIndex: 0.3,
+  lfoRate: 0.5,
+  lfoDepth: 0,
+  drift: 0,
+  driftRate: 0.5,
+  percLevel: 1,
+  percDecay: 0.5,
+  percPitch: 0.5,
+  shakerLevel: 1,
+  shakerDecay: 0.5,
+} as const satisfies Partial<Record<NumericPatchKey, number>>;
+export type P7PatchKey = keyof typeof P7_PATCH_DEFAULTS;
+const P7_KEYS = Object.keys(P7_PATCH_DEFAULTS) as P7PatchKey[];
 /** Allowed range per numeric patch key. */
 export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
-  attack: [0.001, 4],
+  // P7 (spec 8.10): attack and release up to 20 seconds, for pads and drones.
+  attack: [0.001, 20],
   decay: [0.01, 4],
   sustain: [0, 1],
-  release: [0.01, 8],
+  release: [0.01, 20],
   cutoff: [0, 1],
   resonance: [0, 1],
   drive: [0, 1],
@@ -108,6 +156,17 @@ export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
   hatDecay: [0, 1],
   openLevel: [0, 1],
   openDecay: [0, 1],
+  fmRatio: [0, 1],
+  fmIndex: [0, 1],
+  lfoRate: [0, 1],
+  lfoDepth: [0, 1],
+  drift: [0, 1],
+  driftRate: [0, 1],
+  percLevel: [0, 1],
+  percDecay: [0, 1],
+  percPitch: [0, 1],
+  shakerLevel: [0, 1],
+  shakerDecay: [0, 1],
 };
 
 /** A patch value forced into its allowed range; null for an unknown wave or a non-number. */
@@ -118,7 +177,7 @@ export function clampPatchValue<K extends keyof Patch>(key: K, value: Patch[K]):
   return Math.max(lo, Math.min(hi, value)) as Patch[K];
 }
 
-export const LAYER_MODES = ["arp", "pad", "generative"] as const;
+export const LAYER_MODES = ["arp", "pad", "generative", "drone"] as const;
 export type LayerMode = (typeof LAYER_MODES)[number];
 
 export interface PadParams {
@@ -126,6 +185,16 @@ export interface PadParams {
   release: number; // seconds
   brightness: number; // 0..1 (used from G4)
   motion: number; // 0..1 (used from G4)
+  /** Optional (P7, spec 8.10's Swoop): 0 or missing, a pad lets go and restarts on each chord; above 0 it holds and glides. */
+  swoop?: number;
+}
+
+/** Longest attack and release of a pad or drone, in seconds (spec 8.10). */
+export const MAX_PAD_TIME = 20;
+
+/** A layer in Drone mode (P7, spec 8.10): the root alone, or the root and its fifth. */
+export interface DroneParams {
+  fifth: boolean;
 }
 
 export interface LayerPattern {
@@ -133,6 +202,8 @@ export interface LayerPattern {
   arp: ArpParams;
   pad: PadParams;
   gen: LeadParams;
+  /** Optional (P7): Drone mode's settings; missing means root and fifth. */
+  drone?: DroneParams;
   /** Optional (P2): earlier seeds of the lead, newest last, at most SEED_HISTORY. Back returns to the last one. */
   seeds?: number[];
 }
@@ -142,8 +213,10 @@ export const SEED_HISTORY = 8;
 
 export interface ChordStep {
   degree: number; // 0..6
-  bars: 0.5 | 1 | 2;
+  bars: ChordBars;
 }
+/** P7 (spec 8.10): 4 and 8 bars, for Ambient and Drone. */
+export type ChordBars = 0.5 | 1 | 2 | 4 | 8;
 
 export interface DrumsPattern {
   preset: DrumPreset;
@@ -178,8 +251,23 @@ export interface MixState {
   sweep: number; // -1..1: left low-pass, right high-pass, 0 open
   pump: number; // 0..0.95
   saturation: number; // 0..1
+  /** Optional (P7): the lo-fi master, 0 off or 1 on (spec 8.7). */
+  lofi?: number;
+  /** Optional (P7): the air layer's level, 0 off (spec 8.10). */
+  air?: number;
+  /** Optional (P7): the shared reverb's decay in seconds, 1..20 (spec 8.10). */
+  reverbDecay?: number;
 }
 export const DEFAULT_MIX: MixState = { sweep: 0, pump: 0.6, saturation: 0 };
+/** Every mix key, its range and its value when a song does not set it. */
+export const MIX_KEYS = ["sweep", "pump", "saturation", "lofi", "air", "reverbDecay"] as const;
+export type MixKey = (typeof MIX_KEYS)[number];
+export const MIX_RANGES: Record<MixKey, [number, number]> = { sweep: [-1, 1], pump: [0, 0.95], saturation: [0, 1], lofi: [0, 1], air: [0, 1], reverbDecay: [1, 20] };
+export const MIX_DEFAULTS: Record<MixKey, number> = { sweep: 0, pump: 0.6, saturation: 0, lofi: 0, air: 0, reverbDecay: 3.2 };
+/** A mix value, its default where the song does not set it. */
+export function mixValue(m: MixState, k: MixKey): number {
+  return m[k] ?? MIX_DEFAULTS[k];
+}
 
 /** The last take's event log (spec section 6): the song as it stood at the start, then every edit. */
 export interface EventLog {
@@ -213,10 +301,10 @@ export interface Song {
 }
 
 export const LIMITS = { bpm: [60, 180], sections: [1, 4], chords: [1, 8] } as const;
-export const CHORD_LENGTHS = [0.5, 1, 2] as const;
+export const CHORD_LENGTHS = [0.5, 1, 2, 4, 8] as const;
 export const MAX_SECTION_NAME = 12;
 
-/** A chord sequence the engine accepts: 1..8 chords, degrees 0..6, lengths of half, one or two bars. */
+/** A chord sequence the engine accepts: 1..8 chords, degrees 0..6, lengths of half, one, two, four or eight bars. */
 export function validChords(chords: unknown): chords is ChordStep[] {
   return (
     Array.isArray(chords) &&
@@ -262,6 +350,7 @@ export function defaultPatch(id: InstrumentId): Patch {
     hatDecay: 0.5,
     openLevel: 1,
     openDecay: 0.5,
+    ...P7_PATCH_DEFAULTS,
   };
   switch (id) {
     case "drums":
@@ -356,6 +445,7 @@ export function checkPatch(p: unknown, at: string, errors: string[]): void {
   if (!isObj(p)) return void errors.push(`${at}: not an object`);
   if (!oneOf(p.wave, WAVES)) errors.push(`${at}.wave: unknown wave`);
   for (const k of PATCH_KEYS) {
+    if (p[k] === undefined && (P7_KEYS as string[]).includes(k)) continue; // a song saved before P7
     const [lo, hi] = PATCH_RANGES[k];
     if (!inRange(p[k], lo, hi)) errors.push(`${at}.${k}: must be ${lo}..${hi}`);
   }
@@ -375,10 +465,11 @@ function checkLayer(l: unknown, at: string, errors: string[]): void {
   const pad = l.pad;
   if (!isObj(pad)) errors.push(`${at}.pad: not an object`);
   else {
-    if (!inRange(pad.attack, 0.001, 8)) errors.push(`${at}.pad.attack: must be 0.001..8`);
-    if (!inRange(pad.release, 0.01, 8)) errors.push(`${at}.pad.release: must be 0.01..8`);
+    if (!inRange(pad.attack, 0.001, MAX_PAD_TIME)) errors.push(`${at}.pad.attack: must be 0.001..${MAX_PAD_TIME}`);
+    if (!inRange(pad.release, 0.01, MAX_PAD_TIME)) errors.push(`${at}.pad.release: must be 0.01..${MAX_PAD_TIME}`);
     if (!inRange(pad.brightness, 0, 1)) errors.push(`${at}.pad.brightness: must be 0..1`);
     if (!inRange(pad.motion, 0, 1)) errors.push(`${at}.pad.motion: must be 0..1`);
+    if (pad.swoop !== undefined && !inRange(pad.swoop, 0, 1)) errors.push(`${at}.pad.swoop: must be 0..1`);
   }
   const g = l.gen;
   if (!isObj(g)) errors.push(`${at}.gen: not an object`);
@@ -395,6 +486,7 @@ function checkLayer(l: unknown, at: string, errors: string[]): void {
     for (const k of ["range", "register", "noteLength", "variation", "repeats", "slide", "accent"])
       if (g[k] !== undefined && !inRange(g[k], 0, 1)) errors.push(`${at}.gen.${k}: must be 0..1`);
   }
+  if (l.drone !== undefined && (!isObj(l.drone) || typeof l.drone.fifth !== "boolean")) errors.push(`${at}.drone.fifth: must be true or false`);
   if (l.seeds !== undefined) {
     const h = l.seeds;
     if (!Array.isArray(h) || h.length > SEED_HISTORY || !h.every((x) => isNum(x) && Number.isInteger(x)))
@@ -420,7 +512,7 @@ function checkSection(s: unknown, at: string, errors: string[]): void {
   else
     s.chords.forEach((c, i) => {
       if (!isObj(c) || !Number.isInteger(c.degree) || !inRange(c.degree, 0, 6)) errors.push(`${at}.chords[${i}].degree: must be 0..6`);
-      if (!isObj(c) || !oneOf(c.bars, [0.5, 1, 2])) errors.push(`${at}.chords[${i}].bars: must be 0.5, 1 or 2`);
+      if (!isObj(c) || !oneOf(c.bars, CHORD_LENGTHS)) errors.push(`${at}.chords[${i}].bars: must be 0.5, 1, 2, 4 or 8`);
     });
   if (!isObj(s.drums) || !oneOf(s.drums.preset, DRUM_PRESETS)) errors.push(`${at}.drums.preset: unknown preset`);
   else if (s.drums.grid !== undefined) {
@@ -429,6 +521,7 @@ function checkSection(s: unknown, at: string, errors: string[]): void {
     else
       for (const v of DRUM_VOICES) {
         const r = g[v];
+        if (r === undefined && !(CORE_DRUM_VOICES as readonly string[]).includes(v)) continue; // saved before P7
         if (!Array.isArray(r) || r.length !== 16 || !r.every((x) => inRange(x, 0, 1)))
           errors.push(`${at}.drums.grid.${v}: must be 16 values 0..1`);
       }
@@ -444,9 +537,11 @@ function checkSection(s: unknown, at: string, errors: string[]): void {
 
 function checkMix(m: unknown, at: string, errors: string[]): void {
   if (!isObj(m)) return void errors.push(`${at}: not an object`);
-  if (!inRange(m.sweep, -1, 1)) errors.push(`${at}.sweep: must be -1..1`);
-  if (!inRange(m.pump, 0, 0.95)) errors.push(`${at}.pump: must be 0..0.95`);
-  if (!inRange(m.saturation, 0, 1)) errors.push(`${at}.saturation: must be 0..1`);
+  for (const k of MIX_KEYS) {
+    if (m[k] === undefined && (k === "lofi" || k === "air" || k === "reverbDecay")) continue; // optional (P7)
+    const [lo, hi] = MIX_RANGES[k];
+    if (!inRange(m[k], lo, hi)) errors.push(`${at}.${k}: must be ${lo}..${hi}`);
+  }
 }
 
 function checkLog(l: unknown, at: string, errors: string[]): void {
@@ -493,7 +588,8 @@ export const OLD_LAYER2_LEVEL = 0.22;
  * (about 2 dB under) and its lead and arp sit level with Layer 1's, as in a new song. Returns the song itself
  * when nothing needs changing, else a migrated copy. The take's start song in a log migrates the same way.
  */
-export function migrateSong<T extends Song>(song: T): T {
+export function migrateSong<T extends Song>(given: T): T {
+  const song = migrateP7(given);
   const p = song.patches.layer2;
   const old = (Object.keys(OLD_LAYER2_ENVELOPE) as (keyof typeof OLD_LAYER2_ENVELOPE)[]).every((k) => p[k] === OLD_LAYER2_ENVELOPE[k]);
   const log = song.log ? migrateSong(song.log.start) : undefined;
@@ -511,6 +607,27 @@ export function migrateSong<T extends Song>(song: T): T {
   return out;
 }
 
+/**
+ * Bring a song saved before P7 to P7's document: the patch keys P7 added take their defaults, and an edited drum
+ * grid gains silent Perc and Shaker rows. Returns the song itself when nothing is missing, else a copy.
+ */
+export function migrateP7<T extends Song>(song: T): T {
+  const patchGaps = INSTRUMENTS.some((id) => P7_KEYS.some((k) => song.patches[id][k] === undefined));
+  const gridGaps = song.sections.some((s) => s.drums.grid && DRUM_VOICES.some((v) => !Array.isArray(s.drums.grid![v])));
+  if (!patchGaps && !gridGaps) return song;
+  const out: T = { ...song };
+  if (patchGaps)
+    out.patches = Object.fromEntries(INSTRUMENTS.map((id) => [id, { ...P7_PATCH_DEFAULTS, ...song.patches[id] }])) as Record<InstrumentId, Patch>;
+  if (gridGaps)
+    out.sections = song.sections.map((s) => {
+      if (!s.drums.grid) return s;
+      const grid = { ...s.drums.grid };
+      for (const v of DRUM_VOICES) if (!Array.isArray(grid[v])) grid[v] = new Array(16).fill(0);
+      return { ...s, drums: { ...s.drums, grid } };
+    });
+  return out;
+}
+
 /** Parse and validate a song from JSON. Throws with every problem listed. */
 export function parseSong(json: string): Song {
   const doc: unknown = JSON.parse(json);
@@ -525,7 +642,17 @@ export function serializeSong(song: Song): string {
 
 /** The drum grid a section plays: its edited grid, or its preset's. */
 export function sectionDrumGrid(s: Section): DrumGrid {
-  return s.drums.grid ?? DRUM_PATTERNS[s.drums.preset].grid;
+  const g = s.drums.grid;
+  if (!g) return DRUM_PATTERNS[s.drums.preset].grid;
+  return DRUM_VOICES.every((v) => Array.isArray(g[v])) ? g : fullGrid(g);
+}
+
+/**
+ * Hits per sixteenth of one voice in a section (P7, hat rolls): the preset's rolls, on the steps the section's grid
+ * still plays (an edit that clears a step clears its roll; an edited grid keeps the preset's rolls elsewhere).
+ */
+export function sectionRoll(s: Section, voice: DrumVoice, step: number): number {
+  return DRUM_PATTERNS[s.drums.preset]?.rolls[voice]?.[step] ?? 1;
 }
 
 /** The swing a section plays, in sixteenths: its own (the Swing dial), or its preset's. */

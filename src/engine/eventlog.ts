@@ -26,6 +26,7 @@ export const LOG_OPS = [
   "setLayerMode",
   "setArp",
   "setPad",
+  "setDrone",
   "setGen",
   "newSeed",
   "prevSeed",

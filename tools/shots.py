@@ -22,7 +22,7 @@ import time
 
 SIZES = [(360, 640), (412, 915)]
 TABS = ["play", "chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
-LAYER_MODES = ["generative", "arp", "pad"]
+LAYER_MODES = ["generative", "arp", "pad", "drone"]
 # Lead styles the frame walk shows (P6): all five, Pulse with its own page.
 LEAD_WALK = ["hook", "phrase", "roll", "drift", "pulse"]
 

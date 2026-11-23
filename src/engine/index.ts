@@ -22,7 +22,13 @@ import {
   INSTRUMENTS,
   LAYER_IDS,
   LIMITS,
+  MIX_KEYS,
+  MIX_RANGES,
+  P7_PATCH_DEFAULTS,
+  mixValue,
   validateSong,
+  type DroneParams,
+  type MixKey,
   type InstrumentId,
   type LayerInstrument,
   type LayerMode,
@@ -39,16 +45,19 @@ import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/pr
 import type { ArpParams } from "../music/arp.ts";
 import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
+import { PATCHES, PATCH_IDS, patchFor, resolvePatch } from "../music/styles.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
 export { degreeChords, type Chord } from "../music/chords.ts";
 export {
   BASS_PRESETS,
+  CORE_DRUM_VOICES,
   DRUM_PATTERNS,
   DRUM_PRESETS,
   DRUM_VOICES,
   SEQ_STEPS,
+  SEQ_STEPS_16,
   SYNTH_PRESETS,
   eighthOn,
   type BassPreset,
@@ -248,7 +257,10 @@ export class Engine {
     this.seq.start();
     this.inFlight.clear();
     this.landed.length = 0;
-    Tone.getTransport().start("+0.05");
+    const at = Tone.now() + 0.05;
+    Tone.getTransport().start(at);
+    // P7: the synced LFOs start on bar 1 with the transport; the hiss and the air play while it runs.
+    this.graph.startClock(at);
     if (this.rec.state === "armed") this.startTake();
   }
 
@@ -264,6 +276,7 @@ export class Engine {
       this.graph.instruments[id].releaseAll(now);
     }
     this.graph.resetPump();
+    this.graph.setPlaying(false);
     this.inFlight.clear();
     // A song still waiting for its bar line loads now.
     const queued = this.queued;
@@ -414,14 +427,33 @@ export class Engine {
     return true;
   }
 
-  setMix(key: keyof MixState, value: number): void {
-    const [lo, hi] = key === "sweep" ? [-1, 1] : key === "pump" ? [0, 0.95] : [0, 1];
+  setMix(key: MixKey, value: number): void {
+    if (!(MIX_KEYS as readonly string[]).includes(key)) return;
+    const [lo, hi] = MIX_RANGES[key];
     if (!Number.isFinite(value)) return;
     this.note("setMix", [key, value]);
     const v = Math.max(lo, Math.min(hi, value));
     this.mix[key] = v;
     this.graph?.setMix(key, v);
     this.changed();
+  }
+
+  /**
+   * Load a patch (C8, spec 8.2's pickers list whatever exists): every value of the patch file `id` for this
+   * instrument, its level kept (the Level dial is the mix). One change, logged as setParams. False for an unknown id
+   * or a patch for another instrument.
+   */
+  setPatch(inst: InstrumentId, id: string): boolean {
+    const def = PATCHES[id];
+    if (!def || def.instrument !== patchFor(inst)) return false;
+    const { level: _level, ...values } = { ...P7_PATCH_DEFAULTS, ...resolvePatch(inst, id) };
+    this.setParams(inst, values);
+    return true;
+  }
+
+  /** The patch files an instrument can load, in picker order (C8). */
+  patchIds(inst: InstrumentId): string[] {
+    return PATCH_IDS.filter((id) => PATCHES[id].instrument === patchFor(inst));
   }
 
   /** Lands on the next bar line while playing; tapping it again before then cancels it. */
@@ -498,10 +530,10 @@ export class Engine {
   }
 
   /** Flip one of the eight sequencer steps of a drum voice; the first edit opens the preset. Acts at once. */
-  toggleDrumStep(section: number, voice: DrumVoice, step: number): boolean {
-    const ok = this.seq.toggleDrumStep(section, voice, step);
+  toggleDrumStep(section: number, voice: DrumVoice, step: number, sixteen = false): boolean {
+    const ok = this.seq.toggleDrumStep(section, voice, step, sixteen);
     if (!ok) return false;
-    this.note("toggleDrumStep", [section, voice, step]);
+    this.note("toggleDrumStep", sixteen ? [section, voice, step, true] : [section, voice, step]);
     this.changed();
     return ok;
   }
@@ -558,6 +590,15 @@ export class Engine {
     const ok = this.seq.setPad(section, layer, values);
     if (!ok) return false;
     this.note("setPad", [section, layer, values]);
+    this.changed();
+    return ok;
+  }
+
+  /** Drone mode (P7): the root alone (`fifth: false`) or root and fifth. In the playing section the drone glides there. */
+  setDrone(section: number, layer: LayerInstrument, values: Partial<DroneParams>): boolean {
+    const ok = this.seq.setDrone(section, layer, values);
+    if (!ok) return false;
+    this.note("setDrone", [section, layer, values]);
     this.changed();
     return ok;
   }
@@ -763,7 +804,10 @@ export class Engine {
     const bpm = Math.max(LIMITS.bpm[0], Math.min(LIMITS.bpm[1], Math.round(v)));
     if (bpm !== this.seq.song.bpm) this.note("bpm", [bpm]);
     this.seq.song.bpm = bpm;
-    if (this.graph) Tone.getTransport().bpm.rampTo(bpm, 0.05);
+    if (this.graph) {
+      Tone.getTransport().bpm.rampTo(bpm, 0.05);
+      this.graph.setTempo(bpm);
+    }
     this.changed();
   }
 
@@ -797,6 +841,42 @@ export class Engine {
     if (!this.graph) return null;
     const l = this.graph.instruments[id];
     return { glides: l.glides, glideDrops: l.glideDrops, accentAt: l.channel.accentAt };
+  }
+
+  /** The P7 additions are in this build (the smoke test's cost scene reads this). */
+  readonly p7 = true;
+
+  /**
+   * For the smoke test (P7): what of P7 is running now: per instrument the synced LFO, the drift, the voices held by a
+   * drone or a swooping pad, the chord glides so far, the voices allotted and the cap; the lo-fi master, the air
+   * layer and the reverb's decay. Null before audio starts.
+   */
+  p7State(): {
+    lfo: Record<InstrumentId, boolean>;
+    drift: Record<InstrumentId, boolean>;
+    held: Record<LayerInstrument | "synth", number>;
+    swoops: Record<LayerInstrument | "synth", number>;
+    voices: Record<LayerInstrument | "synth", number>;
+    cap: Record<LayerInstrument | "synth", number>;
+    lofi: boolean;
+    air: boolean;
+    reverbDecay: number;
+  } | null {
+    const g = this.graph;
+    if (!g) return null;
+    const per = <T>(ids: readonly InstrumentId[], f: (id: InstrumentId) => T): Record<string, T> => Object.fromEntries(ids.map((id) => [id, f(id)]));
+    const polys = ["synth", "layer1", "layer2"] as const;
+    return {
+      lfo: per(INSTRUMENTS, (id) => g.instruments[id].channel.lfoActive) as Record<InstrumentId, boolean>,
+      drift: per(INSTRUMENTS, (id) => g.instruments[id].channel.driftActive) as Record<InstrumentId, boolean>,
+      held: per(polys, (id) => g.instruments[id as "synth"].heldNotes()) as Record<LayerInstrument | "synth", number>,
+      swoops: per(polys, (id) => g.instruments[id as "synth"].swoops) as Record<LayerInstrument | "synth", number>,
+      voices: per(polys, (id) => g.instruments[id as "synth"].allottedVoices()) as Record<LayerInstrument | "synth", number>,
+      cap: per(polys, (id) => g.instruments[id as "synth"].cap) as Record<LayerInstrument | "synth", number>,
+      lofi: g.lofi.active,
+      air: g.air.active,
+      reverbDecay: g.reverb.decay,
+    };
   }
 
   /** Native value of a drum voice's level gain (its trim times its dial). */
@@ -845,18 +925,20 @@ export class Engine {
     return { shapes: SHAPES, styles: STYLES };
   }
 
-  private jumpWatches = new Map<InstrumentId, JumpWatch>();
+  private jumpWatches = new Map<InstrumentId | "master", JumpWatch>();
 
   /**
    * For the smoke test (P6 review S2): the largest sample-to-sample jump and the largest sample of one
    * instrument's own output since the last call (the first call starts the watch); null before audio starts.
    */
-  async jumps(id: InstrumentId): Promise<Jumps | null> {
+  async jumps(id: InstrumentId | "master"): Promise<Jumps | null> {
     if (!this.graph) return null;
     let w = this.jumpWatches.get(id);
     if (!w) {
       w = await JumpWatch.make(Tone.getContext());
-      this.graph.instruments[id].channel.level.connect(w.node);
+      // P7: "master" watches the output after the limiter (the lo-fi master, the air and the reverb sit there).
+      if (id === "master") this.graph.tap(w.node);
+      else this.graph.instruments[id].channel.level.connect(w.node);
       this.jumpWatches.set(id, w);
     }
     return w.read();
@@ -882,9 +964,9 @@ export class Engine {
       if (at === undefined) g.instruments[id].apply(p);
       else g.instruments[id].applyAt(p, at);
     }
-    for (const k of ["sweep", "pump", "saturation"] as const) {
-      if (at === undefined) g.setMix(k, this.mix[k]);
-      else g.setMixAt(k, this.mix[k], at);
+    for (const k of MIX_KEYS) {
+      if (at === undefined) g.setMix(k, mixValue(this.mix, k));
+      else g.setMixAt(k, mixValue(this.mix, k), at);
     }
   }
 
@@ -906,6 +988,7 @@ export class Engine {
       for (const id of INSTRUMENTS) g.instruments[id].releaseAll(time);
       this.applyAll(time);
       Tone.getTransport().bpm.setValueAtTime(doc.bpm, time);
+      g.setTempo(doc.bpm, time);
       tempo = doc.bpm;
       sixteenth = 60 / tempo / 4;
       this.landedLoad = { name: doc.name, style: doc.style, at: time };
@@ -915,10 +998,12 @@ export class Engine {
     // A new bass or synth rhythm lets go of what the old one held; the sequencer restarts it.
     for (const id of r.restarted) g.instruments[id].releaseAll(time);
     // A new section starts its own chords, and a key, mood or chord edit restarts them: held chords
-    // and pads let go (with their release).
+    // and pads let go (with their release). P7: a drone or a swooping pad that keeps holding glides instead.
     if (r.retrigger || (r.applied && r.applied.section !== null)) {
-      for (const id of ["synth", "layer1", "layer2"] as const) g.instruments[id].releaseAll(time);
+      for (const id of ["synth", "layer1", "layer2"] as const) if (!(r.kept as string[]).includes(id)) g.instruments[id].releaseAll(time);
     }
+    // P7: held notes of a layer that stopped holding (a new mode, Swoop to 0, another section) let go.
+    for (const id of r.letGo) g.instruments[id].releaseAll(time);
     // A held bass note in the old key lets go too; the sequencer restarts it at the new root.
     if (r.retrigger) g.instruments.bass.releaseAll(time);
     // Pad mode's envelope and filter follow the playing section's pad dials, from this step's time.
@@ -926,10 +1011,14 @@ export class Engine {
     for (const e of r.events) {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
-        case "drums":
-          g.instruments.drums.trigger(e.voice, t, e.vel, tempo, e.gap);
+        case "drums": {
+          // P7: a roll splits the sixteenth into 2..4 quick hits, each softer than the last and short enough to end before the next.
+          const n = e.repeat && e.repeat > 1 ? e.repeat : 1;
+          for (let k = 0; k < n; k++)
+            g.instruments.drums.trigger(e.voice, t + (k * sixteenth) / n, e.vel * (1 - 0.12 * k), tempo, k < n - 1 ? 1 / n : e.gap - (k * 1) / n);
           if (e.voice === "kick") g.pump(t);
           break;
+        }
         case "bass":
           g.instruments.bass.trigger(e.midi, e.len * sixteenth, t, e.vel);
           break;
@@ -937,6 +1026,15 @@ export class Engine {
           g.instruments.synth.trigger(e.notes, e.len * sixteenth, t, e.vel);
           break;
         default: {
+          // P7: a drone or a swooping pad starts its held notes, or glides them to the new chord's.
+          if (e.hold) {
+            g.instruments[e.inst].hold(e.notes, t, e.vel);
+            break;
+          }
+          if (e.glide !== undefined) {
+            g.instruments[e.inst].glideTo(e.notes, t, e.glide, e.vel);
+            break;
+          }
           // Lead notes (P5): a slide glides over most of a sixteenth (at most 90 ms); a repeat splits the
           // first sixteenth into two or three quick hits, the last of which holds the rest of the note. A slid
           // note that repeats glides over most of its first hit, so the next hit, on a new voice at the

@@ -29,6 +29,11 @@ export const ICON_FOR = {
   FX: "bolt",
   // P6: Pulse's own page (its Euclidean rhythm), from the set already shipped.
   Pulse: "timeline",
+  // P7: the drums' Kit page (Perc, Shaker, the drum sounds), the Mod page (FM, LFO, drift), the Mix tab's Space page.
+  Kit: "adjust",
+  Steps: "view_week",
+  Mod: "speed",
+  Space: "water",
   "New jam": "add",
   Back: "undo",
   "New idea": "casino",
@@ -61,7 +66,11 @@ export const ICON_FOR = {
 export type IconThing = keyof typeof ICON_FOR;
 
 /** The thing a label names: the whole label ("Kick · Clap"), else its part before " · " ("Lead · B"). */
+/** Short page words that stand for a thing of the table (P7: "Kick" where "Kick · Clap" does not fit). */
+const SHORT: Record<string, IconThing> = { Kick: "Kick · Clap" };
+
 export function iconThing(label: string): IconThing | null {
+  if (label in SHORT) return SHORT[label];
   for (const t of [label, label.split(" · ")[0]]) if (t in ICON_FOR) return t as IconThing;
   return null;
 }

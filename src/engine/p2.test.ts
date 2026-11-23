@@ -15,7 +15,9 @@ import {
   cloneSong,
   defaultPatch,
   defaultSong,
+  migrateP7,
   migrateSong,
+  P7_PATCH_DEFAULTS,
   parseSong,
   sectionSwing,
   validateSong,
@@ -361,12 +363,14 @@ describe("C4 for songs saved before P2 (P2 review S1)", () => {
     const now = defaultPatch("layer2");
     for (const e of [new Engine(old()), (() => { const x = new Engine(); x.loadSong(old()); return x; })()]) {
       const p = e.getSong().patches.layer2;
-      expect(p).toEqual({ ...old().patches.layer2, attack: now.attack, decay: now.decay, sustain: now.sustain, release: now.release, level: now.level });
+      expect(p).toEqual({ ...P7_PATCH_DEFAULTS, ...old().patches.layer2, attack: now.attack, decay: now.decay, sustain: now.sustain, release: now.release, level: now.level });
       // Its pad sits where it did before P2, within 2 dB: level times the trim, against the old level untrimmed.
       expect(Math.abs(20 * Math.log10((p.level * PAD_TRIM) / 0.22))).toBeLessThan(2.1);
       expect(validateSong(e.getDocument())).toEqual([]);
       // Everything else is as saved.
-      expect({ ...e.getSong(), patches: { ...e.getSong().patches, layer2: null } }).toEqual({ ...old(), patches: { ...old().patches, layer2: null } });
+      // Everything else is as saved (P7: the keys P7 added take their defaults).
+      const p7 = migrateP7(old());
+      expect({ ...e.getSong(), patches: { ...e.getSong().patches, layer2: null } }).toEqual({ ...p7, patches: { ...p7.patches, layer2: null } });
     }
   });
 
@@ -384,7 +388,7 @@ describe("C4 for songs saved before P2 (P2 review S1)", () => {
     const once = migrateSong(old());
     expect(migrateSong(once)).toBe(once);
     // A song whose envelope was moved off the old default by hand is not touched.
-    const moved = old();
+    const moved = migrateP7(old());
     moved.patches.layer2.attack = 0.5;
     expect(migrateSong(moved)).toBe(moved);
   });

@@ -3,10 +3,10 @@
  * level per instrument (Levels), and the audio buffer choice (Audio).
  */
 import { useEffect, useState } from "preact/hooks";
-import { INSTRUMENTS, type Engine, type LatencyHint, type MixState } from "../../engine/index.ts";
+import { INSTRUMENTS, MIX_RANGES, mixValue, type Engine, type LatencyHint, type MixKey } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Dial, GroupLabel, Meter, Pager } from "../components.tsx";
-import { meterFraction, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
+import { knobPos, knobValue, meterFraction, secondsText, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 
@@ -66,12 +66,16 @@ const BUFFERS = [
   ["playback", "Safe"],
 ] as const;
 
-type MixPage = "master" | "levels" | "audio";
+type MixPage = "master" | "levels" | "space" | "audio";
 const MIX_PAGES: PageDef<MixPage>[] = [
   ["master", "Master"],
   ["levels", "Levels"],
+  ["space", "Space"],
   ["audio", "Audio"],
 ];
+
+/** The reverb decay dial (P7, spec 8.10): 1 to 20 seconds on an exponential curve. */
+const DECAY = { label: "Tail", seconds: MIX_RANGES.reverbDecay };
 
 export function MixTab({ ctx }: { ctx: Ctx }) {
   const { engine, hint, pos } = ctx;
@@ -85,7 +89,8 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
   };
   const [page, setPage] = useState<MixPage>("master");
   const mix = engine.getMix();
-  const set = (k: keyof MixState) => (v: number) => engine.setMix(k, v);
+  const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
+  const lofi = mixValue(mix, "lofi") > 0;
   return (
     <section class="mixtab">
       <MasterMeter engine={engine} />
@@ -113,6 +118,32 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
             />
           ))}
         </div>
+      )}
+      {page === "space" && (
+        <>
+          <div class="dials n2">
+            <Dial
+              id="reverbDecay"
+              label="Tail s"
+              value={knobPos(DECAY, mixValue(mix, "reverbDecay"))}
+              min={0}
+              max={1}
+              display={secondsText(mixValue(mix, "reverbDecay"))}
+              color="var(--teal)"
+              onChange={(p) => engine.setMix("reverbDecay", knobValue(DECAY, p))}
+            />
+            <Dial id="air" label="Air" value={mixValue(mix, "air")} min={0} max={1} color="var(--blue)" onChange={set("air")} />
+          </div>
+          <GroupLabel thing="Master">Lo-fi</GroupLabel>
+          <div class="seg two">
+            {([false, true] as const).map((v) => (
+              <button key={String(v)} class={lofi === v ? "on" : ""} data-lofi={v ? "on" : "off"} aria-pressed={lofi === v} onClick={() => engine.setMix("lofi", v ? 1 : 0)}>
+                {v ? "Lo-fi on" : "Clean"}
+              </button>
+            ))}
+          </div>
+          <p class="note">Tail is how long the reverb rings. Air is a soft breath of noise. Lo-fi wobbles, crunches and hisses.</p>
+        </>
       )}
       {page === "audio" && (
         <>

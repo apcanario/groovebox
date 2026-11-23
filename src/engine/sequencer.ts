@@ -14,12 +14,14 @@ import {
   DRUM_PRESETS,
   DRUM_VOICES,
   SEQ_STEPS,
+  SEQ_STEPS_16,
   SEQ_VELOCITY,
   SYNTH_HOLD,
   SYNTH_PRESETS,
   SYNTH_RHYTHMS,
   copyGrid,
   toggleEighth,
+  toggleSixteenth,
   nextHitGap,
   type BassPreset,
   type DrumPreset,
@@ -27,7 +29,7 @@ import {
   type SynthPreset,
 } from "../music/presets.ts";
 import { createRng, deriveSeed, type Rng } from "../music/random.ts";
-import { PAD_TRIM } from "../music/sound.ts";
+import { DRONE_SWOOP, PAD_TRIM, swoopSeconds } from "../music/sound.ts";
 import { MOODS, scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
 import { SwitchQueue, type Pending, type PendingChords } from "./queue.ts";
 import {
@@ -39,13 +41,16 @@ import {
   MAX_SECTION_NAME,
   newSection,
   sectionDrumGrid,
+  sectionRoll,
   sectionSwing,
+  MAX_PAD_TIME,
   MAX_SWING,
   SEED_HISTORY,
   validChords,
   type ChordStep,
   type InstrumentId,
   type LayerInstrument,
+  type DroneParams,
   type LayerMode,
   type PadParams,
   type Section,
@@ -62,7 +67,15 @@ export const STEPS_PER_BAR = 16;
 export type GenValues = { [K in keyof Omit<LeadParams, "seed">]?: LeadParams[K] | (undefined extends LeadParams[K] ? null : never) };
 
 export type NoteEvent =
-  | { inst: "drums"; voice: DrumVoice; vel: number; shift: number; gap: number }
+  | {
+      inst: "drums";
+      voice: DrumVoice;
+      vel: number;
+      shift: number;
+      gap: number;
+      /** P7: a roll, 2..4 quick hits inside this sixteenth. */
+      repeat?: number;
+    }
   | { inst: "bass"; midi: number; len: number; vel: number; shift: number }
   | { inst: "synth"; notes: number[]; len: number; vel: number; shift: number }
   | {
@@ -78,6 +91,10 @@ export type NoteEvent =
       accent?: boolean;
       /** Lead only (P5): a quick double (2) or triple (3) inside the first sixteenth. */
       repeat?: number;
+      /** P7, Drone and a pad with Swoop: the notes start and are held until the layer lets go (len is only drawn). */
+      hold?: boolean;
+      /** P7, Drone and a pad with Swoop: the held notes glide to these over this many seconds; nothing restarts. */
+      glide?: number;
     };
 
 export interface StepResult {
@@ -103,10 +120,14 @@ export interface StepResult {
    */
   restarted: InstrumentId[];
   /**
-   * Per layer, the pad settings when the playing section has it in Pad mode, else null: the engine
+   * Per layer, the pad settings when the playing section has it in Pad or Drone mode (P7), else null: the engine
    * sets the layer's envelope and pad filter from this on every step, so pad dials act at once.
    */
   pads: Record<LayerInstrument, PadParams | null>;
+  /** P7: layers whose held notes (Drone, a pad with Swoop) must let go at this step; a new attack may follow. */
+  letGo: LayerInstrument[];
+  /** P7: layers that keep holding their notes over this step (they glide, never restart): no section or chord change releases them. */
+  kept: LayerInstrument[];
   /** A queued song (queueSong) landed on this step: every held note lets go and the new patches apply here. */
   loaded: boolean;
 }
@@ -183,6 +204,19 @@ function cloneNotes(n: LaneNotes): LaneNotes {
   return out;
 }
 
+/**
+ * A drone's notes (P7, spec 8.10): the chord's root an octave under the pads, and its fifth (the chord's own, so a
+ * diminished chord's stays in key) unless switched off.
+ */
+export function droneNotes(chord: Chord, d: DroneParams | undefined): number[] {
+  const root = chord.notes[0] - 12;
+  return d?.fifth === false ? [root] : [root, chord.notes[2] - 12];
+}
+
+function sameNotes(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((n, i) => n === b[i]);
+}
+
 /** Clamp a number into [lo, hi]; null for anything that is not a finite number. */
 function num(v: unknown, lo: number, hi: number, int = false): number | null {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
@@ -241,6 +275,8 @@ export class Sequencer {
   private snaps = true;
   /** A whole song waiting for the next bar line (P3: a vibe loaded while playing), and the section it starts in. */
   private nextSong: { song: Song; section: number } | null = null;
+  /** P7: per layer, the mode whose notes it holds now (Drone, or Pad with Swoop), and those notes; absent when none. */
+  private holding = new Map<LayerInstrument, { mode: LayerMode; notes: number[] }>();
 
   constructor(song: Song) {
     this.song = song;
@@ -266,6 +302,7 @@ export class Sequencer {
   stop(): void {
     this.running = false;
     this.nextSong = null;
+    this.holding.clear();
     this.rec = null;
     this.prevRec = null;
     this.sounding.clear();
@@ -295,12 +332,13 @@ export class Sequencer {
    * Flip one of the eight sequencer steps of a drum voice. The first edit opens the section's preset
    * in the sequencer (copies its grid); the preset's swing stays. Acts at once.
    */
-  toggleDrumStep(section: number, voice: DrumVoice, step: number): boolean {
+  toggleDrumStep(section: number, voice: DrumVoice, step: number, sixteen = false): boolean {
     const s = this.song.sections[section];
-    if (!s || !(DRUM_VOICES as readonly string[]).includes(voice) || !Number.isInteger(step) || step < 0 || step >= SEQ_STEPS)
-      return false;
-    const grid = s.drums.grid ?? copyGrid(DRUM_PATTERNS[s.drums.preset].grid);
-    grid[voice] = toggleEighth(grid[voice], step, SEQ_VELOCITY[voice], DRUM_PATTERNS[s.drums.preset].grid[voice]);
+    const n = sixteen ? SEQ_STEPS_16 : SEQ_STEPS;
+    if (!s || !(DRUM_VOICES as readonly string[]).includes(voice) || !Number.isInteger(step) || step < 0 || step >= n) return false;
+    const grid = copyGrid(s.drums.grid ?? DRUM_PATTERNS[s.drums.preset].grid);
+    const preset = DRUM_PATTERNS[s.drums.preset].grid[voice];
+    grid[voice] = sixteen ? toggleSixteenth(grid[voice], step, SEQ_VELOCITY[voice], preset) : toggleEighth(grid[voice], step, SEQ_VELOCITY[voice], preset);
     s.drums.grid = grid;
     return true;
   }
@@ -376,7 +414,13 @@ export class Sequencer {
   setPad(section: number, id: LayerInstrument, values: Partial<PadParams>): boolean {
     const s = this.song.sections[section];
     if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
-    const ranges: Record<keyof PadParams, [number, number]> = { attack: [0.001, 8], release: [0.01, 8], brightness: [0, 1], motion: [0, 1] };
+    const ranges: Record<keyof PadParams, [number, number]> = {
+      attack: [0.001, MAX_PAD_TIME],
+      release: [0.01, MAX_PAD_TIME],
+      brightness: [0, 1],
+      motion: [0, 1],
+      swoop: [0, 1],
+    };
     const pad = { ...s[id].pad };
     for (const k of Object.keys(values) as (keyof PadParams)[]) {
       if (!(k in ranges)) return false;
@@ -387,6 +431,20 @@ export class Sequencer {
     s[id].pad = pad;
     return true;
   }
+
+  /** Drone mode's notes (P7): the root alone, or root and fifth. Acts from the next chord (the held notes glide). */
+  setDrone(section: number, id: LayerInstrument, values: Partial<DroneParams>): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
+    if (values.fifth !== undefined && typeof values.fifth !== "boolean") return false;
+    s[id].drone = { fifth: values.fifth ?? s[id].drone?.fifth ?? true };
+    // In the playing section the drone moves to its new notes at once, gliding.
+    if (this.running && section === this.current) this.reshape.add(id);
+    return true;
+  }
+
+  /** P7: layers whose held notes should move to the section's notes on the next step (a drone's fifth switched). */
+  private reshape = new Set<LayerInstrument>();
 
   /**
    * Change the lead knobs (not the seed). The lead keeps its random draws: only Lock rewrites them, so a knob
@@ -585,6 +643,7 @@ export class Sequencer {
   load(song: Song, section?: number): void {
     this.song = song;
     this.nextSong = null;
+    this.holding.clear();
     this.leads.clear();
     this.queue.clear();
     this.current = Math.max(0, Math.min(section ?? this.current, song.sections.length - 1));
@@ -646,6 +705,7 @@ export class Sequencer {
       const { song, section } = this.nextSong;
       this.nextSong = null;
       this.song = song;
+      this.holding.clear(); // the engine lets every held note go here
       this.leads.clear();
       this.queue.clear();
       this.retrigger = false;
@@ -679,7 +739,11 @@ export class Sequencer {
       for (const voice of DRUM_VOICES) {
         const vel = grid[voice][step];
         // `gap`: sixteenths to this voice's next hit, so its tail can end before it.
-        if (vel > 0) events.push({ inst: "drums", voice, vel, shift, gap: nextHitGap(grid[voice], step, swing) });
+        if (vel > 0) {
+          const roll = sectionRoll(section, voice, step);
+          const e: NoteEvent = { inst: "drums", voice, vel, shift, gap: nextHitGap(grid[voice], step, swing) };
+          events.push(roll > 1 ? { ...e, repeat: roll } : e);
+        }
       }
     }
 
@@ -711,18 +775,25 @@ export class Sequencer {
       }
     }
 
+    const letGo: LayerInstrument[] = [];
     for (const id of LAYER_IDS) {
-      if (!now.has(id)) continue;
-      const ev = this.layerEvent(id, section, step, pos, chordStart || entered.has(id) || restart.has(id), shift);
+      if (!now.has(id)) {
+        this.holding.delete(id);
+        continue;
+      }
+      const fresh = entered.has(id) || restart.has(id);
+      const ev = this.layerEvent(id, section, step, pos, chordStart || fresh, shift, fresh, chordStart || this.reshape.has(id), letGo);
       if (ev) events.push(ev);
     }
+    this.reshape.clear();
+    const kept = LAYER_IDS.filter((id) => this.holding.has(id) && !events.some((e) => e.inst === id && "hold" in e && e.hold));
 
     this.globalStep++;
     this.sectionStep++;
     const restarted = [...restart].filter((id) => now.has(id));
     const pads = {} as Record<LayerInstrument, PadParams | null>;
-    for (const id of LAYER_IDS) pads[id] = section[id].mode === "pad" ? { ...section[id].pad } : null;
-    const result: StepResult = { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads, loaded };
+    for (const id of LAYER_IDS) pads[id] = section[id].mode === "pad" || section[id].mode === "drone" ? { ...section[id].pad } : null;
+    const result: StepResult = { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads, loaded, letGo, kept };
     this.record(result, now, snap);
     return result;
   }
@@ -845,8 +916,33 @@ export class Sequencer {
     pos: ChordPosition,
     fresh: boolean,
     shift: number,
+    entering = false,
+    moving = false,
+    letGo: LayerInstrument[] = [],
   ): NoteEvent | null {
     const p = section[id];
+    const held = this.holding.get(id);
+    if (p.mode === "drone" || (p.mode === "pad" && (p.pad.swoop ?? 0) > 0)) {
+      // P7 (spec 8.10): a drone, or a pad with Swoop, holds its notes and glides them to the next chord's; it starts
+      // them only when it begins sounding (switched on, a new mode, Play, a vibe) or held something else before.
+      const notes = p.mode === "drone" ? droneNotes(pos.chord, p.drone) : pos.chord.notes.slice(0, 4);
+      const vel = 0.7 * PAD_TRIM;
+      if (held && held.mode !== p.mode) letGo.push(id);
+      if (!held || held.mode !== p.mode || entering) {
+        this.holding.set(id, { mode: p.mode, notes });
+        return { inst: id, mode: p.mode, notes, len: pos.remaining, vel, shift, hold: true };
+      }
+      if (!moving || sameNotes(held.notes, notes)) return null;
+      this.holding.set(id, { mode: p.mode, notes });
+      const seconds = swoopSeconds(p.pad.swoop ?? (p.mode === "drone" ? DRONE_SWOOP : 0));
+      return { inst: id, mode: p.mode, notes, len: pos.remaining, vel, shift, glide: seconds };
+    }
+    if (held) {
+      // Held notes of a drone or a swooping pad let go when the layer stops holding (a mode or Swoop change, a section).
+      letGo.push(id);
+      this.holding.delete(id);
+      fresh = true;
+    }
     if (p.mode === "pad") {
       if (!fresh) return null;
       return {

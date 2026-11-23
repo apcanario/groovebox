@@ -42,11 +42,11 @@ import {
   sweepLabel,
 } from "./logic.ts";
 import { NOTE_NAMES } from "../music/scales.ts";
-import { defaultSong, PATCH_KEYS } from "../engine/song.ts";
+import { defaultSong, PATCH_KEYS, type ChordStep } from "../engine/song.ts";
 import { Sequencer } from "../engine/sequencer.ts";
 import { InFlight } from "../engine/queue.ts";
 
-const seq = [
+const seq: ChordStep[] = [
   { degree: 0, bars: 1 as const },
   { degree: 5, bars: 2 as const },
   { degree: 3, bars: 0.5 as const },
@@ -117,9 +117,11 @@ describe("chord sequence edits", () => {
     expect(moveChord(seq, 0, -1)).toBe(seq);
     expect(moveChord(seq, 2, 1)).toBe(seq);
   });
-  it("cycles length 1, 2, half", () => {
+  it("cycles length 1, 2, 4, 8, half (P7 adds 4 and 8 bars)", () => {
     expect(cycleLength(seq, 0)[0].bars).toBe(2);
-    expect(cycleLength(seq, 1)[1].bars).toBe(0.5);
+    expect(cycleLength(seq, 1)[1].bars).toBe(4);
+    expect(cycleLength(cycleLength(seq, 1), 1)[1].bars).toBe(8);
+    expect(cycleLength(cycleLength(cycleLength(seq, 1), 1), 1)[1].bars).toBe(0.5);
     expect(cycleLength(seq, 2)[2].bars).toBe(1);
   });
 });

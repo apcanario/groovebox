@@ -4,8 +4,10 @@
  * 16 steps per bar. No audio dependency.
  */
 import {
+  CORE_DRUM_VOICES,
   DRUM_VOICES,
   checkGrid,
+  checkRolls,
   checkHits,
   checkNamed,
   readData,
@@ -18,7 +20,7 @@ import {
   type SynthRhythmDef,
 } from "./data.ts";
 
-export { DRUM_VOICES, type DrumGrid, type DrumVoice, type RhythmHit };
+export { CORE_DRUM_VOICES, DRUM_VOICES, type DrumGrid, type DrumVoice, type RhythmHit };
 
 const bass = readData<BassRhythmDef>(import.meta.glob("../data/bass/*.ts", { eager: true }), (e) => {
   const out = checkNamed(e);
@@ -34,6 +36,7 @@ const beats = readData<BeatDef>(import.meta.glob("../data/beats/*.ts", { eager: 
   const out = checkNamed(e);
   if (!(e.swing >= 0 && e.swing <= 0.5)) out.push("swing: must be 0..0.5");
   checkGrid(e.grid, out);
+  if (!out.length) checkRolls(e.rolls, e.grid, out);
   return out;
 });
 
@@ -58,12 +61,28 @@ export interface DrumPattern {
   grid: DrumGrid;
   /** Delay of odd sixteenths, as a fraction of a step (0 = straight). */
   swing: number;
+  /** P7: hits per sixteenth by voice, 16 per row (1 = a single hit); only voices that roll have a row. */
+  rolls: Partial<Record<DrumVoice, number[]>>;
+}
+
+/** A beat file's grid with every voice: Perc and Shaker silent where the file has no row for them. */
+export function fullGrid(g: Partial<DrumGrid>): DrumGrid {
+  return Object.fromEntries(DRUM_VOICES.map((v) => [v, g[v] ? [...g[v]!] : new Array(16).fill(0)])) as DrumGrid;
+}
+
+function rollRows(r: BeatDef["rolls"]): Partial<Record<DrumVoice, number[]>> {
+  const out: Partial<Record<DrumVoice, number[]>> = {};
+  for (const v of DRUM_VOICES) {
+    const steps = r?.[v];
+    if (steps) out[v] = Array.from({ length: 16 }, (_, i) => steps[i] ?? 1);
+  }
+  return out;
 }
 
 /** Every drum beat, in picker order. */
 export const DRUM_PRESETS: readonly DrumPreset[] = beats.ids;
 export const DRUM_PATTERNS: Record<DrumPreset, DrumPattern> = Object.fromEntries(
-  beats.ids.map((id) => [id, { grid: beats.byId[id].grid, swing: beats.byId[id].swing }]),
+  beats.ids.map((id) => [id, { grid: fullGrid(beats.byId[id].grid), swing: beats.byId[id].swing, rolls: rollRows(beats.byId[id].rolls) }]),
 );
 
 /** The picker words of every entry: `name` in Advanced, `simple` in Simple. */
@@ -82,8 +101,11 @@ export const SYNTH_NAMES: Record<SynthPreset, PresetNames> = names(synth.byId);
 /** Steps of the drum sequencer: eight per bar, each covering two sixteenths of the stored grid. */
 export const SEQ_STEPS = 8;
 
+/** Steps of the 16-step view of the sequencer (P7): one per sixteenth of the stored grid. */
+export const SEQ_STEPS_16 = 16;
+
 /** Velocity a step gets when it is switched on in the sequencer. */
-export const SEQ_VELOCITY: Record<DrumVoice, number> = { kick: 1, clap: 0.9, hat: 0.4, open: 0.7 };
+export const SEQ_VELOCITY: Record<DrumVoice, number> = { kick: 1, clap: 0.9, hat: 0.4, open: 0.7, perc: 0.8, shaker: 0.5 };
 
 /** A sequencer step is lit when either of its two sixteenths plays. */
 export function eighthOn(row: readonly number[], i: number): boolean {
@@ -123,7 +145,17 @@ export function nextHitGap(row: readonly number[], step: number, swing: number):
   return 16;
 }
 
-/** A deep copy of a drum grid, so an edited section never shares rows with a preset. */
-export function copyGrid(g: DrumGrid): DrumGrid {
-  return { kick: [...g.kick], clap: [...g.clap], hat: [...g.hat], open: [...g.open] };
+/**
+ * Flip one sixteenth (P7's 16-step view): a lit step clears; an unlit one takes the preset's velocity there, or `vel`.
+ */
+export function toggleSixteenth(row: readonly number[], i: number, vel: number, preset?: readonly number[]): number[] {
+  const out = [...row];
+  if (!Number.isInteger(i) || i < 0 || i >= SEQ_STEPS_16) return out;
+  out[i] = (row[i] ?? 0) > 0 ? 0 : (preset?.[i] ?? 0) > 0 ? preset![i] : vel;
+  return out;
+}
+
+/** A deep copy of a drum grid with every voice, so an edited section never shares rows with a preset. */
+export function copyGrid(g: Partial<DrumGrid>): DrumGrid {
+  return fullGrid(g);
 }
