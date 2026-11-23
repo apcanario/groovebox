@@ -578,3 +578,24 @@ export function flashLevel(notes: readonly { step: number; shift: number; held?:
   }
   return best === Infinity ? 0 : Math.max(0, 1 - best / 1.5);
 }
+
+/**
+ * A paged chip row (P3 review M8): with more than `perRow` options, each page holds `perRow - 1` of them and a
+ * last chip, More, turns to the next page (wrapping). `page`: the page asked for, or null to open on the page
+ * holding `value` (the first if none). Returns the page count, the page shown, its options and the empty
+ * cells that pad the last page so More keeps its place.
+ */
+export function chipPage<T>(
+  options: readonly T[],
+  value: T | null,
+  perRow: number,
+  page: number | null = null,
+): { pages: number; page: number; shown: T[]; pad: number } {
+  if (options.length <= perRow) return { pages: 1, page: 0, shown: [...options], pad: 0 };
+  const per = perRow - 1;
+  const pages = Math.ceil(options.length / per);
+  const at = value === null ? -1 : options.indexOf(value);
+  const p = page === null ? (at < 0 ? 0 : Math.floor(at / per)) : ((page % pages) + pages) % pages;
+  const shown = options.slice(p * per, p * per + per);
+  return { pages, page: p, shown, pad: per - shown.length };
+}

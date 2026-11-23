@@ -140,4 +140,31 @@ describe("Keeper", () => {
     engine.land();
     expect(engine.song.style).toBe("ambient");
   });
+
+  it("two quick vibe taps leave one new song: the second waits for the first and replaces it (P3 review S1)", async () => {
+    const { lib, engine, keeper, first } = await setup();
+    engine.playing = true;
+    const a = keeper.startVibe(vibeSong("loFi")!, 1);
+    const b = keeper.startVibe(vibeSong("ambient")!, 1);
+    expect(await a).toBe(true);
+    expect(await b).toBe(true);
+    expect((await lib.list()).map((e) => e.name).sort()).toEqual(["Ambient", first.doc.name].sort());
+    expect(engine.pendingLoad()?.style).toBe("ambient");
+  });
+
+  it("a vibe picked when its turn comes sees the vibe queued by the tap before it (P3 review S1)", async () => {
+    const { lib, engine, keeper, first } = await setup();
+    engine.playing = true;
+    const seen: (string | undefined)[] = [];
+    const pick = (id: string) => () => {
+      seen.push(engine.pendingLoad()?.style);
+      return { doc: vibeSong(id)!, section: 1 };
+    };
+    const a = keeper.startVibeWith(pick("loFi"));
+    const b = keeper.startVibeWith(pick("ambient"));
+    await Promise.all([a, b]);
+    expect(seen).toEqual([undefined, "loFi"]);
+    expect((await lib.list()).map((e) => e.name).sort()).toEqual(["Ambient", first.doc.name].sort());
+    expect(await keeper.startVibeWith(() => null)).toBe(false);
+  });
 });

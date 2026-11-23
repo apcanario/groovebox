@@ -1497,19 +1497,55 @@ def walk_picker_open(page, failures: list, first: bool) -> None:
 
 
 def solo_bar(page, layer: str, bar_s: float) -> float:
-    """Highest level of one instrument alone over a little more than a bar."""
-    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
-    page.evaluate(solo, layer)
-    time.sleep(0.3)
+    """Highest level of one instrument over a little more than a bar, read on its own channel's meter (P3 review
+    S2): before the shared sends, so another instrument's reverb tail cannot pass a silent one."""
     top = -999.0
     end = time.time() + bar_s + 0.3
     while time.time() < end:
-        v = page.evaluate("window.__groovebox.level()")
+        v = page.evaluate(f"window.__groovebox.instrumentLevel({layer!r})")
         if v is not None:
             top = max(top, v)
         time.sleep(0.05)
-    page.evaluate(solo, None)
     return top
+
+
+CUTOFF_TRACE = """(id) => {
+  const e = window.__groovebox, trace = [], end = performance.now() + 12000;
+  window.__cutoffTrace = trace;
+  const loop = () => {
+    const c = e.cutoffNow(id);
+    if (c) trace.push([c.now, c.hz]);
+    if (window.__cutoffTrace === trace && performance.now() < end) setTimeout(loop, 2);
+  };
+  loop();
+}"""
+
+
+def check_landing_cutoff(page, failures: list, v: dict) -> bool:
+    """P3 review E1: a vibe's patch changes on its bar line, not a lookahead early. Reads the synth's native
+    cutoff traced through the landing: the old value 10 ms before the bar line (the review asked 30; 10 also
+    catches a small lead), the new one 60 ms after.
+    Returns whether the old and new cutoffs differed (so the check could judge anything)."""
+    E = "window.__groovebox"
+    at = (page.evaluate(f"{E}.landed.slice(-1)[0]") or {}).get("loaded", {}).get("at")
+    trace = page.evaluate("window.__cutoffTrace") or []
+    page.evaluate("window.__cutoffTrace = null")
+    if at is None or len(trace) < 10:
+        failures.append(f"{v['id']}: no cutoff trace through the landing ({len(trace)} samples, at {at})")
+        return False
+    old, new = trace[0][1], trace[-1][1]
+    if abs(new - old) / old < 0.05 or trace[0][0] > at - 0.05 or trace[-1][0] < at + 0.1:
+        return False
+    before = [hz for t, hz in trace if t <= at - 0.01]
+    after = [hz for t, hz in trace if t >= at + 0.06]
+    if not before or not after:
+        failures.append(f"{v['id']}: cutoff trace misses the bar line at {at:.3f}")
+        return True
+    if abs(before[-1] - old) / old > 0.01:
+        failures.append(f"{v['id']}: synth cutoff {before[-1]:.0f} Hz 10 ms before the bar line, expected the old {old:.0f} Hz (changed early)")
+    if abs(after[0] - new) / new > 0.02:
+        failures.append(f"{v['id']}: synth cutoff {after[0]:.0f} Hz 60 ms after the bar line, expected the new {new:.0f} Hz")
+    return True
 
 
 def load_vibe_and_check(page, failures: list, v: dict, how: str) -> bool:
@@ -1547,9 +1583,11 @@ def walk_p3(page, failures: list) -> None:
         wait_for(page, f"{E}.playing", 3.0)
     before = page.evaluate("window.__keeper.list().then(l => l.length)")
     vibes = page.evaluate("window.__vibes")
+    timed = 0
     for v in vibes:
         page.click("#new-jam")
         wait_for(page, f"{E}.position().step >= 2 && {E}.position().step <= 8", 6.0)
+        page.evaluate(CUTOFF_TRACE, "synth")
         page.click(f'[data-vibe="{v["id"]}"]')
         wait_for(page, f"!!{E}.pendingLoad() || {E}.getSong().style === {v['id']!r}", 2.0)
         wait_for(page, "!document.querySelector('.vibes')", 2.0)
@@ -1557,7 +1595,10 @@ def walk_p3(page, failures: list) -> None:
             failures.append(f"{v['id']}: the picker stayed open after a tap")
             page.click("#vibe-close")
         if not load_vibe_and_check(page, failures, v, "picker"):
+            page.evaluate("window.__cutoffTrace = null")
             continue
+        if check_landing_cutoff(page, failures, v):
+            timed += 1
         bar_s = 4 * 60 / v["bpm"]
         quiet = []
         for inst in LAYERS:
@@ -1567,6 +1608,9 @@ def walk_p3(page, failures: list) -> None:
         if quiet:
             failures.append(f"{v['id']}: silent in its groove section: {', '.join(quiet)}")
         print(f"vibe {v['name']}: landed on the bar at {v['bpm']} bpm, every instrument audible")
+    if timed < 3:
+        failures.append(f"the synth cutoff was checked across only {timed} vibe landings, expected at least 3")
+    print(f"vibe landings: synth cutoff old before the bar line, new after it, on {timed} landings")
     after = page.evaluate("window.__keeper.list().then(l => l.length)")
     if after != before + len(vibes):
         failures.append(f"each vibe should be a new song kept in Songs: {before} songs before, {after} after {len(vibes)} vibes")

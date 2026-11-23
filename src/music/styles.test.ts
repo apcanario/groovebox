@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { Sequencer, type StepResult } from "../engine/sequencer.ts";
 import { INSTRUMENTS, LIMITS, defaultSong, validateSong, type InstrumentId } from "../engine/song.ts";
-import { checkGrid, checkNamed, readData, type BeatDef, type DataFiles } from "./data.ts";
+import { checkGrid, checkNamed, readData, type BeatDef, type DataFiles, type PatchDef } from "./data.ts";
 import {
   BASS_NAMES,
   BASS_PRESETS,
@@ -17,6 +17,7 @@ import {
 import { MOODS, MOOD_TABLE } from "./scales.ts";
 import {
   PATCHES,
+  checkPatchDef,
   PATCH_IDS,
   STYLES,
   STYLE_IDS,
@@ -80,11 +81,21 @@ describe("the eight launch styles (spec 8.2)", () => {
     expect(a.sections[1].layer1.gen.seed).not.toBe(b.sections[1].layer1.gen.seed);
   });
 
-  it("Lo-fi and Ambient sit under the old 80 bpm floor: the range is 60 to 180", () => {
+  it("Ambient sits under the old 80 bpm floor and Lo-fi at it: the range is 60 to 180", () => {
     expect(LIMITS.bpm).toEqual([60, 180]);
     expect(STYLES.ambient.bpm).toBeLessThan(80);
+    expect(STYLES.loFi.bpm).toBeLessThanOrEqual(80);
     expect(validateSong({ ...defaultSong(), bpm: 60 })).toEqual([]);
     expect(validateSong({ ...defaultSong(), bpm: 59 })).not.toEqual([]);
+  });
+});
+
+describe("patch files (P3 review M2)", () => {
+  it("every patch file's values are range-checked when read, used by a style or not", () => {
+    for (const id of PATCH_IDS) expect(checkPatchDef(PATCHES[id])).toEqual([]);
+    const bad: PatchDef = { order: 9, name: "Bad", instrument: "synth", values: { cutoff: 5 } };
+    expect(checkPatchDef(bad)).toEqual(["values.cutoff: must be 0..1"]);
+    expect(checkPatchDef({ ...bad, instrument: "layer", values: { wave: "noise" as never } })).toEqual(["values.wave: unknown wave"]);
   });
 });
 

@@ -71,7 +71,8 @@ function nativeParam(p: unknown): AudioParam {
  * parameter's present value and always lands (99% after 37 ms). Every parameter ramped here is
  * only ever moved here, so Tone's timeline for it is never consulted.
  */
-function ramp(param: unknown, value: number): void {
+function ramp(param: unknown, value: number, at?: number): void {
+  if (at !== undefined) return rampAt(param, value, at);
   const p = nativeParam(param);
   const t = Tone.getContext().currentTime;
   p.cancelScheduledValues(t);
@@ -170,8 +171,8 @@ class Channel {
     env.triggerAttackRelease(Math.max(0.005, dur), time);
   }
 
-  private rampEnvDepth(): void {
-    if (this.envDepth) ramp(this.envDepth.factor, envDepthHz(this.cutoffHz(this.cutoffValue), this.envAmount, this.hz[1]));
+  private rampEnvDepth(at?: number): void {
+    if (this.envDepth) ramp(this.envDepth.factor, envDepthHz(this.cutoffHz(this.cutoffValue), this.envAmount, this.hz[1]), at);
   }
 
   cutoffHz(x: number): number {
@@ -179,40 +180,46 @@ class Channel {
     return lo * Math.pow(hi / lo, Math.max(0, Math.min(1, x)));
   }
 
-  set(key: NumericPatchKey, v: number): void {
+  /** Native resting cutoff in Hz (the envelope's base where there is one), for the smoke test (P3 review E1). */
+  cutoffNative(): number {
+    return nativeValue(this.envBase ? this.envBase.addend : this.filter.frequency);
+  }
+
+  /** Set one value: ramped from now, or with `at` from that audio time (a vibe landing on its bar line). */
+  set(key: NumericPatchKey, v: number, at?: number): void {
     switch (key) {
       case "cutoff":
         this.cutoffValue = v;
         if (this.envBase) {
-          ramp(this.envBase.addend, this.cutoffHz(v));
-          return this.rampEnvDepth();
+          ramp(this.envBase.addend, this.cutoffHz(v), at);
+          return this.rampEnvDepth(at);
         }
-        return void ramp(this.filter.frequency, this.cutoffHz(v));
+        return void ramp(this.filter.frequency, this.cutoffHz(v), at);
       case "envAmount":
         this.envAmount = clamp01(v);
-        return this.rampEnvDepth();
+        return this.rampEnvDepth(at);
       case "resonance": {
         const q = 0.7 + clamp01(v) * (MAX_Q - 0.7);
-        ramp(this.filter.Q, q);
+        ramp(this.filter.Q, q, at);
         this.comp = qComp(q);
-        return void ramp(this.level.gain, this.levelValue * this.trim * this.comp);
+        return void ramp(this.level.gain, this.levelValue * this.trim * this.comp, at);
       }
       case "drive":
-        return this.setDrive(clamp01(v));
+        return this.setDrive(clamp01(v), at);
       case "delay":
-        return void ramp(this.delaySend.gain, v);
+        return void ramp(this.delaySend.gain, v, at);
       case "reverb":
-        return void ramp(this.reverbSend.gain, v);
+        return void ramp(this.reverbSend.gain, v, at);
       case "level":
         this.levelValue = v;
-        return void ramp(this.level.gain, v * this.trim * this.comp);
+        return void ramp(this.level.gain, v * this.trim * this.comp, at);
       default:
         return;
     }
   }
 
   /** Crossfade dry and driven over RAMP; at 0 the drive leaves the chain once the fade is done. */
-  private setDrive(v: number): void {
+  private setDrive(v: number, at?: number): void {
     const drive = this.drive;
     if (!drive) return;
     const gen = ++this.driveGen;
@@ -221,8 +228,8 @@ class Channel {
       this.driveOn = true;
     }
     const [d, w] = dryWet(v);
-    ramp(this.dry.gain, d);
-    ramp(this.wet.gain, w);
+    ramp(this.dry.gain, d, at);
+    ramp(this.wet.gain, w, at);
     if (v === 0 && this.driveOn)
       afterRamp(() => {
         if (gen !== this.driveGen || !this.driveOn) return;
@@ -248,8 +255,9 @@ class VoiceSets<T extends Tone.ToneAudioNode> {
 
   constructor(private readonly dest: Tone.Gain) {}
 
-  swap(make: () => T): void {
-    if (this.old) this.drop(this.old);
+  /** `at`: the audio time from which the new set is used (the previous one's fade starts no earlier). */
+  swap(make: () => T, at?: number): void {
+    if (this.old) this.drop(this.old, at);
     this.old = this.live;
     const synth = make();
     const gain = new Tone.Gain(1).connect(this.dest);
@@ -270,8 +278,8 @@ class VoiceSets<T extends Tone.ToneAudioNode> {
     }
   }
 
-  private drop(v: { synth: T; gain: Tone.Gain }): void {
-    ramp(v.gain.gain, 0);
+  private drop(v: { synth: T; gain: Tone.Gain }, at?: number): void {
+    ramp(v.gain.gain, 0, at);
     afterRamp(() => {
       v.synth.dispose();
       v.gain.dispose();
@@ -312,17 +320,27 @@ export abstract class Instrument {
   cancel(): void {
     this.epoch++;
   }
-  apply(p: Patch): void {
-    for (const k of PATCH_KEYS) if (!ENV_KEYS.includes(k)) this.set(k, p[k], p);
-    this.setWave(p.wave);
+  /** Apply a whole patch: from now, or from audio time `at` (P3 review E1: a vibe lands on its bar line). */
+  apply(p: Patch, at?: number): void {
+    for (const k of PATCH_KEYS) if (!ENV_KEYS.includes(k)) this.set(k, p[k], p, at);
+    this.setWave(p.wave, at);
     this.setEnvelope(p);
   }
-  set(key: keyof Patch, v: number | Wave, patch: Patch): void {
-    if (key === "wave") return this.setWave(v as Wave);
-    if (ENV_KEYS.includes(key)) return this.setEnvelope(patch);
-    this.channel.set(key, v as number);
+  /** Apply a whole patch from audio time `time`, on the audio clock (P3 review E1). */
+  applyAt(p: Patch, time: number): void {
+    this.apply(p, time);
   }
-  protected abstract setWave(w: Wave): void;
+  /**
+   * Set one value. Continuous values ramp from `at` (else now). Discrete ones (wave, envelope, decays, pitch,
+   * glide) act from the next attack started, and every attack before `at` has already started when a vibe's
+   * bar line is scheduled, so they also take effect from `at`.
+   */
+  set(key: keyof Patch, v: number | Wave, patch: Patch, at?: number): void {
+    if (key === "wave") return this.setWave(v as Wave, at);
+    if (ENV_KEYS.includes(key)) return this.setEnvelope(patch);
+    this.channel.set(key, v as number, at);
+  }
+  protected abstract setWave(w: Wave, at?: number): void;
   protected abstract setEnvelope(p: Patch): void;
   abstract releaseAll(time: number): void;
 }
@@ -382,15 +400,15 @@ export class Drums extends Instrument {
     into("clap", clapBp);
   }
 
-  override set(key: keyof Patch, v: number | Wave, patch: Patch): void {
+  override set(key: keyof Patch, v: number | Wave, patch: Patch, at?: number): void {
     const n = v as number;
-    if (key === "drive") return void ramp(this.kickDrive.wet, clamp01(n));
+    if (key === "drive") return void ramp(this.kickDrive.wet, clamp01(n), at);
     if (key === "pitch") return void (this.pitch = clamp01(n)); // from the next kick
     for (const voice of DRUM_VOICES) {
-      if (key === `${voice}Level`) return void ramp(this.gains[voice].gain, this.trims[voice] * drumLevel(n));
+      if (key === `${voice}Level`) return void ramp(this.gains[voice].gain, this.trims[voice] * drumLevel(n), at);
       if (key === `${voice}Decay`) return void (this.decays[voice] = clamp01(n)); // from the next hit
     }
-    super.set(key, v, patch);
+    super.set(key, v, patch, at);
   }
 
   protected setWave(): void {}
@@ -457,17 +475,17 @@ export class Bass extends Instrument {
     this.setWave("sawtooth");
   }
 
-  override set(key: keyof Patch, v: number | Wave, patch: Patch): void {
-    if (key === "sub") return void ramp(this.subGain.gain, subGain(v as number));
+  override set(key: keyof Patch, v: number | Wave, patch: Patch, at?: number): void {
+    if (key === "sub") return void ramp(this.subGain.gain, subGain(v as number), at);
     if (key === "glide") return void (this.glide = clamp01(v as number)); // from the next note
-    super.set(key, v, patch);
+    super.set(key, v, patch, at);
   }
 
   /** The new wave plays from the next note; the sounding note keeps the old one. */
-  protected setWave(w: Wave): void {
+  protected setWave(w: Wave, at?: number): void {
     if (w === this.wave) return;
     this.wave = w;
-    this.monos.swap(() => new Tone.Synth({ oscillator: { type: w }, envelope: this.env } as Partial<Tone.SynthOptions>));
+    this.monos.swap(() => new Tone.Synth({ oscillator: { type: w }, envelope: this.env } as Partial<Tone.SynthOptions>), at);
   }
 
   protected setEnvelope(p: Patch): void {
@@ -549,14 +567,14 @@ export class Poly extends Instrument {
     this.setWave("sawtooth");
   }
 
-  override set(key: keyof Patch, v: number | Wave, patch: Patch): void {
+  override set(key: keyof Patch, v: number | Wave, patch: Patch, at?: number): void {
     if (key === "detune") {
       // The layers have no Detune dial: they keep G2's fixed spreads (G3 review M4).
       if (!this.opts.fatAll) return;
       this.spread = detuneCents(v as number);
-      return this.polys.each((p) => this.rampSpread(p, this.spread));
+      return this.polys.each((p) => this.rampSpread(p, this.spread, at));
     }
-    super.set(key, v, patch);
+    super.set(key, v, patch, at);
   }
 
   /** Spread of a new voice set: the Detune dial on the Synth; on the layers G2's 22 cents saw, 14 square. */
@@ -569,7 +587,7 @@ export class Poly extends Instrument {
    * fat oscillator's detunes at once, a step in the beating of a held chord. A fat oscillator of
    * `count` voices spreads them evenly from -spread/2 to +spread/2; new voices take the stored spread.
    */
-  private rampSpread(p: Tone.PolySynth, spread: number): void {
+  private rampSpread(p: Tone.PolySynth, spread: number, at?: number): void {
     type Fat = { _spread: number; _oscillators: { detune: Tone.Signal<"cents"> }[] };
     const poly = p as unknown as { _voices: Tone.Synth[]; options: { oscillator: { spread?: number } } };
     poly.options.oscillator.spread = spread;
@@ -578,7 +596,7 @@ export class Poly extends Instrument {
       const subs = fat._oscillators;
       if (!subs || subs.length < 2) continue;
       fat._spread = spread;
-      subs.forEach((o, i) => ramp(o.detune, -spread / 2 + (spread * i) / (subs.length - 1)));
+      subs.forEach((o, i) => ramp(o.detune, -spread / 2 + (spread * i) / (subs.length - 1), at));
     }
   }
 
@@ -601,7 +619,7 @@ export class Poly extends Instrument {
   }
 
   /** The new wave plays from the next note; sounding notes keep the old one and ring out. */
-  protected setWave(w: Wave): void {
+  protected setWave(w: Wave, at?: number): void {
     if (w === this.wave) return;
     this.wave = w;
     this.polys.swap(() => {
@@ -611,7 +629,7 @@ export class Poly extends Instrument {
       } as unknown as Partial<Tone.SynthOptions>);
       p.maxPolyphony = this.maxPolyphony;
       return p;
-    });
+    }, at);
   }
 
   private setEnv(env: { attack: number; decay: number; sustain: number; release: number }): void {
@@ -683,6 +701,7 @@ export class Graph {
   readonly buses: Buses;
   readonly instruments: { drums: Drums; bass: Bass; synth: Poly; layer1: Poly; layer2: Poly };
   private meter: Tone.Meter;
+  private meters = new Map<InstrumentId, Tone.Meter>();
   /** Raw samples after the limiter, for the peak reading (the last 16384, about 0.37 s at 44.1 kHz). */
   private scope: Tone.Analyser;
   private lp: Tone.Filter;
@@ -769,14 +788,35 @@ export class Graph {
     g.linearRampToValueAtTime(1, now + RAMP);
   }
 
-  setMix(key: keyof MixState, v: number): void {
+  /** Pump depth is read by each kick's pump, so it acts from the next kick; the rest ramps from now. */
+  setMix(key: keyof MixState, v: number, at?: number): void {
     if (key === "pump") this.pumpDepth = Math.max(0, Math.min(0.95, v));
-    else if (key === "saturation") ramp(this.sat.wet, Math.max(0, Math.min(1, v)));
+    else if (key === "saturation") ramp(this.sat.wet, Math.max(0, Math.min(1, v)), at);
     else {
       const s = Math.max(-1, Math.min(1, v));
-      ramp(this.lp.frequency, s < 0 ? 20000 * Math.pow(150 / 20000, -s) : 20000);
-      ramp(this.hp.frequency, s > 0 ? 10 * Math.pow(4000 / 10, s) : 10);
+      ramp(this.lp.frequency, s < 0 ? 20000 * Math.pow(150 / 20000, -s) : 20000, at);
+      ramp(this.hp.frequency, s > 0 ? 10 * Math.pow(4000 / 10, s) : 10, at);
     }
+  }
+
+  /** A mix value from audio time `time`, on the audio clock (P3 review E1). */
+  setMixAt(key: keyof MixState, v: number, time: number): void {
+    this.setMix(key, v, time);
+  }
+
+  /**
+   * One instrument's own level in dB, after its level dial and before the sends and buses (P3 review S2): the
+   * shared reverb's tail is not in it. The meter is made on first use (the smoke test).
+   */
+  instrumentLevel(id: InstrumentId): number {
+    let m = this.meters.get(id);
+    if (!m) {
+      m = new Tone.Meter({ smoothing: 0.6 });
+      this.instruments[id].channel.level.connect(m);
+      this.meters.set(id, m);
+    }
+    const v = m.getValue();
+    return typeof v === "number" ? v : v[0];
   }
 
   setGate(id: InstrumentId, on: boolean): void {

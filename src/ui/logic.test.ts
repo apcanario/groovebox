@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LOCK_FROZEN } from "../music/lead.ts";
 import {
   addChord,
+  chipPage,
   GEN_KNOBS,
   LAYER_PATCH_KNOBS,
   PAD_KNOBS,
@@ -314,5 +315,22 @@ describe("record labels (G5)", () => {
     expect(sizeLabel(500)).toBe("1 KB");
     expect(sizeLabel(820 * 1024)).toBe("820 KB");
     expect(sizeLabel(9.6 * 1024 * 1024)).toBe("9.6 MB");
+  });
+});
+
+describe("chipPage (P3 review M8)", () => {
+  const ten = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+  it("up to a row of options is one page with no More", () => {
+    expect(chipPage(ten.slice(0, 5), "c", 5)).toEqual({ pages: 1, page: 0, shown: ["a", "b", "c", "d", "e"], pad: 0 });
+  });
+  it("more than a row pages them four at a time, opening on the chosen value's page", () => {
+    expect(chipPage(ten, null, 5)).toMatchObject({ pages: 3, page: 0, shown: ["a", "b", "c", "d"], pad: 0 });
+    expect(chipPage(ten, "f", 5)).toMatchObject({ page: 1, shown: ["e", "f", "g", "h"] });
+    expect(chipPage(ten, "zz", 5).page).toBe(0);
+  });
+  it("pads the last page so More keeps its place, and wraps", () => {
+    expect(chipPage(ten, "j", 5)).toEqual({ pages: 3, page: 2, shown: ["i", "j"], pad: 2 });
+    expect(chipPage(ten, "j", 5, 3).page).toBe(0);
+    expect(chipPage(ten, null, 5, -1).page).toBe(2);
   });
 });

@@ -351,7 +351,8 @@ const inRange = (v: unknown, lo: number, hi: number): boolean => isNum(v) && v >
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const oneOf = (v: unknown, list: readonly unknown[]): boolean => list.includes(v);
 
-function checkPatch(p: unknown, at: string, errors: string[]): void {
+/** Every problem with a patch (wave and every value in range), pushed onto `errors`. */
+export function checkPatch(p: unknown, at: string, errors: string[]): void {
   if (!isObj(p)) return void errors.push(`${at}: not an object`);
   if (!oneOf(p.wave, WAVES)) errors.push(`${at}.wave: unknown wave`);
   for (const k of PATCH_KEYS) {

@@ -12,6 +12,8 @@ export class Keeper {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private savedLog: EventLog | null;
   private chain: Promise<void> = Promise.resolve();
+  /** startVibe calls, one after another (P3 review S1). */
+  private vibeChain: Promise<void> = Promise.resolve();
   private listeners = new Set<() => void>();
   /** The last save failed (storage full, private mode): the UI says so. */
   failed = false;
@@ -111,7 +113,28 @@ export class Keeper {
    * bar line while playing (at once when stopped), from `section`. The jam it replaces is saved and stays in
    * Songs. Refused while a take is recording or finishing.
    */
-  async startVibe(doc: Song, section: number): Promise<boolean> {
+  startVibe(doc: Song, section: number): Promise<boolean> {
+    return this.startVibeWith(() => ({ doc, section }));
+  }
+
+  /**
+   * As `startVibe`, with the vibe chosen by `pick` once every earlier call has finished (P3 review S1): calls
+   * run one after another, so a second quick tap sees the first one's pending load (and replaces it), and an
+   * arrow steps from the vibe the first tap queued. `pick` returning null takes nothing.
+   */
+  startVibeWith(pick: () => { doc: Song; section: number } | null): Promise<boolean> {
+    const run = this.vibeChain.then(() => {
+      const got = pick();
+      return got ? this.startVibeNow(got.doc, got.section) : false;
+    });
+    this.vibeChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async startVibeNow(doc: Song, section: number): Promise<boolean> {
     const st = this.engine.recordInfo().state;
     if (st === "recording" || st === "finishing") return false;
     // Replaced, not kept: the untouched first-launch song, or a vibe still waiting for its bar line (never heard).

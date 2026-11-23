@@ -105,8 +105,8 @@ export interface Position {
 export interface LandedSwitch {
   bar: number;
   pending: Pending;
-  /** A whole song (a vibe) landed on this bar line: its name and style. */
-  loaded?: { name: string; style?: string };
+  /** A whole song (a vibe) landed on this bar line: its name, style and the bar line's audio time. */
+  loaded?: { name: string; style?: string; at: number };
 }
 
 export class Engine {
@@ -139,7 +139,7 @@ export class Engine {
   /** A song waiting for the next bar line (loadAtBar), with its mix; null when none. */
   private queued: Song | null = null;
   private queuedSection = 0;
-  private landedLoad: { name: string; style?: string } | null = null;
+  private landedLoad: { name: string; style?: string; at: number } | null = null;
   /** Switches applied by the scheduler but not heard yet (the lookahead before their bar line). */
   private inFlight = new InFlight();
   /** Every bar line at which queued switches landed, newest last (kept short). */
@@ -811,6 +811,19 @@ export class Engine {
     return this.graph ? { at: this.graph.instruments[id].padMoveTime(), now: Tone.getContext().currentTime } : null;
   }
 
+  /**
+   * For the smoke test (P3 review E1): an instrument's native resting cutoff in Hz, and the audio clock now;
+   * null before audio starts.
+   */
+  cutoffNow(id: InstrumentId): { hz: number; now: number } | null {
+    return this.graph ? { hz: this.graph.instruments[id].channel.cutoffNative(), now: Tone.getContext().currentTime } : null;
+  }
+
+  /** One instrument's own level in dB, without the shared sends (P3 review S2); -Infinity before audio starts. */
+  instrumentLevel(id: InstrumentId): number {
+    return this.graph ? this.graph.instrumentLevel(id) : -Infinity;
+  }
+
   info(): { sampleRate: number; baseLatencyMs: number; outputLatencyMs: number; hint: string } {
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
     return {
@@ -823,10 +836,18 @@ export class Engine {
 
   // ---- Internals --------------------------------------------------------------------
 
-  private applyAll(): void {
+  /** Apply every patch and the mix: from now, or from audio time `at` (a vibe's bar line, P3 review E1). */
+  private applyAll(at?: number): void {
     const g = this.graph!;
-    for (const id of INSTRUMENTS) g.instruments[id].apply(this.seq.song.patches[id]);
-    for (const k of ["sweep", "pump", "saturation"] as const) g.setMix(k, this.mix[k]);
+    for (const id of INSTRUMENTS) {
+      const p = this.seq.song.patches[id];
+      if (at === undefined) g.instruments[id].apply(p);
+      else g.instruments[id].applyAt(p, at);
+    }
+    for (const k of ["sweep", "pump", "saturation"] as const) {
+      if (at === undefined) g.setMix(k, this.mix[k]);
+      else g.setMixAt(k, this.mix[k], at);
+    }
   }
 
   private tick(time: number): void {
@@ -838,21 +859,18 @@ export class Engine {
     let sixteenth = 60 / bpm / 4;
     let tempo = bpm;
     if (r.loaded && this.queued) {
-      // A vibe lands on this bar line (P3): every held note lets go, and its patches, mix and tempo apply
-      // exactly here, on the audio clock, before this step's notes start (they wait on the same clock).
+      // A vibe lands on this bar line (P3): every held note lets go, and its patches, mix and tempo are
+      // scheduled from `time` on the audio clock (P3 review E1). This tick runs a lookahead early, so every
+      // continuous value ramps from `time`, not from now; the old bar's last notes keep the old sound.
       const doc = this.queued;
       this.queued = null;
       this.takeDocument(doc);
       for (const id of INSTRUMENTS) g.instruments[id].releaseAll(time);
-      const ctx = Tone.getContext();
-      const apply = (): void => this.applyAll();
-      const wait = time - ctx.now() - 0.002;
-      if (wait <= 0) apply();
-      else ctx.setTimeout(apply, wait);
+      this.applyAll(time);
       Tone.getTransport().bpm.setValueAtTime(doc.bpm, time);
       tempo = doc.bpm;
       sixteenth = 60 / tempo / 4;
-      this.landedLoad = { name: doc.name, style: doc.style };
+      this.landedLoad = { name: doc.name, style: doc.style, at: time };
       Tone.getDraw().schedule(() => this.changed(true), time);
     }
     for (const id of r.stopped) g.instruments[id].releaseAll(time);

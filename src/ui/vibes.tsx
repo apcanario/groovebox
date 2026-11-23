@@ -51,7 +51,6 @@ function Tile({ tile, on, onPick }: { tile: VibeTile; on: boolean; onPick: () =>
       aria-label={`${tile.name}: load it and play`}
       onClick={onPick}
     >
-      <i aria-hidden="true" />
       <span>{tile.name}</span>
     </button>
   );
@@ -72,6 +71,8 @@ export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) 
   const st = engine.recordInfo().state;
   const recording = st === "recording" || st === "finishing";
   const rows = Math.ceil(tiles.length / 2);
+  // As in groovebox-6 (P3 review M5): the jam's vibe, or its name for a song with none.
+  const jam = vibeName(song.style) ?? song.name;
   const pick = async (id: string): Promise<void> => {
     setBusy(true);
     try {
@@ -89,10 +90,10 @@ export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) 
         </button>
       </div>
       {canContinue && (
-        <button class="btn vcont" id="vibe-continue" aria-label={`Continue last jam: ${song.name}`} onClick={onClose}>
+        <button class="btn vcont" id="vibe-continue" aria-label={`Continue last jam: ${jam}`} onClick={onClose}>
           <span>Continue last jam</span>
           <small>
-            {stripWord(song.name, CONTINUE_WORD_PX)} · {song.bpm}
+            {vibeName(song.style) ?? stripWord(song.name, CONTINUE_WORD_PX)} · {song.bpm}
           </small>
         </button>
       )}
@@ -117,9 +118,14 @@ export function VibeControl({ ctx, onOpen }: { ctx: Ctx; onOpen: () => void }) {
   const name = vibeName(shown) ?? "Pick a vibe";
   const st = engine.recordInfo().state;
   const recording = st === "recording" || st === "finishing";
+  // The next vibe is worked out when the keeper gets to this tap, from what is queued then, not from this
+  // render (P3 review S1): two quick taps step twice and start one song each, the first replaced unheard.
   const step = (dir: 1 | -1): void => {
-    const id = stepVibe(shown, dir);
-    if (id) void loadVibe(ctx, id, false);
+    void ctx.keeper.startVibeWith(() => {
+      const id = stepVibe(engine.pendingLoad()?.style ?? engine.getSong().style, dir);
+      const doc = id ? vibeSong(id) : null;
+      return id && doc ? { doc, section: vibeStart(id) } : null;
+    });
   };
   return (
     <div class="vibectl">
@@ -127,7 +133,7 @@ export function VibeControl({ ctx, onOpen }: { ctx: Ctx; onOpen: () => void }) {
         <Icon name="chevron_left" />
       </button>
       <button
-        class={`tile vmain on${pending ? " pending" : ""}`}
+        class={`tile vmain ${vibeName(shown) ? "on" : "off"}${pending ? " pending" : ""}`}
         id="vibe-open"
         style={{ "--c": shown && STYLES[shown] ? FAMILY_COLOR[STYLES[shown].family] : "var(--coral)" }}
         aria-label={`Vibe: ${name}${pending ? ", loading on the next bar" : ""}. Tap for all vibes`}

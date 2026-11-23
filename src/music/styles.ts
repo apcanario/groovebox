@@ -4,6 +4,7 @@
  * file in `src/styles/`: the picker, the vibe arrows and the tests list whatever is there. No audio dependency.
  */
 import {
+  checkPatch,
   defaultLayerPattern,
   defaultPatch,
   INSTRUMENTS,
@@ -33,12 +34,20 @@ import { MOODS, NOTE_NAMES } from "./scales.ts";
 
 // ---- Patches -------------------------------------------------------------------------------
 
-const patchData = readData<PatchDef>(import.meta.glob("../data/patches/*.ts", { eager: true }), (p) => {
+/**
+ * What is wrong with a patch file: its name, its instrument, and (P3 review M2) every value range-checked as
+ * the song check does, laid over the instrument's defaults, so an unused patch file is checked too.
+ */
+export function checkPatchDef(p: PatchDef): string[] {
   const out = checkNamed(p);
-  if (!["drums", "bass", "synth", "layer"].includes(p.instrument)) out.push("instrument: unknown");
-  if (!p.values || typeof p.values !== "object") out.push("values: not an object");
+  if (!["drums", "bass", "synth", "layer"].includes(p.instrument)) return [...out, "instrument: unknown"];
+  if (!p.values || typeof p.values !== "object") return [...out, "values: not an object"];
+  const inst: InstrumentId = p.instrument === "layer" ? "layer1" : p.instrument;
+  checkPatch({ ...defaultPatch(inst), ...p.values }, "values", out);
   return out;
-});
+}
+
+const patchData = readData<PatchDef>(import.meta.glob("../data/patches/*.ts", { eager: true }), checkPatchDef);
 
 /** Every patch, in picker order, and each by id. */
 export const PATCH_IDS: readonly string[] = patchData.ids;

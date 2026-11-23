@@ -2,7 +2,7 @@
 import type { ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { Icon, iconThing, type IconThing } from "./icons.tsx";
-import { dragValue, fraction } from "./logic.ts";
+import { chipPage, dragValue, fraction } from "./logic.ts";
 
 
 type PE = PointerEvent & { currentTarget: HTMLElement };
@@ -372,13 +372,9 @@ export function PagedChips<T extends string>({
   /** What the options are, for the More chip's label ("beats"). */
   what: string;
 }) {
-  const per = CHIPS_PER_ROW - 1;
-  const pages = options.length <= CHIPS_PER_ROW ? 1 : Math.ceil(options.length / per);
-  const at = value === null ? -1 : options.indexOf(value);
-  const [page, setPage] = useState(at < 0 || pages === 1 ? 0 : Math.floor(at / per));
+  const [page, setPage] = useState(() => chipPage(options, value, CHIPS_PER_ROW).page);
+  const { pages, page: p, shown, pad } = chipPage(options, value, CHIPS_PER_ROW, page);
   if (pages === 1) return <Chips name={name} options={options} value={value} label={label} onPick={onPick} />;
-  const p = Math.min(page, pages - 1);
-  const shown = options.slice(p * per, p * per + per);
   return (
     <div class="chips" style={{ gridTemplateColumns: `repeat(${CHIPS_PER_ROW}, minmax(0, 1fr))` }}>
       {shown.map((o) => (
@@ -392,7 +388,7 @@ export function PagedChips<T extends string>({
           {label(o)}
         </button>
       ))}
-      {Array.from({ length: per - shown.length }, (_, i) => (
+      {Array.from({ length: pad }, (_, i) => (
         <i key={`gap${i}`} aria-hidden="true" />
       ))}
       <button

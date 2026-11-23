@@ -1629,34 +1629,26 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--gap);
 }
+/* Spec 8.12: names at 800, tight; off is a dark tile with a 4 px edge of its colour, on is filled. */
 .vibe {
   --c: var(--coral);
   min-height: var(--hit);
   min-width: 0;
   border-radius: var(--r);
   background: var(--card);
+  box-shadow: inset 4px 0 0 var(--c);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
+  padding: 0 12px 0 16px;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   text-align: left;
-}
-.vibe i {
-  flex: none;
-  width: 6px;
-  height: 24px;
-  border-radius: var(--r);
-  background: var(--c);
 }
 .vibe.on {
   background: var(--c);
+  box-shadow: none;
   color: var(--bg);
-}
-.vibe.on i {
-  background: var(--bg);
-  opacity: 0.35;
 }
 .vnote {
   flex: none;

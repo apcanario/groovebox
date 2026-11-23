@@ -22,6 +22,7 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C7. Bundle 4 listen item** (23 Nov 2026): the drum lane is about 32 px high at 640 px screen height (recorded choice); say in the notes if it is hard to read.
 - **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
+- **C8. P3 review M1, for P7 (sounds)** (23 Nov 2026): patches are data files (`src/data/patches/`, 22 of them) but no picker lists them; Simple Synth's Sound picker still lists waves. P7 adds a Sound picker per instrument listing `PATCH_IDS` for that instrument (spec 8.2: pickers list whatever exists).
 
 ## By hand (Pedro)
 
