@@ -10,6 +10,7 @@ P1b look (DM Sans only, the spec's icons where its table says, lanes that match 
 in time, sentence case, the motion switch and the states without motion) with no page error, no control under
 48 px and no more than six dials on one screen. P3: the vibe picker opens the app, every vibe loads mid-jam on the bar line
 as a new song and plays every instrument audibly in its groove section, and the vibe arrows step on the bar.
+P5: Layer 1 sounds in each of the five lead styles, and its voice glides and accents notes.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -989,6 +990,41 @@ def walk_c4(page, failures: list) -> None:
     wait_for(page, "window.__groovebox.position().section === 0", 4.0)
 
 
+LEAD_STYLES = ["hook", "phrase", "roll", "drift", "pulse"]  # src/music/lead.ts
+
+
+def walk_p5(page, failures: list) -> None:
+    """P5, on the default song's Groove section: Layer 1's lead in each of the five styles, soloed, makes sound;
+    with Slide and Accent at 1 the layer voice glides notes and opens its filter (per note). Reported, so the
+    levels can be read against Pedro's ear. The layer goes back to what it was."""
+    page.evaluate("window.__groovebox.switchSection(1)")
+    wait_for(page, "window.__groovebox.position().section === 1", 4.0)
+    S = f"{SONG}.sections[1]"
+    saved = page.evaluate(f"{S}.layer1")
+    page.evaluate("()=>window.__groovebox.setLayerMode(1, 'layer1', 'generative')")
+    levels = {}
+    for style in LEAD_STYLES:
+        page.evaluate(f"()=>window.__groovebox.setGen(1, 'layer1', {{style: '{style}', density: 1, slide: 1, accent: 1}})")
+        before = page.evaluate("window.__groovebox.leadMarks('layer1')")
+        levels[style] = solo_level(page, "layer1", seconds=2.5, settle=0.5)
+        after = page.evaluate("window.__groovebox.leadMarks('layer1')")
+        if levels[style] < -50:
+            failures.append(f"P5: Layer 1's {style} lead is silent ({levels[style]:.1f} dB)")
+        if after["glides"] <= before["glides"]:
+            failures.append(f"P5: {style} with Slide at 1 started no glide")
+        if after["accentAt"] <= before["accentAt"]:
+            failures.append(f"P5: {style} with Accent at 1 opened no accent")
+    print("P5, Layer 1 lead solo levels (dB): " + ", ".join(f"{k} {v:.1f}" for k, v in levels.items()))
+    gen = dict(saved["gen"])
+    gen.pop("seed", None)
+    for k in ["style", "slide", "accent"]:
+        gen.setdefault(k, {"style": "pulse", "slide": 0, "accent": 0}[k])
+    page.evaluate("(g)=>window.__groovebox.setGen(1, 'layer1', g)", gen)
+    page.evaluate(f"()=>window.__groovebox.setLayerMode(1, 'layer1', '{saved['mode']}')")
+    page.evaluate("window.__groovebox.switchSection(0)")
+    wait_for(page, "window.__groovebox.position().section === 0", 4.0)
+
+
 def jsround(x: float) -> int:
     """Math.round: halves go up (Python's round goes to even)."""
     return math.floor(x + 0.5)
@@ -1824,6 +1860,7 @@ def main() -> int:
             page.click("#play")
             time.sleep(0.5)
             walk_c4(page, failures)
+            walk_p5(page, failures)
             walk_now(page, failures)
             walk_look(page, failures)
             walk_p2(page, failures)

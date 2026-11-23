@@ -11,7 +11,8 @@
     "check": "tsc --noEmit && vitest run && vite build",
     "smoke": "vite build && python3 tools/smoke.py dist",
     "test": "vitest run",
-    "record-test": "vite build && python3 tools/record_long.py dist 10"
+    "record-test": "vite build && python3 tools/record_long.py dist 10",
+    "leads": "LEAD_PATTERNS=1 vitest run src/music/leadStyles.test.ts -t \"clearly different\" --silent=false"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

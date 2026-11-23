@@ -1,6 +1,6 @@
 /** Song document (spec section 6): types, default song, validation. No audio dependency. */
 import { ARP_DIRECTIONS, type ArpParams } from "../music/arp.ts";
-import type { LeadParams } from "../music/lead.ts";
+import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, type LeadParams } from "../music/lead.ts";
 import {
   BASS_PRESETS,
   DRUM_PATTERNS,
@@ -388,6 +388,12 @@ function checkLayer(l: unknown, at: string, errors: string[]): void {
     if (!inRange(g.rotate, 0, 15)) errors.push(`${at}.gen.rotate: must be 0..15`);
     if (!inRange(g.length, 2, 16)) errors.push(`${at}.gen.length: must be 2..16`);
     if (!isNum(g.seed) || !Number.isInteger(g.seed)) errors.push(`${at}.gen.seed: must be an integer`);
+    // P5: optional, so songs saved before it load as Pulse at its defaults.
+    if (g.style !== undefined && !(LEAD_STYLES as readonly unknown[]).includes(g.style)) errors.push(`${at}.gen.style: unknown`);
+    if (g.shape !== undefined && !(LEAD_SHAPES as readonly unknown[]).includes(g.shape)) errors.push(`${at}.gen.shape: unknown`);
+    if (g.phrase !== undefined && !(PHRASE_BARS as readonly unknown[]).includes(g.phrase)) errors.push(`${at}.gen.phrase: must be 1, 2, 4 or 8`);
+    for (const k of ["range", "register", "noteLength", "variation", "repeats", "slide", "accent"])
+      if (g[k] !== undefined && !inRange(g[k], 0, 1)) errors.push(`${at}.gen.${k}: must be 0..1`);
   }
   if (l.seeds !== undefined) {
     const h = l.seeds;

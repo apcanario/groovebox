@@ -9,14 +9,49 @@
 import { createRng, deriveSeed, type Rng } from "./random.ts";
 import { euclid } from "./rhythm.ts";
 
+/** The lead styles of spec 8.5. Pulse is this file's generator; the others are in `lead*.ts` beside it. */
+export const LEAD_STYLES = ["hook", "phrase", "roll", "drift", "pulse"] as const;
+export type LeadStyle = (typeof LEAD_STYLES)[number];
+
+/** The Shape selector (spec 8.5): the contour the line follows. */
+export const LEAD_SHAPES = ["rise", "fall", "arch", "valley", "zigzag", "flat", "free"] as const;
+export type LeadShape = (typeof LEAD_SHAPES)[number];
+
+/** The Phrase knob: bars before the line repeats or answers itself. */
+export const PHRASE_BARS = [1, 2, 4, 8] as const;
+export type PhraseBars = (typeof PHRASE_BARS)[number];
+
+/**
+ * A layer's lead settings. The six G4 knobs are required; the P5 knobs (spec 8.5) are optional, so songs
+ * saved before P5 load unchanged: a missing value takes its style's default (`leadKnobs` in leadKit.ts),
+ * and a missing style is Pulse, which at its defaults plays exactly what G4 played. Busy is `density`.
+ */
 export interface LeadParams {
   lock: number; // 0..1: 1 frozen, 0 new notes all the time
-  hits: number; // 1..16
-  rotate: number; // 0..15
-  length: number; // 2..16
+  hits: number; // 1..16 (Pulse)
+  rotate: number; // 0..15 (Pulse)
+  length: number; // 2..16 (Pulse)
   tension: number; // 0..1: 0 chord tones, 0.5 scale tones, 1 passing (non-chord scale) tones
-  density: number; // 0..1: chance each hit plays
+  density: number; // 0..1: Busy, how many notes play (Pulse: chance each hit plays)
   seed: number;
+  style?: LeadStyle;
+  shape?: LeadShape;
+  range?: number; // 0..1: half an octave to three octaves
+  register?: number; // 0..1: low, middle, high
+  noteLength?: number; // 0..1: short and clipped to long and overlapping
+  phrase?: PhraseBars;
+  variation?: number; // 0..1
+  repeats?: number; // 0..1
+  slide?: number; // 0..1
+  accent?: number; // 0..1
+}
+
+/** Where Pulse may bend its pitch choice: the window and, with a Shape other than Free, the contour height. */
+export interface PulseShape {
+  lo: number;
+  hi: number;
+  /** 0..1: where the shape puts the line at this step; undefined for Free. */
+  contour?: number;
 }
 
 export interface LeadContext {
@@ -131,7 +166,7 @@ export class GenerativeLead {
   }
 
   /** Advance one sixteenth. `barStep` is the position in the bar (0..15). */
-  step(barStep: number, p: LeadParams, ctx: LeadContext): LeadNote | null {
+  step(barStep: number, p: LeadParams, ctx: LeadContext, shape?: PulseShape): LeadNote | null {
     const length = Math.max(2, Math.min(16, Math.round(p.length)));
     if (barStep === 0) {
       this.prevBarStart = this.barStart;
@@ -147,11 +182,12 @@ export class GenerativeLead {
     }
     const slot = this.slots[index];
     if (slot.roll >= p.density) return null;
-    return { midi: pickPitch(slot, p.tension, ctx), vel: 0.6 + 0.3 * slot.roll };
+    return { midi: pickPitch(slot, p.tension, ctx, shape), vel: 0.6 + 0.3 * slot.roll };
   }
 }
 
-function pickPitch(slot: Slot, tension: number, ctx: LeadContext): number {
+/** Without `shape` (or at Pulse's defaults) this is G4's pick, note for note. */
+function pickPitch(slot: Slot, tension: number, ctx: LeadContext, shape?: PulseShape): number {
   const t = Math.max(0, Math.min(1, tension));
   const chordSet = new Set(ctx.chordTones);
   const passing = ctx.scale.filter((pc) => !chordSet.has(pc));
@@ -160,6 +196,12 @@ function pickPitch(slot: Slot, tension: number, ctx: LeadContext): number {
   else pcs = passing;
   if (pcs.length === 0) pcs = ctx.scale;
   const pool: number[] = [];
-  for (let m = LEAD_RANGE.lo; m <= LEAD_RANGE.hi; m++) if (pcs.includes(m % 12)) pool.push(m);
-  return pool[Math.min(pool.length - 1, Math.floor(slot.pitch * pool.length))];
+  const lo = shape?.lo ?? LEAD_RANGE.lo;
+  const hi = shape?.hi ?? LEAD_RANGE.hi;
+  for (let m = lo; m <= hi; m++) if (pcs.includes(m % 12)) pool.push(m);
+  // A narrow window can miss every note of the pool (passing tones of a 9th chord): it widens by fifths.
+  for (let w = 7; pool.length === 0; w += 7) for (let m = lo - w; m <= hi + w; m++) if (pcs.includes(((m % 12) + 12) % 12)) pool.push(m);
+  // A Shape other than Free pulls the pick toward the contour, keeping a third of the slot's own choice.
+  const h = shape?.contour === undefined ? slot.pitch : Math.min(0.999, 0.35 * slot.pitch + 0.65 * shape.contour);
+  return pool[Math.min(pool.length - 1, Math.floor(h * pool.length))];
 }

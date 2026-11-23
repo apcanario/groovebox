@@ -5,7 +5,8 @@
  */
 import { ARP_DIRECTIONS, arpNote, type ArpParams } from "../music/arp.ts";
 import { buildChord, type Chord } from "../music/chords.ts";
-import { GenerativeLead, nextSeed, type LeadParams, type LeadStepView } from "../music/lead.ts";
+import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, nextSeed, type LeadParams, type LeadStepView } from "../music/lead.ts";
+import { Lead } from "../music/leadStyles.ts";
 import {
   BASS_PRESETS,
   BASS_RHYTHMS,
@@ -68,6 +69,12 @@ export type NoteEvent =
       len: number;
       vel: number;
       shift: number;
+      /** Lead only (P5): the previous note slides into this one from this MIDI note. */
+      glideFrom?: number;
+      /** Lead only (P5): louder (in `vel`) and brighter. */
+      accent?: boolean;
+      /** Lead only (P5): a quick double (2) or triple (3) inside the first sixteenth. */
+      repeat?: number;
     };
 
 export interface StepResult {
@@ -202,7 +209,7 @@ export class Sequencer {
    * Generative leads by section and layer ("2:layer1"). A section entered again keeps its notes
    * (rewound to the bar); Play, a load and a section insert or delete start every lead from its seed.
    */
-  private leads = new Map<string, GenerativeLead>();
+  private leads = new Map<string, Lead>();
   private arpIndex = new Map<LayerInstrument, number>();
   private arpRng = new Map<LayerInstrument, Rng>();
   /** Instruments that were sounding at the previous step. */
@@ -366,29 +373,45 @@ export class Sequencer {
   }
 
   /**
-   * Change the generative knobs (not the seed). The lead keeps its notes: only Lock rewrites them,
-   * so moving Hits, Rotate, Length, Tension or Density never draws a new melody.
+   * Change the lead knobs (not the seed). The lead keeps its random draws: only Lock rewrites them, so a knob
+   * reshapes the same line (Pulse: Hits, Rotate, Length, Tension or Busy never draw a new melody). P5 adds the
+   * style, the shared knobs of spec 8.5 (0..1) and the Shape and Phrase selectors.
    */
   setGen(section: number, id: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
     const s = this.song.sections[section];
     if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
-    const ranges: Record<Exclude<keyof LeadParams, "seed">, [number, number, boolean]> = {
+    const ranges: Record<string, [number, number, boolean]> = {
       lock: [0, 1, false],
       hits: [1, 16, true],
       rotate: [0, 15, true],
       length: [2, 16, true],
       tension: [0, 1, false],
       density: [0, 1, false],
+      range: [0, 1, false],
+      register: [0, 1, false],
+      noteLength: [0, 1, false],
+      variation: [0, 1, false],
+      repeats: [0, 1, false],
+      slide: [0, 1, false],
+      accent: [0, 1, false],
     };
-    const g = { ...s[id].gen };
-    for (const k of Object.keys(values) as (keyof typeof ranges)[]) {
+    // The P5 selectors: a style, a shape, a phrase of 1, 2, 4 or 8 bars.
+    const choices: Record<string, readonly unknown[]> = { style: LEAD_STYLES, shape: LEAD_SHAPES, phrase: PHRASE_BARS };
+    const g: Record<string, unknown> = { ...s[id].gen };
+    for (const k of Object.keys(values)) {
+      const raw = (values as Record<string, unknown>)[k];
+      if (k in choices) {
+        if (!choices[k].includes(raw)) return false;
+        g[k] = raw;
+        continue;
+      }
       if (!(k in ranges)) return false;
       const [lo, hi, int] = ranges[k];
-      const v = num(values[k], lo, hi, int);
+      const v = num(raw, lo, hi, int);
       if (v === null) return false;
       g[k] = v;
     }
-    s[id].gen = g;
+    s[id].gen = g as unknown as LeadParams;
     return true;
   }
 
@@ -436,7 +459,7 @@ export class Sequencer {
     const s = this.song.sections[section];
     if (!s) return [];
     const lead = this.leads.get(`${section}:${id}`);
-    const view = lead && lead.seedValue === s[id].gen.seed ? lead : new GenerativeLead(s[id].gen.seed);
+    const view = lead && lead.seedValue === s[id].gen.seed ? lead : new Lead(s[id].gen.seed);
     return view.preview(s[id].gen, shownStep);
   }
 
@@ -823,13 +846,23 @@ export class Sequencer {
       // Made mid-bar (New idea, Back while playing): it runs silently through the steps before this one, so it
       // stands as if it had begun at the bar line, mutations included (G4 review M1). Back pressed mid-bar then
       // plays the old lead note for note from the next bar line (P2 review M1).
-      lead = new GenerativeLead(p.gen.seed);
+      lead = new Lead(p.gen.seed);
       for (let s = 0; s < step; s++) lead.step(s, p.gen, ctx);
       this.leads.set(key, lead);
     }
     const note = lead.step(step, p.gen, ctx);
     if (!note) return null;
-    return { inst: id, mode: "generative", notes: [note.midi], len: 0.8, vel: note.vel, shift };
+    return {
+      inst: id,
+      mode: "generative",
+      notes: [note.midi],
+      len: note.len,
+      vel: note.vel,
+      shift,
+      ...(note.glideFrom !== undefined ? { glideFrom: note.glideFrom } : {}),
+      ...(note.accent ? { accent: true } : {}),
+      ...(note.repeat ? { repeat: note.repeat } : {}),
+    };
   }
 
   private applyPending(p: Pending): void {

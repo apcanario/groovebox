@@ -180,6 +180,26 @@ class Channel {
     return lo * Math.pow(hi / lo, Math.max(0, Math.min(1, x)));
   }
 
+  /** Audio time of the last accent's filter boost (-1 before the first), for the smoke test. */
+  accentAt = -1;
+
+  /**
+   * An accented note (P5, spec 8.5): the filter opens by up to an octave at `time` and settles back over about
+   * 0.15 s, through the filter's detune, so the cutoff (the XY pad) is never touched. Never past the channel's
+   * top (10 kHz, C1). Both moves are setTargetAtTime curves from whatever value the detune has: no step.
+   */
+  accent(time: number): void {
+    const base = this.cutoffHz(this.cutoffValue);
+    const cents = Math.max(0, Math.min(1200, 1200 * Math.log2(this.hz[1] / base)));
+    if (cents <= 0) return;
+    const p = nativeParam(this.filter.detune);
+    const t = Math.max(time, Tone.getContext().currentTime);
+    p.cancelScheduledValues(t);
+    p.setTargetAtTime(cents, t, 0.004);
+    p.setTargetAtTime(0, t + 0.025, 0.05);
+    this.accentAt = t;
+  }
+
   /** Native resting cutoff in Hz (the envelope's base where there is one), for the smoke test (P3 review E1). */
   cutoffNative(): number {
     return nativeValue(this.envBase ? this.envBase.addend : this.filter.frequency);
@@ -681,11 +701,34 @@ export class Poly extends Instrument {
     return this.pad ? nativeValue(this.pad.filter.frequency) : null;
   }
 
-  trigger(notes: number[], dur: number, time: number, vel: number): void {
+  /** Glides started (P5), for the smoke test. */
+  glides = 0;
+
+  /**
+   * `lead` (P5, layers in Lead mode): `glideFrom` starts the note's pitch at that MIDI note and slides it to its
+   * own over `glide` seconds (only this voice: the others keep their pitch); `accent` opens the filter for it.
+   */
+  trigger(notes: number[], dur: number, time: number, vel: number, lead?: { glideFrom?: number; glide?: number; accent?: boolean }): void {
     this.atTime(time, () => {
       this.polys.retireIf((p) => p.activeVoices === 0);
-      this.polys.live!.synth.triggerAttackRelease(notes.map(midiToHz), dur, time, vel);
+      const poly = this.polys.live!.synth;
+      poly.triggerAttackRelease(notes.map(midiToHz), dur, time, vel);
       this.channel.triggerEnv(time, dur, this.env);
+      if (lead?.accent) this.channel.accent(time);
+      if (lead?.glideFrom !== undefined && notes.length === 1) {
+        // The voice just started is the last one PolySynth listed (it starts synchronously at or after now).
+        const active = (poly as unknown as { _activeVoices: { voice: Tone.Synth }[] })._activeVoices;
+        const voice = active[active.length - 1]?.voice;
+        if (voice) {
+          const f = nativeParam(voice.frequency);
+          const t = Math.max(time, Tone.getContext().currentTime);
+          const g = Math.max(0.01, lead.glide ?? 0.06);
+          f.cancelScheduledValues(t);
+          f.setValueAtTime(midiToHz(lead.glideFrom), t);
+          f.exponentialRampToValueAtTime(midiToHz(notes[0]), t + g);
+          this.glides++;
+        }
+      }
     });
   }
 

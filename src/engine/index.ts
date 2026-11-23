@@ -58,7 +58,7 @@ export {
 export { ARP_DIRECTIONS, type ArpDirection, type ArpParams } from "../music/arp.ts";
 export { MACROS, type MacroDef, type MacroId, type MacroInstrument } from "../music/macros.ts";
 export { macroPosition } from "./macro.ts";
-export { LOCK_FROZEN, type LeadParams, type LeadStepView } from "../music/lead.ts";
+export { LEAD_SHAPES, LEAD_STYLES, LOCK_FROZEN, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStepView, type LeadStyle, type PhraseBars } from "../music/lead.ts";
 export type { Pending, PendingChords, PendingToggle } from "./queue.ts";
 export type { LaneBar, LaneNote, LaneNotes } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
@@ -561,7 +561,7 @@ export class Engine {
     return ok;
   }
 
-  /** The six generative knobs. The lead keeps its notes; only Lock rewrites them. */
+  /** The lead's knobs (P5: style, Shape, Phrase and the 0..1 knobs of spec 8.5 too). Only Lock draws new notes. */
   setGen(section: number, layer: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
     const ok = this.seq.setGen(section, layer, values);
     if (!ok) return false;
@@ -796,6 +796,13 @@ export class Engine {
     return this.graph ? this.graph.attacks() : 0;
   }
 
+  /** For the smoke test (P5): a layer's lead glides started and the audio time of its last accent (-1: none). */
+  leadMarks(id: LayerInstrument): { glides: number; accentAt: number } | null {
+    if (!this.graph) return null;
+    const l = this.graph.instruments[id];
+    return { glides: l.glides, accentAt: l.channel.accentAt };
+  }
+
   /** Native value of a drum voice's level gain (its trim times its dial). */
   drumGain(voice: DrumVoice): number | null {
     return this.graph ? this.graph.instruments.drums.levelGain(voice) : null;
@@ -911,8 +918,18 @@ export class Engine {
         case "synth":
           g.instruments.synth.trigger(e.notes, e.len * sixteenth, t, e.vel);
           break;
-        default:
-          g.instruments[e.inst].trigger(e.notes, e.len * sixteenth, t, e.vel);
+        default: {
+          // Lead notes (P5): a slide glides over most of a sixteenth (at most 90 ms); a repeat splits the
+          // first sixteenth into two or three quick hits, the last of which holds the rest of the note.
+          const glide = Math.min(0.09, 0.8 * sixteenth);
+          const lead = e.glideFrom !== undefined || e.accent ? { glideFrom: e.glideFrom, glide, accent: e.accent } : undefined;
+          const n = e.repeat && e.repeat > 1 ? e.repeat : 1;
+          const sub = sixteenth / n;
+          for (let r = 0; r < n; r++) {
+            const dur = r < n - 1 ? 0.6 * sub : Math.max(0.6 * sub, e.len * sixteenth - r * sub);
+            g.instruments[e.inst].trigger(e.notes, dur, t + r * sub, r === 0 ? e.vel : 0.85 * e.vel, r === 0 ? lead : undefined);
+          }
+        }
       }
     }
     if (r.applied) {
