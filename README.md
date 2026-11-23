@@ -26,8 +26,9 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, P1, P1b and P2, 22 and 23 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1, P1b, P2 and P3, 22 and 23 Nov 2026):
 
+- **Vibes (P3):** eight complete starting grooves, one data file each (Deep house, Tropical house, Deep techno, Melodic techno, Drum and bass, 2-step, Lo-fi, Ambient), each with four arranged sections. The vibe picker opens the app (Continue last jam first); a tap loads the vibe as a new song and plays, landing on the next bar with its sounds, mix and tempo. On the Simple Play tab the vibe control steps with an arrow each side, the middle opens the picker. New jam opens the picker, also while playing. Tempo runs 60 to 180. Beats, bass and synth rhythms, moods and patches are data files too, and pickers list whatever exists.
 - **One frame on every tab (P1):** header (New jam, Songs, Simple/Advanced), content, one row of sections, a transport bar with four beat lights and the bar counter, then the tab bar. Tapping a section plays it from the next bar; holding one opens its sheet. Nothing scrolls, and text shrinks to fit its tile.
 - **Simple and Advanced (P2):** one switch in the header, remembered, Simple on first launch. Simple instrument tabs have one picker, four macro dials and the XY pad, in plain words; Simple Layer tabs have Busy, Evolve, Bright and Space. Advanced has every control, and every Simple move shows there. Switching changes nothing you hear. New idea and Back on both layers keep the last eight seeds, and Back restores the earlier lead note for note.
 - **The look (P1b):** flat, 3 px corners, a hatched frame on anything queued for the next bar, square-cut dials with ticks, a dot-grid XY pad, DM Sans only, Material line icons beside the words. Each instrument shows the bar it is playing as a lane of notes under one playhead, five lanes together in Simple's Now view and one above the controls on each instrument tab. Motion marks what sounds and what is queued; it stops with the phone's reduce-motion setting or the Moving/Still switch on the Mix tab, and every state still reads by fill and hatching.
@@ -51,8 +52,8 @@ Built and live on the link above (rows G0 to G5, P1, P1b and P2, 22 and 23 Nov 2
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
-**Phase 2** (rows P3 to P11)
-- **Vibes:** 24 complete starting grooves (Deep house, Deep techno, Lo-fi, Drum and bass, Ambient, Drone, Trance and more). One tap loads tempo, chords, beat, bass, sounds, leads and four arranged sections, and it plays.
+**Phase 2** (rows P4 to P11)
+- **Sixteen more vibes** (P8), to make 24: Drone, Trance, Acid house, Dubstep and more.
 - **Simple chords:** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting) and tap a progression. No scales or chord names needed.
 - **Four more lead styles** beside the current one: Hook, Phrase, Roll and Drift, shaped by twelve knobs (among them Shape, Range, Register, Note length, Phrase, Variation, Slide and Accent), with New idea and Back buttons.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
@@ -79,8 +80,8 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b, P2 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced | Done |
-| P3 to P11 | Phase 2: vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
+| G0 to G5, P1, P1b, P2, P3 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker | Done |
+| P4 to P11 | Phase 2: vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |

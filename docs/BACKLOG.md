@@ -5,7 +5,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | Bundle | Rows | What you get |
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
-| 5 | P3, P4, P5, P6 | Eight vibes, Simple chords, five lead styles |
+| 5 | P3 (Done), P4, P5, P6 | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
@@ -23,6 +23,7 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
 - **C8. P3 review M1, for P7 (sounds)** (23 Nov 2026): patches are data files (`src/data/patches/`, 22 of them) but no picker lists them; Simple Synth's Sound picker still lists waves. P7 adds a Sound picker per instrument listing `PATCH_IDS` for that instrument (spec 8.2: pickers list whatever exists).
+- **C9. 24-tile picker does not fit at 360 x 640** (P3 review, 23 Nov 2026), for P8: 12 rows of 48 px with gaps plus Continue last jam needs at least 648 px, so the spec's no-scroll rule and 48 px rule conflict at 24 tiles. Reviewer's proposal: no title or Close row, 1 px gap only under 648 px screen height (636 px total). P8 edits spec 8.6 accordingly and adds a smoke check at 24 tiles.
 
 ## By hand (Pedro)
 
@@ -45,18 +46,6 @@ All rows of this bundle are Done. The player's check of the bundle is in `docs/r
 ## Bundle 5: phase 2, vibes, chords and leads
 
 Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
-
-### P3. Styles
-
-- Spec 8.2: the style format as one data file per style under `src/styles/`, and the first eight styles, each a complete groove with four arranged sections: Deep house, Tropical house, Deep techno, Melodic techno, Drum and bass, 2-step, Lo-fi, Ambient. The other sixteen come in P8.
-- The beats, bass rhythms and patches those eight need, as data, using the engine as it is.
-- Bpm range 60 to 180.
-- The vibe control on the Simple Play tab (spec 8.6): current vibe with an arrow each side, arrows step on the next bar, the middle opens the picker.
-- The vibe picker as the opening screen: a two-column grid that fits all 24 tiles on one screen without scrolling (unbuilt styles are not shown until they exist), Continue last jam first; New jam from style in the header; loading lands on the next bar; a vibe loads as a new song, so the jam it replaces stays in Songs.
-- New jam is disabled while playing since P1 (review M1); this row enables it, since a vibe loads as a new song.
-- Move the existing presets (moods, drum presets, bass and synth rhythms) to data files in the same way, with pickers that list whatever exists.
-
-**Done when:** each of the eight styles loads and plays with every instrument audible in its groove section (smoke test loops all of them); adding another style is one new file and no other change (shown by a test fixture); loading a style mid-jam lands on the bar; `check` and `smoke` pass. Whether each style sounds like its name is Pedro's call.
 
 ### P4. Simple chords
 
@@ -224,3 +213,4 @@ Kept here so no row disappears without a record.
 - **P1. The frame** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 5 minor, all applied except M1 and M2, which belong to P3 and P2 and stay in those rows), pushed. Report in `docs/reviews/P1.md`.
 - **P1b. The look** (23 Nov 2026). Built, reviewed (fix: 1 error, 4 should-fix, 11 minor, all applied), pushed. Report in `docs/reviews/P1b.md`. Whether it has the wow is Pedro's call.
 - **P2. Simple and Advanced** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 8 minor, all applied except Busy silent in Pad and bass Punch without drive, kept as choices), pushed. Report in `docs/reviews/P2.md`. C4 cleared. Bundle 4 is done.
+- **P3. Styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 8 minor, all applied; the error was a vibe's sounds and mix landing 0.1 s before the bar line), pushed. Report in `docs/reviews/P3.md`.
