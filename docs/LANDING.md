@@ -2,13 +2,15 @@
 
 This file exists only on the branch `plan`. It tells one fresh Opus agent, the **lander**, how to put the phase 2 and 3 plan onto `main`. The main chat reads nothing but this heading and the last section; it launches the lander with "follow `docs/LANDING.md` on `origin/plan` to the letter; reply in six lines or fewer".
 
-The branch `plan` is one commit on top of `main` as it was at `ffc6939` (bundles 1 to 3 built, G5 not started). `main` has moved since: the G5 chat changed some of the same documents. A shallow clone cannot merge the two branches, so the landing is done file by file.
+The branch `plan` sits directly on top of `main` as it was at `ffc6939` (bundles 1 to 3 built, G5 not started). `main` has moved since: the G5 chat changed some of the same documents. A shallow clone cannot merge the two branches, so the landing is done file by file.
 
 ## 1. Fetch
 
 ```
-git fetch --depth=1 origin plan
+git fetch --depth=1 origin plan:refs/remotes/origin/plan
 ```
+
+The plain form, `git fetch origin plan`, does not create `origin/plan` in a shallow clone; use the line above exactly.
 
 Do not run `git merge`. If `README.md` already exists on `main` with a line reading "Landed: plan", the plan is already landed: stop and say so.
 
@@ -31,7 +33,7 @@ git show origin/plan:docs/SPEC.md > /tmp/plan-SPEC.md
 git merge-file docs/SPEC.md docs/landing-base/SPEC.md /tmp/plan-SPEC.md
 ```
 
-(and the same for the others; `CLAUDE.md`'s base is `docs/landing-base/CLAUDE.md`). `git merge-file` exits with the number of conflicts and leaves markers. Resolve every one by these rules:
+(and the same for the others; `CLAUDE.md`'s base is `docs/landing-base/CLAUDE.md`). `git merge-file` exits with the number of conflicts and leaves markers. A dry run against a simulated G5 gave no conflict in `SPEC.md`, `RUN.md` and `CLAUDE.md`, one in `BACKLOG.md` (the whole block of bundles, where the plan's side is the one to keep) and one in `CHANGELOG.md` (keep both lines). Resolve every one by these rules:
 
 - **`docs/SPEC.md`:** keep everything the plan added (sections 8 and 9, the "No samples" lines). Keep anything G5 changed in sections 1 to 7. Where both changed the same line, keep G5's fact and the plan's rule, written as one line.
 - **`docs/BACKLOG.md`:** the plan's bundle table and bundles 4 to 9 stay exactly as the plan has them. From `main` keep: every Carried item, every By-hand item, and the Done list. If `main` shows G5 as Done, delete the plan's "## Save and record" section and make sure G5 is in Done with `main`'s wording. If G5 is not Done on `main`, keep that section as it is. Row G6 lives in bundle 7 only; remove any other copy.
