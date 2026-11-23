@@ -26,6 +26,7 @@ import {
   knobText,
   knobValue,
   leadCellClass,
+  sectionLetter,
   shownPage,
   withFilterPage,
   type PageDef,
@@ -79,6 +80,7 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const octs = ARP_OCTAVES.map(String);
   return (
     <>
+      <div class="glabel">Direction</div>
       <Chips
         name="arpdir"
         options={ARP_DIRECTIONS}
@@ -87,20 +89,26 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
         onPick={(d) => engine.setArp(edit, id, { direction: d })}
       />
       <div class="arprow">
-        <Chips
-          name="arprate"
-          options={rates}
-          value={String(arp.rate)}
-          label={(r) => ARP_RATE_LABEL[Number(r)]}
-          onPick={(r) => engine.setArp(edit, id, { rate: Number(r) as 1 | 2 | 4 })}
-        />
-        <Chips
-          name="arpoct"
-          options={octs}
-          value={String(arp.octaves)}
-          label={(o) => `${o} oct`}
-          onPick={(o) => engine.setArp(edit, id, { octaves: Number(o) as 1 | 2 | 3 })}
-        />
+        <div class="group">
+          <div class="glabel">Rate</div>
+          <Chips
+            name="arprate"
+            options={rates}
+            value={String(arp.rate)}
+            label={(r) => ARP_RATE_LABEL[Number(r)]}
+            onPick={(r) => engine.setArp(edit, id, { rate: Number(r) as 1 | 2 | 4 })}
+          />
+        </div>
+        <div class="group">
+          <div class="glabel">Octaves</div>
+          <Chips
+            name="arpoct"
+            options={octs}
+            value={String(arp.octaves)}
+            label={(o) => `${o} oct`}
+            onPick={(o) => engine.setArp(edit, id, { octaves: Number(o) as 1 | 2 | 3 })}
+          />
+        </div>
       </div>
       <div class="dials n1">
         <Dial
@@ -147,6 +155,10 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
   const patch = song.patches[id];
   return (
     <>
+      <div class="glabel split">
+        <span>Wave</span>
+        {roomy && mode === "pad" && <span>Attack and release: the Pad page</span>}
+      </div>
       <Chips
         name="wave"
         options={WAVES}
@@ -154,7 +166,6 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
         label={(w) => WAVE_LABEL[w]}
         onPick={(w) => engine.setParam(id, "wave", w)}
       />
-      {roomy && mode === "pad" && <p class="note">In Pad mode the Pad page's attack and release shape the chord.</p>}
       <div class="dials n5">
         {LAYER_PATCH_KNOBS.map((k) => (
           <Dial
@@ -181,7 +192,8 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const [chosen, setPage] = useState<LayerPage>("pattern");
   const layer = ctx.song.sections[edit][id];
   const base: PageDef<LayerPage>[] = [
-    ["pattern", LAYER_MODE_LABEL[layer.mode]],
+    // On a short screen the name row gives way: the page chip names the edited section, as on Chords.
+    ["pattern", roomy ? LAYER_MODE_LABEL[layer.mode] : `${LAYER_MODE_LABEL[layer.mode]} · ${sectionLetter(edit)}`],
     ["sound", "Sound"],
   ];
   const pages = withFilterPage(base, roomy);

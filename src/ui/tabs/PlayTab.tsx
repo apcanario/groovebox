@@ -3,30 +3,20 @@
  * turns one on or off at the next bar, a hold opens its tab (P1b turns the tiles into lanes).
  * Advanced, "Song": instruments by sections, sitting on the section strip, which is its column labels.
  */
-import { INSTRUMENTS, type InstrumentId, type Song } from "../../engine/song.ts";
+import { INSTRUMENTS, type InstrumentId } from "../../engine/song.ts";
 import type { Ctx } from "../App.tsx";
 import { useLongPress } from "../components.tsx";
-import { LAYER_MODE_TITLE, PRESET_LABEL, sectionLetter } from "../logic.ts";
+import { nowTile, sectionLetter } from "../logic.ts";
 import { INST_COLOR, INST_NAME } from "../theme.tsx";
 
-/** What an instrument plays in a section, in a word or two. */
-function plays(song: Song, sec: number, id: InstrumentId): string {
-  const s = song.sections[sec];
-  if (id === "drums") return s.drums.grid ? `${PRESET_LABEL[s.drums.preset]}, edited` : PRESET_LABEL[s.drums.preset];
-  if (id === "bass") return PRESET_LABEL[s.bass.rhythm];
-  if (id === "synth") return PRESET_LABEL[s.synth.rhythm];
-  return LAYER_MODE_TITLE[s[id].mode];
-}
-
 function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
-  const { engine, song, pending, playing, pos } = ctx;
-  const on = song.sections[playing].on[id];
-  const queued = pending.toggles.some((t) => t.section === playing && t.instrument === id);
+  const { engine, song, pending, pos } = ctx;
+  // Read the section the tap toggles (the scheduler's), not the one heard, which lags it at a switch.
+  const { on, queued, sub } = nowTile(song, engine.schedulerSection(), pending, id, pos.playing);
   const press = useLongPress(
     () => engine.toggleInstrumentInPlaying(id),
     () => ctx.goTab(id),
   );
-  const sub = queued && pos.playing ? "Next bar" : plays(song, playing, id);
   return (
     <button
       class={`tile now-tile${on ? " on" : ""}${queued ? " pending" : ""}`}

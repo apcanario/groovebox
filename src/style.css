@@ -337,6 +337,27 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
 }
+/* A group heading over a chip row (spec 8.12, small labels): one line, sentence case. */
+.glabel {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.glabel.split {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
 .label {
   font-family: var(--mono);
   font-size: 11px;
@@ -427,9 +448,9 @@ button:disabled {
 .playtab.song {
   justify-content: flex-end;
 }
-/* Rows of up to 72 px that give way on a short screen, never under 48. */
+/* Rows of up to 96 px that give way on a short screen, never under 48. */
 .grid {
-  flex: 0 1 384px;
+  flex: 0 1 504px;
   min-height: 0;
   display: grid;
   gap: 6px;
@@ -794,10 +815,15 @@ button:disabled {
 .xy .ly {
   top: 10px;
 }
+/* The readout is drawn over the dot, on a dark backing, so the dot never hides it. */
 .xy .rv {
   position: absolute;
-  right: 12px;
-  bottom: 8px;
+  z-index: 1;
+  right: 8px;
+  bottom: 6px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
   font-family: var(--mono);
   font-size: 12px;
   color: var(--dim);

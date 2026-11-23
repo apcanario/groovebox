@@ -31,10 +31,17 @@ import {
   removeChord,
   replaceChord,
   stripState,
+  stripWord,
+  STRIP_WORD_PX,
+  textPx,
+  plays,
+  nowTile,
   sweepLabel,
 } from "./logic.ts";
 import { NOTE_NAMES } from "../music/scales.ts";
-import { PATCH_KEYS } from "../engine/song.ts";
+import { defaultSong, PATCH_KEYS } from "../engine/song.ts";
+import { Sequencer } from "../engine/sequencer.ts";
+import { InFlight } from "../engine/queue.ts";
 
 const seq = [
   { degree: 0, bars: 1 as const },
@@ -154,6 +161,74 @@ describe("section strip", () => {
   it("stopped: the start section shows its name, never Next bar", () => {
     expect(stripState(0, { chosen: null, playing: 0, running: false, queued: 2, name: "Intro" }).sub).toBe("Intro");
     expect(stripState(2, { chosen: null, playing: 0, running: false, queued: 2, name: "Break" }).sub).toBe("Break");
+  });
+});
+
+describe("strip word (P1 fix E1)", () => {
+  it("keeps a name that fits the narrowest tile", () => {
+    for (const n of ["Intro", "Groove", "Break", "Outro", "Section D", "Next bar", "Playing", "Editing"]) {
+      expect(stripWord(n)).toBe(n);
+      expect(textPx(n)).toBeLessThanOrEqual(STRIP_WORD_PX);
+    }
+  });
+  it("cuts a long or wide name to fit, ending in an ellipsis", () => {
+    for (const n of ["Breakdown 2", "W".repeat(12), "M".repeat(12), "mmmmmmmmmmmm", "@@@@@@@@@@@@", "ドラムブレイクです"]) {
+      const w = stripWord(n);
+      expect(w.endsWith("…")).toBe(true);
+      expect(textPx(w.slice(0, -1)) + 6).toBeLessThanOrEqual(STRIP_WORD_PX);
+      expect(n.startsWith(w.slice(0, -1))).toBe(true);
+    }
+    expect(stripWord("Breakdown 2")).toBe("Breakdo…");
+    expect(stripWord("WWWWWWWWWWWW")).toBe("WWWW…");
+  });
+  it("keeps at least one letter and drops a trailing space before the ellipsis", () => {
+    expect(stripWord("WWWWW", 5)).toBe("W…");
+    expect(stripWord("Big drop zone")).toBe("Big drop…");
+  });
+  it("the strip shows the cut word", () => {
+    const base = { chosen: null, playing: 1, running: true, queued: null };
+    expect(stripState(0, { ...base, name: "W".repeat(12) }).sub).toBe("WWWW…");
+  });
+});
+
+describe("plays (P1 fix M4)", () => {
+  it("names a preset, an edited preset, a rhythm and a layer mode", () => {
+    const song = defaultSong();
+    expect(plays(song, 0, "drums")).toBe("4/4");
+    song.sections[0].drums.grid = { kick: Array(16).fill(0) } as unknown as NonNullable<(typeof song.sections)[0]["drums"]["grid"]>;
+    expect(plays(song, 0, "drums")).toBe("4/4, edited");
+    expect(plays(song, 2, "bass")).toBe("Long");
+    expect(plays(song, 1, "synth")).toBe("Stabs");
+    expect(plays(song, 0, "layer1")).toBe("Lead");
+    expect(plays(song, 2, "layer1")).toBe("Arp");
+  });
+});
+
+describe("Now tile (P1 fix S2)", () => {
+  it("a tap within the lookahead after a switch lands shows Next bar on the tile it toggled", () => {
+    const song = defaultSong();
+    const seq = new Sequencer(song);
+    const inFlight = new InFlight();
+    seq.start();
+    seq.switchSection(2); // Break
+    // The scheduler runs bar 0 and applies the switch on the first step of bar 1, a lookahead before it sounds.
+    for (let k = 0; k < 17; k++) {
+      const r = seq.next();
+      if (r.applied) inFlight.land(r.bar, r.applied);
+    }
+    const heard = 0; // the listener is still on bar 0, Intro
+    expect(seq.section).toBe(2);
+    seq.toggleInstrument(seq.section, "bass"); // what toggleInstrumentInPlaying does
+    const shown = inFlight.shown(seq.pending());
+    const tile = nowTile(seq.song, seq.section, shown, "bass", true);
+    expect(tile).toEqual({ on: false, queued: true, sub: "Next bar" });
+    // Reading the heard section instead shows no pending mark: the bug this fixes.
+    expect(nowTile(seq.song, heard, shown, "bass", true).queued).toBe(false);
+  });
+  it("stopped: shows what it plays, not Next bar", () => {
+    const song = defaultSong();
+    expect(nowTile(song, 0, { toggles: [{ section: 0, instrument: "drums" }] }, "drums", false)).toEqual({ on: true, queued: true, sub: "4/4" });
+    expect(nowTile(song, 9, { toggles: [] }, "bass", false).sub).toBe("Rolling"); // clamped to the last section
   });
 });
 

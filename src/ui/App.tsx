@@ -347,11 +347,11 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
           <b>{song.bpm}</b>
           <span>bpm</span>
         </div>
-        <div class="pill bar" aria-label="Bar and beat">
+        <div class="pill bar" aria-label="Bar and beat" data-nofit>
           <b id="bar">{barLabel(pos.playing, pos.bar, pos.step)}</b>
           <span>bar</span>
         </div>
-        <div class="beats" id="beats" aria-label={`Beat ${lights.lastIndexOf(true) + 1} of 4`}>
+        <div class="beats" id="beats" data-nofit aria-label={`Beat ${lights.lastIndexOf(true) + 1} of 4`}>
           {lights.map((on, b) => (
             <i key={b} class={`${on ? "on" : ""}${b === 0 ? " one" : ""}`} data-beat={b} />
           ))}
@@ -365,7 +365,11 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
           onClick={() => engine.record()}
         >
           <i />
-          {taking && <b id="rec-time">{clockLabel(rec.seconds)}</b>}
+          {taking && (
+            <b id="rec-time" data-nofit>
+              {clockLabel(rec.seconds)}
+            </b>
+          )}
         </button>
       </div>
 

@@ -46,10 +46,15 @@ export function overflows(c: HTMLElement, ls: HTMLElement[] = leaves(c)): boolea
   return false;
 }
 
+/** What a control was last fitted for: its size and its text. Read without walking its tree. */
+function keyOf(c: HTMLElement): string {
+  return `${c.clientWidth}x${c.clientHeight}|${c.textContent ?? ""}`;
+}
+
 function fit(c: HTMLElement): void {
-  const ls = leaves(c);
-  const key = `${c.clientWidth}x${c.clientHeight}|${ls.map((l) => l.textContent).join("|")}`;
+  const key = keyOf(c);
   if (done.get(c) === key) return;
+  const ls = leaves(c);
   for (const l of ls) l.style.fontSize = "";
   if (overflows(c, ls)) {
     // The widest text gives way first; then the others, until the control fits.
@@ -64,10 +69,13 @@ function fit(c: HTMLElement): void {
       if (!overflows(c, ls)) break;
     }
   }
-  done.set(c, `${c.clientWidth}x${c.clientHeight}|${ls.map((l) => l.textContent).join("|")}`);
+  done.set(c, keyOf(c));
 }
 
-/** Fit every control on screen. Cheap when nothing changed: each control remembers what it last fitted. */
+/**
+ * Fit every control on screen. Cheap when nothing changed: each control remembers the size and text it
+ * last fitted, and is only measured again when one of them changes.
+ */
 export function fitAll(root: ParentNode = document): void {
   for (const c of root.querySelectorAll<HTMLElement>(FIT_CONTROLS)) fit(c);
 }
@@ -82,9 +90,24 @@ export function fitSoon(): void {
   });
 }
 
+/**
+ * Readouts that change while playing (bar counter, beat lights, record clock) and are sized in CSS to
+ * fit: changes inside them do not start a fit pass, so the step clock costs no layout.
+ */
+export const NO_FIT = "[data-nofit]";
+
+function worthFitting(records: MutationRecord[]): boolean {
+  return records.some((r) => {
+    const el = r.target instanceof Element ? r.target : r.target.parentElement;
+    return !el || !el.closest(NO_FIT);
+  });
+}
+
 /** Fit now and after every change to the page (any component's render) and every resize. */
 export function startFit(root: HTMLElement): () => void {
-  const mo = new MutationObserver(fitSoon);
+  const mo = new MutationObserver((records) => {
+    if (worthFitting(records)) fitSoon();
+  });
   mo.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class"] });
   window.addEventListener("resize", fitSoon);
   fitSoon();

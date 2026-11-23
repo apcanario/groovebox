@@ -137,10 +137,16 @@ class Walk:
 
 
 def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
-    """Every tab and page, both modes, both sizes. Leaves the app in Simple on the Play tab at 390 x 844,
+    """Every tab and page, both modes, both sizes, with the song and every section renamed to the longest,
+    widest names the app accepts (spec 8.6: user text fits too). Leaves the app in Simple on the Play tab at 390 x 844,
     with every layer back in the mode it had. Returns the number of screens checked."""
     w = Walk(page, failures, out_dir)
     sec = page.evaluate("window.__groovebox.position().section")
+    # The longest names the app accepts, in wide letters: the engine cuts "W" * 64 to its own maximum, so
+    # every section and the song carry the widest name they can (restored at the end).
+    names = page.evaluate("(() => { const g = window.__groovebox.getSong(); return [g.name, ...g.sections.map(s => s.name)]; })()")
+    page.evaluate("""(w) => { const e = window.__groovebox; e.renameSong(w);
+      e.getSong().sections.forEach((_, i) => e.renameSection(i, w)); }""", "W" * 64)
     modes = {lid: page.evaluate(f"window.__groovebox.getSong().sections[{sec}].{lid}.mode") for lid in ["layer1", "layer2"]}
     for size in SIZES:
         page.set_viewport_size({"width": size[0], "height": size[1]})
@@ -173,6 +179,8 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
             page.click("#songs-open")
             w.screen(size, f"{mode}-songs-sheet")
             page.click("#songs-close")
+    page.evaluate("""(n) => { const e = window.__groovebox; e.renameSong(n[0]);
+      n.slice(1).forEach((s, i) => e.renameSection(i, s)); }""", names)
     page.click('[data-appmode="simple"]')
     page.click('[data-tab="play"]')
     page.set_viewport_size({"width": 390, "height": 844})

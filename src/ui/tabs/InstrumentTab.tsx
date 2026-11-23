@@ -109,6 +109,7 @@ export function HeadRow({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
 function Waves({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   return (
     <>
+      <div class="glabel">Wave</div>
       <Chips
         name="wave"
         options={WAVES}
@@ -135,6 +136,9 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
         label={(p) => PRESET_LABEL[p]}
         onPick={(p) => engine.setDrumPreset(edit, p)}
       />
+      <div class="glabel">
+        Sequencer · {edited ? "edited" : "8 steps"} · {DRUM_PATTERNS[drums.preset].swing > 0 ? "swung" : "straight"}
+      </div>
       <div class="chips" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
         {DRUM_VOICES.map((v) => (
           <button key={v} class={`chip${voice === v ? " on" : ""}`} data-voice={v} aria-pressed={voice === v} onClick={() => setVoice(v)}>
@@ -169,9 +173,6 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
           );
         })}
       </div>
-      <p class="note">
-        {edited ? `${PRESET_LABEL[drums.preset]}, edited` : PRESET_LABEL[drums.preset]} · 8 steps · {DRUM_PATTERNS[drums.preset].swing > 0 ? "swung" : "straight"}
-      </p>
     </>
   );
 }
@@ -200,6 +201,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           {page === "beat" && <DrumBeat ctx={ctx} />}
           {page === "kick" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
           {page === "hats" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs} />}
+          {page === "rhythm" && <div class="glabel">Rhythm</div>}
           {page === "rhythm" && inst === "bass" && (
             <Chips
               name="rhythm"

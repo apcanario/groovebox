@@ -398,6 +398,15 @@ export class Engine {
     this.changed();
   }
 
+  /**
+   * The section the scheduler plays: the one `toggleInstrumentInPlaying` changes. At a section switch it
+   * runs ahead of `position().section` by the lookahead. The Now tiles read this, so what a tile shows
+   * and what its tap toggles are the same section.
+   */
+  schedulerSection(): number {
+    return this.seq.section;
+  }
+
   /** Change key and mood at once; held chords and pads restart on the new chord. */
   setKeyMood(key: KeyName, mood: Mood): void {
     const same = key === this.seq.song.key && mood === this.seq.song.mood;

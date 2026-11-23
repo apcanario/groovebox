@@ -1,5 +1,5 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
-import type { ChordStep, InstrumentId, NumericPatchKey } from "../engine/song.ts";
+import type { ChordStep, InstrumentId, NumericPatchKey, Song } from "../engine/song.ts";
 
 export const MAX_CHORDS = 8;
 const LENGTHS: ChordStep["bars"][] = [1, 2, 0.5];
@@ -80,8 +80,52 @@ export function stripState(i: number, s: StripInput): StripView {
   const isPlaying = i === s.playing;
   const isNext = s.running && s.queued === i && !isPlaying;
   const isEdit = s.chosen === i && !isPlaying;
-  const sub = isNext ? "Next bar" : isPlaying && s.running ? "Playing" : isEdit ? "Editing" : s.name;
+  const sub = isNext ? "Next bar" : isPlaying && s.running ? "Playing" : isEdit ? "Editing" : stripWord(s.name);
   return { isPlaying, isNext, isEdit, sub };
+}
+
+/**
+ * Width of each printable ASCII character (space to "~") in DM Sans at 10 px with the strip's letter
+ * spacing, in px: measured in Chrome, rounded up, plus 0.1. Anything else counts as WIDE_PX.
+ */
+const GLYPH_PX = [
+  3.0, 2.8, 3.3, 8.4, 6.1, 8.2, 7.7, 1.9, 4.1, 4.1, 5.1, 5.8, 2.2, 5.8, 2.3, 3.2, 7.2, 3.5, 6.1, 6.3, 6.4, 6.4, 6.6, 5.7,
+  6.4, 6.6, 2.4, 2.6, 5.8, 5.8, 5.8, 5.6, 10.4, 7.0, 6.4, 7.5, 7.2, 6.0, 5.7, 7.9, 7.2, 2.7, 5.4, 6.2, 5.6, 8.8, 7.3, 8.1,
+  6.1, 8.1, 6.3, 6.1, 6.0, 6.9, 7.0, 10.0, 6.4, 6.1, 5.8, 3.5, 3.0, 3.5, 6.6, 6.9, 2.5, 5.8, 6.6, 6.1, 6.6, 6.0, 3.7, 5.9,
+  6.1, 2.7, 2.8, 5.4, 2.6, 9.3, 6.1, 6.3, 6.6, 6.6, 4.0, 5.4, 4.3, 6.1, 5.6, 8.0, 5.3, 5.9, 4.9, 4.6, 2.7, 4.6, 5.8,
+];
+const WIDE_PX = 13;
+const ELLIPSIS = "…";
+const ELLIPSIS_PX = 6;
+
+/** Estimated width of `text` at 10 px (an upper bound for DM Sans). */
+export function textPx(text: string): number {
+  let w = 0;
+  for (const ch of text) {
+    const c = ch.codePointAt(0) ?? 0;
+    w += c >= 32 && c <= 126 ? GLYPH_PX[c - 32] : WIDE_PX;
+  }
+  return w;
+}
+
+/**
+ * Room for the word under a strip tile's letter at 10 px in the narrowest tile (Advanced Play at
+ * 360 px: a 59 px tile less 4 px padding a side), with 1 px to spare.
+ */
+export const STRIP_WORD_PX = 50;
+
+/**
+ * The word under a strip tile's letter (spec 8.6: text never overflows): a section name as typed when it
+ * fits the narrowest tile at 10 px, else cut to the longest start that fits with "…". The full name
+ * stays in the section sheet's title and the tile's label.
+ */
+export function stripWord(name: string, budget = STRIP_WORD_PX): string {
+  if (textPx(name) <= budget) return name;
+  const chars = [...name];
+  let w = ELLIPSIS_PX;
+  let n = 0;
+  while (n < chars.length && w + textPx(chars[n]) <= budget) w += textPx(chars[n++]);
+  return chars.slice(0, Math.max(1, n)).join("").trimEnd() + ELLIPSIS;
 }
 
 /** The four beat lights of the transport bar: lit up to the beat now playing; all dark when stopped. */
@@ -301,6 +345,35 @@ export function meterFraction(db: number): number {
 export const LAYER_MODE_ORDER = ["arp", "generative", "pad"] as const;
 export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Generative", pad: "Pad" };
 export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Lead", pad: "Pad" };
+
+/** What an instrument plays in a section, in a word or two (the Now tile's second line). */
+export function plays(song: Song, sec: number, id: InstrumentId): string {
+  const s = song.sections[sec];
+  if (id === "drums") return s.drums.grid ? `${PRESET_LABEL[s.drums.preset]}, edited` : PRESET_LABEL[s.drums.preset];
+  if (id === "bass") return PRESET_LABEL[s.bass.rhythm];
+  if (id === "synth") return PRESET_LABEL[s.synth.rhythm];
+  return LAYER_MODE_TITLE[s[id].mode];
+}
+
+export interface NowTileView {
+  on: boolean;
+  /** A toggle of this instrument waits for the next bar line. */
+  queued: boolean;
+  /** The second line: "Next bar" while queued and playing, else what it plays. */
+  sub: string;
+}
+
+/**
+ * A Now tile (Simple Play tab). `target` is the section a tap toggles (the scheduler's, which leads what
+ * is heard by the lookahead at a switch); the tile reads the same section, so a tap right after a switch
+ * lands shows its "Next bar" at once.
+ */
+export function nowTile(song: Song, target: number, pending: { toggles: { section: number; instrument: InstrumentId }[] }, id: InstrumentId, running: boolean): NowTileView {
+  const sec = Math.max(0, Math.min(song.sections.length - 1, target));
+  const on = song.sections[sec].on[id];
+  const queued = pending.toggles.some((t) => t.section === sec && t.instrument === id);
+  return { on, queued, sub: queued && running ? "Next bar" : plays(song, sec, id) };
+}
 
 /** One generative knob: range, whole steps or not, and its colour token. */
 export interface GenKnob {
