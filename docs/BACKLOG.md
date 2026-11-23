@@ -8,23 +8,17 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 
 - **C1. Treble crackle, applied, waiting for Pedro's ear.** G1 changed everything on the original list (22 Nov 2026): 4x oversampled kick drive and waveshapers, resonance capped (Q 6, level-compensated), filters top out at 10 kHz, hats and clap lower, master bus 0.5, limiter now -4 dB with 1 ms attack, compressor with 120 ms release in place of Tone.Limiter, pump ramps 4 ms, buffer default `balanced`. Pedro confirms by ear; if it still crackles, the next suspects are the 4x oversampled shapers' CPU cost and buffer underruns (`?hint=interactive` vs `balanced`).
 
+- **C2. G3 listen items for C1** (23 Nov 2026): the bass lost its second filter (listen for crackle on a saw bass with Env amt high); the drum filter still tops at 18 kHz, not the 10 kHz of the other filters. If C1 crackle persists, these are the next suspects after buffer size.
+- **C3. G3 sound defaults changed** (23 Nov 2026): default bass cutoff 0.3 with env amount 0.45, kick now about 0.2 s, drum level and sub dials max out at the C1 trims, defaults moved up the dial. Pedro's ears judge them.
+
 ## By hand (Pedro)
 
-- **H3. Hear and use the shell on the phone** (22 Nov 2026): open https://apcanario.github.io/groovebox/ and jam a whole song with one thumb; confirm whether the C1 crackle is gone. Send notes in the next starter's `Notes:` line. Open until Pedro says done.
+- **H3. Hear and use the shell on the phone** (22 Nov 2026): open https://apcanario.github.io/groovebox/ and jam a whole song with one thumb; confirm whether the C1 crackle is gone. Send notes in the next starter's `Notes:` line. Now also covers the G3 tabs (Drums, Bass, Synth, Mix). Open until Pedro says done.
 - H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026.
 
 ## Bundle 2: drums, bass, synth, mix
 
-### G3. Drums, Bass, Synth and Mix tabs
-
-- **Drums:** the five presets; the 8-step sequencer for four drum voices; open a preset in the sequencer; per-voice level and decay; kick pitch and drive.
-- **Bass:** rhythm preset picker; patch dials (wave, cutoff envelope amount, decay, drive, sub level, glide); XY pad; sends.
-- **Synth:** stab rhythm presets (stabs, offbeat, sustained); patch dials (wave and detune, attack, decay, release, filter envelope, drive); XY pad; sends.
-- **Mix:** filter sweep knob, pump, saturation, level per instrument, master level meter.
-- Six dials per screen at most. Where an instrument needs more, use two pages inside its tab.
-- Drum and bass presets must work at 170 to 176 bpm as well as 118 to 128.
-
-**Done when:** every control named above changes the sound while playing without clicks or stuck notes; a 2-step and a drum and bass beat exist; `check` and `smoke` pass.
+All rows of this bundle are Done.
 
 ## Bundle 3: the layers
 
@@ -83,3 +77,4 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **G0. Sound spike** (22 Nov 2026). Built, deployed and heard by Pedro: it works, with a slight treble crackle carried as C1.
 - **G1. Engine** (22 Nov 2026). Built, reviewed (fix: 0 errors, 7 should-fix, 10 minor, all applied), pushed. Report in `docs/reviews/G1.md`.
 - **G2. Shell** (22 Nov 2026). Built, reviewed (fix: 1 error, 5 should-fix, 5 minor, all applied), pushed. Report in `docs/reviews/G2.md`. Bundle 1 is done.
+- **G3. Drums, Bass, Synth and Mix tabs** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 9 minor, all applied), pushed. Report in `docs/reviews/G3.md`. Bundle 2 is done.
