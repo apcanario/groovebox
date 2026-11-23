@@ -57,7 +57,7 @@ One reply at the end of the chat, in this order:
 3. **Choices:** each open choice taken, one line each, so Pedro can veto.
 4. **Listen for:** three to five specific things to try on the phone, each a thing he can hear or feel. This is the only test that matters.
 5. **For Pedro by hand:** only what no agent can do. Repeat every open item from the backlog's By-hand list until he says it is done.
-6. **Next:** always the last thing in the reply, never left out, also when the chat stopped early. One line naming the next open bundle and what it builds, then the starter in a code block with an empty third line `Notes:` for Pedro to fill. Everything the next chat must fix is already in the backlog's Carried list, so the starter never changes. When G1 to G6 are all Done, the next bundle is G7 Retouch, and the line says it needs his notes to run.
+6. **Next:** always the last thing in the reply, never left out, also when the chat stopped early. One line naming the next open bundle and what it builds, then the starter in a code block with an empty third line `Notes:` for Pedro to fill. Everything the next chat must fix is already in the backlog's Carried list, so the starter never changes. When every row before G7 is Done, the next bundle is G7 Retouch, and the line says it needs his notes to run.
 
 ## 6. When to leave this model
 
