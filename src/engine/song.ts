@@ -451,3 +451,12 @@ export function serializeSong(song: Song): string {
 export function sectionDrumGrid(s: Section): DrumGrid {
   return s.drums.grid ?? DRUM_PATTERNS[s.drums.preset].grid;
 }
+
+/** Longest song name, in characters. */
+export const MAX_SONG_NAME = 24;
+
+/** A name a song can carry: spaces collapsed, trimmed, at most MAX_SONG_NAME characters; null if empty. */
+export function cleanName(name: string): string | null {
+  const n = name.replace(/\s+/g, " ").trim().slice(0, MAX_SONG_NAME);
+  return n.length ? n : null;
+}

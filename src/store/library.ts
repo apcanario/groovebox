@@ -6,6 +6,9 @@
  */
 import { defaultSong, validateSong, type EventLog, type Song } from "../engine/song.ts";
 
+/** The song-name rule lives with the song (G5 review M5); re-exported for the UI and the tests. */
+export { cleanName, MAX_SONG_NAME } from "../engine/song.ts";
+
 export type StoreName = "songs" | "logs" | "meta";
 
 export interface Kv {
@@ -35,18 +38,11 @@ export interface SongEntry {
   updated: number;
 }
 
-export const MAX_SONG_NAME = 24;
 
 /** "Song N" with the lowest N not taken. */
 export function nextName(names: readonly string[]): string {
   const taken = new Set(names.map((n) => n.trim().toLowerCase()));
   for (let i = 1; ; i++) if (!taken.has(`song ${i}`)) return `Song ${i}`;
-}
-
-/** A name a song can carry: trimmed, at most MAX_SONG_NAME characters; null if empty. */
-export function cleanName(name: string): string | null {
-  const n = name.replace(/\s+/g, " ").trim().slice(0, MAX_SONG_NAME);
-  return n.length ? n : null;
 }
 
 export class Library {

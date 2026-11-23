@@ -2,7 +2,7 @@
  * The shell (G2): transport bar, section strip, tab bar and the eight tabs. The UI reads the song
  * and the position from the engine and calls the engine for every change; it never touches audio.
  */
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Engine, MOOD_TABLE, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
 import type { Keeper } from "../store/keeper.ts";
 import { Sheet, useVerticalDrag } from "./components.tsx";
@@ -85,8 +85,11 @@ type NamedTake = Take & { name: string };
 
 /** A finished take: save it to the phone or share it. */
 function TakeSheet({ take, onClose }: { take: NamedTake; onClose: () => void }) {
-  const file = new File([take.file], take.name, { type: "audio/mpeg" });
-  const canShare = typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+  // Built once per take: App re-renders on every position change (G5 review M4).
+  const { file, canShare } = useMemo(() => {
+    const f = new File([take.file], take.name, { type: "audio/mpeg" });
+    return { file: f, canShare: typeof navigator.canShare === "function" && navigator.canShare({ files: [f] }) };
+  }, [take]);
   const [msg, setMsg] = useState("");
   const save = (): void => {
     const url = URL.createObjectURL(file);
@@ -257,6 +260,11 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
 
       <main class="body">
         {error && <p class="err">{error}</p>}
+        {rec.error && rec.state === "off" && (
+          <p class="err" id="rec-err">
+            {rec.error}
+          </p>
+        )}
         {saveFailed && <p class="err">The song could not be saved on this phone (storage full or blocked).</p>}
         {tab === "play" && <PlayTab ctx={ctx} />}
         {tab === "chords" && <ChordsTab ctx={ctx} />}

@@ -12,10 +12,15 @@ the end, and the process memory's low points (the encoder worker collects its ga
 about 70 MB) grow less than LIMIT_MB from minutes 1 to 2.5 to the last two minutes. Held as samples, ten minutes
 of stereo would be about 212 MB of float (106 MB as 16-bit). `--baseline` plays without a take, to show what
 the app's own memory does.
+
+Chrome runs with an on-disk profile (G5 review S2): an off-the-record context keeps the origin-private file
+system in memory, so the MP3 being written would count as memory growth; the phone writes it to disk.
 """
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 import psutil
@@ -26,7 +31,8 @@ from mp3check import mp3_info  # noqa: E402
 
 PORT = 4181
 LIMIT_MB = 30.0
-HEAP_LIMIT_MB = 10.0
+# Tight enough to catch the Tone 15.1.22 oscillator leak (G5 review E1): about 0.9 MB a minute, +7.6 MB over a take.
+HEAP_LIMIT_MB = 3.0
 
 
 def chrome_mb(marker: str) -> tuple[float, float]:
@@ -52,6 +58,18 @@ def chrome_mb(marker: str) -> tuple[float, float]:
     return total, rend
 
 
+def growth(rows: list) -> tuple[float, float, float, tuple, tuple]:
+    """JS heap growth from the first minute to the end, and growth of the process-memory low points from
+    minutes 1 to 2.5 to the last two minutes (renderers, all Chrome). The same figures for a take and a baseline."""
+    base = next((r for r in rows if r[0] >= 60), rows[0])
+    end = rows[-1]
+    early = [r for r in rows if 60 <= r[0] <= 150] or rows[:1]
+    late = [r for r in rows if r[0] >= end[0] - 120] or rows[-1:]
+    rend = min(r[4] for r in late) - min(r[4] for r in early)
+    tot = min(r[5] for r in late) - min(r[5] for r in early)
+    return end[3] - base[3], rend, tot, base, end
+
+
 def main() -> int:
     root = sys.argv[1] if len(sys.argv) > 1 else "dist"
     minutes = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
@@ -66,17 +84,22 @@ def main() -> int:
     failures: list[str] = []
     errors: list[str] = []
     rows = []
+    profile = tempfile.mkdtemp(prefix="groovebox-long-take-")
     try:
         with sync_playwright() as p:
             chrome = "/usr/bin/google-chrome"
             kwargs = {"executable_path": chrome} if os.path.exists(chrome) else {}
             marker = f"--groovebox-long-take={os.getpid()}"
-            browser = p.chromium.launch(
-                args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required", marker], **kwargs
+            browser = p.chromium.launch_persistent_context(
+                profile,
+                args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required", marker],
+                viewport={"width": 390, "height": 844},
+                accept_downloads=True,
+                **kwargs,
             )
-            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page = browser.pages[0] if browser.pages else browser.new_page()
             page.on("pageerror", lambda e: errors.append(str(e)))
-            cdp = page.context.new_cdp_session(page)
+            cdp = browser.new_cdp_session(page)
             cdp.send("Performance.enable")
 
             def heap_mb() -> float:
@@ -114,8 +137,9 @@ def main() -> int:
                     break
             if baseline:
                 browser.close()
-                base, end = next((r for r in rows if r[0] >= 60), rows[0]), rows[-1]
-                print(f"baseline, no take: js heap {end[3] - base[3]:+.1f} MB, renderers {end[4] - base[4]:+.1f} MB from {base[0]:.0f} s to {end[0]:.0f} s")
+                heap, rend, tot, base, end = growth(rows)
+                print(f"baseline, no take, from {base[0]:.0f} s to {end[0]:.0f} s: js heap {heap:+.1f} MB; low points: "
+                      f"renderers {rend:+.1f} MB, all chrome {tot:+.1f} MB")
                 return 0
             want = page.evaluate("window.__groovebox.recordInfo().seconds")
             wall = time.time() - t0
@@ -131,6 +155,7 @@ def main() -> int:
             browser.close()
     finally:
         server.terminate()
+        shutil.rmtree(profile, ignore_errors=True)
 
     print(f"MP3: {mp3['frames']} frames, {mp3['sample_rate']} Hz, {mp3['kbps']} kbps, {mp3['seconds']:.2f} s, "
           f"{mp3['bytes'] / 2**20:.2f} MB; take timer {want:.2f} s, wall clock {wall:.2f} s, log {log['seconds']:.2f} s")
@@ -152,13 +177,7 @@ def main() -> int:
     except FileNotFoundError:
         print("ffprobe/ffmpeg not installed: frame walk only")
 
-    base = next((r for r in rows if r[0] >= 60), rows[0])
-    end = rows[-1]
-    early = [r for r in rows if 60 <= r[0] <= 150] or rows[:1]
-    late = [r for r in rows if r[0] >= end[0] - 120] or rows[-1:]
-    heap_growth = end[3] - base[3]
-    rend_growth = min(r[4] for r in late) - min(r[4] for r in early)
-    tot_growth = min(r[5] for r in late) - min(r[5] for r in early)
+    heap_growth, rend_growth, tot_growth, base, end = growth(rows)
     print(f"memory from {base[0]:.0f} s to {end[0]:.0f} s: js heap {heap_growth:+.1f} MB; low points: renderers "
           f"{rend_growth:+.1f} MB, all chrome {tot_growth:+.1f} MB (limits {HEAP_LIMIT_MB:.0f} and {LIMIT_MB:.0f} MB; "
           f"the samples held would be {(end[1] - base[1]) * 44100 * 8 / 2**20:.0f} MB)")

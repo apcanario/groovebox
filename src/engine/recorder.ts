@@ -54,6 +54,9 @@ registerProcessor("groove-tap", GrooveTap);
 
 export const MP3_KBPS = 160;
 
+/** After `stop()`, the encoder has this long to hand back the file before the take fails (G5 review S1). */
+export const FINISH_TIMEOUT_MS = 10000;
+
 export interface Take {
   /** The MP3 (disk-backed where the browser allows). */
   file: File;
@@ -91,6 +94,8 @@ export class Recorder {
   /** Bytes of MP3 written so far (reported by the worker about once a second). */
   bytes = 0;
   private done: Promise<Take>;
+  private fail: (err: Error) => void = () => undefined;
+  private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(ctx: TapContext, name: string) {
     if (!loaded.has(ctx)) throw new Error("capture processor not loaded");
@@ -106,22 +111,35 @@ export class Recorder {
     this.node.port.postMessage({ type: "port", port: ch.port1 }, [ch.port1]);
     this.worker.postMessage({ type: "init", port: ch.port2, sampleRate: ctx.sampleRate, kbps: MP3_KBPS, name }, [ch.port2]);
     this.done = new Promise<Take>((resolve, reject) => {
-      this.worker.onerror = (e) => reject(new Error(`MP3 encoder failed: ${e.message}`));
+      const end = (): void => {
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = null;
+        this.worker.terminate();
+      };
+      this.fail = (err) => {
+        end();
+        reject(err);
+      };
+      this.worker.onerror = (e) => this.fail(new Error(`MP3 encoder failed: ${e.message}`));
       this.worker.onmessage = (e: MessageEvent) => {
-        const m = e.data as { type: string; bytes: number; frames: number; file?: File; sampleRate?: number };
+        const m = e.data as { type: string; bytes: number; frames: number; file?: File; sampleRate?: number; message?: string };
         if (m.type === "progress") this.bytes = m.bytes;
+        else if (m.type === "error") this.fail(new Error(`MP3 encoder failed: ${m.message ?? "unknown error"}`));
         else if (m.type === "done" && m.file) {
           this.bytes = m.bytes;
-          this.worker.terminate();
+          end();
           resolve({ file: m.file, bytes: m.bytes, seconds: m.frames / (m.sampleRate ?? ctx.sampleRate), sampleRate: m.sampleRate ?? ctx.sampleRate });
         }
       };
     });
+    // A rejection before stop() is awaited must not surface as unhandled; stop() returns the same promise.
+    this.done.catch(() => undefined);
   }
 
-  /** Ends the take; resolves when the last frame is encoded and the file is closed. */
+  /** Ends the take; resolves when the last frame is encoded and the file is closed, rejects on an encoder error or after FINISH_TIMEOUT_MS. */
   stop(): Promise<Take> {
     this.node.port.postMessage({ type: "stop" });
+    if (!this.timer) this.timer = setTimeout(() => this.fail(new Error("MP3 encoder did not finish in time")), FINISH_TIMEOUT_MS);
     return this.done;
   }
 }

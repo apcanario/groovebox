@@ -73,6 +73,7 @@ let lastReport = 0;
 let sampleRate = 48000;
 let name = "take.mp3";
 let ended = false;
+let failed = false;
 
 function out(b: Uint8Array): void {
   if (!b.length) return;
@@ -81,27 +82,45 @@ function out(b: Uint8Array): void {
   else queue.push(b.slice());
 }
 
-async function finish(): Promise<void> {
-  if (!encoder) return;
-  out(encoder.flush());
+/** Any failure ends the take with an error message instead of leaving the page waiting (G5 review S1). */
+function fail(err: unknown): void {
+  if (failed) return;
+  failed = true;
   encoder = null;
-  while (!sink) await new Promise((r) => setTimeout(r, 20));
-  const file = await sink.finish();
-  self.postMessage({ type: "done", file, bytes, frames, sampleRate });
+  self.postMessage({ type: "error", message: err instanceof Error ? err.message : String(err) });
+}
+
+async function finish(): Promise<void> {
+  try {
+    if (!encoder) return;
+    out(encoder.flush());
+    encoder = null;
+    while (!sink) await new Promise((r) => setTimeout(r, 20));
+    const file = await sink.finish();
+    self.postMessage({ type: "done", file, bytes, frames, sampleRate });
+  } catch (err) {
+    fail(err);
+  }
 }
 
 function onPort(e: MessageEvent<Chunk | End>): void {
   const m = e.data;
   if (m.type === "chunk") {
     if (!encoder) return;
-    frames += m.l.length;
-    out(encoder.encodeBuffer(m.l, m.r));
+    try {
+      frames += m.l.length;
+      out(encoder.encodeBuffer(m.l, m.r));
+    } catch (err) {
+      fail(err);
+      return;
+    }
     if (frames - lastReport >= sampleRate) {
       lastReport = frames;
       self.postMessage({ type: "progress", bytes, frames });
     }
   } else if (m.type === "end" && !ended) {
     ended = true;
+    if (failed) return;
     void finish();
   }
 }
@@ -111,10 +130,19 @@ self.onmessage = (e: MessageEvent<Init>) => {
   if (m.type !== "init") return;
   sampleRate = m.sampleRate;
   name = m.name;
-  encoder = new Mp3Encoder(2, m.sampleRate, m.kbps);
+  try {
+    encoder = new Mp3Encoder(2, m.sampleRate, m.kbps);
+  } catch (err) {
+    fail(err);
+    return;
+  }
   m.port.onmessage = onPort;
   const ready = (s: Sink): void => {
-    for (const b of queue) s.write(b);
+    try {
+      for (const b of queue) s.write(b);
+    } catch (err) {
+      fail(err);
+    }
     queue = [];
     sink = s;
     self.postMessage({ type: "ready", opfs: s !== fallback });

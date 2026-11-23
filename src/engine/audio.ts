@@ -20,6 +20,34 @@ import { DRUM_VOICES, type DrumVoice } from "../music/presets.ts";
 import { DRUM_RELEASE, PAD_TOP_HZ, padBrightnessHz, padMotionCents, detuneCents, drumDecay, drumLevel, envDepthHz, glideSeconds, kickHz, subGain } from "../music/sound.ts";
 import { PATCH_KEYS, type InstrumentId, type MixState, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
 
+// Tone 15.1.22 leak (G5 review E1): Oscillator._start connects its frequency and detune signals to each new
+// native oscillator and never disconnects them, so every ended oscillator stays reachable from the
+// instrument's signals. Disconnect them when the oscillator ends. Drop this patch once Tone fixes it.
+{
+  const proto = Tone.Oscillator.prototype as unknown as {
+    _start(t: unknown): void;
+    _oscillator: { onended: (n: unknown) => void; frequency: unknown; detune: unknown };
+    frequency: Tone.Signal<"frequency">;
+    detune: Tone.Signal<"cents">;
+  };
+  const start = proto._start;
+  proto._start = function (this: typeof proto, t: unknown): void {
+    start.call(this, t);
+    const node = this._oscillator;
+    const end = node.onended;
+    node.onended = (n: unknown): void => {
+      try {
+        this.frequency.disconnect(node.frequency as Tone.InputNode);
+        this.detune.disconnect(node.detune as Tone.InputNode);
+      } catch {
+        // already disconnected (the oscillator was disposed first)
+      } finally {
+        end(n);
+      }
+    };
+  };
+}
+
 const RAMP = 0.03; // seconds; every continuous parameter change is ramped this long
 const MAX_Q = 6; // resonance cap (the spike went to 14, G1 shipped 8)
 /** Level compensation as Q rises: about -5 dB at the cap. */

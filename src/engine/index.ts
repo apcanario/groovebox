@@ -11,6 +11,7 @@ import { InFlight, type Pending } from "./queue.ts";
 import { Sequencer, STEPS_PER_BAR, type StepResult } from "./sequencer.ts";
 import {
   clampPatchValue,
+  cleanName,
   cloneSong,
   defaultSong,
   DEFAULT_MIX,
@@ -60,6 +61,8 @@ export type RecordState = "off" | "armed" | "recording" | "finishing";
 
 export interface RecordInfo {
   state: RecordState;
+  /** Why the last take failed or recording is unavailable (G5 review S1, M8); null when all is well. */
+  error: string | null;
   /** Seconds recorded so far (0 unless recording or finishing). */
   seconds: number;
   /** MP3 bytes written so far. */
@@ -117,7 +120,11 @@ export class Engine {
     start: Song | null;
     section: number;
     at: Date;
-  } = { state: "off", recorder: null, writer: null, startTicks: 0, startTime: 0, endTime: 0, start: null, section: 0, at: new Date(0) };
+    /** finishTake has begun closing this take (the tail timer and Play must not close it twice). */
+    closing: boolean;
+  } = { state: "off", recorder: null, writer: null, startTicks: 0, startTime: 0, endTime: 0, start: null, section: 0, at: new Date(0), closing: false };
+  /** The last recording failure, shown by the transport; cleared when a take starts. */
+  private recError: string | null = null;
   private takeListeners = new Set<(t: Take & { name: string }) => void>();
   /** Switches applied by the scheduler but not heard yet (the lookahead before their bar line). */
   private inFlight = new InFlight();
@@ -135,7 +142,9 @@ export class Engine {
     Tone.setContext(new Tone.Context({ latencyHint: hint }));
     await Tone.start();
     this.graph = await Graph.build();
-    await prepareTap(Tone.getContext()).catch(() => undefined);
+    await prepareTap(Tone.getContext()).catch((err: unknown) => {
+      this.recError = `Recording unavailable: ${err instanceof Error ? err.message : String(err)}`;
+    });
     this.applyAll();
     const transport = Tone.getTransport();
     transport.bpm.value = this.seq.song.bpm;
@@ -183,6 +192,11 @@ export class Engine {
 
   play(): void {
     if (!this.graph || this.playing) return;
+    // Play during the Stop tail: close the old take now, so the new run is not recorded into it (G5 review M3).
+    if (this.rec.state === "finishing" && !this.rec.closing) {
+      this.rec.endTime = Math.min(this.rec.endTime || Infinity, Tone.getContext().currentTime);
+      void this.finishTake();
+    }
     this.seq.start();
     this.inFlight.clear();
     this.landed.length = 0;
@@ -207,7 +221,10 @@ export class Engine {
       // Keep the tail, then close the take.
       this.rec.state = "finishing";
       this.rec.endTime = Tone.getContext().currentTime + RECORD_TAIL;
-      setTimeout(() => void this.finishTake(), RECORD_TAIL * 1000);
+      const recorder = this.rec.recorder;
+      setTimeout(() => {
+        if (this.rec.recorder === recorder) void this.finishTake();
+      }, RECORD_TAIL * 1000);
     }
     this.emit({ playing: false, section: this.seq.section, bar: 0, step: 0 });
   }
@@ -232,7 +249,7 @@ export class Engine {
     const { state, recorder, startTime, endTime } = this.rec;
     const now = this.graph ? Tone.getContext().currentTime : 0;
     const seconds = state === "recording" ? now - startTime : state === "finishing" ? Math.min(now, endTime) - startTime : 0;
-    return { state, seconds: Math.max(0, seconds), bytes: recorder?.bytes ?? 0 };
+    return { state, error: this.recError, seconds: Math.max(0, seconds), bytes: recorder?.bytes ?? 0 };
   }
 
   /** Called with each finished take: the MP3 and the name to save it under. */
@@ -248,10 +265,13 @@ export class Engine {
     let recorder: Recorder;
     try {
       recorder = new Recorder(raw, `take-${at.getTime()}.mp3`);
-    } catch {
+    } catch (err) {
       this.rec.state = "off";
+      this.recError ??= `Recording unavailable: ${err instanceof Error ? err.message : String(err)}`;
+      this.changed();
       return;
     }
+    this.recError = null;
     this.graph.tap(recorder.node);
     const transport = Tone.getTransport();
     this.rec = {
@@ -264,12 +284,14 @@ export class Engine {
       start: { ...this.getSong(), mix: { ...this.mix } },
       section: this.seq.section,
       at,
+      closing: false,
     };
   }
 
   private async finishTake(): Promise<void> {
     const r = this.rec;
-    if (!r.recorder || (r.state !== "recording" && r.state !== "finishing")) return;
+    if (!r.recorder || r.closing || (r.state !== "recording" && r.state !== "finishing")) return;
+    r.closing = true;
     r.state = "finishing";
     if (!r.endTime) r.endTime = Tone.getContext().currentTime;
     this.changed();
@@ -277,6 +299,9 @@ export class Engine {
     let take: Take | null = null;
     try {
       take = await recorder.stop();
+    } catch (err) {
+      // The encoder failed or timed out (G5 review S1): the log is still saved and the state reset below.
+      this.recError = `The take could not be saved: ${err instanceof Error ? err.message : String(err)}`;
     } finally {
       this.graph?.untap(recorder.node);
       if (r.writer && r.start) {
@@ -288,9 +313,10 @@ export class Engine {
           events: r.writer.events,
         };
       }
-      this.rec = { ...r, state: "off", recorder: null, writer: null, start: null, endTime: 0 };
+      this.rec = { ...r, state: "off", recorder: null, writer: null, start: null, endTime: 0, closing: false };
       this.changed();
     }
+    if (!take) return;
     const named = { ...take, name: takeName(this.seq.song.name, r.at) };
     for (const fn of this.takeListeners) fn(named);
   }
@@ -312,18 +338,20 @@ export class Engine {
 
   /** Change one knob of an instrument's patch. Continuous values ramp; values are clamped to PATCH_RANGES, unknown waves ignored. */
   setParam<K extends keyof Patch>(inst: InstrumentId, key: K, value: Patch[K]): void {
+    if (!this.applyParam(inst, key, value)) return;
     this.note("setParam", [inst, key, value]);
-    if (this.applyParam(inst, key, value)) this.changed();
+    this.changed();
   }
 
   /** Change several knobs of one patch at once (an XY pad move): listeners hear one change. */
   setParams(inst: InstrumentId, values: Partial<Patch>): void {
-    this.note("setParams", [inst, values]);
     let any = false;
     for (const key of Object.keys(values) as (keyof Patch)[]) {
       if (this.applyParam(inst, key, values[key] as Patch[typeof key])) any = true;
     }
-    if (any) this.changed();
+    if (!any) return;
+    this.note("setParams", [inst, values]);
+    this.changed();
   }
 
   private applyParam<K extends keyof Patch>(inst: InstrumentId, key: K, value: Patch[K]): boolean {
@@ -336,9 +364,9 @@ export class Engine {
   }
 
   setMix(key: keyof MixState, value: number): void {
-    this.note("setMix", [key, value]);
     const [lo, hi] = key === "sweep" ? [-1, 1] : key === "pump" ? [0, 0.95] : [0, 1];
     if (!Number.isFinite(value)) return;
+    this.note("setMix", [key, value]);
     const v = Math.max(lo, Math.min(hi, value));
     this.mix[key] = v;
     this.graph?.setMix(key, v);
@@ -372,56 +400,63 @@ export class Engine {
 
   /** Change key and mood at once; held chords and pads restart on the new chord. */
   setKeyMood(key: KeyName, mood: Mood): void {
-    this.note("setKeyMood", [key, mood]);
+    const same = key === this.seq.song.key && mood === this.seq.song.mood;
     this.seq.setKeyMood(key, mood);
+    if (!same) this.note("setKeyMood", [key, mood]);
     this.changed();
   }
 
   /** Replace a section's chord sequence (1..8 chords). Acts at once. Returns false if refused. */
   setChords(section: number, chords: ChordStep[]): boolean {
-    this.note("setChords", [section, chords]);
     const ok = this.seq.setChords(section, chords);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setChords", [section, chords]);
+    this.changed();
     return ok;
   }
 
   /** Pick a section's drum preset; drops its sequencer edit. Acts at once. */
   setDrumPreset(section: number, preset: DrumPreset): boolean {
-    this.note("setDrumPreset", [section, preset]);
     const ok = this.seq.setDrumPreset(section, preset);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setDrumPreset", [section, preset]);
+    this.changed();
     return ok;
   }
 
   /** Flip one of the eight sequencer steps of a drum voice; the first edit opens the preset. Acts at once. */
   toggleDrumStep(section: number, voice: DrumVoice, step: number): boolean {
-    this.note("toggleDrumStep", [section, voice, step]);
     const ok = this.seq.toggleDrumStep(section, voice, step);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("toggleDrumStep", [section, voice, step]);
+    this.changed();
     return ok;
   }
 
   /** Drop a section's sequencer edit: back to its preset. */
   revertDrums(section: number): boolean {
-    this.note("revertDrums", [section]);
     const ok = this.seq.revertDrums(section);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("revertDrums", [section]);
+    this.changed();
     return ok;
   }
 
   /** Pick a section's bass rhythm. Acts at once; a held note restarts in the new rhythm. */
   setBassRhythm(section: number, rhythm: BassPreset): boolean {
-    this.note("setBassRhythm", [section, rhythm]);
     const ok = this.seq.setBassRhythm(section, rhythm);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setBassRhythm", [section, rhythm]);
+    this.changed();
     return ok;
   }
 
   /** Pick a section's synth rhythm. Acts at once; a held chord restarts in the new rhythm. */
   setSynthRhythm(section: number, rhythm: SynthPreset): boolean {
-    this.note("setSynthRhythm", [section, rhythm]);
     const ok = this.seq.setSynthRhythm(section, rhythm);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setSynthRhythm", [section, rhythm]);
+    this.changed();
     return ok;
   }
 
@@ -429,41 +464,46 @@ export class Engine {
 
   /** Switch a layer's mode (Arp, Pad, Generative) in a section. In the playing section held notes let go. */
   setLayerMode(section: number, layer: LayerInstrument, mode: LayerMode): boolean {
-    this.note("setLayerMode", [section, layer, mode]);
     const ok = this.seq.setLayerMode(section, layer, mode);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setLayerMode", [section, layer, mode]);
+    this.changed();
     return ok;
   }
 
   /** Arp direction, rate (steps per note: 1, 2, 4), octaves (1..3), gate (0.1..1). */
   setArp(section: number, layer: LayerInstrument, values: Partial<ArpParams>): boolean {
-    this.note("setArp", [section, layer, values]);
     const ok = this.seq.setArp(section, layer, values);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setArp", [section, layer, values]);
+    this.changed();
     return ok;
   }
 
   /** Pad attack and release (seconds), brightness and motion (0..1). */
   setPad(section: number, layer: LayerInstrument, values: Partial<PadParams>): boolean {
-    this.note("setPad", [section, layer, values]);
     const ok = this.seq.setPad(section, layer, values);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setPad", [section, layer, values]);
+    this.changed();
     return ok;
   }
 
   /** The six generative knobs. The lead keeps its notes; only Lock rewrites them. */
   setGen(section: number, layer: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
-    this.note("setGen", [section, layer, values]);
     const ok = this.seq.setGen(section, layer, values);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("setGen", [section, layer, values]);
+    this.changed();
     return ok;
   }
 
   /** New notes: the next seed of the layer's lead (from the seeded generator). */
   newSeed(section: number, layer: LayerInstrument): number | null {
-    this.note("newSeed", [section, layer]);
     const seed = this.seq.newSeed(section, layer);
-    if (seed !== null) this.changed();
+    if (seed === null) return null;
+    this.note("newSeed", [section, layer]);
+    this.changed();
     return seed;
   }
 
@@ -478,7 +518,7 @@ export class Engine {
 
   /** Rename the song (trimmed, at most 24 characters). Returns false for an empty name. */
   renameSong(name: string): boolean {
-    const n = name.replace(/\s+/g, " ").trim().slice(0, 24);
+    const n = cleanName(name);
     if (!n) return false;
     this.seq.song.name = n;
     this.changed();
@@ -486,34 +526,38 @@ export class Engine {
   }
 
   renameSection(index: number, name: string): boolean {
-    this.note("renameSection", [index, name]);
     const ok = this.seq.renameSection(index, name);
-    if (ok) this.changed();
+    if (!ok) return false;
+    this.note("renameSection", [index, name]);
+    this.changed();
     return ok;
   }
 
   /** Append a section (at most four). Returns its index, or -1. */
   addSection(): number {
-    this.note("addSection", []);
     const i = this.seq.addSection();
-    if (i >= 0) this.changed(true);
+    if (i < 0) return i;
+    this.note("addSection", []);
+    this.changed(true);
     return i;
   }
 
   /** Insert a copy right after a section (at most four). Returns the copy's index, or -1. */
   copySection(index: number): number {
-    this.note("copySection", [index]);
     const i = this.seq.copySection(index);
-    if (i >= 0) this.changed(true);
+    if (i < 0) return i;
+    this.note("copySection", [index]);
+    this.changed(true);
     return i;
   }
 
   /** Delete a section; refused for the last one and for the one playing now. */
   deleteSection(index: number): boolean {
-    this.note("deleteSection", [index]);
     const ok = this.seq.deleteSection(index);
-    if (ok) this.changed(true);
-    return ok;
+    if (!ok) return false;
+    this.note("deleteSection", [index]);
+    this.changed(true);
+    return true;
   }
 
   /** The current mix settings (a copy). */
@@ -567,8 +611,9 @@ export class Engine {
   }
 
   set bpm(v: number) {
+    if (!Number.isFinite(v)) return;
     const bpm = Math.max(80, Math.min(180, Math.round(v)));
-    this.note("bpm", [bpm]);
+    if (bpm !== this.seq.song.bpm) this.note("bpm", [bpm]);
     this.seq.song.bpm = bpm;
     if (this.graph) Tone.getTransport().bpm.rampTo(bpm, 0.05);
     this.changed();
