@@ -5,7 +5,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | Bundle | Rows | What you get |
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
-| 5 | P3 (Done), P4 (Done), P5, P6 | Eight vibes, Simple chords, five lead styles |
+| 5 | P3 (Done), P4 (Done), P5 (Done), P6 | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
@@ -25,6 +25,7 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C8. P3 review M1, for P7 (sounds)** (23 Nov 2026): patches are data files (`src/data/patches/`, 22 of them) but no picker lists them; Simple Synth's Sound picker still lists waves. P7 adds a Sound picker per instrument listing `PATCH_IDS` for that instrument (spec 8.2: pickers list whatever exists).
 - **C9. 24-tile picker does not fit at 360 x 640** (P3 review, 23 Nov 2026), for P8: 12 rows of 48 px with gaps plus Continue last jam needs at least 648 px, so the spec's no-scroll rule and 48 px rule conflict at 24 tiles. Reviewer's proposal: no title or Close row, 1 px gap only under 648 px screen height (636 px total). P8 edits spec 8.6 accordingly and adds a smoke check at 24 tiles.
 - **C10. P4 review M2, for P8** (23 Nov 2026): the library's vibe tags are six blanket groups; when P8 adds the sixteen vibes, retag each progression per vibe by choice, not by group.
+- **C11. P5 listen items** (23 Nov 2026): Drift is sparse after the review fix (4 notes in 8 bars at seed 1234, whole bars of silence), say in the notes if it is too sparse; an accent brightens every sounding note of the layer, a lead-is-monophonic approximation (review M3); Pulse slides do not hold the previous note over the next as the other styles do.
 
 ## By hand (Pedro)
 
@@ -47,13 +48,6 @@ All rows of this bundle are Done. The player's check of the bundle is in `docs/r
 ## Bundle 5: phase 2, vibes, chords and leads
 
 Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
-
-### P5. Lead styles
-
-- Spec 8.5: Hook, Phrase, Roll and Drift as pure seeded generators beside Pulse, with the twelve shared knobs, varied velocity, and per-note glide and accent in the layer voice.
-- Tests per style: same seed gives the same notes; always in key; Hook repeats exactly for a whole phrase when Variation is 0; Phrase ends each phrase on a chord tone and rests between phrases; Roll plays at least 12 of 16 steps with Busy at maximum; Drift's notes last at least two beats; each knob's minimum and maximum give different notes.
-
-**Done when:** all tests above pass; the five styles produce clearly different note patterns from the same seed (shown in the review report as printed patterns); `check` and `smoke` pass.
 
 ### P6. Lead screens
 
@@ -207,3 +201,4 @@ Kept here so no row disappears without a record.
 - **P2. Simple and Advanced** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 8 minor, all applied except Busy silent in Pad and bass Punch without drive, kept as choices), pushed. Report in `docs/reviews/P2.md`. C4 cleared. Bundle 4 is done.
 - **P3. Styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 8 minor, all applied; the error was a vibe's sounds and mix landing 0.1 s before the bar line), pushed. Report in `docs/reviews/P3.md`.
 - **P4. Simple chords** (23 Nov 2026). Built, reviewed (fix: 0 errors, 5 should-fix, 6 minor, all applied except M2, carried as C10 for P8), pushed. Report in `docs/reviews/P4.md`.
+- **P5. Lead styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 3 should-fix, 5 minor, all applied), pushed. Report in `docs/reviews/P5.md`, printed patterns in `docs/reviews/P5-patterns.md`.
