@@ -534,6 +534,15 @@ export function laneRects(
   const lo = pitches.length ? Math.min(...pitches) : 60;
   // A bar that holds one pitch draws it in the middle; wider bars spread over 10..82 % of the height.
   const span = Math.max(hi - lo, 1);
+  // Chords and pads (more than one pitch at once) draw each note at most 10 % tall, so the notes of a chord stay
+  // apart with a gap (bundle 4 review M1); single-line instruments keep a fifth of the lane.
+  const at = new Map<number, number>();
+  for (const n of notes) if (n.pitch !== undefined) at.set(n.step + n.shift, (at.get(n.step + n.shift) ?? 0) + 1);
+  const poly = Math.max(0, ...at.values()) > 1;
+  const distinct = [...new Set(pitches)].sort((a, b) => a - b);
+  let gap = Infinity;
+  for (let i = 1; i < distinct.length; i++) gap = Math.min(gap, ((distinct[i] - distinct[i - 1]) / span) * 70);
+  const pitchH = poly ? Math.max(3, Math.min(10, 70 / distinct.length - 2, gap - 1.5)) : 20;
   const out: LaneRect[] = [];
   for (const n of notes) {
     const s = n.step + n.shift;
@@ -548,8 +557,8 @@ export function laneRects(
       y = 12 + row * 28 + (row === 0 ? 3 : 0);
       w = Math.min(unit * 0.32, w);
     } else {
-      // A fifth of the lane tall (P1b review M8), tops spread over 10..80 % so the lowest ends at the edge.
-      h = 20;
+      // A fifth of the lane tall (P1b review M8), less for chords; tops spread over 10..80 %.
+      h = pitchH;
       y = hi === lo ? 40 : 10 + ((hi - n.pitch!) / span) * 70;
       w = Math.max(unit * 0.5, w - unit * 0.12);
     }

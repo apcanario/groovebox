@@ -118,6 +118,13 @@ describe("lane geometry (spec 8.12)", () => {
     }
     expect(r.map((n) => n.k)).toEqual(["48", "72"]);
   });
+
+  it("chord notes stay apart: each is shorter than the gap to the next (bundle 4 review M1)", () => {
+    const chord = [48, 55, 60, 64, 67].map((pitch) => ({ step: 0, len: 4, shift: 0, pitch }));
+    const r = laneRects(chord).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < r.length; i++) expect(r[i - 1].y + r[i - 1].h).toBeLessThan(r[i].y);
+    for (const n of r) expect(n.y + n.h).toBeLessThanOrEqual(100);
+  });
 });
 
 describe("the playhead keeps time", () => {

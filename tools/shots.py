@@ -57,7 +57,7 @@ CHECK = r"""() => {
     }
   }
   // Text on every tile, chip, button, dial and pill: one line, inside its edge, at least 10 px.
-  for (const c of document.querySelectorAll('button, .pill, .dial, .dial .val, .send, .meter, .tile')) {
+  for (const c of document.querySelectorAll('button, .pill, .dial, .dial .val, .send, .meter, .tile, .sheet h2')) {
     if (!shown(c)) continue;
     const box = c.getBoundingClientRect();
     if (c.scrollWidth > c.clientWidth + 0.5) bad.push(`text overflows ${name(c)}: ${c.scrollWidth} > ${c.clientWidth}`);

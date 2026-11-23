@@ -4,8 +4,8 @@
  */
 import { fitSize } from "./logic.ts";
 
-/** Everything that counts as a tile, chip, button, dial or pill. */
-export const FIT_CONTROLS = "button, .pill, .dial, .dial .val, .send, .meter, .tile";
+/** Everything that counts as a tile, chip, button, dial or pill, and the sheet titles (bundle 4 review M3). */
+export const FIT_CONTROLS = "button, .pill, .dial, .dial .val, .send, .meter, .tile, .sheet h2";
 
 const MIN_PX = 10;
 const done = new WeakMap<Element, string>();
