@@ -33,10 +33,32 @@ export interface Named {
   simple?: string;
 }
 
-/** A mood (spec section 3): a scale and a voicing. */
+/** A mood (spec section 3): a scale and a voicing. `feel`: the feel Simple Chords opens on for a song in this mood (P4). */
 export interface MoodDef extends Named {
   scale: ScaleName;
   voicing: Voicing;
+  feel?: Feel;
+}
+
+/** The six feels of Simple Chords (spec 8.4), in picker order. */
+export const FEELS = ["bright", "warm", "dreamy", "dark", "tense", "uplifting"] as const;
+export type Feel = (typeof FEELS)[number];
+
+/**
+ * A chord progression of the library (P4, spec 8.4): degrees of its mood's scale with their lengths in bars, the
+ * mood (which sets the scale) and the voicing it is written for, the feels it has and the vibes (style ids) it
+ * suits. Stored as degrees, so it transposes to any key and stays in it. `name` is plain and neutral: no artist,
+ * song or label. Until row L1 adds per-chord voicings, a mood sets the voicing (spec section 3), so `voicing` must
+ * be its mood's.
+ */
+export interface ProgressionDef {
+  order: number;
+  name: string;
+  feels: Feel[];
+  vibes: string[];
+  mood: string;
+  voicing: Voicing;
+  chords: [number, 0.5 | 1 | 2][];
 }
 
 /** A drum beat: 16 steps per voice and its swing. */

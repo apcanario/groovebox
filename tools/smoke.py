@@ -1632,6 +1632,133 @@ def walk_p3(page, failures: list) -> None:
     print("vibe arrows: next and previous landed on the bar")
 
 
+def walk_p4(page, failures: list) -> None:
+    """P4: Simple Chords while playing. Every feel shows four cards for the vibe; a tapped card plays from the next
+    bar line (mood and chords together, nothing before it), and is then shown playing; a card tapped twice cancels;
+    More chords turns the page; the vibe button borrows another vibe's cards and loads nothing; Lower and Higher
+    move the key; Advanced shows the progression as ordinary chords."""
+    E = "window.__groovebox"
+    page.click('[data-appmode="simple"]')
+    if not page.evaluate(f"{E}.playing"):
+        page.click("#play")
+        wait_for(page, f"{E}.playing", 3.0)
+    page.click('[data-tab="chords"]')
+    feels = page.eval_on_selector_all("[data-feel]", "els => els.map(e => e.dataset.feel)")
+    if feels != ["bright", "warm", "dreamy", "dark", "tense", "uplifting"]:
+        failures.append(f"Simple Chords shows the feels {feels}")
+    style = page.evaluate(f"{E}.getSong().style")
+    landings = 0
+    for feel in feels:
+        page.click(f'[data-feel="{feel}"]')
+        cards = page.eval_on_selector_all("[data-prog]", "els => els.map(e => e.dataset.prog)")
+        if len(cards) != 4:
+            failures.append(f"{style}/{feel}: {len(cards)} cards, not four")
+            continue
+        free = [c for c in cards if "playing" not in (page.get_attribute(f'[data-prog="{c}"]', "class") or "")]
+        if not free:
+            failures.append(f"{style}/{feel}: every card shows playing")
+            continue
+        card = free[0]
+        sec = page.evaluate(f"{E}.position().section")
+        wait_for(page, f"{E}.position().step >= 2 && {E}.position().step <= 8", 6.0)
+        before = page.evaluate(f"JSON.stringify([{E}.getSong().mood, {E}.getSong().sections[{sec}].chords])")
+        bar = page.evaluate(f"{E}.position().bar")
+        page.click(f'[data-prog="{card}"]')
+        want = page.evaluate(f"{E}.pending().chords")
+        if not want:
+            failures.append(f"{style}/{feel}: tapping card {card} queued nothing")
+            continue
+        if "pending" not in (page.get_attribute(f'[data-prog="{card}"]', "class") or ""):
+            failures.append(f"{style}/{feel}: card {card} not shown as Next bar")
+        if page.evaluate(f"JSON.stringify([{E}.getSong().mood, {E}.getSong().sections[{sec}].chords])") != before:
+            failures.append(f"{style}/{feel}: card {card} changed the chords before the bar line")
+        if not wait_for(page, f"!{E}.pending().chords", 6.0):
+            failures.append(f"{style}/{feel}: card {card} did not land")
+            continue
+        last = page.evaluate(f"{E}.landed.slice(-1)[0]")
+        got = page.evaluate(f"[{E}.getSong().mood, {E}.getSong().sections[{sec}].chords]")
+        if not last or not last["pending"].get("chords") or last["bar"] != bar + 1:
+            failures.append(f"{style}/{feel}: card {card} did not land on the next bar line ({bar} -> {last})")
+        elif got != [want["mood"], want["chords"]]:
+            failures.append(f"{style}/{feel}: card {card} landed as {got}, not {want}")
+        else:
+            landings += 1
+        wait_for(page, f"{E}.position().bar > {bar + 1}", 6.0)
+        if "playing" not in (page.get_attribute(f'[data-prog="{card}"]', "class") or ""):
+            failures.append(f"{style}/{feel}: card {card} is not shown playing after it landed")
+        check_sizes(page, f"simple chords {feel}", failures)
+    print(f"Simple Chords ({style}): {landings} of {len(feels)} cards landed on the next bar line, one per feel")
+    lvl = solo_bar(page, "synth", 4 * 60 / page.evaluate(f"{E}.bpm"))
+    if lvl < -60:
+        failures.append(f"the synth is silent on a card's progression ({lvl:.1f} dB)")
+
+    # Tapped twice before the bar line: cancelled, nothing lands.
+    wait_for(page, f"{E}.position().step >= 2 && {E}.position().step <= 8", 6.0)
+    cards = page.eval_on_selector_all("[data-prog]:not(.playing)", "els => els.map(e => e.dataset.prog)")
+    sec = page.evaluate(f"{E}.position().section")
+    before = page.evaluate(f"JSON.stringify({E}.getSong().sections[{sec}].chords)")
+    page.click(f'[data-prog="{cards[0]}"]')
+    page.click(f'[data-prog="{cards[0]}"]')
+    if page.evaluate(f"{E}.pending().chords"):
+        failures.append("a card tapped twice before the bar line is still queued")
+    bar = page.evaluate(f"{E}.position().bar")
+    wait_for(page, f"{E}.position().bar > {bar + 1}", 6.0)
+    if page.evaluate(f"JSON.stringify({E}.getSong().sections[{sec}].chords)") != before:
+        failures.append("a cancelled card changed the chords")
+
+    # More chords: the next four, wrapping back to the first page.
+    first = page.eval_on_selector_all("[data-prog]", "els => els.map(e => e.dataset.prog)")
+    of = page.get_attribute("#chord-more", "data-page-of")
+    pages = int(of.split("/")[1])
+    seen = {tuple(first)}
+    for _ in range(pages):
+        page.click("#chord-more")
+        seen.add(tuple(page.eval_on_selector_all("[data-prog]", "els => els.map(e => e.dataset.prog)")))
+    again = page.eval_on_selector_all("[data-prog]", "els => els.map(e => e.dataset.prog)")
+    if pages > 1 and len(seen) != pages:
+        failures.append(f"More chords showed {len(seen)} different pages, not {pages}")
+    if again != first:
+        failures.append("More chords did not wrap back to the first page")
+    print(f"More chords: {pages} pages, wraps")
+
+    # Borrow another vibe's chords: the cards change, nothing loads.
+    vibes = page.evaluate("window.__vibes")
+    other = next(v for v in vibes if v["id"] != style)
+    page.click("#chord-vibe")
+    if not page.locator(f'[data-borrow="{other["id"]}"]').count():
+        failures.append("the vibe button in the Chords title did not open the vibe picker")
+    else:
+        check_sizes(page, "borrow picker", failures)
+        page.click(f'[data-borrow="{other["id"]}"]')
+        if page.evaluate(f"{E}.pendingLoad()") or page.evaluate(f"{E}.getSong().style") != style:
+            failures.append("borrowing a vibe's chords loaded the vibe")
+        if other["name"] not in page.inner_text("#chord-vibe"):
+            failures.append(f"the vibe button does not name the borrowed vibe: {page.inner_text('#chord-vibe')!r}")
+        page.click("#chord-vibe")
+        page.click("#borrow-own")
+        print(f"borrowed {other['name']}'s chords without loading it, then went back")
+
+    # Lower and Higher: a semitone each way, at once.
+    names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    key = page.evaluate(f"{E}.getSong().key")
+    page.click('[data-transpose="1"]')
+    up = page.evaluate(f"{E}.getSong().key")
+    page.click('[data-transpose="-1"]')
+    back = page.evaluate(f"{E}.getSong().key")
+    if up != names[(names.index(key) + 1) % 12] or back != key:
+        failures.append(f"Higher then Lower moved the key {key} -> {up} -> {back}")
+
+    # Advanced shows the progression as ordinary chords.
+    sec = page.evaluate(f"{E}.position().section")
+    n = page.evaluate(f"{E}.getSong().sections[{sec}].chords.length")
+    page.click('[data-appmode="advanced"]')
+    shown = page.locator("[data-seq]").count()
+    if shown != n:
+        failures.append(f"Advanced shows {shown} chords of the card's {n}")
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+
+
 def wait_for(page, expr: str, timeout: float) -> bool:
     end = time.time() + timeout
     while time.time() < end:
@@ -1799,6 +1926,7 @@ def main() -> int:
                 failures.append("transport did not stop")
             walk_g5_songs(page, failures, f"http://localhost:{PORT}/index.html")
             walk_p3(page, failures)
+            walk_p4(page, failures)
             browser.close()
     finally:
         server.terminate()

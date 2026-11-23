@@ -201,6 +201,11 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                     page.click(f'[data-mode="{tab}:{modes[tab]}"]')
                 else:
                     w.pages(size, label)
+                if mode == "simple" and tab == "chords":
+                    # P4: the vibe picker borrowing chords, from the title's vibe button.
+                    page.click("#chord-vibe")
+                    w.screen(size, "simple-chords-borrow")
+                    page.click("#vibe-close")
             # The sheets: a held section, and Songs from the header.
             page.click('[data-tab="play"]')
             box = page.locator('[data-strip="0"]').bounding_box()

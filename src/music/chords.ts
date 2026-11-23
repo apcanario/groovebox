@@ -10,6 +10,13 @@ export interface Chord {
   tones: number[];
 }
 
+/**
+ * Where the chord instruments play (P4): the synth and the pads voice every chord inside CHORD_RANGE (A2..C6), the
+ * bass plays its root inside BASS_RANGE (E1..D#2). The library test holds every progression to them in all twelve keys.
+ */
+export const CHORD_RANGE = { lo: 45, hi: 84 } as const;
+export const BASS_RANGE = { lo: 28, hi: 39 } as const;
+
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
 
 /** Semitone offset from the tonic of the scale step `step` (may exceed 6: wraps up an octave). */

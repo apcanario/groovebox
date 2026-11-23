@@ -60,6 +60,15 @@ function Tile({ tile, on, onPick }: { tile: VibeTile; on: boolean; onPick: () =>
  * The vibe picker (spec 8.2): every vibe as a tile in two columns on one screen, coloured by family, "Continue
  * last jam" first when there is one. A tile loads its vibe and plays. It never scrolls.
  */
+/**
+ * Borrowing (P4, spec 8.4): the picker opened from Simple Chords to borrow another vibe's chords. A tile then picks
+ * whose progressions the cards show and loads nothing; "This jam's vibe" goes back to the song's own.
+ */
+export interface Borrow {
+  current: string | undefined;
+  onPick: (id: string | undefined) => void;
+}
+
 export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
   const { engine, keeper, song } = ctx;
   const [busy, setBusy] = useState(false);
@@ -103,6 +112,47 @@ export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) 
         ))}
       </div>
       <p class="note vnote">{recording ? "Stop recording to load a vibe." : "One tap loads a full groove on the next bar."}</p>
+    </div>
+  );
+}
+
+/** The vibe picker borrowing chords (P4): the same tiles on one screen; a tap chooses whose cards Simple Chords shows. */
+export function BorrowPicker({ ctx, onClose, borrow }: { ctx: Ctx; onClose: () => void; borrow: Borrow }) {
+  const tiles = vibeTiles();
+  const rows = Math.ceil(tiles.length / 2);
+  const own = ctx.song.style;
+  const pick = (id: string | undefined): void => {
+    borrow.onPick(id);
+    onClose();
+  };
+  return (
+    <div class="vibes" role="dialog" aria-label="Borrow a vibe's chords">
+      <div class="vibehead">
+        <h2>Chords from</h2>
+        <button class="btn" id="vibe-close" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <button class="btn vcont" id="borrow-own" aria-label={`This jam's vibe: ${vibeName(own) ?? "every vibe"}`} onClick={() => pick(undefined)}>
+        <span>This jam's vibe</span>
+        <small>{vibeName(own) ?? "Every vibe"}</small>
+      </button>
+      <div class="vibegrid" style={{ gridTemplateRows: `repeat(${rows}, minmax(48px, 64px))` }}>
+        {tiles.map((t) => (
+          <button
+            key={t.id}
+            class={`vibe${t.id === borrow.current ? " on" : ""}`}
+            style={{ "--c": FAMILY_COLOR[t.family] }}
+            data-borrow={t.id}
+            aria-pressed={t.id === borrow.current}
+            aria-label={`${t.name}: show its chords`}
+            onClick={() => pick(t.id)}
+          >
+            <span>{t.name}</span>
+          </button>
+        ))}
+      </div>
+      <p class="note vnote">The cards show this vibe's chords. Nothing else changes.</p>
     </div>
   );
 }

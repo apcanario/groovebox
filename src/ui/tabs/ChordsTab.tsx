@@ -1,14 +1,13 @@
 /**
- * Chords tab, easy mode (spec section 3) on two pages so nothing scrolls (P1): Chords (seven in-key
- * degree buttons, the section's sequence and its tools) and Key (mood and key). In Simple each chord is a
- * coloured block, its colour fixed by its place in the key, with no number or name (spec 8.1; P4 replaces it).
+ * Chords tab. Advanced: the G2 editor (spec 8.4), easy mode of section 3 on two pages so nothing scrolls (P1):
+ * Chords (seven in-key degree buttons, the section's sequence and its tools) and Key (mood and key). Simple
+ * (P4): a feel, four progression cards, More chords, Lower and Higher, and the vibe button (SimpleChords.tsx).
  */
 import { useEffect, useState } from "preact/hooks";
 import { MOODS, MOOD_TABLE, NOTE_NAMES, degreeChords } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Pager } from "../components.tsx";
 import {
-  CHORD_COLOR,
   MAX_CHORDS,
   addChord,
   chordName,
@@ -18,14 +17,19 @@ import {
   removeChord,
   replaceChord,
   sectionLetter,
-  SIMPLE_MOOD_LABEL,
   type PageDef,
 } from "../logic.ts";
+import { SimpleChords } from "./SimpleChords.tsx";
 
 type ChordPage = "chords" | "key";
 
 export function ChordsTab({ ctx }: { ctx: Ctx }) {
-  const { engine, song, edit, advanced } = ctx;
+  return ctx.advanced ? <ChordEditor ctx={ctx} /> : <SimpleChords ctx={ctx} />;
+}
+
+/** The G2 degree editor (Advanced, spec 8.4). */
+function ChordEditor({ ctx }: { ctx: Ctx }) {
+  const { engine, song, edit } = ctx;
   const section = song.sections[edit];
   const [sel, setSel] = useState<number | null>(null);
   const [page, setPage] = useState<ChordPage>("chords");
@@ -49,8 +53,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
   const mood = MOOD_TABLE[song.mood];
   const pages: PageDef<ChordPage>[] = [
     ["chords", `Chords · ${sectionLetter(edit)}`],
-    // Simple shows no note or scale names (spec 8.1): the mood by how it feels.
-    ["key", advanced ? `Key · ${song.key} ${mood.label}` : `Key · ${SIMPLE_MOOD_LABEL[song.mood]}`],
+    ["key", `Key · ${song.key} ${mood.label}`],
   ];
   const hint =
     sel !== null ? `Tap a chord to replace chord ${sel + 1}` : full ? "Sequence full: select a chord to replace it" : "Tap a chord to add it";
@@ -69,26 +72,11 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 aria-pressed={song.mood === m}
                 onClick={() => engine.setKeyMood(song.key, m)}
               >
-                {advanced ? MOOD_TABLE[m].label : SIMPLE_MOOD_LABEL[m]}
+                {MOOD_TABLE[m].label}
               </button>
             ))}
           </div>
-          {!advanced && (
-            <div class="row2">
-              {([-1, 1] as const).map((d) => (
-                <button
-                  key={d}
-                  class="btn"
-                  data-transpose={d}
-                  aria-label={d < 0 ? "Lower: the whole song a semitone down" : "Higher: the whole song a semitone up"}
-                  onClick={() => engine.setKeyMood(NOTE_NAMES[(NOTE_NAMES.indexOf(song.key) + d + 12) % 12], song.mood)}
-                >
-                  {d < 0 ? "Lower" : "Higher"}
-                </button>
-              ))}
-            </div>
-          )}
-          {advanced && <div class="row6">
+          <div class="row6">
             {NOTE_NAMES.map((k) => (
               <button
                 key={k}
@@ -100,7 +88,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 {k}
               </button>
             ))}
-          </div>}
+          </div>
           <p class="note">
             {section.name} · {seq.length} of {MAX_CHORDS} chords
           </p>
@@ -115,16 +103,13 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
             {chords.map((c) => (
               <button
                 key={c.degree}
-                class={`degree${advanced ? "" : " block"}`}
+                class="degree"
                 data-degree={c.degree}
-                style={{ "--dc": CHORD_COLOR[c.degree] }}
                 disabled={sel === null && full}
-                aria-label={advanced ? undefined : sel !== null ? "Put this chord in its place" : "Add this chord"}
                 onClick={() => tapDegree(c.degree)}
               >
-                {/* Simple: each chord a coloured block, no number, degree or note name (spec 8.1; P2 review E2). */}
-                {advanced && <b>{c.label}</b>}
-                {advanced && <span>{chordName(c.bass % 12, c.label, NOTE_NAMES)}</span>}
+                <b>{c.label}</b>
+                <span>{chordName(c.bass % 12, c.label, NOTE_NAMES)}</span>
               </button>
             ))}
           </div>
@@ -134,13 +119,12 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
               return (
                 <button
                   key={i}
-                  class={`step${sel === i ? " on" : ""}${advanced ? "" : " block"}`}
+                  class={`step${sel === i ? " on" : ""}`}
                   data-seq={i}
-                  style={{ "--dc": CHORD_COLOR[c.degree] }}
                   aria-pressed={sel === i}
                   onClick={() => setSel(sel === i ? null : i)}
                 >
-                  {advanced && <b>{chord.label}</b>}
+                  <b>{chord.label}</b>
                   <span>{lengthLabel(c.bars)}</span>
                 </button>
               );

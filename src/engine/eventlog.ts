@@ -17,6 +17,7 @@ export const LOG_OPS = [
   "toggleInstrument",
   "setKeyMood",
   "setChords",
+  "setProgression",
   "setDrumPreset",
   "toggleDrumStep",
   "revertDrums",

@@ -1,7 +1,6 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
 import type { ChordStep, InstrumentId, NumericPatchKey, Song } from "../engine/song.ts";
 import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
-import { MOODS, MOOD_TABLE } from "../music/scales.ts";
 
 export const MAX_CHORDS = 8;
 const LENGTHS: ChordStep["bars"][] = [1, 2, 0.5];
@@ -364,8 +363,6 @@ export function seedHeard(layer: { mode: string; arp: { direction: string } }): 
   return layer.mode === "generative" || (layer.mode === "arp" && layer.arp.direction === "random");
 }
 
-/** Moods by how they feel, for Simple (no scale names; spec 8.1). */
-export const SIMPLE_MOOD_LABEL: Record<string, string> = Object.fromEntries(MOODS.map((m) => [m, MOOD_TABLE[m].simple]));
 
 /** Sweep display in Simple: "Dark 40" left of centre (the highs go), "Thin 40" right (the lows go), "Open" at centre. */
 export function simpleSweepLabel(v: number): string {

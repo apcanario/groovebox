@@ -142,7 +142,7 @@ describe("presets as data (P3)", () => {
     for (const id of ["offbeat", "rolling", "long", "dnbSub"]) expect(BASS_PRESETS).toContain(id);
     for (const id of ["stabs", "offbeat", "sustained"]) expect(SYNTH_PRESETS).toContain(id);
     expect(MOODS).toEqual(["major", "minor", "house", "deep", "dark"]);
-    expect(MOOD_TABLE.deep).toEqual({ scale: "dorian", voicing: "extended", label: "Deep", simple: "Deep" });
+    expect(MOOD_TABLE.deep).toEqual({ scale: "dorian", voicing: "extended", label: "Deep", simple: "Deep", feel: "dreamy" });
     expect(BEAT_NAMES.dnb).toEqual({ name: "DnB", simple: "Breakbeat" });
     expect(BASS_NAMES.dnbSub).toEqual({ name: "DnB sub", simple: "Deep" });
     expect(SYNTH_NAMES.sustained.name).toBe("Held");

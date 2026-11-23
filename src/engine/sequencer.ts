@@ -27,8 +27,8 @@ import {
 } from "../music/presets.ts";
 import { createRng, deriveSeed, type Rng } from "../music/random.ts";
 import { PAD_TRIM } from "../music/sound.ts";
-import { scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
-import { SwitchQueue, type Pending } from "./queue.ts";
+import { MOODS, scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
+import { SwitchQueue, type Pending, type PendingChords } from "./queue.ts";
 import {
   cloneSong,
   INSTRUMENTS,
@@ -459,6 +459,32 @@ export class Sequencer {
     return true;
   }
 
+  /**
+   * Play a progression (P4, a Simple Chords card): the song's mood and a section's chords, together. While
+   * running it waits for the next bar line, where the section starts it from its first chord if it is playing;
+   * the same progression tapped again before then cancels it, another replaces it. Stopped, it acts at once.
+   * Returns false (and changes nothing) for an unknown mood or section or a sequence that is not 1..8 valid chords.
+   */
+  setProgression(section: number, mood: Mood, chords: ChordStep[]): boolean {
+    const s = this.song.sections[section];
+    if (!s || !MOODS.includes(mood) || !validChords(chords)) return false;
+    const p = { section, mood, chords: chords.map((c) => ({ degree: c.degree, bars: c.bars })) };
+    if (this.running) this.queue.queueChords(p);
+    else this.landChords(p);
+    return true;
+  }
+
+  private landChords(p: PendingChords): void {
+    const s = this.song.sections[p.section];
+    if (!s) return;
+    this.song.mood = p.mood;
+    s.chords = p.chords.map((c) => ({ degree: c.degree, bars: c.bars }));
+    if (!this.running) return;
+    // Every held chord restarts in the new mood; the playing section starts the progression from its first chord.
+    this.retrigger = true;
+    if (p.section === this.current) this.sectionStep = 0;
+  }
+
   /** Rename a section. Empty or blank names are refused. */
   renameSection(index: number, name: string): boolean {
     const s = this.song.sections[index];
@@ -814,6 +840,7 @@ export class Sequencer {
       this.current = p.section;
       this.enterSection(p.section);
     }
+    if (p.chords) this.landChords(p.chords);
   }
 
   /**

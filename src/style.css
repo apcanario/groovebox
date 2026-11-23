@@ -949,22 +949,128 @@ button:disabled {
 .step.on span {
   color: var(--yellow);
 }
-/* Simple: each chord a block of its colour (P2 review E2); the sequence shows its length under it. */
-.degree.block,
-.step.block {
-  background: var(--dc);
-  color: var(--bg);
+/* ---- Simple Chords (P4, spec 8.4): feel, four cards, Lower / More chords / Higher ---- */
+.btn.cvibe {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 52%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 0 12px;
+  font-weight: 700;
 }
-.step.block span {
-  color: var(--bg);
+.btn.cvibe span {
+  min-width: 0;
 }
-.step.block.on {
-  background: var(--card);
-  box-shadow: inset 0 0 0 3px var(--dc);
+.btn.cvibe.borrowed {
+  box-shadow: inset 0 0 0 2px var(--yellow);
+  color: var(--yellow);
 }
-.step.block.on span {
-  color: var(--text);
-  opacity: 1;
+.feels {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--gap);
+  margin-top: calc(var(--group) - var(--gap));
+}
+.feels .chip {
+  padding: 0 2px;
+  font-size: 13px;
+}
+/* Room for two rows of three (as groovebox-3) on a taller screen. */
+@media (min-height: 760px) {
+  .feels {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .feels .chip {
+    font-size: 14px;
+  }
+}
+/* On a phone of 640 to 759 px the four cards sit two by two; taller, one under another as in groovebox-3. */
+.cards {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(var(--hit), 1fr));
+  gap: var(--gap);
+  margin-top: calc(var(--group) - var(--gap));
+}
+.tile.card {
+  min-height: var(--hit);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "name word" "blocks blocks";
+  align-items: center;
+  gap: 6px 8px;
+  padding: 10px 12px 10px 14px;
+}
+.tile.card b {
+  grid-area: name;
+  display: block;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.card .blocks {
+  grid-area: blocks;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 12px;
+  max-height: 34px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+.card .blocks i {
+  flex-basis: 0;
+  min-width: 4px;
+  border-radius: 2px;
+}
+.card small {
+  grid-area: word;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--c);
+}
+@media (min-height: 760px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(4, minmax(var(--hit), 1fr));
+  }
+  .tile.card {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "name blocks word";
+    padding: 0 12px 0 14px;
+  }
+  .card .blocks {
+    align-self: center;
+    height: 60%;
+  }
+}
+.card.playing:not(.pending) {
+  box-shadow: inset 0 0 0 3px var(--c);
+}
+.row3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--gap);
+}
+.cardtools {
+  flex: none;
+  margin-top: calc(var(--group) - var(--gap));
+}
+.cardtools .btn {
+  padding: 0 6px;
+}
+.cardtools .more {
+  color: var(--yellow);
 }
 .seqtools {
   display: grid;

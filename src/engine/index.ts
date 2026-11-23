@@ -59,7 +59,7 @@ export { ARP_DIRECTIONS, type ArpDirection, type ArpParams } from "../music/arp.
 export { MACROS, type MacroDef, type MacroId, type MacroInstrument } from "../music/macros.ts";
 export { macroPosition } from "./macro.ts";
 export { LOCK_FROZEN, type LeadParams, type LeadStepView } from "../music/lead.ts";
-export type { Pending, PendingToggle } from "./queue.ts";
+export type { Pending, PendingChords, PendingToggle } from "./queue.ts";
 export type { LaneBar, LaneNote, LaneNotes } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { MP3_KBPS, type Take } from "./recorder.ts";
@@ -470,6 +470,19 @@ export class Engine {
     const ok = this.seq.setChords(section, chords);
     if (!ok) return false;
     this.note("setChords", [section, chords]);
+    this.changed();
+    return ok;
+  }
+
+  /**
+   * Play a progression (P4, a Simple Chords card): the song's mood and a section's chords together, from the next
+   * bar line while playing (from its first chord in the playing section), at once when stopped. The same one
+   * tapped again before the bar line cancels it. `pending().chords` shows it waiting. Returns false if refused.
+   */
+  setProgression(section: number, mood: Mood, chords: ChordStep[]): boolean {
+    const ok = this.seq.setProgression(section, mood, chords);
+    if (!ok) return false;
+    this.note("setProgression", [section, mood, chords]);
     this.changed();
     return ok;
   }
@@ -903,6 +916,8 @@ export class Engine {
       }
     }
     if (r.applied) {
+      // A progression changes the song document when it lands (P4): listeners (the screen, autosave) hear it then.
+      if (r.applied.chords && !r.loaded) Tone.getDraw().schedule(() => this.changed(), time);
       this.inFlight.land(r.bar, r.applied);
       this.landed.push(this.landedLoad ? { bar: r.bar, pending: r.applied, loaded: this.landedLoad } : { bar: r.bar, pending: r.applied });
       this.landedLoad = null;
