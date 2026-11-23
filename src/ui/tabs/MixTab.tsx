@@ -6,7 +6,7 @@ import { useEffect, useState } from "preact/hooks";
 import { INSTRUMENTS, type Engine, type LatencyHint, type MixState } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Dial, GroupLabel, Meter, Pager } from "../components.tsx";
-import { meterFraction, sweepLabel, type PageDef } from "../logic.ts";
+import { meterFraction, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 
@@ -92,9 +92,9 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
       <Pager id="mix" pages={MIX_PAGES} page={page} onPage={setPage} />
       {page === "master" && (
         <div class="dials n3">
-          <Dial id="sweep" label="Filter" value={mix.sweep} min={-1} max={1} bipolar display={sweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
+          <Dial id="sweep" label="Filter" value={mix.sweep} min={-1} max={1} bipolar display={ctx.advanced ? sweepLabel(mix.sweep) : simpleSweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
           <Dial id="pump" label="Pump" value={mix.pump} min={0} max={0.95} display={String(Math.round(mix.pump * 100))} color="var(--teal)" onChange={set("pump")} />
-          <Dial id="saturation" label="Saturate" value={mix.saturation} min={0} max={1} color="var(--coral)" onChange={set("saturation")} />
+          <Dial id="saturation" label={ctx.advanced ? "Saturate" : "Grit"} value={mix.saturation} min={0} max={1} color="var(--coral)" onChange={set("saturation")} />
         </div>
       )}
       {page === "levels" && (
@@ -130,7 +130,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
               </button>
             ))}
           </div>
-          <p class="note">Audio buffer: if it crackles, try a larger one. The page reloads; the song is kept.</p>
+          <p class="note">If it crackles, try Safe. The page reloads; the song is kept.</p>
           {pos.playing && <p class="note">Stop to change it.</p>}
           {armed && !pos.playing && <p class="note">Tap again to reload.</p>}
           <MotionSwitch />

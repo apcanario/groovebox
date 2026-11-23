@@ -16,13 +16,14 @@ import {
   removeChord,
   replaceChord,
   sectionLetter,
+  SIMPLE_MOOD_LABEL,
   type PageDef,
 } from "../logic.ts";
 
 type ChordPage = "chords" | "key";
 
 export function ChordsTab({ ctx }: { ctx: Ctx }) {
-  const { engine, song, edit } = ctx;
+  const { engine, song, edit, advanced } = ctx;
   const section = song.sections[edit];
   const [sel, setSel] = useState<number | null>(null);
   const [page, setPage] = useState<ChordPage>("chords");
@@ -46,7 +47,8 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
   const mood = MOOD_TABLE[song.mood];
   const pages: PageDef<ChordPage>[] = [
     ["chords", `Chords · ${sectionLetter(edit)}`],
-    ["key", `Key · ${song.key} ${mood.label}`],
+    // Simple shows no note or scale names (spec 8.1): the mood by how it feels.
+    ["key", advanced ? `Key · ${song.key} ${mood.label}` : `Key · ${SIMPLE_MOOD_LABEL[song.mood]}`],
   ];
   const hint =
     sel !== null ? `Tap a chord to replace chord ${sel + 1}` : full ? "Sequence full: select a chord to replace it" : "Tap a chord to add it";
@@ -65,11 +67,26 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 aria-pressed={song.mood === m}
                 onClick={() => engine.setKeyMood(song.key, m)}
               >
-                {MOOD_TABLE[m].label}
+                {advanced ? MOOD_TABLE[m].label : SIMPLE_MOOD_LABEL[m]}
               </button>
             ))}
           </div>
-          <div class="row6">
+          {!advanced && (
+            <div class="row2">
+              {([-1, 1] as const).map((d) => (
+                <button
+                  key={d}
+                  class="btn"
+                  data-transpose={d}
+                  aria-label={d < 0 ? "Lower: the whole song a semitone down" : "Higher: the whole song a semitone up"}
+                  onClick={() => engine.setKeyMood(NOTE_NAMES[(NOTE_NAMES.indexOf(song.key) + d + 12) % 12], song.mood)}
+                >
+                  {d < 0 ? "Lower" : "Higher"}
+                </button>
+              ))}
+            </div>
+          )}
+          {advanced && <div class="row6">
             {NOTE_NAMES.map((k) => (
               <button
                 key={k}
@@ -81,7 +98,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 {k}
               </button>
             ))}
-          </div>
+          </div>}
           <p class="note">
             {section.name} · {seq.length} of {MAX_CHORDS} chords
           </p>
@@ -101,8 +118,9 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 disabled={sel === null && full}
                 onClick={() => tapDegree(c.degree)}
               >
-                <b>{c.label}</b>
-                <span>{chordName(c.bass % 12, c.label, NOTE_NAMES)}</span>
+                {/* Simple: the chord's number in the key, no degree or note names (spec 8.1). */}
+                <b>{advanced ? c.label : c.degree + 1}</b>
+                {advanced && <span>{chordName(c.bass % 12, c.label, NOTE_NAMES)}</span>}
               </button>
             ))}
           </div>
@@ -117,7 +135,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                   aria-pressed={sel === i}
                   onClick={() => setSel(sel === i ? null : i)}
                 >
-                  <b>{chord.label}</b>
+                  <b>{advanced ? chord.label : c.degree + 1}</b>
                   <span>{lengthLabel(c.bars)}</span>
                 </button>
               );

@@ -326,7 +326,7 @@ def turn_all(page, where: str, failures: list) -> int:
         mix = page.evaluate("window.__groovebox.getMix()")
         if turn(page, f'[data-dial="{d}"]') < 0.05:
             failures.append(f"dial {d} on {where} did not move")
-        if page.evaluate(SONG)["patches"] == song["patches"] and page.evaluate("window.__groovebox.getMix()") == mix:
+        if page.evaluate(SONG) == song and page.evaluate("window.__groovebox.getMix()") == mix:
             failures.append(f"dial {d} on {where} changed nothing in the engine")
     check_sizes(page, where, failures)
     return len(ids)
@@ -508,8 +508,8 @@ def walk_g3(page, failures: list) -> None:
     page.click('[data-page="drums:hats"]')
     n += turn_all(page, "drums page 2", failures)
     page.click('[data-page="drums:beat"]')
-    if n != 10:
-        failures.append(f"drums tab has {n} dials, expected 10 over two pages")
+    if n != 11:
+        failures.append(f"drums tab has {n} dials, expected 11 over two pages (Swing since P2)")
 
     # Drum level is audible: the kick, clap and hats down to 0 silence the drum solo.
     loud = solo_level(page, "drums")
@@ -695,7 +695,7 @@ def check_fonts(page, failures: list) -> None:
     print(f"fonts: {sorted(set(r['loaded']))} from {[f.rsplit('/', 1)[-1] for f in r['files']]}")
 
 
-# Spec 8.12's icon table, where each icon goes at this row (Drone, Notes, Feel, FX, Back, Morph, DROP and
+# Spec 8.12's icon table, where each icon goes at this row (Drone, Notes, Feel, FX, Morph, DROP and
 # the effects do not exist yet).
 ICON_PLACES = [
     ('[data-tab="play"]', "grid_view"), ('[data-tab="chords"]', "piano"), ('[data-tab="drums"]', "adjust"),
@@ -706,7 +706,7 @@ ICON_PLACES = [
 ]
 LAYER_ICONS = [
     ('[data-mode="layer1:generative"]', "show_chart"), ('[data-mode="layer1:arp"]', "stairs"),
-    ('[data-mode="layer1:pad"]', "cloud"), ('[data-page="layer1:sound"]', "tune"), ('[data-seed="layer1"]', "casino"),
+    ('[data-mode="layer1:pad"]', "cloud"), ('[data-seed="layer1"]', "casino"), ('[data-back="layer1"]', "undo"),
     (".headrow .head", "layers"),
 ]
 
@@ -943,6 +943,128 @@ def walk_look(page, failures: list) -> None:
     if page.evaluate("document.documentElement.classList.contains('still')"):
         failures.append("motion on again: the root stays still")
     print(f"look: DM Sans only, {len(ICON_PLACES) + len(LAYER_ICONS)} icons placed, 5 lanes match the engine, playhead in time, motion switch")
+
+
+def walk_c4(page, failures: list) -> None:
+    """C4 (P2), on the default song's Groove section with its default patches: each layer soloed in Lead, Arp
+    and Pad (the lead at the G4 walk's settings). A mode switch keeps the layer's level, and Layer 2 sits with
+    Layer 1: each of the six within 6 dB of their median (before P2 the pad sat about 13 dB over the lead and
+    Layer 2 10 to 16 dB under Layer 1). Reported, so the balance can be read against Pedro's ear."""
+    page.evaluate("window.__groovebox.switchSection(1)")
+    wait_for(page, "window.__groovebox.position().section === 1", 4.0)
+    S = f"{SONG}.sections[1]"
+    saved = {lid: page.evaluate(f"{S}.{lid}") for lid in ["layer1", "layer2"]}
+    levels = {}
+    for lid in ["layer1", "layer2"]:
+        page.evaluate(f"()=>window.__groovebox.setGen(1, '{lid}', {{hits: 9, density: 1, lock: 0.5}})")
+        for mode in ["generative", "arp", "pad"]:
+            page.evaluate(f"()=>window.__groovebox.setLayerMode(1, '{lid}', '{mode}')")
+            levels[(lid, mode)] = solo_level(page, lid, seconds=3.0, settle=1.0)
+    mid = sorted(levels.values())[len(levels) // 2]
+    print("C4, solo levels (dB): " + ", ".join(f"{l} {m} {v:.1f}" for (l, m), v in levels.items()) + f"; median {mid:.1f}")
+    for (lid, mode), v in levels.items():
+        if abs(v - mid) > 6:
+            failures.append(f"C4: {lid} {mode} at {v:.1f} dB, {v - mid:+.1f} dB from the median of the layer modes")
+    for lid, layer in saved.items():
+        page.evaluate(f"()=>window.__groovebox.setLayerMode(1, '{lid}', '{layer['mode']}')")
+        gen = {k: layer["gen"][k] for k in ["hits", "density", "lock"]}
+        page.evaluate(f"(g)=>window.__groovebox.setGen(1, '{lid}', g)", gen)
+    page.evaluate("window.__groovebox.switchSection(0)")
+    wait_for(page, "window.__groovebox.position().section === 0", 4.0)
+
+
+def walk_p2(page, failures: list) -> None:
+    """P2, while playing, starting in Simple: switching mode changes nothing in the song document; each Simple
+    tab shows one picker, four macro dials and the XY pad; each macro dial moves its values, and Advanced
+    shows them; New idea and Back on both layers, in both modes; Simple shows no Advanced words."""
+    doc = "JSON.stringify(window.__groovebox.getDocument())"
+    sec = page.evaluate("window.__groovebox.position().section")
+    for tab in TABS:
+        page.click(f'[data-tab="{tab}"]')
+        before = page.evaluate(doc)
+        page.click('[data-appmode="advanced"]')
+        time.sleep(0.1)
+        mid = page.evaluate(doc)
+        page.click('[data-appmode="simple"]')
+        time.sleep(0.1)
+        if not (before == mid == page.evaluate(doc)):
+            failures.append(f"switching mode on the {tab} tab changed the song document")
+    print(f"mode switched on all {len(TABS)} tabs: the song document identical before and after")
+
+    # Simple instrument tabs: one picker (drums, bass, synth), four dials, the XY pad, plain words.
+    jargon = ["Cutoff", "Resonance", "Euclid", "Envelope", "Env amt", "Attack", "Decay", "Release", "Sustain", "Hz",
+              "Lock", "Hits", "Rotate", "Tension", "Density", "Detune", "Saw", "Tri", "4/4"]
+    for inst in LAYERS:
+        page.click(f'[data-tab="{inst}"]')
+        time.sleep(0.1)
+        ids = page.eval_on_selector_all(".body [data-dial]", "els => els.map(e => e.dataset.dial)")
+        want = [f"{inst}:macro:{m}" for m in {"drums": ["punch", "hats", "swing", "level"], "bass": ["bright", "weight", "punch", "level"],
+                "synth": ["bright", "punch", "space", "level"]}.get(inst, ["busy", "evolve", "bright", "space"])]
+        if ids != want:
+            failures.append(f"Simple {inst}: dials {ids}, the spec's table says {want}")
+        if not page.locator(f'[data-xy="{inst}"]').count():
+            failures.append(f"Simple {inst}: no XY pad")
+        if inst in ("drums", "bass", "synth"):
+            n = page.locator(".body .chips").count()
+            if n != 1:
+                failures.append(f"Simple {inst}: {n} pickers, not one")
+        lines = [t.strip() for t in page.inner_text(".body").split("\n")]
+        for w in jargon:
+            if any(t == w or t.startswith(w + " ") for t in lines):
+                failures.append(f"Simple {inst}: shows the word {w!r}")
+        check_sizes(page, f"Simple {inst}", failures)
+        for d in ids:
+            song = page.evaluate(SONG)
+            if turn(page, f'[data-dial="{d}"]') < 0.05:
+                failures.append(f"macro dial {d} did not move")
+            if page.evaluate(SONG) == song:
+                failures.append(f"macro dial {d} changed nothing in the song")
+    print("Simple tabs: one picker, four macro dials and the XY pad each; every macro dial moves the song")
+
+    # Every Simple move is visible in Advanced: a few dials read in Advanced after a Simple move.
+    S = f"{SONG}.sections[{sec}]"
+    checks = [
+        ("bass", "weight", "bass:sub", f"Math.round({SONG}.patches.bass.sub * 100)", "bass:sound"),
+        ("layer1", "busy", "layer1:gen:hits", f"{S}.layer1.gen.hits", "layer1:pattern"),
+        ("drums", "swing", "drums:swing", f"Math.round(window.__groovebox.getSong().sections[{sec}].drums.swing * 100)", "drums:hats"),
+    ]
+    for inst, macro, adv, expr, adv_page in checks:
+        page.click(f'[data-tab="{inst}"]')
+        if inst == "layer1":
+            page.click('[data-mode="layer1:generative"]')
+        turn(page, f'[data-dial="{inst}:macro:{macro}"]')
+        want = str(page.evaluate(expr))
+        page.click('[data-appmode="advanced"]')
+        page.click(f'[data-page="{adv_page}"]')
+        got = page.get_attribute(f'[data-dial="{adv}"]', "aria-valuetext")
+        if got != want:
+            failures.append(f"Simple {inst} {macro}: Advanced dial {adv} shows {got}, the song holds {want}")
+        page.click('[data-appmode="simple"]')
+    print("Simple macro moves read back on the Advanced dials (bass sub, lead hits, swing)")
+
+    # New idea and Back on both layers, in both modes.
+    for mode in ["simple", "advanced"]:
+        page.click(f'[data-appmode="{mode}"]')
+        for lid in ["layer1", "layer2"]:
+            L = f"{S}.{lid}"
+            page.click(f'[data-tab="{lid}"]')
+            was = page.evaluate(f"{L}.mode")
+            page.click(f'[data-mode="{lid}:generative"]')
+            seed = page.evaluate(f"{L}.gen.seed")
+            page.click(f'[data-seed="{lid}"]')
+            page.click(f'[data-seed="{lid}"]')
+            if page.evaluate(f"{L}.gen.seed") == seed:
+                failures.append(f"{mode} {lid}: New idea did not change the seed")
+            page.click(f'[data-back="{lid}"]')
+            page.click(f'[data-back="{lid}"]')
+            if page.evaluate(f"{L}.gen.seed") != seed:
+                failures.append(f"{mode} {lid}: Back twice did not return to the seed before two new ideas")
+            if not page.locator(f'[data-back="{lid}"]').is_disabled():
+                failures.append(f"{mode} {lid}: Back is offered with no earlier seed")
+            page.click(f'[data-mode="{lid}:{was}"]')
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    print("New idea and Back on both layers, in both modes")
 
 
 def walk_g4(page, failures: list) -> None:
@@ -1191,8 +1313,13 @@ def walk_g5_songs(page, failures: list, url: str) -> None:
     if not wait_for(page, "!!window.__groovebox", 5.0):
         failures.append("the app did not come back after a reload")
         return
+    # P2: the Simple / Advanced switch is remembered (the walk left it on Advanced).
+    if page.get_attribute('[data-appmode="advanced"]', "aria-checked") != "true":
+        failures.append("the Advanced mode was not remembered over a reload")
+    else:
+        print("the mode switch was remembered over a reload: Advanced")
     after = page.evaluate("window.__groovebox.getDocument()")
-    for k in ["name", "bpm", "key", "mood", "sections", "patches", "mix"]:
+    for k in ["name", "bpm", "key", "mood", "sections", "patches", "mix", "macros"]:
         if after.get(k) != before.get(k):
             failures.append(f"reload lost the song's {k}")
     if (after.get("log") or {}).get("events") != (before.get("log") or {}).get("events"):
@@ -1288,8 +1415,10 @@ def main() -> int:
                 failures.append("the app does not start in Simple")
             page.click("#play")
             time.sleep(0.5)
+            walk_c4(page, failures)
             walk_now(page, failures)
             walk_look(page, failures)
+            walk_p2(page, failures)
             # The rest of the walk uses Advanced's controls (the Song grid, Edit without playing).
             page.click('[data-appmode="advanced"]')
 

@@ -68,3 +68,10 @@ export function padBrightnessHz(v: number): number {
 
 /** Pad motion: how far the slow sweep closes the pad filter below its top, 0 to two octaves (in cents). */
 export const padMotionCents = (v: number): number => clamp01(v) * 2400;
+
+/**
+ * C4 (P2): a held four-note pad measured about 13 dB over the same layer's lead and arp. Pad notes play
+ * at this fraction of their velocity (-12 dB), so a mode switch keeps the layer's level and the Level and
+ * Space macros act alike in every mode. Layer 2's default level and envelope changed to match (song.ts).
+ */
+export const PAD_TRIM = 0.25;

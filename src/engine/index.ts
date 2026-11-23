@@ -33,6 +33,8 @@ import type { KeyName, Mood } from "../music/scales.ts";
 import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
 import type { ArpParams } from "../music/arp.ts";
 import type { LeadParams, LeadStepView } from "../music/lead.ts";
+import { findMacro, macroKey, sectionScoped, targetValue, type MacroId } from "../music/macros.ts";
+import { macroPosition } from "./macro.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
@@ -51,6 +53,8 @@ export {
   type SynthPreset,
 } from "../music/presets.ts";
 export { ARP_DIRECTIONS, type ArpDirection, type ArpParams } from "../music/arp.ts";
+export { MACROS, type MacroDef, type MacroId, type MacroInstrument } from "../music/macros.ts";
+export { macroPosition } from "./macro.ts";
 export { LOCK_FROZEN, type LeadParams, type LeadStepView } from "../music/lead.ts";
 export type { Pending, PendingToggle } from "./queue.ts";
 export type { LaneBar, LaneNote, LaneNotes } from "./sequencer.ts";
@@ -515,6 +519,59 @@ export class Engine {
     this.note("newSeed", [section, layer]);
     this.changed();
     return seed;
+  }
+
+  /**
+   * Back (spec 8.3): the layer's previous seed, from the last eight kept per layer per section. The lead
+   * plays again what it played under that seed. Returns the seed, or null when there is no earlier one.
+   */
+  prevSeed(section: number, layer: LayerInstrument): number | null {
+    const seed = this.seq.prevSeed(section, layer);
+    if (seed === null) return null;
+    this.note("prevSeed", [section, layer]);
+    this.changed();
+    return seed;
+  }
+
+  /** A section's swing set by hand, 0..0.5 sixteenths (the Swing dial). Acts at once. */
+  setSwing(section: number, swing: number): boolean {
+    const ok = this.seq.setSwing(section, swing);
+    if (!ok) return false;
+    this.note("setSwing", [section, swing]);
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Turn a Simple macro dial (spec 8.3) to `pos` (0..1): it writes the ordinary patch and section values
+   * its mapping names (src/music/macros.ts), so Advanced shows the result, and stores its position in the
+   * song (per section when it acts on section values). `section` is the edited section.
+   */
+  setMacro(section: number, inst: InstrumentId, id: MacroId, pos: number): boolean {
+    const def = findMacro(inst, id);
+    const s = this.seq.song.sections[section];
+    if (!def || !s || typeof pos !== "number" || !Number.isFinite(pos)) return false;
+    const p = Math.max(0, Math.min(1, pos));
+    const layer = inst as LayerInstrument;
+    for (const t of def.targets) {
+      const v = targetValue(t, p);
+      if (t.kind === "patch") this.applyParam(inst, t.key, v);
+      else if (t.kind === "swing") this.seq.setSwing(section, v);
+      else if (t.kind === "gen") this.seq.setGen(section, layer, { [t.key]: v });
+      else if (t.kind === "arp") this.seq.setArp(section, layer, { rate: v as 1 | 2 | 4 });
+      else this.seq.setPad(section, layer, { [t.key]: v });
+    }
+    const key = macroKey(inst, id);
+    if (sectionScoped(def)) s.macros = { ...s.macros, [key]: p };
+    else this.seq.song.macros = { ...this.seq.song.macros, [key]: p };
+    this.note("setMacro", [section, inst, id, p]);
+    this.changed();
+    return true;
+  }
+
+  /** Where a macro dial stands in a section (stored, or read from its first value). */
+  macroPos(section: number, inst: InstrumentId, id: MacroId): number {
+    return macroPosition(this.seq.song, section, inst, id);
   }
 
   /**

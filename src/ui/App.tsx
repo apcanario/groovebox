@@ -13,12 +13,14 @@ import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
 import { SectionSheet, SongsSheet } from "./sheets.tsx";
+import { loadMode, saveMode } from "./mode.ts";
 import { TABS, TAB_COLOR, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PlayTab } from "./tabs/PlayTab.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
 import { InstrumentTab } from "./tabs/InstrumentTab.tsx";
 import { MixTab } from "./tabs/MixTab.tsx";
 import { LayerTab } from "./tabs/LayerTab.tsx";
+import { SimpleInstrumentTab, SimpleLayerTab } from "./tabs/SimpleTab.tsx";
 
 /** What every tab gets: the engine, a fresh copy of the song, the position and the edited section. */
 export interface Ctx {
@@ -35,7 +37,7 @@ export interface Ctx {
   goTab: (t: Tab) => void;
   hint: LatencyHint;
   keeper: Keeper;
-  /** Advanced mode (spec 8.1). Until P2 it chooses the Play tab's view and allows editing without playing. */
+  /** Advanced mode (spec 8.1): app-wide, remembered; it changes what is shown, never what is heard. */
   advanced: boolean;
   /**
    * The tab body is tall enough to show the filter XY pad and the sends under every page. When it is
@@ -197,7 +199,11 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   const [pending, setPending] = useState<Pending>(() => engine.pendingShown());
   const [chosen, setChosen] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("play");
-  const [advanced, setAdvanced] = useState(false);
+  const [advanced, setAdvancedState] = useState(() => loadMode() === "advanced");
+  const setAdvanced = (on: boolean): void => {
+    saveMode(on ? "advanced" : "simple");
+    setAdvancedState(on);
+  };
   const [held, setHeld] = useState<number | null>(null);
   const [songs, setSongs] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -339,8 +345,10 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
         {tab === "play" && <PlayTab ctx={ctx} />}
         {tab === "chords" && <ChordsTab ctx={ctx} />}
         {tab === "mix" && <MixTab ctx={ctx} />}
-        {(tab === "layer1" || tab === "layer2") && <LayerTab ctx={ctx} id={tab} key={tab} />}
-        {(tab === "drums" || tab === "bass" || tab === "synth") && <InstrumentTab ctx={ctx} inst={tab} key={tab} />}
+        {(tab === "layer1" || tab === "layer2") &&
+          (advanced ? <LayerTab ctx={ctx} id={tab} key={tab} /> : <SimpleLayerTab ctx={ctx} id={tab} key={`s${tab}`} />)}
+        {(tab === "drums" || tab === "bass" || tab === "synth") &&
+          (advanced ? <InstrumentTab ctx={ctx} inst={tab} key={tab} /> : <SimpleInstrumentTab ctx={ctx} inst={tab} key={`s${tab}`} />)}
       </main>
 
       <div class="secs" style={{ gridTemplateColumns: stripCols }}>

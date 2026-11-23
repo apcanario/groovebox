@@ -25,6 +25,7 @@ import {
   type SynthPreset,
 } from "../music/presets.ts";
 import { createRng, deriveSeed, type Rng } from "../music/random.ts";
+import { PAD_TRIM } from "../music/sound.ts";
 import { scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
 import { SwitchQueue, type Pending } from "./queue.ts";
 import {
@@ -36,6 +37,9 @@ import {
   MAX_SECTION_NAME,
   newSection,
   sectionDrumGrid,
+  sectionSwing,
+  MAX_SWING,
+  SEED_HISTORY,
   validChords,
   type ChordStep,
   type InstrumentId,
@@ -244,7 +248,17 @@ export class Sequencer {
   setDrumPreset(section: number, preset: DrumPreset): boolean {
     const s = this.song.sections[section];
     if (!s || !(DRUM_PRESETS as readonly string[]).includes(preset)) return false;
-    s.drums = { preset };
+    // A swing set by hand stays with the section (the Swing dial shows it); the beat changes under it.
+    s.drums = s.drums.swing === undefined ? { preset } : { preset, swing: s.drums.swing };
+    return true;
+  }
+
+  /** Set a section's swing by hand, 0..MAX_SWING sixteenths (the Swing dial). Acts at once. */
+  setSwing(section: number, swing: number): boolean {
+    const s = this.song.sections[section];
+    const v = num(swing, 0, MAX_SWING, false);
+    if (!s || v === null) return false;
+    s.drums = { ...s.drums, swing: v };
     return true;
   }
 
@@ -266,7 +280,8 @@ export class Sequencer {
   revertDrums(section: number): boolean {
     const s = this.song.sections[section];
     if (!s || !s.drums.grid) return false;
-    s.drums = { preset: s.drums.preset };
+    const { grid: _edit, ...rest } = s.drums;
+    s.drums = rest;
     return true;
   }
 
@@ -375,8 +390,29 @@ export class Sequencer {
   newSeed(section: number, id: LayerInstrument): number | null {
     const s = this.song.sections[section];
     if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return null;
-    s[id].gen = { ...s[id].gen, seed: nextSeed(s[id].gen.seed) };
+    const seeds = [...(s[id].seeds ?? []), s[id].gen.seed].slice(-SEED_HISTORY);
+    s[id] = { ...s[id], seeds, gen: { ...s[id].gen, seed: nextSeed(s[id].gen.seed) } };
     return s[id].gen.seed;
+  }
+
+  /**
+   * Back (spec 8.3): the layer's previous seed, from the last eight. The lead starts again from that seed,
+   * so it plays the notes it played before, note for note. Returns the seed, or null when there is none.
+   */
+  prevSeed(section: number, id: LayerInstrument): number | null {
+    const s = this.song.sections[section];
+    if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return null;
+    const seeds = s[id].seeds ?? [];
+    if (!seeds.length) return null;
+    const seed = seeds[seeds.length - 1];
+    const rest = seeds.slice(0, -1);
+    const next = { ...s[id], gen: { ...s[id].gen, seed } };
+    if (rest.length) next.seeds = rest;
+    else delete next.seeds;
+    s[id] = next;
+    // Start the lead from the seed even when the same seed is cached (it may have drifted with Lock).
+    this.leads.delete(`${section}:${id}`);
+    return seed;
   }
 
   /** The current bar of a section's generative lead as it stands (for P6's step row; no caller since P1b). */
@@ -524,7 +560,7 @@ export class Sequencer {
 
     const pos = chordAt(this.song, section, this.sectionStep);
     const chordStart = pos.starts || retrigger;
-    const swing = DRUM_PATTERNS[section.drums.preset].swing;
+    const swing = sectionSwing(section);
     const shift = step % 2 === 1 ? swing : 0;
 
     if (now.has("drums")) {
@@ -694,7 +730,7 @@ export class Sequencer {
         mode: "pad",
         notes: pos.chord.notes.slice(0, 4),
         len: pos.remaining,
-        vel: 0.7,
+        vel: 0.7 * PAD_TRIM,
         shift,
       };
     }

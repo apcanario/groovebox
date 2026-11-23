@@ -1,6 +1,6 @@
 /**
  * Layer 1 and Layer 2 (G4), laid out after docs/design/look/: title and on/off, the mode switch, the
- * layer's lane (P1b; New idea beside it in Lead mode), the mode's controls (Lead: six dials; Arp: direction,
+ * layer's lane (P1b), Back and New idea (P2), the mode's controls (Lead: six dials; Arp: direction,
  * rate, octaves and gate; Pad: four dials), then the filter XY pad and the sends. A second page,
  * Sound (its switch below the sends), holds the patch dials the three modes share (wave, envelope, drive).
  * Patterns belong to the edited section; the patch belongs to the instrument. Nothing scrolls (P1):
@@ -35,6 +35,7 @@ import { INST_COLOR } from "../theme.tsx";
 import { FilterPanel, HeadRow, InstToggle } from "./InstrumentTab.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
+import { SeedButtons } from "./SimpleTab.tsx";
 
 function Generative({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
@@ -205,15 +206,10 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
         </div>
         {!roomy && <InstToggle ctx={ctx} inst={id} />}
       </div>
-      {/* The layer's lane; in Lead mode New idea (a new seed) sits beside it. */}
+      {/* The layer's lane, with Back and New idea beside it (spec 8.3: in both modes). */}
       <div class="lanerow">
         <Lane id={id} lanes={ctx.lanes} playhead />
-        {layer.mode === "generative" && (
-          <button class="btn idea" data-seed={id} aria-label="New idea: new notes for this lead" onClick={() => engine.newSeed(edit, id)}>
-            <Icon thing="New idea" />
-            <span>New idea</span>
-          </button>
-        )}
+        <SeedButtons ctx={ctx} id={id} />
       </div>
       <Pager id={id} pages={pages} page={page} onPage={setPage} />
       {page !== "filter" && (

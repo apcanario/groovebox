@@ -193,10 +193,10 @@ describe("strip word (P1 fix E1)", () => {
 describe("plays (P1 fix M4)", () => {
   it("names a preset, an edited preset, a rhythm and a layer mode", () => {
     const song = defaultSong();
-    expect(plays(song, 0, "drums")).toBe("4/4");
+    expect(plays(song, 0, "drums")).toBe("Four floor");
     song.sections[0].drums.grid = { kick: Array(16).fill(0) } as unknown as NonNullable<(typeof song.sections)[0]["drums"]["grid"]>;
-    expect(plays(song, 0, "drums")).toBe("4/4, edited");
-    expect(plays(song, 2, "bass")).toBe("Long");
+    expect(plays(song, 0, "drums")).toBe("Four floor, edited");
+    expect(plays(song, 2, "bass")).toBe("Long notes");
     expect(plays(song, 1, "synth")).toBe("Stabs");
     expect(plays(song, 0, "layer1")).toBe("Lead");
     expect(plays(song, 2, "layer1")).toBe("Arp");
@@ -226,7 +226,7 @@ describe("Now tile (P1 fix S2)", () => {
   });
   it("stopped: shows what it plays, not Next bar", () => {
     const song = defaultSong();
-    expect(nowTile(song, 0, { toggles: [{ section: 0, instrument: "drums" }] }, "drums", false)).toEqual({ on: true, queued: true, sub: "4/4" });
+    expect(nowTile(song, 0, { toggles: [{ section: 0, instrument: "drums" }] }, "drums", false)).toEqual({ on: true, queued: true, sub: "Four floor" });
     expect(nowTile(song, 9, { toggles: [] }, "bass", false).sub).toBe("Rolling"); // clamped to the last section
   });
 });

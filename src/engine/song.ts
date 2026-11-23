@@ -14,6 +14,7 @@ import {
 } from "../music/presets.ts";
 import { MOODS, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
 import { checkEvents, type LogEvent } from "./eventlog.ts";
+import { MACRO_KEYS } from "../music/macros.ts";
 
 export const INSTRUMENTS = ["drums", "bass", "synth", "layer1", "layer2"] as const;
 export type InstrumentId = (typeof INSTRUMENTS)[number];
@@ -132,7 +133,12 @@ export interface LayerPattern {
   arp: ArpParams;
   pad: PadParams;
   gen: LeadParams;
+  /** Optional (P2): earlier seeds of the lead, newest last, at most SEED_HISTORY. Back returns to the last one. */
+  seeds?: number[];
 }
+
+/** Seeds kept per layer per section for Back (spec 8.3). */
+export const SEED_HISTORY = 8;
 
 export interface ChordStep {
   degree: number; // 0..6
@@ -147,7 +153,12 @@ export interface DrumsPattern {
    * its two sixteenths plays (see `toggleEighth`).
    */
   grid?: DrumGrid;
+  /** Optional (P2): swing set by hand (the Swing dial), 0..MAX_SWING sixteenths; missing means the preset's. */
+  swing?: number;
 }
+
+/** Most swing the Swing dial gives, in sixteenths (the presets use up to 0.22). */
+export const MAX_SWING = 0.5;
 
 export interface Section {
   name: string;
@@ -158,6 +169,8 @@ export interface Section {
   synth: { rhythm: SynthPreset };
   layer1: LayerPattern;
   layer2: LayerPattern;
+  /** Optional (P2): positions 0..1 of the macro dials that act on this section ("drums.swing", "layer1.busy"). */
+  macros?: Record<string, number>;
 }
 
 /** The Mix tab's master knobs. Saved with the song (G5) so a reload keeps them. */
@@ -193,6 +206,8 @@ export interface Song {
   mix?: MixState;
   /** Optional (G5): the event log of the last take. */
   log?: EventLog;
+  /** Optional (P2): positions 0..1 of the macro dials that act on the patches ("bass.bright"). */
+  macros?: Record<string, number>;
 }
 
 export const LIMITS = { bpm: [80, 180], sections: [1, 4], chords: [1, 8] } as const;
@@ -256,7 +271,10 @@ export function defaultPatch(id: InstrumentId): Patch {
     case "layer1":
       return { ...base, wave: "triangle", attack: 0.003, decay: 0.16, sustain: 0.05, release: 0.2, cutoff: 0.8, delay: 0.5, reverb: 0.35, level: 0.35 };
     case "layer2":
-      return { ...base, attack: 0.7, decay: 0.6, sustain: 0.8, release: 1.8, cutoff: 0.45, resonance: 0.1, reverb: 0.6, level: 0.22 };
+      // C4 (P2): level 0.7 (was 0.22), so its pad, trimmed 12 dB (PAD_TRIM), sits about 2 dB under where it
+      // did; a short envelope (was attack 0.7 s, a pad's) so its lead and arp sit level with Layer 1's. Pad mode
+      // takes its attack and release from the pad settings, so the pad does not hear the envelope change.
+      return { ...base, attack: 0.02, decay: 0.3, sustain: 0.1, release: 0.4, cutoff: 0.45, resonance: 0.1, reverb: 0.6, level: 0.7 };
   }
 }
 
@@ -368,6 +386,19 @@ function checkLayer(l: unknown, at: string, errors: string[]): void {
     if (!inRange(g.length, 2, 16)) errors.push(`${at}.gen.length: must be 2..16`);
     if (!isNum(g.seed) || !Number.isInteger(g.seed)) errors.push(`${at}.gen.seed: must be an integer`);
   }
+  if (l.seeds !== undefined) {
+    const h = l.seeds;
+    if (!Array.isArray(h) || h.length > SEED_HISTORY || !h.every((x) => isNum(x) && Number.isInteger(x)))
+      errors.push(`${at}.seeds: must be at most ${SEED_HISTORY} integers`);
+  }
+}
+
+function checkMacros(m: unknown, at: string, errors: string[]): void {
+  if (!isObj(m)) return void errors.push(`${at}: not an object`);
+  for (const [k, v] of Object.entries(m)) {
+    if (!MACRO_KEYS.includes(k)) errors.push(`${at}.${k}: unknown macro`);
+    else if (!inRange(v, 0, 1)) errors.push(`${at}.${k}: must be 0..1`);
+  }
 }
 
 function checkSection(s: unknown, at: string, errors: string[]): void {
@@ -393,6 +424,9 @@ function checkSection(s: unknown, at: string, errors: string[]): void {
           errors.push(`${at}.drums.grid.${v}: must be 16 values 0..1`);
       }
   }
+  if (isObj(s.drums) && s.drums.swing !== undefined && !inRange(s.drums.swing, 0, MAX_SWING))
+    errors.push(`${at}.drums.swing: must be 0..${MAX_SWING}`);
+  if (s.macros !== undefined) checkMacros(s.macros, `${at}.macros`, errors);
   if (!isObj(s.bass) || !oneOf(s.bass.rhythm, BASS_PRESETS)) errors.push(`${at}.bass.rhythm: unknown preset`);
   if (!isObj(s.synth) || !oneOf(s.synth.rhythm, SYNTH_PRESETS)) errors.push(`${at}.synth.rhythm: unknown preset`);
   checkLayer(s.layer1, `${at}.layer1`, errors);
@@ -422,6 +456,7 @@ export function validateSong(doc: unknown): string[] {
   if (!isObj(doc)) return ["song: not an object"];
   if (doc.mix !== undefined) checkMix(doc.mix, "mix", errors);
   if (doc.log !== undefined) checkLog(doc.log, "log", errors);
+  if (doc.macros !== undefined) checkMacros(doc.macros, "macros", errors);
   if (doc.version !== 1) errors.push("version: must be 1");
   if (typeof doc.name !== "string") errors.push("name: must be a string");
   if (!oneOf(doc.key, NOTE_NAMES)) errors.push("key: unknown key");
@@ -450,6 +485,11 @@ export function serializeSong(song: Song): string {
 /** The drum grid a section plays: its edited grid, or its preset's. */
 export function sectionDrumGrid(s: Section): DrumGrid {
   return s.drums.grid ?? DRUM_PATTERNS[s.drums.preset].grid;
+}
+
+/** The swing a section plays, in sixteenths: its own (the Swing dial), or its preset's. */
+export function sectionSwing(s: Section): number {
+  return s.drums.swing ?? DRUM_PATTERNS[s.drums.preset].swing;
 }
 
 /** Longest song name, in characters. */

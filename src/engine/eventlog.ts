@@ -27,6 +27,9 @@ export const LOG_OPS = [
   "setPad",
   "setGen",
   "newSeed",
+  "prevSeed",
+  "setSwing",
+  "setMacro",
   "renameSection",
   "addSection",
   "copySection",
@@ -61,6 +64,10 @@ export function coalesceKey(op: LogOp, a: readonly unknown[]): string | null {
       return `${op}:${String(a[0])}`;
     case "bpm":
       return op;
+    case "setSwing":
+      return `${op}:${String(a[0])}`;
+    case "setMacro":
+      return `${op}:${String(a[0])}:${String(a[1])}:${String(a[2])}`;
     case "setArp":
     case "setPad":
     case "setGen":

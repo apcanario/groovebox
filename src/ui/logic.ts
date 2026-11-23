@@ -321,20 +321,53 @@ export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
 
 /** Preset names as shown on the chips. */
 export const PRESET_LABEL: Record<string, string> = {
-  fourFloor: "4/4",
+  fourFloor: "Four floor",
   houseShuffle: "Shuffle",
   techno: "Techno",
   twoStep: "2-step",
   dnb: "DnB",
   offbeat: "Offbeat",
   rolling: "Rolling",
-  long: "Long",
+  long: "Long notes",
   dnbSub: "DnB sub",
   stabs: "Stabs",
   sustained: "Held",
 };
 
 export const WAVE_LABEL: Record<string, string> = { sawtooth: "Saw", square: "Square", triangle: "Tri", sine: "Sine" };
+
+// ---- Simple (P2): plain words only (spec 8.1) ------------------------------------------
+
+/** The synth's Sound picker in Simple: the four waves by how they sound. */
+export const SIMPLE_WAVE_LABEL: Record<string, string> = { sawtooth: "Buzzy", square: "Hollow", triangle: "Soft", sine: "Pure" };
+
+/** Each macro dial's colour, as in docs/design/look/ (Busy purple, Evolve yellow, Bright orange, Space teal). */
+export const MACRO_COLOR: Record<string, string> = {
+  busy: "var(--purple)",
+  evolve: "var(--yellow)",
+  bright: "var(--orange)",
+  space: "var(--teal)",
+  punch: "var(--coral)",
+  hats: "var(--yellow)",
+  swing: "var(--purple)",
+  weight: "var(--blue)",
+  level: "var(--teal)",
+};
+
+/** The Simple XY pad's readout: Bright and Edge as 0..100, no hertz. */
+export function simpleXYReadout(x: number, y: number): string {
+  return `${Math.round(x * 100)} · ${Math.round(y * 100)}`;
+}
+
+/** Moods by how they feel, for Simple (no scale names; spec 8.1). */
+export const SIMPLE_MOOD_LABEL: Record<string, string> = { major: "Bright", minor: "Sad", house: "Warm", deep: "Deep", dark: "Dark" };
+
+/** Sweep display in Simple: "Dark 40" left of centre (the highs go), "Thin 40" right (the lows go), "Open" at centre. */
+export function simpleSweepLabel(v: number): string {
+  const n = Math.round(Math.abs(v) * 100);
+  if (n === 0) return "Open";
+  return `${v < 0 ? "Dark" : "Thin"} ${n}`;
+}
 
 /** Meter fill 0..1 for a level in dB: -60 dB empty, 0 dB full. */
 export function meterFraction(db: number): number {

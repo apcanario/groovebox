@@ -874,6 +874,11 @@ button:disabled {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--gap);
 }
+.row2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+}
 .row6 {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1466,4 +1471,51 @@ button:disabled {
 }
 .btn.song.on {
   box-shadow: inset 0 0 0 2px var(--yellow);
+}
+
+/* ---- Simple instrument tabs (P2, spec 8.3): picker, four macro dials, XY pad lowest ---- */
+.insttab.simple > .lane {
+  flex: none;
+  height: 40px;
+}
+.roomy.simple > .lane {
+  height: 52px;
+}
+/* Four dials: one row on a short phone, two by two when there is room (docs/design/look/). */
+.dials.macros {
+  flex: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 84px;
+}
+@media (min-height: 800px) {
+  .dials.macros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 104px;
+  }
+}
+.insttab.simple .xy {
+  min-height: 96px;
+}
+/* Back and New idea, side by side. */
+.seedrow {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.btn.seedbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
+  min-width: 0;
+}
+.btn.seedbtn:disabled {
+  opacity: 0.45;
+}
+.lanerow .btn.seedbtn {
+  flex: none;
+  padding: 0 10px;
+  gap: 6px;
 }

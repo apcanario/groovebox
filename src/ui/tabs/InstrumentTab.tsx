@@ -4,6 +4,7 @@
  * (P1): pages by chips at the top; the XY pad and sends sit lowest, under every page when the
  * screen is tall enough, else on a Filter page of their own.
  */
+import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import {
   BASS_PRESETS,
@@ -12,9 +13,10 @@ import {
   SEQ_STEPS,
   SYNTH_PRESETS,
   WAVES,
-  DRUM_PATTERNS,
   eighthOn,
+  MAX_SWING,
   sectionDrumGrid,
+  sectionSwing,
   type DrumVoice,
   type InstrumentId,
 } from "../../engine/index.ts";
@@ -26,7 +28,7 @@ import { Lane } from "../lanes.tsx";
 
 const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open" };
 
-function Knobs({ ctx, inst, knobs }: { ctx: Ctx; inst: InstrumentId; knobs: readonly KnobSpec[] }) {
+function Knobs({ ctx, inst, knobs, children }: { ctx: Ctx; inst: InstrumentId; knobs: readonly KnobSpec[]; children?: ComponentChildren }) {
   const patch = ctx.song.patches[inst];
   return (
     <div class={`dials n${knobs.length}`}>
@@ -43,6 +45,7 @@ function Knobs({ ctx, inst, knobs }: { ctx: Ctx; inst: InstrumentId; knobs: read
           onChange={(p) => ctx.engine.setParam(inst, k.key, knobValue(k, p))}
         />
       ))}
+      {children}
     </div>
   );
 }
@@ -140,7 +143,7 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
         onPick={(p) => engine.setDrumPreset(edit, p)}
       />
       <GroupLabel thing="Sequencer">
-        Sequencer · {edited ? "edited" : "8 steps"} · {DRUM_PATTERNS[drums.preset].swing > 0 ? "swung" : "straight"}
+        Sequencer · {edited ? "edited" : "8 steps"} · {sectionSwing(song.sections[edit]) > 0 ? "swung" : "straight"}
       </GroupLabel>
       <div class="chips" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
         {DRUM_VOICES.map((v) => (
@@ -180,6 +183,24 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/** The edited section's swing, in hundredths of a sixteenth (P2: what the Simple Swing dial moves). */
+function SwingDial({ ctx }: { ctx: Ctx }) {
+  const { engine, song, edit } = ctx;
+  const v = sectionSwing(song.sections[edit]);
+  return (
+    <Dial
+      id="drums:swing"
+      label="Swing"
+      value={v}
+      min={0}
+      max={MAX_SWING}
+      display={String(Math.round(v * 100))}
+      color={INST_COLOR.drums}
+      onChange={(x) => engine.setSwing(edit, x)}
+    />
+  );
+}
+
 type InstPage = "beat" | "rhythm" | "sound" | "kick" | "hats" | "filter";
 
 /** The pages of the Drums, Bass and Synth tabs, before the Filter page. */
@@ -204,7 +225,11 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
         <div class="page" data-shown={`${inst}:${page}`}>
           {page === "beat" && <DrumBeat ctx={ctx} />}
           {page === "kick" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
-          {page === "hats" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs} />}
+          {page === "hats" && (
+            <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs}>
+              <SwingDial ctx={ctx} />
+            </Knobs>
+          )}
           {page === "rhythm" && <GroupLabel thing="Rhythm" />}
           {page === "rhythm" && inst === "bass" && (
             <Chips
