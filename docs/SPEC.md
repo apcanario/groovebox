@@ -148,10 +148,10 @@ A style is a complete starting point: one tap gives a full groove.
 | Family | Styles |
 |---|---|
 | House | Deep house, Tropical house, Progressive, Acid house, Afro house |
-| Techno | Deep techno, Melodic techno, Minimal techno, Dub techno, Detroit techno |
+| Techno | Deep techno, Melodic techno, Minimal techno, Dub techno |
 | Breaks | Drum and bass, 2-step, Breakbeat, Dubstep, Future garage |
-| Slow | Lo-fi, Ambient, Downtempo, Synthwave, Trap |
-| Other | IDM, EDM, Trance, Electro |
+| Slow | Lo-fi, Ambient, Drone, Downtempo, Synthwave |
+| Other | IDM, EDM, Trance, Electro, Trap |
 
 - **A style's name is at most 14 characters,** so it fits a tile on one line. In Simple the word on screen is "Vibe".
 - **A style sets everything:** bpm, swing, key and mood, its chord progression, drum beat, bass rhythm, synth rhythm, the five patches, each layer's mode and lead style, send and mix settings, and four sections arranged as intro, groove, break and outro with different instruments on in each.
@@ -252,7 +252,7 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 - A bar indicator of four beat dots sits by the play button, so it is visible when "next bar" arrives.
 
 **Play tab.**
-- **Simple, "Now":** the vibe control at the top, then five large instrument buttons for the playing section, then the DROP button (section 8.9), directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
+- **Simple, "Now":** the vibe control at the top, then five large instrument buttons for the playing section, then the DROP button (section 8.9) with the Morph switch (section 8.11) beside it, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
 - **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
 
@@ -306,30 +306,65 @@ Things that make a sound weird and fun. All synthesized, all switchable while pl
 
 ### 8.9 The Drop
 
-One large button, DROP, that turns whatever section is playing into its biggest moment: a build, a cliffhanger, a swoosh, then everything at once.
+One large button, DROP, that turns whatever section is playing into its biggest moment and keeps it there until it is switched off.
 
-**What happens after a press,** all on the audio clock and starting on the next bar line:
+**Switching it on.** A press is never immediate: the track gets a few bars to prepare and deliver. Everything runs on the audio clock and starts on the next bar line.
 
 1. **Build** (2, 4 or 8 bars, set by the vibe). The bass is filtered out, the drums thin and a snare or clap roll speeds up, a noise riser sweeps upward, the reverb grows, the lead climbs.
-2. **Cliffhanger** (the last beat or half bar of the build). One of: Gap (silence), Hold (a single filtered chord hangs), Brake (the tempo sags and the pitch falls, then snaps back).
+2. **Cliffhanger** (the last beat or half bar of the build). Gap (silence) or Hold (a single filtered chord hangs). The tempo never changes.
 3. **Swoosh and impact** on the bar line: a falling noise sweep, a sub hit and a bright noise burst.
-4. **The drop** (8 or 16 bars, set by the vibe): every instrument of the section, plus extra layers.
-   - Synth: a second, wider, detuned layer an octave up.
-   - Bass: added sub and grit.
-   - Drums: more punch on the kick, open hats, a ride or crash layer, extra percussion.
-   - Layers: the lead an octave up and busier; the pad wider and brighter.
-   - Mix: deeper pump, filter fully open, a little more saturation.
-5. **Return:** at the end of the drop everything goes back to exactly what it was.
+4. **The drop:** every instrument of the section, plus extra layers. It stays on.
+
+**Switching it off.** A second press runs the reverse: over 2 or 4 bars (set by the vibe) the extra layers narrow and fall away, and on a bar line the music is back at its normal size.
+- If another section was tapped during the drop, the wind-down lands in that section. Otherwise it lands in the same one.
+- A section tapped during the drop does not switch at once; it waits for the wind-down. This is the one exception to the next-bar rule, and the section shows as queued until then.
+- A press during the build cancels it, back to normal on the next bar line.
+
+**Bigger means wider, not louder.**
+- The drop sits at the same loudness as the section it came from, within 1 dB (measured). Nothing gets turned up.
+- The size comes from layers that are added automatically and spread across the stereo field:
+  - Synth: extra detuned voices panned wide, and a second layer an octave up.
+  - Bass: the centre stays as it was; a wide, filtered upper layer is added around it.
+  - Drums: open hats, a ride or shaker layer and extra percussion, panned out; the kick is unchanged.
+  - Layers: the lead doubled an octave up with a short stereo delay; the pad wider and brighter.
+  - Mix: deeper pump and a fully open filter.
+- The build makes room for it: with the low end filtered out beforehand, the full range coming back is what reads as big.
 
 **Rules**
-- **The extra layers are an overlay.** They sit on top of the song for the length of the drop and change nothing in the song document. After the drop, every knob is where it was.
-- **Pressing again cancels** a build (back to normal on the next bar line) or ends a drop early (on the next bar line).
-- **The button counts down** the bars of the build and shows the bars left in the drop.
-- **Each vibe has its own recipe,** as data in its style file: build length, which build parts it uses, the cliffhanger, the impact, which extra layers and how strong, the drop length. Deep techno's is restrained (hats out, filter down, kick back in). Ambient's is a bloom with no drums. Lo-fi's is a tape stop and the beat falling back in. EDM's and Trance's are the full thing.
-- **It must be bigger without clipping.** The build removes low end so the return feels large; the drop may sit up to 3 dB above the section, through the limiter.
-- **Where it is:** Simple, on the Play tab between the instruments and the section strip, full width. Advanced shows the same button and adds a Drop page on the Mix tab: build length, cliffhanger, drop length and one Size knob.
-- **Recorded as one event,** so a saved jam replays it identically.
-- Brake changes the tempo for under a bar. If it cannot be made to land back exactly on the bar line, it is left out and the vibes that asked for it use Hold.
+- **The extra layers are an overlay.** They sit on top of the song while the drop is on and change nothing in the song document. After the wind-down, every knob is where it was. Knobs still work during a drop.
+- **The button shows where it is:** a countdown of bars during the build and the wind-down, lit steadily while the drop is on.
+- **Each vibe has its own recipe,** as data in its style file: build length and parts, the cliffhanger, the impact, which extra layers and how wide, the wind-down length. Deep techno's is restrained (hats out, filter down, kick back in, wider chords). Ambient's and Drone's are a slow bloom with no impact. Lo-fi's is a filter-down and the beat falling back in. EDM's and Trance's are the full thing.
+- **Where it is:** Simple, on the Play tab between the instruments and the section strip, full width. Advanced shows the same button and adds a Drop page on the Mix tab: build length, cliffhanger, wind-down length and one Width knob.
+- **Recorded as events** (on, off), so a saved jam replays it identically.
+
+### 8.10 Ambient and Drone
+
+Two vibes for coasting: drones, swooping pads, weird and slow, changing by themselves. Ambient is soft and tonal; Drone is darker and stays on one note or chord for a long time. They need things the dance vibes do not.
+
+- **Long everything:** attack and release up to 20 seconds on pads and layers; reverb decay up to 20 seconds; chords that last 4 or 8 bars (the other vibes keep half a bar to 2).
+- **A Drone mode on the layers,** beside Arp, Pad and the lead styles: one or two held notes (root, or root and fifth) that never retrigger and glide slowly when the chord changes.
+- **Swoop:** pads and drones glide in pitch between chords, with the glide time as a knob.
+- **Free-running slow movement:** a second kind of LFO, not tied to the tempo, with a period of up to two minutes, on filter, pitch (a few cents), width and send levels.
+- **An air layer:** filtered noise that breathes slowly.
+- **Tempo from 60 bpm; the beat picker's None,** or a sparse pulse.
+- **Effects that suit them:** Shifter, Vowel, Echo and the long reverb.
+- Their Drop is a bloom: no roll, no impact, the pads open and widen over 8 bars.
+
+### 8.11 Morph
+
+A switch that lets the jam change by itself, slowly, so it can be left playing.
+
+- **Simple:** one on/off button, Morph, on the Play tab, and one Speed dial on the Mix tab. On by default in Ambient and Drone, off elsewhere.
+- **What it moves,** all slowly and all within limits the vibe sets:
+  - The Bright and Space macros of each instrument drift up and down.
+  - Leads evolve: Lock eases off for a few bars now and then, so a note or two changes, then holds again.
+  - Pads and drones change voicing and register at phrase ends.
+  - Instruments drop out and return at section-length intervals.
+  - Optionally, the section moves on by itself every 16 or 32 bars.
+- **Advanced:** a Morph page on the Mix tab with a switch per thing it may move, the speed and the depth.
+- **It is seeded and recorded,** so a saved jam replays the same journey.
+- **Touching a control takes it back:** Morph leaves a control alone for 16 bars after it is moved by hand.
+- **It never writes to the song document** except through the same recorded events a hand would make.
 
 ## 9. Phase 3: tablet
 
@@ -380,7 +415,7 @@ Six momentary performance effects, all synthesized, all landing in time.
 | Stutter | The last half beat repeats while held; normal play resumes on the next beat. |
 | Echo | One tap throws the mix into the delay for a bar. |
 | Wash | One tap throws the mix into the reverb for a bar. |
-| Brake | The tempo and pitch sag while held and snap back on the next bar line after release. Left out if section 8.9's Brake was. |
+| Riser | A noise riser sweeps upward while held and falls away on release. |
 
 - Several can be held at once.
 - On a phone they are a page of the Mix tab.

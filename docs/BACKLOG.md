@@ -97,6 +97,7 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 ### P7. Sound additions
 
 - Spec 8.7, engine additions: Perc and Shaker drum voices; 16-step drum presets with repeats and the 16-step switch on the Advanced sequencer; noise oscillator and two-operator FM wave; tempo-synced filter LFO; the lo-fi master option. Each switchable off. (Chorus and the other effects are P9.)
+- Spec 8.10, what Ambient and Drone need: attack, release and reverb decay up to 20 seconds; chord lengths of 4 and 8 bars; the Drone layer mode; pitch glide between chords on pads and drones; the free-running slow LFO; the air layer. Rework the Ambient vibe of P3 to use them.
 - Measure the cost: report the smoke test's worst stall and audio load with everything on, against the same measure before the row.
 
 **Done when:** each addition is audible and can be turned off; nothing clicks when one is switched while playing; the voice cap holds; `check` and `smoke` pass.
@@ -116,25 +117,34 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 ### P8. The other sixteen vibes and the library
 
-- The remaining styles of spec 8.2: Progressive, Acid house, Afro house, Minimal techno, Dub techno, Detroit techno, Breakbeat, Dubstep, Future garage, Downtempo, Synthwave, Trap, IDM, EDM, Trance, Electro.
+- The remaining styles of spec 8.2: Progressive, Acid house, Afro house, Minimal techno, Dub techno, Drone, Breakbeat, Dubstep, Future garage, Downtempo, Synthwave, Trap, IDM, EDM, Trance, Electro.
 - The full lists of spec 8.7: at least 24 beats, 14 bass rhythms, 10 synth rhythms and 8 patches per instrument, all as data, all with names of 14 characters or fewer.
 - Every one of the 24 styles sets its two effects per instrument.
 - Revisit the first eight styles where the new sounds serve them (Lo-fi gets the lo-fi master, Ambient the airy pads).
 
 **Done when:** all 24 styles load and play (smoke test loops them); every list meets its count; every name fits its tile (tested); `check` and `smoke` pass. Whether each vibe sounds like its name is Pedro's call.
 
-## Bundle 9: phase 2, the Drop
+## Bundle 9: phase 2, the Drop and Morph
 
 ### P10. The Drop
 
-- Spec 8.9 in full: the conductor that runs build, cliffhanger, impact, drop and return on the audio clock; the overlay that adds the extra layers without touching the song document; cancel and early end; the countdown on the button.
+- Spec 8.9 in full: the conductor that runs build, cliffhanger and impact on the audio clock; the drop that stays on; the wind-down on a second press, landing in the same section or the one tapped during the drop; cancel during the build; the button's countdown and lit state.
+- The overlay that adds the extra layers without touching the song document, with the size coming from width and added layers. No stage changes the tempo.
 - The build and impact voices (noise riser, falling sweep, sub hit, noise burst, snare roll), synthesized.
 - A recipe for every one of the 24 vibes, as data in its style file.
 - Simple: the button on the Play tab. Advanced: the same button and the Drop page on the Mix tab.
-- Try Brake. If it cannot land back on the bar line every time (tested over 50 runs at three tempos), remove it and use Hold where a recipe asked for it.
 - Measure the cost of the overlay's extra voices and stay inside the voice cap, raising it only with the measured load reported.
 
-**Done when:** after a full build and drop the song document is identical to before the press (tested); every stage starts on its bar line or beat (tested on the audio clock); a second press cancels or ends it on the next bar line (tested); the master never clips during a drop in any vibe (smoke test loops all 24); `check` and `smoke` pass. Whether it goes BAM is Pedro's call, vibe by vibe.
+**Done when:** the drop's loudness is within 1 dB of the section it came from in every vibe, and its stereo width is measurably greater (both measured in the smoke test across all 24); it stays on until the second press; the wind-down lands on a bar line in the right section (tested for same and for another section); after the wind-down the song document is identical to before the first press (tested); the master never clips; `check` and `smoke` pass. Whether it goes BAM is Pedro's call, vibe by vibe.
+
+### P11. Morph
+
+- Spec 8.11: the seeded, recorded slow movement of macros, leads, pad voicings, instruments and, optionally, sections, within limits each vibe sets.
+- Simple: the Morph button on the Play tab and the Speed dial on the Mix tab. Advanced: the Morph page.
+- Hands win: a control moved by hand is left alone for 16 bars.
+- On by default in Ambient and Drone.
+
+**Done when:** with Morph on, ten minutes of Ambient in the smoke test never repeats a 16-bar stretch exactly and never leaves the key (tested); the same seed gives the same ten minutes twice (tested); a hand-moved control is not touched for 16 bars (tested); Morph off changes nothing; `check` and `smoke` pass. Whether it is good to coast on is Pedro's call.
 
 ## Bundle 10: keep it and install it
 
@@ -183,7 +193,7 @@ Spec section 9 is the brief for bundles 11 and 12. Read it in full, with section
 
 ### T3. Punch pads, movement and many fingers
 
-- Spec 9.4: the six punch pads (Cut, Filter, Stutter, Echo, Wash, Brake), each landing in time as the table says, several at once; on the phone as a page of the Mix tab. The DROP button of P10 placed beside them on both tablet layouts.
+- Spec 9.4: the six punch pads (Cut, Filter, Stutter, Echo, Wash, Riser), each landing in time as the table says, several at once; on the phone as a page of the Mix tab. The DROP button of P10 placed beside them on both tablet layouts.
 - Spec 9.5: pads pulse from per-instrument meters, playing step shown, moved dials animate, one animation loop with an off switch, audio first.
 - Spec 9.6: multi-touch on every control, tested with simultaneous pointers (two dials; XY pad and a pad; three pads).
 - Measure the cost: worst stall and audio load with animation on and off, on the smoke test, reported.
@@ -194,7 +204,7 @@ Spec section 9 is the brief for bundles 11 and 12. Read it in full, with section
 
 ### G7. Retouch
 
-Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P10, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P11, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
 
 **Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
 
@@ -208,7 +218,6 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **L6.** Knob snapshots per section.
 - **L7.** Morph between two saved generative patterns.
 - **L9.** Automatic transitions on a section switch (drum fill, filter drop), chosen per style.
-- **L12.** Autopilot: the jam slowly changes itself (leads evolve, sections rotate) when left alone.
 - **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch.
 - **L11.** Take one part from another style (only its drums, only its chords, only its sounds).
 

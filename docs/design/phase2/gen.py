@@ -340,10 +340,10 @@ page("3-simple-chords", header("simple") + transport("simple") + strip(["", "pla
 
 # 6. The vibe picker: 24 vibes on one screen
 FAM = [(C["coral"], ["Deep house", "Tropical house", "Progressive", "Acid house", "Afro house"]),
-       (C["violet"], ["Deep techno", "Melodic techno", "Minimal techno", "Dub techno", "Detroit techno"]),
+       (C["violet"], ["Deep techno", "Melodic techno", "Minimal techno", "Dub techno"]),
        (C["yellow"], ["Drum and bass", "2-step", "Breakbeat", "Dubstep", "Future garage"]),
-       (C["teal"], ["Lo-fi", "Ambient", "Downtempo", "Synthwave", "Trap"]),
-       (C["blue"], ["IDM", "EDM", "Trance", "Electro"])]
+       (C["teal"], ["Lo-fi", "Ambient", "Drone", "Downtempo", "Synthwave"]),
+       (C["blue"], ["IDM", "EDM", "Trance", "Electro", "Trap"])]
 tiles = ""
 for col, names_ in FAM:
     for n in names_:
