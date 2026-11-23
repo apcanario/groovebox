@@ -8,11 +8,15 @@ import {
   genText,
   leadCellClass,
   barLabel,
-  chooseSection,
+  beatLights,
   chordName,
   cycleLength,
   dragValue,
   editedSection,
+  editWithoutPlaying,
+  fitSize,
+  shownPage,
+  withFilterPage,
   fraction,
   hzLabel,
   keepChosen,
@@ -66,8 +70,23 @@ describe("transport and sections", () => {
     expect(editedSection(null, 2, 4)).toBe(2);
     expect(editedSection(1, 2, 4)).toBe(1);
     expect(editedSection(3, 0, 2)).toBe(1);
-    expect(chooseSection(2, 2)).toBe(null);
-    expect(chooseSection(1, 2)).toBe(1);
+  });
+  it("edit without playing is Advanced only, and never the playing section", () => {
+    expect(editWithoutPlaying(3, 1, true)).toBe(3);
+    expect(editWithoutPlaying(1, 1, true)).toBe(null);
+    expect(editWithoutPlaying(3, 1, false)).toBe(null);
+  });
+  it("beat lights: lit up to the beat playing, the bar line lights only the first, dark when stopped", () => {
+    expect(beatLights(true, 0)).toEqual([true, false, false, false]);
+    expect(beatLights(true, 9)).toEqual([true, true, true, false]);
+    expect(beatLights(true, 15)).toEqual([true, true, true, true]);
+    expect(beatLights(false, 9)).toEqual([false, false, false, false]);
+  });
+  it("text fit: the largest size that fits, never under 10 px", () => {
+    expect(fitSize(15, (px) => px * 6 <= 70)).toBe(11.5);
+    expect(fitSize(15, () => true)).toBe(15);
+    expect(fitSize(15, () => false)).toBe(10);
+    expect(fitSize(15, (px) => px <= 9)).toBe(10);
   });
 });
 
@@ -117,23 +136,34 @@ describe("section strip", () => {
     expect(keepChosen(2, 2, 4)).toBe(null);
     expect(keepChosen(3, 0, 3)).toBe(null);
   });
-  it("following: the playing section is marked playing, not edited", () => {
-    const base = { chosen: null, playing: 1, edit: 1, running: true };
-    expect(stripState(1, { ...base, name: "Groove" })).toEqual({ isPlaying: true, isEdit: false, sub: "Playing" });
-    expect(stripState(0, { ...base, name: "Intro" })).toEqual({ isPlaying: false, isEdit: false, sub: "Intro" });
+  it("following: the playing section says Playing while running, the others their names", () => {
+    const base = { chosen: null, playing: 1, running: true, queued: null };
+    expect(stripState(1, { ...base, name: "Groove" })).toEqual({ isPlaying: true, isNext: false, isEdit: false, sub: "Playing" });
+    expect(stripState(0, { ...base, name: "Intro" })).toEqual({ isPlaying: false, isNext: false, isEdit: false, sub: "Intro" });
   });
-  it("a chosen section is marked editing; the playing one still says playing", () => {
-    const base = { chosen: 2, playing: 1, edit: 2, running: true };
-    expect(stripState(2, { ...base, name: "Break" })).toEqual({ isPlaying: false, isEdit: true, sub: "Editing" });
-    expect(stripState(1, { ...base, name: "Groove" })).toEqual({ isPlaying: true, isEdit: false, sub: "Playing" });
+  it("a tapped section says Next bar until the bar line", () => {
+    const base = { chosen: null, playing: 1, running: true, queued: 2 };
+    expect(stripState(2, { ...base, name: "Break" })).toEqual({ isPlaying: false, isNext: true, isEdit: false, sub: "Next bar" });
+    expect(stripState(1, { ...base, name: "Groove" }).sub).toBe("Playing");
   });
-  it("stopped: the start section shows its name, and editing another shows Editing", () => {
-    expect(stripState(0, { chosen: null, playing: 0, edit: 0, running: false, name: "Intro" })).toEqual({
-      isPlaying: true,
-      isEdit: false,
-      sub: "Intro",
-    });
-    expect(stripState(3, { chosen: 3, playing: 0, edit: 3, running: false, name: "Drop" }).sub).toBe("Editing");
+  it("a section edited without playing says Editing; queued wins over editing", () => {
+    const base = { chosen: 3, playing: 1, running: true, queued: null };
+    expect(stripState(3, { ...base, name: "Outro" })).toEqual({ isPlaying: false, isNext: false, isEdit: true, sub: "Editing" });
+    expect(stripState(3, { ...base, queued: 3, name: "Outro" })).toEqual({ isPlaying: false, isNext: true, isEdit: true, sub: "Next bar" });
+  });
+  it("stopped: the start section shows its name, never Next bar", () => {
+    expect(stripState(0, { chosen: null, playing: 0, running: false, queued: 2, name: "Intro" }).sub).toBe("Intro");
+    expect(stripState(2, { chosen: null, playing: 0, running: false, queued: 2, name: "Break" }).sub).toBe("Break");
+  });
+});
+
+describe("pages (P1)", () => {
+  it("short screens get a Filter page; a page that disappears falls back to the first", () => {
+    const pages = [["beat", "Beat"], ["kick", "Kick"]] as const;
+    expect(withFilterPage(pages, true).map(([k]) => k)).toEqual(["beat", "kick"]);
+    expect(withFilterPage(pages, false).map(([k]) => k)).toEqual(["beat", "kick", "filter"]);
+    expect(shownPage(withFilterPage(pages, true), "filter")).toBe("beat");
+    expect(shownPage(withFilterPage(pages, false), "filter")).toBe("filter");
   });
 });
 

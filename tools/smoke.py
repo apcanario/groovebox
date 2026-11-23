@@ -2,8 +2,10 @@
 """Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar,
 then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials, section menu) and every G3 control
 (drum presets and sequencer, bass and synth rhythms, waves and dials, mix levels and meter, DnB at 174 bpm) and
-every G4 layer control (three modes, lead row, new seed, pattern and sound dials), and G5 (two takes saved as MP3
-and walked frame by frame, the event log, songs surviving a reload, new and delete) with no
+every G4 layer control (three modes, lead row, new seed, pattern and sound dials), G5 (two takes saved as MP3
+and walked frame by frame, the event log, songs surviving a reload, new and delete) and the P1 frame (header,
+one section strip whose tap always plays from the next bar, Simple's Now tiles, the frame walk of tools/shots.py
+at 360 x 640 and 412 x 915: nothing scrolls, no control cut off, no text that wraps, clips or overflows) with no
 page error, no control under 48 px and no more than six dials on one screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
@@ -19,6 +21,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
+from shots import walk_frame  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -90,6 +93,57 @@ def narrow_pass(page, failures: list, width: int = 360, height: int = 740) -> No
     print(f"all {len(TABS)} tabs checked at {width} x {height}")
 
 
+def hold(page, selector: str) -> None:
+    """Long-press an element (the section sheet, a Now tile)."""
+    drag(page, selector, 0, 0, hold=0.8)
+
+
+def walk_now(page, failures: list) -> None:
+    """P1, Simple, while playing: the Play tab's Now view (five tiles of the playing section; a tap switches
+    at the next bar, a hold opens the tab), no Edit without playing, and a strip tap on another tab
+    plays that section from the next bar, as on the Play tab."""
+    page.click('[data-tab="play"]')
+    tiles = page.eval_on_selector_all("[data-now]", "els => els.map(e => e.dataset.now)")
+    if tiles != LAYERS:
+        failures.append(f"the Now view shows {tiles}, not the five instruments")
+    sec = page.evaluate("window.__groovebox.position().section")
+    was = page.evaluate(f"{SONG}.sections[{sec}].on.layer2")
+    wait_for(page, "window.__groovebox.position().step === 2", 3.0)
+    page.click('[data-now="layer2"]')
+    if "pending" not in (page.get_attribute('[data-now="layer2"]', "class") or ""):
+        failures.append("a tapped Now tile is not shown as switching on the next bar")
+    if page.evaluate(f"{SONG}.sections[{sec}].on.layer2") != was:
+        failures.append("a Now tile switched at once, not on the next bar")
+    if not wait_for(page, f"{SONG}.sections[{sec}].on.layer2 === {str(not was).lower()}", 4.0):
+        failures.append("a Now tile's switch did not land")
+    page.click('[data-now="layer2"]')
+    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+    hold(page, '[data-now="bass"]')
+    if page.get_attribute('[data-tab="bass"]', "aria-current") != "true":
+        failures.append("holding a Now tile did not open its tab")
+    if page.evaluate("window.__groovebox.pending().toggles.length"):
+        failures.append("holding a Now tile also switched it")
+    # On the Bass tab: a strip tap plays that section from the next bar.
+    other = (sec + 1) % page.evaluate(f"{SONG}.sections.length")
+    page.click(f'[data-strip="{other}"]')
+    if page.evaluate("window.__groovebox.pending().section") != other:
+        failures.append("a strip tap on the Bass tab did not queue the section")
+    if not wait_for(page, f"window.__groovebox.position().section === {other}", 4.0):
+        failures.append("a strip tap on the Bass tab did not land")
+    page.click(f'[data-strip="{sec}"]')
+    wait_for(page, f"window.__groovebox.position().section === {sec}", 4.0)
+    hold(page, f'[data-strip="{other}"]')
+    if page.locator("#section-edit").count():
+        failures.append("Simple offers Edit without playing")
+    page.click("#section-close")
+    page.click('[data-tab="play"]')
+    print(f"Now view: {len(tiles)} tiles, tap lands on the bar, hold opens the tab; strip tap from Bass played {sectionLetter(other)}")
+
+
+def sectionLetter(i: int) -> str:
+    return chr(65 + i)
+
+
 def walk_shell(page, failures: list) -> None:
     """The G2 shell, played with the mouse as one thumb would, while the transport runs."""
     for tab in TABS:
@@ -120,6 +174,8 @@ def walk_shell(page, failures: list) -> None:
     seq2 = page.evaluate(f"{SONG}.sections[{playing}].chords")
     if len(seq2) != len(seq) - 1 or seq2[0] != seq[1]:
         failures.append(f"move and remove failed: {seq} -> {seq2}")
+    page.click('[data-page="chords:key"]')
+    check_sizes(page, "chords key page", failures)
     page.click('[data-mood="deep"]')
     page.click('[data-key="D"]')
     song = page.evaluate(SONG)
@@ -127,13 +183,20 @@ def walk_shell(page, failures: list) -> None:
         failures.append("mood or key did not change")
     page.click('[data-mood="house"]')
     page.click('[data-key="A"]')
+    page.click('[data-page="chords:chords"]')
     print(f"chords edited in section {playing}: {[c['degree'] for c in seq2]}")
 
-    # Section strip: edit section C silently while B plays.
-    page.click('[data-strip="2"]')
-    head = page.inner_text(".chordtab .head")
-    if "Break" not in head:
-        failures.append(f"strip did not select section C for editing: {head!r}")
+    # Advanced: hold section C and choose "Edit without playing": it is edited silently while B plays.
+    hold(page, '[data-strip="2"]')
+    if not page.locator("#section-edit").count():
+        failures.append("the section sheet offers no Edit without playing in Advanced")
+        return
+    page.click("#section-edit")
+    tile = page.inner_text('[data-strip="2"]')
+    if "editing" not in tile.lower():
+        failures.append(f"edit without playing did not mark section C: {tile!r}")
+    if page.evaluate("window.__groovebox.pending().section") is not None:
+        failures.append("edit without playing queued a section switch")
     page.click('[data-degree="1"]')
     if page.evaluate(f"{SONG}.sections[2].chords.slice(-1)[0].degree") != 1:
         failures.append("chord edit did not reach the edited section")
@@ -154,7 +217,12 @@ def walk_shell(page, failures: list) -> None:
         failures.append("XY pad did not move the synth cutoff")
     drag(page, '[data-send="reverb"]', 30, 0)
     print(f"synth cutoff {cut:.2f} -> {p['cutoff']:.2f}, resonance {p['resonance']:.2f}")
-    page.click('[data-strip="1"]')  # back to following
+    hold(page, '[data-strip="2"]')
+    if page.inner_text("#section-edit") != "Stop editing":
+        failures.append("the edited section's sheet does not offer Stop editing")
+    page.click("#section-edit")  # back to following
+    if "editing" in page.inner_text('[data-strip="2"]').lower():
+        failures.append("Stop editing left section C marked Editing")
 
     # Mix dial: vertical drag.
     page.click('[data-tab="mix"]')
@@ -168,9 +236,11 @@ def walk_shell(page, failures: list) -> None:
         failures.append(f"filter dial did not come back to open ({sweep:.2f})")
 
     # Buffer choice reloads and resets the song: refused while playing.
+    page.click('[data-page="mix:audio"]')
     for h in ["interactive", "playback"]:
         if not page.locator(f'[data-hint="{h}"]').is_disabled():
             failures.append(f"buffer choice {h} is not disabled while playing")
+    page.click('[data-page="mix:master"]')
 
     # Tempo: drag up on the bpm pill.
     bpm = page.evaluate(f"{SONG}.bpm")
@@ -180,11 +250,11 @@ def walk_shell(page, failures: list) -> None:
         failures.append(f"bpm drag did nothing ({bpm} -> {bpm2})")
     drag(page, "#bpm", 0, 40)
 
-    # Section menu: long-press a column header, rename, delete, add back.
+    # Section sheet: hold a section in the strip, rename, delete, add back.
     page.click('[data-tab="play"]')
-    drag(page, '[data-col="3"]', 0, 0, hold=0.8)
+    hold(page, '[data-strip="3"]')
     if not page.locator("#section-name").count():
-        failures.append("long-press on a column header did not open the section menu")
+        failures.append("holding a section did not open the section sheet")
         return
     check_sizes(page, "section menu", failures)
     page.fill("#section-name", "Drop")
@@ -193,22 +263,23 @@ def walk_shell(page, failures: list) -> None:
         failures.append("rename failed")
     if page.evaluate("window.__groovebox.pending().section") is not None:
         failures.append("a long-press also switched section")
-    drag(page, '[data-col="3"]', 0, 0, hold=0.8)
+    hold(page, '[data-strip="3"]')
     page.click("#section-delete")
     n = page.evaluate(f"{SONG}.sections.length")
     if n != 3:
         failures.append(f"delete failed: {n} sections")
-    page.click("#add-section")
+    hold(page, '[data-strip="0"]')
+    page.click("#section-add")
     n = page.evaluate(f"{SONG}.sections.length")
-    if n != 4 or page.locator('[data-col="3"]').count() != 1:
+    if n != 4 or page.locator('[data-strip="3"]').count() != 1:
         failures.append(f"add section failed: {n} sections")
     print("section menu: rename, delete, add")
 
     # Copy section A while B plays: B moves to index 2, and positions scheduled before the copy
     # (carrying the old index) must still name Groove once drawn.
-    drag(page, '[data-col="3"]', 0, 0, hold=0.8)
+    hold(page, '[data-strip="3"]')
     page.click("#section-delete")
-    drag(page, '[data-col="0"]', 0, 0, hold=0.8)
+    hold(page, '[data-strip="0"]')
     page.click("#section-copy")
     names = page.evaluate(f"{SONG}.sections.map(s => s.name)")
     if len(names) != 4 or names[1] != names[0] + " 2":
@@ -363,6 +434,7 @@ def walk_held_synth(page, sec: int, failures: list) -> None:
     # attack and release, so the voice count follows the notes.
     page.evaluate(f"window.__groovebox.setChords({sec}, [{{degree: 0, bars: 2}}, {{degree: 3, bars: 2}}])")
     page.evaluate("window.__groovebox.setParams('synth', {attack: 0.005, release: 0.05})")
+    page.click('[data-page="synth:rhythm"]')
     page.click('[data-rhythm="sustained"]')
     if not wait_for(page, "window.__groovebox.activeVoices('synth') >= 3", 5.0):
         failures.append(f"synth on Held sounds no chord ({page.evaluate('window.__groovebox.activeVoices(' + chr(39) + 'synth' + chr(39) + ')')} voices)")
@@ -371,6 +443,7 @@ def walk_held_synth(page, sec: int, failures: list) -> None:
 
     # Detune on the held chord: every sub-oscillator lands on +-spread/2 of the new spread.
     before = page.evaluate("window.__groovebox.detunes('synth')")
+    page.click('[data-page="synth:sound"]')
     turn(page, '[data-dial="synth:detune"]')
     spread = page.evaluate(f"{SONG}.patches.synth.detune") * 60
     time.sleep(0.25)
@@ -386,6 +459,7 @@ def walk_held_synth(page, sec: int, failures: list) -> None:
     # Held -> Stabs mid-chord: the held chord is released, so within a bar there is a moment between
     # two short stabs with no voice sounding. A held chord left on (two-bar chords) never lets it reach 0.
     bar = 4 * 60 / page.evaluate(f"{SONG}.bpm")
+    page.click('[data-page="synth:rhythm"]')
     page.click('[data-rhythm="stabs"]')
     low = held
     end = time.time() + bar + 0.3
@@ -427,10 +501,11 @@ def walk_g3(page, failures: list) -> None:
     page.click("#drums-revert")
     if page.evaluate(f"{S}.drums.grid !== undefined"):
         failures.append("revert did not drop the sequencer edit")
+    page.click('[data-page="drums:kick"]')
     n = turn_all(page, "drums page 1", failures)
-    page.click('[data-page="drums:1"]')
+    page.click('[data-page="drums:hats"]')
     n += turn_all(page, "drums page 2", failures)
-    page.click('[data-page="drums:0"]')
+    page.click('[data-page="drums:beat"]')
     if n != 10:
         failures.append(f"drums tab has {n} dials, expected 10 over two pages")
 
@@ -448,6 +523,7 @@ def walk_g3(page, failures: list) -> None:
     # Bass and Synth: every rhythm, every wave, every dial.
     for inst, rhythms in [("bass", ["offbeat", "rolling", "long", "dnbSub"]), ("synth", ["stabs", "offbeat", "sustained"])]:
         page.click(f'[data-tab="{inst}"]')
+        page.click(f'[data-page="{inst}:rhythm"]')
         for r in rhythms:
             page.click(f'[data-rhythm="{r}"]')
             time.sleep(0.25)
@@ -459,7 +535,9 @@ def walk_g3(page, failures: list) -> None:
             time.sleep(0.25)
             if page.evaluate(f"{SONG}.patches.{inst}.wave") != w:
                 failures.append(f"{inst} wave {w} did not take")
+        page.click(f'[data-page="{inst}:sound"]')
         k = turn_all(page, f"{inst} tab", failures)
+        page.click(f'[data-page="{inst}:rhythm"]')
         print(f"{inst}: {len(rhythms)} rhythms, 4 waves, {k} dials")
         lvl = solo_level(page, inst)
         if lvl < -60:
@@ -473,7 +551,7 @@ def walk_g3(page, failures: list) -> None:
     meter = page.inner_text("#meter")
     if "db" not in meter.lower():
         failures.append(f"master meter shows no level: {meter!r}")
-    page.click('[data-page="mix:1"]')
+    page.click('[data-page="mix:levels"]')
     ids = dials_on_screen(page, "mix levels", failures)
     if sorted(ids) != sorted(f"level:{i}" for i in LAYERS):
         failures.append(f"mix levels page has {ids}")
@@ -491,7 +569,7 @@ def walk_g3(page, failures: list) -> None:
     print(f"master meter {meter.split()[-2:]}; bass solo {bass:.1f} dB, level 0: {muted:.1f} dB")
     if not muted < bass - 20:
         failures.append(f"bass level 0 did not silence the bass ({bass:.1f} -> {muted:.1f} dB)")
-    page.click('[data-page="mix:0"]')
+    page.click('[data-page="mix:master"]')
     if len(dials_on_screen(page, "mix master", failures)) != 3:
         failures.append("mix master page lost its dials")
 
@@ -604,7 +682,7 @@ def walk_g4(page, failures: list) -> None:
         walk_pad_to_arp(page, sec, lid, failures)
 
         # Sound page: wave chips and the shared patch dials.
-        page.click(f'[data-page="{lid}:1"]')
+        page.click(f'[data-page="{lid}:sound"]')
         for w in ["square", "sine", "sawtooth", "triangle"]:
             page.click(f'[data-wave="{w}"]')
             time.sleep(0.1)
@@ -613,7 +691,7 @@ def walk_g4(page, failures: list) -> None:
         k = turn_all(page, f"{lid} sound", failures)
         if k != 5:
             failures.append(f"{lid}: sound page has {k} dials, not 5")
-        page.click(f'[data-page="{lid}:0"]')
+        page.click(f'[data-page="{lid}:pattern"]')
 
         page.click(f'[data-mode="{lid}:{saved_mode}"]')
         if saved_mode != "pad":
@@ -777,11 +855,14 @@ def walk_g5_songs(page, failures: list, url: str) -> None:
         failures.append("reload lost the event log")
     print(f"reload kept {after['name']!r}: {len(after['sections'])} sections, mix {after['mix']}, "
           f"log of {len((after.get('log') or {}).get('events', []))} events")
-    if "Smoke jam" not in page.inner_text("#songs-open"):
-        failures.append("the song bar does not show the reopened song")
+    if "Smoke jam" not in (page.get_attribute("#songs-open", "aria-label") or ""):
+        failures.append("the Songs button does not name the reopened song")
 
-    page.click("#songs-open")
-    page.click("#song-new")
+    # New jam, in the header: a new song; the jam it replaces stays in Songs.
+    page.click('[data-tab="mix"]')
+    if page.locator("#new-jam").is_disabled():
+        failures.append("New jam is disabled while stopped")
+    page.click("#new-jam")
     time.sleep(0.3)
     name = page.evaluate("window.__groovebox.getSong().name")
     n = page.evaluate("window.__keeper.list().then(l => l.length)")
@@ -859,13 +940,20 @@ def main() -> int:
             )
             page.goto(f"http://localhost:{PORT}/index.html")
             wait_for(page, "!!window.__groovebox", 5.0)
+            if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
+                failures.append("the app does not start in Simple")
             page.click("#play")
             time.sleep(0.5)
+            walk_now(page, failures)
+            # The rest of the walk uses Advanced's controls (the Song grid, Edit without playing).
+            page.click('[data-appmode="advanced"]')
 
-            # Section B (Groove) has every instrument on. The switch waits for the bar line.
-            page.click('[data-col="1"]')
-            if "pending" not in (page.get_attribute('[data-col="1"]', "class") or ""):
+            # Section B (Groove) has every instrument on. A tap on the strip waits for the bar line.
+            page.click('[data-strip="1"]')
+            if "pending" not in (page.get_attribute('[data-strip="1"]', "class") or ""):
                 failures.append("queued section is not shown as pending")
+            if "next bar" not in page.inner_text('[data-strip="1"]').lower():
+                failures.append(f"queued section does not say Next bar: {page.inner_text('.secs')!r}")
             if page.evaluate("window.__groovebox.pending().section") != 1:
                 failures.append("section switch was not queued")
             if not wait_for(page, "window.__groovebox.position().section === 1", 4.0):
@@ -948,6 +1036,11 @@ def main() -> int:
             walk_g3(page, failures)
             walk_g4(page, failures)
             walk_g5_record(page, failures)
+            if not page.locator("#new-jam").is_disabled():
+                failures.append("New jam is allowed while playing")
+            n = walk_frame(page, failures)
+            print(f"frame walk: {n} screens at 360 x 640 and 412 x 915, both modes")
+            page.click('[data-appmode="advanced"]')
             narrow_pass(page, failures)
             if not page.evaluate("window.__groovebox.playing"):
                 failures.append("the transport stopped during the shell walk")

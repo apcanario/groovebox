@@ -135,11 +135,13 @@ export function Dial({ label, value, min, max, step = 0, display, color, onChang
       data-dial={id ?? label.toLowerCase()}
       {...drag}
     >
-      <svg viewBox="0 0 78 78" aria-hidden="true">
-        <path d={arc(135, 405)} class="track" />
-        {to - from > 0.5 && <path d={arc(from, to)} style={{ stroke: color }} class="arc" />}
-      </svg>
-      <div class="val">{text}</div>
+      <div class="knob">
+        <svg viewBox="0 0 78 78" aria-hidden="true">
+          <path d={arc(135, 405)} class="track" />
+          {to - from > 0.5 && <path d={arc(from, to)} style={{ stroke: color }} class="arc" />}
+        </svg>
+        <div class="val">{text}</div>
+      </div>
       <label style={{ color }}>{label}</label>
     </div>
   );
@@ -305,7 +307,7 @@ export function Chips<T extends string>({
   cols?: number;
 }) {
   return (
-    <div class="chips" style={{ gridTemplateColumns: `repeat(${cols ?? options.length}, 1fr)` }}>
+    <div class="chips" style={{ gridTemplateColumns: `repeat(${cols ?? options.length}, minmax(0, 1fr))` }}>
       {options.map((o) => (
         <button
           key={o}
@@ -321,13 +323,23 @@ export function Chips<T extends string>({
   );
 }
 
-/** Page switch inside a tab: where an instrument needs more than six dials. */
-export function Pager({ pages, page, onPage, id }: { pages: string[]; page: number; onPage: (i: number) => void; id: string }) {
+/** Page chips at the top of a tab (spec 8.6): where a tab holds more than fits one screen. */
+export function Pager<K extends string>({
+  pages,
+  page,
+  onPage,
+  id,
+}: {
+  pages: readonly (readonly [K, string])[];
+  page: K;
+  onPage: (k: K) => void;
+  id: string;
+}) {
   return (
-    <div class="seg pager" style={{ gridTemplateColumns: `repeat(${pages.length}, 1fr)` }}>
-      {pages.map((p, i) => (
-        <button key={p} class={i === page ? "on" : ""} data-page={`${id}:${i}`} aria-pressed={i === page} onClick={() => onPage(i)}>
-          {p}
+    <div class="seg pager" style={{ gridTemplateColumns: `repeat(${pages.length}, minmax(0, 1fr))` }}>
+      {pages.map(([k, label]) => (
+        <button key={k} class={k === page ? "on" : ""} data-page={`${id}:${k}`} aria-pressed={k === page} onClick={() => onPage(k)}>
+          {label}
         </button>
       ))}
     </div>

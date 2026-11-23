@@ -1,12 +1,12 @@
 /**
- * Mix tab: filter sweep, pump and saturation (page Master), level per instrument (page Levels),
- * the master level meter, and the audio buffer choice.
+ * Mix tab: the master level meter over three pages: filter sweep, pump and saturation (Master),
+ * level per instrument (Levels), and the audio buffer choice (Audio).
  */
 import { useEffect, useState } from "preact/hooks";
 import { INSTRUMENTS, type Engine, type LatencyHint, type MixState } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Dial, Meter, Pager } from "../components.tsx";
-import { meterFraction, sweepLabel } from "../logic.ts";
+import { meterFraction, sweepLabel, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME } from "../theme.tsx";
 
 /** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
@@ -35,6 +35,13 @@ const BUFFERS = [
   ["playback", "Safe"],
 ] as const;
 
+type MixPage = "master" | "levels" | "audio";
+const MIX_PAGES: PageDef<MixPage>[] = [
+  ["master", "Master"],
+  ["levels", "Levels"],
+  ["audio", "Audio"],
+];
+
 export function MixTab({ ctx }: { ctx: Ctx }) {
   const { engine, hint, pos } = ctx;
   // Changing the buffer reloads the page; the song is saved first and reopens (G5). Refused while
@@ -45,24 +52,22 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
     if (armed === h) void ctx.keeper.flush().then(() => (location.href = `?hint=${h}`));
     else setArmed(h);
   };
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState<MixPage>("master");
   const mix = engine.getMix();
   const set = (k: keyof MixState) => (v: number) => engine.setMix(k, v);
   return (
     <section class="mixtab">
-      <h1 class="head">
-        <em>Mix</em>
-      </h1>
       <MasterMeter engine={engine} />
-      <Pager id="mix" pages={["Master", "Levels"]} page={page} onPage={setPage} />
-      {page === 0 ? (
-        <div class="dials">
+      <Pager id="mix" pages={MIX_PAGES} page={page} onPage={setPage} />
+      {page === "master" && (
+        <div class="dials n3">
           <Dial id="sweep" label="Filter" value={mix.sweep} min={-1} max={1} bipolar display={sweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
           <Dial id="pump" label="Pump" value={mix.pump} min={0} max={0.95} display={String(Math.round(mix.pump * 100))} color="var(--teal)" onChange={set("pump")} />
           <Dial id="saturation" label="Saturate" value={mix.saturation} min={0} max={1} color="var(--coral)" onChange={set("saturation")} />
         </div>
-      ) : (
-        <div class="dials">
+      )}
+      {page === "levels" && (
+        <div class="dials n5">
           {INSTRUMENTS.map((id) => (
             <Dial
               key={id}
@@ -77,24 +82,27 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
           ))}
         </div>
       )}
-      <div class="label">
-        Audio buffer · if it crackles, try a larger one. {pos.playing ? "Stop to change it: " : ""}The page reloads; the song is kept.
-      </div>
-      <div class="seg">
-        {BUFFERS.map(([h, name]) => (
-          <button
-            key={h}
-            class={`${hint === h ? "on" : ""}${armed === h ? " armed" : ""}`}
-            data-hint={h}
-            aria-pressed={hint === h}
-            disabled={pos.playing && hint !== h}
-            onClick={() => choose(h)}
-          >
-            {armed === h && !pos.playing ? "Tap again" : name}
-          </button>
-        ))}
-      </div>
-      {armed && !pos.playing && <p class="note">Tap again to reload.</p>}
+      {page === "audio" && (
+        <>
+          <div class="seg">
+            {BUFFERS.map(([h, name]) => (
+              <button
+                key={h}
+                class={`${hint === h ? "on" : ""}${armed === h ? " armed" : ""}`}
+                data-hint={h}
+                aria-pressed={hint === h}
+                disabled={pos.playing && hint !== h}
+                onClick={() => choose(h)}
+              >
+                {armed === h && !pos.playing ? "Tap again" : name}
+              </button>
+            ))}
+          </div>
+          <p class="note">Audio buffer: if it crackles, try a larger one. The page reloads; the song is kept.</p>
+          {pos.playing && <p class="note">Stop to change it.</p>}
+          {armed && !pos.playing && <p class="note">Tap again to reload.</p>}
+        </>
+      )}
     </section>
   );
 }

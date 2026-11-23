@@ -38,9 +38,12 @@ export function editedSection(chosen: number | null, playing: number, count: num
   return Math.max(0, Math.min(count - 1, i));
 }
 
-/** Tapping a section in the strip: the playing one goes back to following, any other is edited silently. */
-export function chooseSection(tapped: number, playing: number): number | null {
-  return tapped === playing ? null : tapped;
+/**
+ * Holding a section and choosing "Edit without playing" (spec 8.6, Advanced only): the held section is
+ * edited while the playing one keeps playing. Holding the playing section, or Simple, means following.
+ */
+export function editWithoutPlaying(held: number, playing: number, advanced: boolean): number | null {
+  return advanced && held !== playing ? held : null;
 }
 
 /** A chosen section that no longer exists, or that is now the playing one, goes back to following (null). */
@@ -49,28 +52,51 @@ export function keepChosen(chosen: number | null, playing: number, count: number
 }
 
 export interface StripInput {
-  /** Section chosen for editing, or null when following. */
+  /** Section chosen with "Edit without playing", or null when following. */
   chosen: number | null;
   /** Section heard now (or the one Play starts from). */
   playing: number;
-  /** Section being edited (from editedSection). */
-  edit: number;
   /** Whether the transport runs. */
   running: boolean;
+  /** The section queued to start on the next bar line, or null. */
+  queued: number | null;
   /** The section's name. */
   name: string;
 }
 
+export interface StripView {
+  isPlaying: boolean;
+  isNext: boolean;
+  isEdit: boolean;
+  /** The word under the letter. */
+  sub: string;
+}
+
 /**
- * One button of the section strip. The edit mark shows only when editing departs from following:
- * a chosen section, or the edited one when it is not the playing one. The label says "Playing" for
- * the section heard while running, "Editing" for the edited one, and the name otherwise.
+ * One tile of the section strip (spec 8.6): three states, each with its word under the letter.
+ * Next bar wins over Editing (a queued section is about to play); Playing shows only while running.
  */
-export function stripState(i: number, s: StripInput): { isPlaying: boolean; isEdit: boolean; sub: string } {
+export function stripState(i: number, s: StripInput): StripView {
   const isPlaying = i === s.playing;
-  const isEdit = i === s.edit && (s.chosen !== null || !isPlaying);
-  const sub = isPlaying && s.running ? "Playing" : isEdit ? "Editing" : s.name;
-  return { isPlaying, isEdit, sub };
+  const isNext = s.running && s.queued === i && !isPlaying;
+  const isEdit = s.chosen === i && !isPlaying;
+  const sub = isNext ? "Next bar" : isPlaying && s.running ? "Playing" : isEdit ? "Editing" : s.name;
+  return { isPlaying, isNext, isEdit, sub };
+}
+
+/** The four beat lights of the transport bar: lit up to the beat now playing; all dark when stopped. */
+export function beatLights(playing: boolean, step: number): boolean[] {
+  const beat = playing ? Math.floor((((step % 16) + 16) % 16) / 4) : -1;
+  return [0, 1, 2, 3].map((b) => b <= beat);
+}
+
+/**
+ * Text fit (spec 8.6): the largest font size from `start` down to `min`, in steps of `step`, at which
+ * `fits` holds; `min` when none does (the label must then be shortened in the source).
+ */
+export function fitSize(start: number, fits: (px: number) => boolean, min = 10, step = 0.5): number {
+  for (let px = start; px > min; px -= step) if (fits(px)) return px;
+  return min;
 }
 
 // ---- Chord sequence edits (each returns a new array, or the same one when refused) ----
@@ -172,6 +198,22 @@ export function paginate<T>(items: readonly T[], size = 6): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out.length ? out : [[]];
+}
+
+/** A page of a tab: its key and the word on its chip. */
+export type PageDef<K extends string = string> = readonly [K, string];
+
+/** The page shown: the chosen one while it exists, else the first. */
+export function shownPage<K extends string>(pages: readonly PageDef<K>[], page: K): K {
+  return pages.some(([k]) => k === page) ? page : pages[0][0];
+}
+
+/**
+ * Instrument tab pages (no-scroll rule, spec 8.6): the tab's own pages, plus a Filter page holding
+ * the XY pad and the sends when the screen is too short to show them under every page.
+ */
+export function withFilterPage<K extends string>(pages: readonly PageDef<K>[], roomy: boolean): PageDef<K | "filter">[] {
+  return roomy ? [...pages] : [...pages, ["filter", "Filter"]];
 }
 
 export interface KnobPage {

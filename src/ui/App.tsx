@@ -1,12 +1,16 @@
 /**
- * The shell (G2): transport bar, section strip, tab bar and the eight tabs. The UI reads the song
- * and the position from the engine and calls the engine for every change; it never touches audio.
+ * The frame (P1, spec 8.6), top to bottom on every tab: the header (New jam, Songs, Simple and
+ * Advanced), the tab's own content, the section strip, the transport bar and the tab bar. Nothing
+ * scrolls. The UI reads the song and the position from the engine and calls the engine for every
+ * change; it never touches audio.
  */
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Engine, MOOD_TABLE, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import { Engine, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
 import type { Keeper } from "../store/keeper.ts";
-import { Sheet, useVerticalDrag } from "./components.tsx";
-import { barLabel, chooseSection, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
+import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
+import { startFit } from "./fit.ts";
+import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
+import { SectionSheet, SongsSheet } from "./sheets.tsx";
 import { TABS, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PlayTab } from "./tabs/PlayTab.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
@@ -27,9 +31,60 @@ export interface Ctx {
   goTab: (t: Tab) => void;
   hint: LatencyHint;
   keeper: Keeper;
+  /** Advanced mode (spec 8.1). Until P2 it chooses the Play tab's view and allows editing without playing. */
+  advanced: boolean;
+  /**
+   * The tab body is tall enough to show the filter XY pad and the sends under every page. When it is
+   * not, instrument tabs give them a page of their own, so nothing scrolls.
+   */
+  roomy: boolean;
 }
 
-const SCALE_SHORT = { major: "maj", minor: "min", dorian: "dor", phrygian: "phr" } as const;
+/** Tab body height (CSS px) from which the XY pad and sends sit under every page. */
+export const ROOMY_PX = 560;
+
+/** Watches the tab body's height. */
+function useRoomy(ref: { current: HTMLElement | null }): boolean {
+  const [roomy, setRoomy] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = (): void => setRoomy(el.clientHeight >= ROOMY_PX);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return roomy;
+}
+
+/** One tile of the section strip: a tap plays it from the next bar line; a hold opens its sheet. */
+function StripTile({
+  i,
+  name,
+  view,
+  onTap,
+  onHold,
+}: {
+  i: number;
+  name: string;
+  view: ReturnType<typeof stripState>;
+  onTap: () => void;
+  onHold: () => void;
+}) {
+  const press = useLongPress(onTap, onHold);
+  return (
+    <button
+      class={`sec${view.isPlaying ? " playing" : ""}${view.isEdit ? " edit" : ""}${view.isNext ? " pending" : ""}`}
+      data-strip={i}
+      aria-label={`Section ${sectionLetter(i)} ${name}: ${view.sub}. Tap to play from the next bar, hold for options`}
+      {...press}
+    >
+      <b>{sectionLetter(i)}</b>
+      <span>{view.sub}</span>
+    </button>
+  );
+}
 
 /** Keep the screen on while playing (spec section 2). Released on stop; re-taken when the page returns. */
 function useWakeLock(on: boolean): void {
@@ -138,10 +193,16 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   const [pending, setPending] = useState<Pending>(() => engine.pendingShown());
   const [chosen, setChosen] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("play");
+  const [advanced, setAdvanced] = useState(false);
+  const [held, setHeld] = useState<number | null>(null);
+  const [songs, setSongs] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [take, setTake] = useState<NamedTake | null>(null);
   const [saveFailed, setSaveFailed] = useState(keeper.failed);
+  const [idle, setIdle] = useState(keeper.idle());
+  const bodyRef = useRef<HTMLElement | null>(null);
+  const roomy = useRoomy(bodyRef);
   const rec = useRecordInfo(engine);
   useEffect(() => engine.onTake(setTake), [engine]);
   useEffect(() => keeper.onChange(() => setSaveFailed(keeper.failed)), [keeper]);
@@ -159,23 +220,29 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
       setSong(engine.getSong());
       setPending(engine.pendingShown());
       setPos(engine.position());
+      setIdle(keeper.idle());
     });
     return () => {
       offPos();
       offChange();
     };
-  }, [engine]);
+  }, [engine, keeper]);
+  useEffect(() => setIdle(keeper.idle()), [keeper, pos.playing, rec.state]);
+
+  // Text fits its tile: re-fitted after any change on screen and on resize (display only).
+  useEffect(() => startFit(document.body), []);
 
   useWakeLock(pos.playing);
 
   const count = song.sections.length;
   const playing = Math.min(pos.section, count - 1);
   const edit = editedSection(chosen, playing, count);
-  // A chosen section that no longer exists, or that is now the playing one, goes back to following.
+  // A chosen section that no longer exists, or that is now the playing one, goes back to following;
+  // Simple has no editing without playing.
   useEffect(() => {
-    const keep = keepChosen(chosen, playing, count);
+    const keep = advanced ? keepChosen(chosen, playing, count) : null;
     if (keep !== chosen) setChosen(keep);
-  }, [chosen, count, playing]);
+  }, [chosen, count, playing, advanced]);
 
   const togglePlay = async (): Promise<void> => {
     if (engine.playing) {
@@ -195,70 +262,49 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   };
 
   const bpmDrag = useVerticalDrag(song.bpm, 80, 180, (v) => (engine.bpm = v), 1, 400);
-  const ctx: Ctx = { engine, song, pos, pending, edit, playing, goTab: setTab, hint, keeper };
+  const ctx: Ctx = { engine, song, pos, pending, edit, playing, goTab: setTab, hint, keeper, advanced, roomy };
   const taking = rec.state === "recording" || rec.state === "finishing";
-  const mood = MOOD_TABLE[song.mood];
+  const lights = beatLights(pos.playing, pos.step);
+  // On the Advanced Play tab the strip is the grid's column labels: indented under its four columns.
+  const gridStrip = tab === "play" && advanced;
+  const stripCols = `${gridStrip ? "var(--rowhead) " : ""}repeat(${count}, minmax(0, 1fr))`;
 
   return (
-    <div class="shell">
-      <div class="top">
+    <div class={`shell${tab === "play" && !advanced ? " now" : ""}`}>
+      <header class="hdr">
         <button
-          id="play"
-          class={`play${pos.playing ? " on" : ""}`}
-          aria-label={pos.playing ? "Stop" : "Play"}
-          disabled={starting}
-          onClick={() => void togglePlay()}
+          class="btn hb"
+          id="new-jam"
+          aria-label="New jam: start a new song; this one stays in Songs"
+          disabled={!idle}
+          onClick={() => void keeper.create()}
         >
-          <i />
+          <span class="plus" aria-hidden="true">+</span>
+          <span>New jam</span>
         </button>
-        <div class="pill drag" id="bpm" role="slider" aria-label="Tempo, drag up or down" aria-valuenow={song.bpm} {...bpmDrag}>
-          <b>{song.bpm}</b>
-          <span>bpm</span>
+        <button class="btn hb" id="songs-open" aria-label={`Songs: ${song.name}`} onClick={() => setSongs(true)}>
+          <span>Songs</span>
+        </button>
+        <div class="modesw" role="radiogroup" aria-label="Mode">
+          {(["simple", "advanced"] as const).map((m) => {
+            const on = (m === "advanced") === advanced;
+            return (
+              <button
+                key={m}
+                class={`btn${on ? " on" : ""}`}
+                data-appmode={m}
+                role="radio"
+                aria-checked={on}
+                onClick={() => setAdvanced(m === "advanced")}
+              >
+                {m === "simple" ? "Simple" : "Advanced"}
+              </button>
+            );
+          })}
         </div>
-        <button class="pill key" id="keymood" aria-label="Key and mood: open Chords" onClick={() => setTab("chords")}>
-          <b>
-            {song.key} {SCALE_SHORT[mood.scale]}
-          </b>
-          <span>{mood.label}</span>
-        </button>
-        <div class="pill bar" aria-label="Bar and beat">
-          <b id="bar">{barLabel(pos.playing, pos.bar, pos.step)}</b>
-          <span>bar</span>
-        </div>
-        <button
-          id="rec"
-          class={`rec ${rec.state}`}
-          aria-label={recordLabel(rec.state)}
-          aria-pressed={rec.state !== "off"}
-          disabled={rec.state === "finishing"}
-          onClick={() => engine.record()}
-        >
-          <i />
-          {taking && <b id="rec-time">{clockLabel(rec.seconds)}</b>}
-        </button>
-      </div>
+      </header>
 
-      <div class="secs" style={{ gridTemplateColumns: `repeat(${count}, 1fr)` }}>
-        {song.sections.map((s, i) => {
-          const { isPlaying, isEdit, sub } = stripState(i, { chosen, playing, edit, running: pos.playing, name: s.name });
-          const queued = pending.section === i;
-          return (
-            <button
-              key={i}
-              class={`sec${isPlaying ? " playing" : ""}${isEdit ? " edit" : ""}${queued ? " pending" : ""}`}
-              data-strip={i}
-              aria-label={`Edit section ${sectionLetter(i)} ${s.name}`}
-              aria-pressed={i === edit}
-              onClick={() => setChosen(chooseSection(i, playing))}
-            >
-              <b>{sectionLetter(i)}</b>
-              <span>{sub}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <main class="body">
+      <main class="body" ref={bodyRef}>
         {error && <p class="err">{error}</p>}
         {rec.error && rec.state === "off" && (
           <p class="err" id="rec-err">
@@ -273,16 +319,78 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
         {(tab === "drums" || tab === "bass" || tab === "synth") && <InstrumentTab ctx={ctx} inst={tab} key={tab} />}
       </main>
 
-      {take && <TakeSheet take={take} onClose={() => setTake(null)} />}
+      <div class="secs" style={{ gridTemplateColumns: stripCols }}>
+        {gridStrip && <div class="seclabel">Sections</div>}
+        {song.sections.map((s, i) => (
+          <StripTile
+            key={i}
+            i={i}
+            name={s.name}
+            view={stripState(i, { chosen, playing, running: pos.playing, queued: pending.section, name: s.name })}
+            onTap={() => engine.switchSection(i)}
+            onHold={() => setHeld(i)}
+          />
+        ))}
+      </div>
+
+      <div class="top">
+        <button
+          id="play"
+          class={`play${pos.playing ? " on" : ""}`}
+          aria-label={pos.playing ? "Stop" : "Play"}
+          disabled={starting}
+          onClick={() => void togglePlay()}
+        >
+          <i />
+        </button>
+        <div class="pill drag" id="bpm" role="slider" aria-label="Tempo, drag up or down" aria-valuenow={song.bpm} {...bpmDrag}>
+          <b>{song.bpm}</b>
+          <span>bpm</span>
+        </div>
+        <div class="pill bar" aria-label="Bar and beat">
+          <b id="bar">{barLabel(pos.playing, pos.bar, pos.step)}</b>
+          <span>bar</span>
+        </div>
+        <div class="beats" id="beats" aria-label={`Beat ${lights.lastIndexOf(true) + 1} of 4`}>
+          {lights.map((on, b) => (
+            <i key={b} class={`${on ? "on" : ""}${b === 0 ? " one" : ""}`} data-beat={b} />
+          ))}
+        </div>
+        <button
+          id="rec"
+          class={`rec ${rec.state}`}
+          aria-label={recordLabel(rec.state)}
+          aria-pressed={rec.state !== "off"}
+          disabled={rec.state === "finishing"}
+          onClick={() => engine.record()}
+        >
+          <i />
+          {taking && <b id="rec-time">{clockLabel(rec.seconds)}</b>}
+        </button>
+      </div>
 
       <nav class="tabs">
         {TABS.map((t) => (
           <button key={t} class={`tab${t === tab ? " on" : ""}`} data-tab={t} aria-current={t === tab} onClick={() => setTab(t)}>
             <TabIcon tab={t} />
-            {TAB_NAME[t]}
+            <span>{TAB_NAME[t]}</span>
           </button>
         ))}
       </nav>
+
+      {take && <TakeSheet take={take} onClose={() => setTake(null)} />}
+      {songs && <SongsSheet ctx={ctx} onClose={() => setSongs(false)} />}
+      {held !== null && (
+        <SectionSheet
+          ctx={ctx}
+          index={held}
+          advanced={advanced}
+          chosen={chosen}
+          onChoose={setChosen}
+          onClose={() => setHeld(null)}
+          key={held}
+        />
+      )}
     </div>
   );
 }

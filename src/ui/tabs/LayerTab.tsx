@@ -3,12 +3,13 @@
  * switch, the mode's controls (Generative: the 16-step row, new seed and six dials; Arp: direction,
  * rate, octaves and gate; Pad: four dials), then the filter XY pad and the sends. A second page,
  * Sound (its switch below the sends), holds the patch dials the three modes share (wave, envelope, drive).
- * Patterns belong to the edited section; the patch belongs to the instrument.
+ * Patterns belong to the edited section; the patch belongs to the instrument. Nothing scrolls (P1):
+ * the page chips sit at the top, and on a short screen the XY pad and sends get a Filter page.
  */
 import { useState } from "preact/hooks";
 import { ARP_DIRECTIONS, LAYER_MODES, WAVES, type ArpDirection, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
+import { Chips, Dial, Pager } from "../components.tsx";
 import {
   ARP_DIRECTION_LABEL,
   ARP_OCTAVES,
@@ -17,19 +18,20 @@ import {
   GEN_KNOBS,
   LAYER_MODE_LABEL,
   LAYER_MODE_ORDER,
-  LAYER_MODE_TITLE,
   LAYER_PATCH_KNOBS,
   PAD_KNOBS,
   WAVE_LABEL,
   genText,
-  hzLabel,
   knobPos,
   knobText,
   knobValue,
   leadCellClass,
-  sectionLetter,
+  shownPage,
+  withFilterPage,
+  type PageDef,
 } from "../logic.ts";
-import { INST_COLOR, INST_NAME } from "../theme.tsx";
+import { INST_COLOR } from "../theme.tsx";
+import { FilterPanel, HeadRow, InstToggle } from "./InstrumentTab.tsx";
 
 function Generative({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit, pos, playing } = ctx;
@@ -50,7 +52,7 @@ function Generative({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
           </svg>
         </button>
       </div>
-      <div class="dials">
+      <div class="dials n6">
         {GEN_KNOBS.map((k) => (
           <Dial
             key={k.key}
@@ -77,7 +79,6 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const octs = ARP_OCTAVES.map(String);
   return (
     <>
-      <div class="label">Direction</div>
       <Chips
         name="arpdir"
         options={ARP_DIRECTIONS}
@@ -86,28 +87,22 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
         onPick={(d) => engine.setArp(edit, id, { direction: d })}
       />
       <div class="arprow">
-        <div>
-          <div class="label">Rate</div>
-          <Chips
-            name="arprate"
-            options={rates}
-            value={String(arp.rate)}
-            label={(r) => ARP_RATE_LABEL[Number(r)]}
-            onPick={(r) => engine.setArp(edit, id, { rate: Number(r) as 1 | 2 | 4 })}
-          />
-        </div>
-        <div>
-          <div class="label">Octaves</div>
-          <Chips
-            name="arpoct"
-            options={octs}
-            value={String(arp.octaves)}
-            label={(o) => o}
-            onPick={(o) => engine.setArp(edit, id, { octaves: Number(o) as 1 | 2 | 3 })}
-          />
-        </div>
+        <Chips
+          name="arprate"
+          options={rates}
+          value={String(arp.rate)}
+          label={(r) => ARP_RATE_LABEL[Number(r)]}
+          onPick={(r) => engine.setArp(edit, id, { rate: Number(r) as 1 | 2 | 4 })}
+        />
+        <Chips
+          name="arpoct"
+          options={octs}
+          value={String(arp.octaves)}
+          label={(o) => `${o} oct`}
+          onPick={(o) => engine.setArp(edit, id, { octaves: Number(o) as 1 | 2 | 3 })}
+        />
       </div>
-      <div class="dials">
+      <div class="dials n1">
         <Dial
           id={`${id}:arp:gate`}
           label="Gate"
@@ -127,7 +122,7 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
   const pad = song.sections[edit][id].pad;
   return (
-    <div class="dials">
+    <div class="dials n4">
       {PAD_KNOBS.map((k) => (
         <Dial
           key={k.key}
@@ -147,11 +142,11 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
 
 /** The patch dials shared by every mode: wave, envelope, drive. */
 function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string }) {
+  const { roomy } = ctx;
   const { engine, song } = ctx;
   const patch = song.patches[id];
   return (
     <>
-      <div class="label">Wave</div>
       <Chips
         name="wave"
         options={WAVES}
@@ -159,8 +154,8 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
         label={(w) => WAVE_LABEL[w]}
         onPick={(w) => engine.setParam(id, "wave", w)}
       />
-      {mode === "pad" && <p class="note">In Pad mode the Pad page's attack and release shape the chord.</p>}
-      <div class="dials">
+      {roomy && mode === "pad" && <p class="note">In Pad mode the Pad page's attack and release shape the chord.</p>}
+      <div class="dials n5">
         {LAYER_PATCH_KNOBS.map((k) => (
           <Dial
             key={k.key}
@@ -179,66 +174,49 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
   );
 }
 
+type LayerPage = "pattern" | "sound" | "filter";
+
 export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
-  const { engine, song, edit, pending } = ctx;
-  const [page, setPage] = useState(0);
-  const patch = song.patches[id];
-  const section = song.sections[edit];
-  const layer = section[id];
-  const on = section.on[id];
-  const queued = pending.toggles.some((t) => t.section === edit && t.instrument === id);
-  const hz = engine.cutoffHz(id, patch.cutoff);
-  const readout = `${hz === null ? `${Math.round(patch.cutoff * 100)}%` : hzLabel(hz)} · ${Math.round(patch.resonance * 100)}%`;
-  const color = INST_COLOR[id];
+  const { engine, edit, roomy } = ctx;
+  const [chosen, setPage] = useState<LayerPage>("pattern");
+  const layer = ctx.song.sections[edit][id];
+  const base: PageDef<LayerPage>[] = [
+    ["pattern", LAYER_MODE_LABEL[layer.mode]],
+    ["sound", "Sound"],
+  ];
+  const pages = withFilterPage(base, roomy);
+  const page = shownPage(pages, chosen);
   return (
-    <section class="insttab layertab" style={{ "--c": color }}>
-      <div class="headrow">
-        <h1 class="head">
-          <em style={{ color }}>{INST_NAME[id]}</em> · {LAYER_MODE_TITLE[layer.mode]}
-        </h1>
-        <Toggle
-          on={on}
-          pending={queued}
-          color={color}
-          label={`${INST_NAME[id]} in section ${sectionLetter(edit)}`}
-          id={id}
-          onToggle={() => engine.toggleInstrument(edit, id)}
-        />
+    <section class={`insttab layertab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[id] }}>
+      {/* On a short screen the name row gives way: the on/off switch joins the mode row. */}
+      {roomy && <HeadRow ctx={ctx} inst={id} />}
+      <div class={`modes${roomy ? "" : " withtog"}`}>
+        <div class="modegroup" role="radiogroup" aria-label="Mode">
+          {LAYER_MODE_ORDER.filter((m) => (LAYER_MODES as readonly string[]).includes(m)).map((m) => (
+            <button
+              key={m}
+              class={`mode${layer.mode === m ? " on" : ""}`}
+              data-mode={`${id}:${m}`}
+              role="radio"
+              aria-checked={layer.mode === m}
+              onClick={() => engine.setLayerMode(edit, id, m)}
+            >
+              {LAYER_MODE_LABEL[m]}
+            </button>
+          ))}
+        </div>
+        {!roomy && <InstToggle ctx={ctx} inst={id} />}
       </div>
-      {queued && <p class="note">Switches {on ? "off" : "on"} on the next bar.</p>}
-      <div class="modes" role="radiogroup" aria-label="Mode">
-        {LAYER_MODE_ORDER.filter((m) => (LAYER_MODES as readonly string[]).includes(m)).map((m) => (
-          <button
-            key={m}
-            class={`mode${layer.mode === m ? " on" : ""}`}
-            data-mode={`${id}:${m}`}
-            role="radio"
-            aria-checked={layer.mode === m}
-            onClick={() => engine.setLayerMode(edit, id, m)}
-          >
-            {LAYER_MODE_LABEL[m]}
-          </button>
-        ))}
-      </div>
-      {page === 0 && layer.mode === "generative" && <Generative ctx={ctx} id={id} />}
-      {page === 0 && layer.mode === "arp" && <Arp ctx={ctx} id={id} />}
-      {page === 0 && layer.mode === "pad" && <Pad ctx={ctx} id={id} />}
-      {page === 1 && <Sound ctx={ctx} id={id} mode={layer.mode} />}
-      <XYPad
-        id={id}
-        x={patch.cutoff}
-        y={patch.resonance}
-        xLabel="Cutoff"
-        yLabel="Resonance"
-        readout={readout}
-        onChange={(x, y) => engine.setParams(id, { cutoff: x, resonance: y })}
-      />
-      <div class="sends">
-        <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => engine.setParam(id, "delay", v)} />
-        <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => engine.setParam(id, "reverb", v)} />
-      </div>
-      {/* Below the sends, so the first screen keeps the design's order: modes, pattern, XY pad, sends. */}
-      <Pager id={id} pages={[LAYER_MODE_LABEL[layer.mode], "Sound"]} page={page} onPage={setPage} />
+      <Pager id={id} pages={pages} page={page} onPage={setPage} />
+      {page !== "filter" && (
+        <div class="page" data-shown={`${id}:${page}`}>
+          {page === "pattern" && layer.mode === "generative" && <Generative ctx={ctx} id={id} />}
+          {page === "pattern" && layer.mode === "arp" && <Arp ctx={ctx} id={id} />}
+          {page === "pattern" && layer.mode === "pad" && <Pad ctx={ctx} id={id} />}
+          {page === "sound" && <Sound ctx={ctx} id={id} mode={layer.mode} />}
+        </div>
+      )}
+      {(roomy || page === "filter") && <FilterPanel ctx={ctx} inst={id} />}
     </section>
   );
 }
