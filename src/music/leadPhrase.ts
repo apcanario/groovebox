@@ -1,6 +1,6 @@
 /**
  * Phrase (spec 8.5): a line in call and response, A, A varied, A, B, each part a quarter of the phrase (a bar
- * at Phrase 4). Every part ends on a chord tone and leaves at least two steps of rest before the next, so the
+ * at Phrase 4). A line needs room, so Phrase 1 plays as 2 bars (parts of half a bar). Every part ends on a chord tone and leaves at least two steps of rest before the next, so the
  * phrase rests between phrases and ends on a chord tone. B, the last part, answers A: Variation sets how much
  * of A it changes; at 0 only its last note answers, lower. Pure and seeded.
  */
@@ -9,8 +9,13 @@ import { height, lengthFactor, pickSteps, velocity, type LeadKnobs, type Plan, t
 /** Steps of rest kept at the end of every part. */
 export const PHRASE_REST = 2;
 
+/** Bars of a Phrase-style phrase: at least two, so each part is half a bar or more (P5 review M5). */
+export function phraseStyleBars(phrase: number): number {
+  return Math.max(2, phrase);
+}
+
 export function phrasePlan(k: LeadKnobs, rand: Rand): Plan {
-  const steps = 16 * k.phrase;
+  const steps = 16 * phraseStyleBars(k.phrase);
   const part = steps / 4;
   const active = Math.max(1, Math.floor(part * 0.7));
   const grid = part >= 8 ? 2 : 1;

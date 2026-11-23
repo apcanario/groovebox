@@ -187,9 +187,13 @@ class Channel {
    * An accented note (P5, spec 8.5): the filter opens by up to an octave at `time` and settles back over about
    * 0.15 s, through the filter's detune, so the cutoff (the XY pad) is never touched. Never past the channel's
    * top (10 kHz, C1). Both moves are setTargetAtTime curves from whatever value the detune has: no step.
+   * The filter is the layer channel's, so a note still sounding under the accented one brightens with it
+   * (P5 review M3): spec 8.5's per-note boost is approximated, as the lead plays mostly one note at a time.
    */
   accent(time: number): void {
-    const base = this.cutoffHz(this.cutoffValue);
+    // From the cutoff sounding now, not the XY pad's target: while a drag from bright to dark ramps the cutoff
+    // down, the target is lower than the filter, and an octave above it could pass 10 kHz (P5 review S3).
+    const base = Math.max(this.cutoffHz(this.cutoffValue), nativeValue(this.filter.frequency));
     const cents = Math.max(0, Math.min(1200, 1200 * Math.log2(this.hz[1] / base)));
     if (cents <= 0) return;
     const p = nativeParam(this.filter.detune);
@@ -703,6 +707,8 @@ export class Poly extends Instrument {
 
   /** Glides started (P5), for the smoke test. */
   glides = 0;
+  /** Glides not started because the layer had no voice free and the note was dropped (P5 review S2). */
+  glideDrops = 0;
 
   /**
    * `lead` (P5, layers in Lead mode): `glideFrom` starts the note's pitch at that MIDI note and slides it to its
@@ -712,14 +718,22 @@ export class Poly extends Instrument {
     this.atTime(time, () => {
       this.polys.retireIf((p) => p.activeVoices === 0);
       const poly = this.polys.live!.synth;
+      type Active = { _activeVoices: { midi: number; voice: Tone.Synth }[] };
+      const was = (poly as unknown as Active)._activeVoices.length;
       poly.triggerAttackRelease(notes.map(midiToHz), dur, time, vel);
+      const active = (poly as unknown as Active)._activeVoices;
       this.channel.triggerEnv(time, dur, this.env);
       if (lead?.accent) this.channel.accent(time);
       if (lead?.glideFrom !== undefined && notes.length === 1) {
         // The voice just started is the last one PolySynth listed (it starts synchronously at or after now).
-        const active = (poly as unknown as { _activeVoices: { voice: Tone.Synth }[] })._activeVoices;
-        const voice = active[active.length - 1]?.voice;
-        if (voice) {
+        // At maxPolyphony PolySynth drops the note and starts no voice: then the last entry is another note
+        // still sounding, which must not bend (P5 review S2).
+        const last = active[active.length - 1];
+        // PolySynth keys a voice by its note read as Tone.Midi (here the Hz value passed): compare the same way.
+        const key = Tone.Midi(midiToHz(notes[0])).toMidi();
+        const voice = active.length > was && last && last.midi === key ? last.voice : undefined;
+        if (!voice) this.glideDrops++;
+        else {
           const f = nativeParam(voice.frequency);
           const t = Math.max(time, Tone.getContext().currentTime);
           const g = Math.max(0.01, lead.glide ?? 0.06);

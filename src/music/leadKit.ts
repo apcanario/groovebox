@@ -152,6 +152,13 @@ export interface PlanNote {
   /** Glides into the next note: it holds until the next note starts, which slides from its pitch. */
   slide?: boolean;
   accent?: boolean;
+  /**
+   * Moves by step (Drift): given the note played before it, when its pool note would leap from that one (or
+   * stay on it while the scale note its height picks moves), it plays the pool note nearest that scale note
+   * within two semitones of the note before, else the scale note itself, which is in key. At Tension 0 it
+   * stays on chord tones, as every style does.
+   */
+  near?: boolean;
 }
 
 export interface Plan {
@@ -201,12 +208,28 @@ export function windowNotes(pcs: number[], lo: number, hi: number): number[] {
  * window, then it moves to the nearest note of its pool (chord tones, or passing tones), so neighbouring
  * heights stay neighbouring notes whatever the pool.
  */
-export function realize(n: Pick<PlanNote, "h" | "pool" | "chord" | "oct">, tension: number, ctx: LeadContext, win: { lo: number; hi: number }): number {
+export function realize(
+  n: Pick<PlanNote, "h" | "pool" | "chord" | "oct" | "near">,
+  tension: number,
+  ctx: LeadContext,
+  win: { lo: number; hi: number },
+  from?: number,
+): number {
   const scale = windowNotes(ctx.scale, win.lo, win.hi);
   const target = scale[Math.min(scale.length - 1, Math.round(Math.max(0, Math.min(1, n.h)) * (scale.length - 1)))];
   const pool = windowNotes(pitchClasses(n.pool, tension, !!n.chord, ctx), win.lo, win.hi);
   let midi = pool[0];
   for (const m of pool) if (Math.abs(m - target) < Math.abs(midi - target) || (Math.abs(m - target) === Math.abs(midi - target) && n.pool >= 0.5 && m > midi)) midi = m;
+  if (n.near && from !== undefined && tension > 0 && !n.chord) {
+    // A step stays a step: when the pool note would leap from the note before (or sit on it while the scale
+    // note moves), the pool note nearest the scale note within two semitones of the note before, else the
+    // scale note itself, which is in key.
+    const step = (m: number): boolean => Math.abs(m - from) <= 2 && (m !== from || target === from);
+    if (!step(midi)) {
+      const near = pool.filter(step);
+      midi = near.length ? near.reduce((x, m) => (Math.abs(m - target) < Math.abs(x - target) ? m : x)) : target;
+    }
+  }
   const up = midi + 12 * (n.oct ?? 0);
   return up <= WINDOW_LIMITS.hi ? up : midi;
 }

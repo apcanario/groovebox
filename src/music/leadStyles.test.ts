@@ -4,7 +4,7 @@ import { buildChord } from "./chords.ts";
 import { GenerativeLead, LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, type LeadParams, type LeadStyle } from "./lead.ts";
 import { STYLE_DEFAULTS, leadKnobs, leadWindow } from "./leadKit.ts";
 import { DRIFT_MIN } from "./leadDrift.ts";
-import { PHRASE_REST } from "./leadPhrase.ts";
+import { PHRASE_REST, phraseStyleBars } from "./leadPhrase.ts";
 import { Lead } from "./leadStyles.ts";
 import { PRINT_BASE, playLead, printPatterns, type Playback, type PlayedNote } from "./leadPrint.ts";
 import { MOODS, inScale, scalePitchClasses } from "./scales.ts";
@@ -148,7 +148,7 @@ describe("lead styles (P5)", () => {
           for (const slide of [0, 1]) {
             const q: LeadParams = { ...BASE, style: "phrase", seed, phrase, noteLength, slide, tension: 1, density: 1 };
             const notes = playLead(q, 16, SONG);
-            const steps = 16 * phrase;
+            const steps = 16 * phraseStyleBars(phrase);
             for (let start = 0; start < 16 * 16; start += steps) {
               const inside = notes.filter((n) => n.at >= start && n.at < start + steps);
               expect(inside.length).toBeGreaterThan(0);
@@ -159,6 +159,17 @@ describe("lead styles (P5)", () => {
               expect(last.at + last.len).toBeLessThanOrEqual(start + steps - PHRASE_REST + 1e-9);
             }
           }
+  });
+
+  it("Phrase at 1 bar plays as 2, its parts half a bar each", () => {
+    expect(phraseStyleBars(1)).toBe(2);
+    expect(phraseStyleBars(2)).toBe(2);
+    expect(phraseStyleBars(4)).toBe(4);
+    for (const seed of SEEDS) {
+      const one = playLead({ ...BASE, style: "phrase", seed, phrase: 1, lock: 1 }, 8, SONG);
+      const two = playLead({ ...BASE, style: "phrase", seed, phrase: 2, lock: 1 }, 8, SONG);
+      expect(full(one)).toEqual(full(two));
+    }
   });
 
   it("Phrase answers itself: A, A varied, A, B", () => {
@@ -201,8 +212,36 @@ describe("lead styles (P5)", () => {
       const notes = playLead({ ...BASE, style: "drift", seed, tension: 0.5 }, 16, { key: "A", mood: "house", degrees: [0] });
       expect(notes.length).toBeLessThanOrEqual(16 * 2); // at most two notes a bar
       const leaps = notes.slice(1).map((n, i) => Math.abs(n.midi - notes[i].midi));
-      expect(leaps.filter((l) => l <= 7).length / leaps.length).toBeGreaterThanOrEqual(0.75);
+      // A step is a scale degree, at most two semitones (a repeated note counts as one).
+      expect(leaps.filter((l) => l <= 2).length / leaps.length).toBeGreaterThanOrEqual(0.75);
     }
+    // Over changing chords, every range, and any Tension above 0 (at 0 every note is a chord tone).
+    for (const seed of SEEDS)
+      for (const range of [0, 0.35, 1])
+        for (const tension of [0.1, 0.35, 1]) {
+          const notes = playLead({ ...BASE, style: "drift", seed, range, tension, lock: 1, variation: 0 }, 32, SONG);
+          const leaps = notes.slice(1).map((n, i) => Math.abs(n.midi - notes[i].midi));
+          expect(leaps.filter((l) => l <= 2).length / leaps.length).toBeGreaterThanOrEqual(0.75);
+        }
+  });
+
+  it("Drift rests long: at Busy 0.85 or less every four bars hold a rest of half a bar, and no note overlaps the next", () => {
+    for (const seed of [...SEEDS, 2, 3])
+      for (const density of [0, 0.5, 0.85])
+        for (const noteLength of [0, 0.5, 1])
+          for (const phrase of PHRASE_BARS) {
+            const notes = playLead({ ...BASE, style: "drift", seed, density, noteLength, phrase, slide: 0, lock: 1 }, 32, SONG);
+            for (let i = 1; i < notes.length; i++) expect(notes[i].at).toBeGreaterThanOrEqual(notes[i - 1].at + notes[i - 1].len);
+            const sounding = new Array<boolean>(32 * 16).fill(false);
+            for (const n of notes) for (let s = n.at; s < Math.min(sounding.length, n.at + n.len); s++) sounding[s] = true;
+            // Every four bars hold a rest of half a bar or more.
+            for (let start = 0; start + 64 <= sounding.length; start += 64) {
+              let run = 0;
+              let longest = 0;
+              for (let s = start; s < start + 64; s++) longest = Math.max(longest, (run = sounding[s] ? 0 : run + 1));
+              expect(longest, `seed ${seed} busy ${density} length ${noteLength} phrase ${phrase} bar ${start / 16 + 1}`).toBeGreaterThanOrEqual(8);
+            }
+          }
   });
 
   it("Pulse at its defaults plays exactly what G4 played", () => {

@@ -1006,7 +1006,8 @@ def walk_p5(page, failures: list) -> None:
     for style in LEAD_STYLES:
         page.evaluate(f"()=>window.__groovebox.setGen(1, 'layer1', {{style: '{style}', density: 1, slide: 1, accent: 1}})")
         before = page.evaluate("window.__groovebox.leadMarks('layer1')")
-        levels[style] = solo_level(page, "layer1", seconds=2.5, settle=0.5)
+        # Drift rests up to a bar and a quarter at Busy 1 (P5 review E1): read it over three bars or so.
+        levels[style] = solo_level(page, "layer1", seconds=6.0 if style == "drift" else 2.5, settle=0.5)
         after = page.evaluate("window.__groovebox.leadMarks('layer1')")
         if levels[style] < -50:
             failures.append(f"P5: Layer 1's {style} lead is silent ({levels[style]:.1f} dB)")
@@ -1015,11 +1016,17 @@ def walk_p5(page, failures: list) -> None:
         if after["accentAt"] <= before["accentAt"]:
             failures.append(f"P5: {style} with Accent at 1 opened no accent")
     print("P5, Layer 1 lead solo levels (dB): " + ", ".join(f"{k} {v:.1f}" for k, v in levels.items()))
+    marks = page.evaluate("window.__groovebox.leadMarks('layer1')")
+    print(f"P5, Layer 1 glides: {marks['glides']} started, {marks['glideDrops']} not started (no voice free)")
     gen = dict(saved["gen"])
     gen.pop("seed", None)
+    # A knob the song did not set goes back to unset (null clears it, P5 review M4).
     for k in ["style", "slide", "accent"]:
-        gen.setdefault(k, {"style": "pulse", "slide": 0, "accent": 0}[k])
+        gen.setdefault(k, None)
     page.evaluate("(g)=>window.__groovebox.setGen(1, 'layer1', g)", gen)
+    restored = page.evaluate(f"{S}.layer1.gen")
+    if restored != saved["gen"]:
+        failures.append(f"P5: Layer 1's lead did not go back to what it was: {restored} != {saved['gen']}")
     page.evaluate(f"()=>window.__groovebox.setLayerMode(1, 'layer1', '{saved['mode']}')")
     page.evaluate("window.__groovebox.switchSection(0)")
     wait_for(page, "window.__groovebox.position().section === 0", 4.0)
@@ -1468,22 +1475,50 @@ def walk_g5_songs(page, failures: list, url: str) -> None:
     page.click("#rec")
     if page.evaluate(REC)["state"] != "armed" or "armed" not in (page.get_attribute("#rec", "class") or ""):
         failures.append("record while stopped did not arm")
+    played = time.monotonic()
     page.click("#play")
     if not wait_for(page, "window.__groovebox.recordInfo().state === 'recording'", 3.0):
         failures.append("an armed take did not start with Play")
         return
     time.sleep(2.0)
+    # The take's length is audio-clock seconds, so it is measured against the audio clock, not this sleep (a
+    # busy host can stall the audio clock or delay the click; P5 review): the take's seconds just before and
+    # just after Stop bracket the moment Stop landed.
+    before = page.evaluate(REC)["seconds"]
+    waited = time.monotonic() - played
     page.click("#play")
-    if page.evaluate(REC)["state"] != "finishing":
+    info = page.evaluate(REC)
+    after = info["seconds"]
+    if info["state"] != "finishing":
         failures.append("Stop did not keep a tail")
+    # The tail closes on a 1.5 s timer; the last reading while it runs is how far the audio clock got by then
+    # (capped at Stop + 1.5 s), so a stalled audio clock is seen rather than counted as a short tail.
+    reached = after
     page.click("#songs-open")
     if not page.locator("#song-new").is_disabled():
         failures.append("new song is allowed while a take finishes")
     page.click("#songs-close")
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline:
+        r = page.evaluate(REC)
+        if r["state"] != "finishing":
+            break
+        reached = max(reached, r["seconds"])
+        time.sleep(0.02)
     wait_for(page, "!!document.querySelector('#take-save')", 6.0)
     secs = page.evaluate("window.__groovebox.getLog().seconds")
-    if not 3.2 <= secs <= 4.2:
-        failures.append(f"armed take with tail lasts {secs:.2f} s, expected about 3.5")
+    tail = 1.5  # RECORD_TAIL, src/engine/index.ts
+    # It started with Play (the audio clock cannot run ahead of the wall clock) and recorded something.
+    if not 0.5 <= before <= waited + 0.1:
+        failures.append(f"armed take was {before:.2f} s long {waited:.2f} s after Play")
+    # It holds everything up to Stop and the whole tail: at least to Stop + 1.5 s, or as far as the audio
+    # clock got before the take closed if that was less, and never less than half the tail; at most Stop +
+    # 1.5 s plus the encoder's last block and the timer's lateness.
+    lo = max(before + tail / 2, min(before + tail, reached) - 0.1)
+    hi = after + tail + 0.5
+    if not lo <= secs <= hi:
+        failures.append(f"armed take with tail lasts {secs:.2f} s, expected {lo:.2f}..{hi:.2f} (Stop at {before:.2f}..{after:.2f} s)")
+    print(f"armed take: Stop at {before:.2f}..{after:.2f} s, tail reached {reached:.2f} s, take {secs:.2f} s")
     save_take(page, failures, secs, "armed take")
 
 

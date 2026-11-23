@@ -12,7 +12,7 @@ import { GenerativeLead, mutationChance, type LeadContext, type LeadParams, type
 import { createRng, deriveSeed, type Rng } from "./random.ts";
 import { SLOTS, contour, decorate, leadKnobs, leadWindow, lengthFactor, makeRand, realize, type LeadKnobs, type Plan, type PlanNote, type Rand } from "./leadKit.ts";
 import { hookPlan } from "./leadHook.ts";
-import { phrasePlan } from "./leadPhrase.ts";
+import { phrasePlan, phraseStyleBars } from "./leadPhrase.ts";
 import { rollPlan } from "./leadRoll.ts";
 import { driftPlan } from "./leadDrift.ts";
 
@@ -51,7 +51,7 @@ export function planFor(k: LeadKnobs, rand: Rand): Plan {
 
 /** Hook and Phrase change only at a phrase's end; Roll and Drift may change at any bar line. */
 function lockEvery(k: LeadKnobs): number {
-  return k.style === "hook" || k.style === "phrase" ? 16 * k.phrase : 16;
+  return k.style === "hook" ? 16 * k.phrase : k.style === "phrase" ? 16 * phraseStyleBars(k.phrase) : 16;
 }
 
 export class Lead {
@@ -67,6 +67,8 @@ export class Lead {
   private byStep = new Map<number, PlanNote>();
   /** The pitch of the last note when it slides into the next one. */
   private glide: number | null = null;
+  /** The last planned note's pitch (Drift moves by step from it). */
+  private prev: number | undefined = undefined;
   private barStart = 0;
   private prevBarStart = 0;
   private lastStep = -1;
@@ -107,6 +109,7 @@ export class Lead {
     this.prevBarStart = 0;
     this.lastStep = -1;
     this.glide = null;
+    this.prev = undefined;
   }
 
   private rand(): Rand {
@@ -169,7 +172,8 @@ export class Lead {
     const plan = this.currentPlan(k);
     const n = this.byStep.get(c % plan.steps);
     if (!n) return null;
-    const midi = realize(n, k.tension, ctx, win);
+    const midi = realize(n, k.tension, ctx, win, this.prev);
+    this.prev = midi;
     return this.emit({ midi, vel: n.vel, len: n.len, accent: n.accent, repeat: n.repeat }, !!n.slide);
   }
 

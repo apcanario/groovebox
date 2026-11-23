@@ -37,15 +37,15 @@ bar 6 VI   | B43  D5   G5!  F4   F5   B4!  C53  E6!  ~C5  F5!2 .    A4   ~G4! F4
 bar 7 III  | F5!  E4   E4!  E4   B4   ~C5  ~B4  E4   F6   E5   .    C6   A4   A4!3 E4!  E4
 bar 8 VII  | C53  E5   F5!  D4   D5   C5!  D53  F6!  ~D5  D5!2 .    B4   ~A4! G4   F4   ~E4
 
-DRIFT: 8 notes in 8 bars, 3 pitches (C5..E5), length 11.0..18.0 steps, velocity 0.42..0.73, 1 slides, 0 accents, 0 repeats
-bar 1 i    | .    .    .    .    D5   -    -    -    -    -    -    -    -    -    -    E5
-bar 2 VI   | -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -
-bar 3 III  | -    .    .    C5   -    -    -    -    -    -    -    -    -    -    -    -
-bar 4 VII  | -    .    .    E5   -    -    -    -    -    -    -    -    -    -    -    -
-bar 5 i    | -    -    -    -    ~D5  -    -    -    -    -    -    -    -    -    -    E5
-bar 6 VI   | -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -
-bar 7 III  | -    .    .    C5   -    -    -    -    -    -    -    -    -    -    -    -
-bar 8 VII  | -    .    .    E5   -    -    -    -    -    -    -    -    -    -    -    -
+DRIFT: 4 notes in 8 bars, 2 pitches (F5..G5), length 11.0..18.0 steps, velocity 0.44..0.73, 0 slides, 0 accents, 0 repeats
+bar 1 i    | .    .    .    .    F5   -    -    -    -    -    -    -    -    -    -    .
+bar 2 VI   | .    .    .    .    .    .    .    F5   -    -    -    -    -    -    -    -
+bar 3 III  | -    -    -    -    -    -    -    -    -    .    .    .    .    .    .    .
+bar 4 VII  | .    .    .    .    .    .    .    .    .    .    .    .    .    .    .    .
+bar 5 i    | .    .    .    .    G5   -    -    -    -    -    -    -    -    -    -    .
+bar 6 VI   | .    .    .    .    .    .    .    F5   -    -    -    -    -    -    -    -
+bar 7 III  | -    -    -    -    -    -    -    -    -    .    .    .    .    .    .    .
+bar 8 VII  | .    .    .    .    .    .    .    .    .    .    .    .    .    .    .    .
 
 PULSE: 56 notes in 8 bars, 10 pitches (A4..E6), length 0.8..0.8 steps, velocity 0.68..0.82, 0 slides, 0 accents, 0 repeats
 bar 1 i    | A4   .    .    E6   .    A4   .    D5   .    .    A4   .    D5   .    F5   .

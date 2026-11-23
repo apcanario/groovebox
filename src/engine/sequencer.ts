@@ -58,6 +58,9 @@ export const STEPS_PER_BAR = 16;
  * One note or hit. `shift` is the swing delay in sixteenths: on odd steps of a swung section every
  * instrument carries the drum pattern's swing, so bass and synth stay with the hats.
  */
+/** setGen's values: any of the lead's knobs but the seed; an optional (P5) knob set to undefined or null is cleared. */
+export type GenValues = { [K in keyof Omit<LeadParams, "seed">]?: LeadParams[K] | (undefined extends LeadParams[K] ? null : never) };
+
 export type NoteEvent =
   | { inst: "drums"; voice: DrumVoice; vel: number; shift: number; gap: number }
   | { inst: "bass"; midi: number; len: number; vel: number; shift: number }
@@ -377,7 +380,7 @@ export class Sequencer {
    * reshapes the same line (Pulse: Hits, Rotate, Length, Tension or Busy never draw a new melody). P5 adds the
    * style, the shared knobs of spec 8.5 (0..1) and the Shape and Phrase selectors.
    */
-  setGen(section: number, id: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
+  setGen(section: number, id: LayerInstrument, values: GenValues): boolean {
     const s = this.song.sections[section];
     if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return false;
     const ranges: Record<string, [number, number, boolean]> = {
@@ -397,9 +400,16 @@ export class Sequencer {
     };
     // The P5 selectors: a style, a shape, a phrase of 1, 2, 4 or 8 bars.
     const choices: Record<string, readonly unknown[]> = { style: LEAD_STYLES, shape: LEAD_SHAPES, phrase: PHRASE_BARS };
+    // The P5 knobs are optional: undefined (or null, as the event log saves it) clears one back to "unset",
+    // its style's default (P5 review M4). The six G4 knobs are required and cannot be cleared.
+    const optional = ["style", "shape", "phrase", "range", "register", "noteLength", "variation", "repeats", "slide", "accent"];
     const g: Record<string, unknown> = { ...s[id].gen };
     for (const k of Object.keys(values)) {
       const raw = (values as Record<string, unknown>)[k];
+      if ((raw === undefined || raw === null) && optional.includes(k)) {
+        delete g[k];
+        continue;
+      }
       if (k in choices) {
         if (!choices[k].includes(raw)) return false;
         g[k] = raw;

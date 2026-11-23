@@ -8,7 +8,7 @@ import { Graph } from "./audio.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { InFlight, type Pending } from "./queue.ts";
-import { Sequencer, STEPS_PER_BAR, type LaneBar, type StepResult } from "./sequencer.ts";
+import { Sequencer, STEPS_PER_BAR, type GenValues, type LaneBar, type StepResult } from "./sequencer.ts";
 import {
   clampPatchValue,
   cleanName,
@@ -35,7 +35,7 @@ import {
 import type { KeyName, Mood } from "../music/scales.ts";
 import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
 import type { ArpParams } from "../music/arp.ts";
-import type { LeadParams, LeadStepView } from "../music/lead.ts";
+import type { LeadStepView } from "../music/lead.ts";
 import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
 
@@ -562,10 +562,12 @@ export class Engine {
   }
 
   /** The lead's knobs (P5: style, Shape, Phrase and the 0..1 knobs of spec 8.5 too). Only Lock draws new notes. */
-  setGen(section: number, layer: LayerInstrument, values: Partial<Omit<LeadParams, "seed">>): boolean {
+  setGen(section: number, layer: LayerInstrument, values: GenValues): boolean {
     const ok = this.seq.setGen(section, layer, values);
     if (!ok) return false;
-    this.note("setGen", [section, layer, values]);
+    // A cleared knob is logged as null: the saved log is JSON, which drops undefined.
+    const logged = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v === undefined ? null : v]));
+    this.note("setGen", [section, layer, logged]);
     this.changed();
     return ok;
   }
@@ -796,11 +798,14 @@ export class Engine {
     return this.graph ? this.graph.attacks() : 0;
   }
 
-  /** For the smoke test (P5): a layer's lead glides started and the audio time of its last accent (-1: none). */
-  leadMarks(id: LayerInstrument): { glides: number; accentAt: number } | null {
+  /**
+   * For the smoke test (P5): a layer's lead glides started, glides not started because the layer ran out of
+   * voices and dropped the note, and the audio time of its last accent (-1: none).
+   */
+  leadMarks(id: LayerInstrument): { glides: number; glideDrops: number; accentAt: number } | null {
     if (!this.graph) return null;
     const l = this.graph.instruments[id];
-    return { glides: l.glides, accentAt: l.channel.accentAt };
+    return { glides: l.glides, glideDrops: l.glideDrops, accentAt: l.channel.accentAt };
   }
 
   /** Native value of a drum voice's level gain (its trim times its dial). */
@@ -920,11 +925,13 @@ export class Engine {
           break;
         default: {
           // Lead notes (P5): a slide glides over most of a sixteenth (at most 90 ms); a repeat splits the
-          // first sixteenth into two or three quick hits, the last of which holds the rest of the note.
-          const glide = Math.min(0.09, 0.8 * sixteenth);
-          const lead = e.glideFrom !== undefined || e.accent ? { glideFrom: e.glideFrom, glide, accent: e.accent } : undefined;
+          // first sixteenth into two or three quick hits, the last of which holds the rest of the note. A slid
+          // note that repeats glides over most of its first hit, so the next hit, on a new voice at the
+          // note's own pitch, does not cut the slide short (P5 review M2).
           const n = e.repeat && e.repeat > 1 ? e.repeat : 1;
           const sub = sixteenth / n;
+          const glide = Math.min(0.09, 0.8 * sub);
+          const lead = e.glideFrom !== undefined || e.accent ? { glideFrom: e.glideFrom, glide, accent: e.accent } : undefined;
           for (let r = 0; r < n; r++) {
             const dur = r < n - 1 ? 0.6 * sub : Math.max(0.6 * sub, e.len * sixteenth - r * sub);
             g.instruments[e.inst].trigger(e.notes, dur, t + r * sub, r === 0 ? e.vel : 0.85 * e.vel, r === 0 ? lead : undefined);

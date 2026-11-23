@@ -61,6 +61,19 @@ describe("lead styles in the sequencer (P5)", () => {
     expect(seq.setGen(0, "layer1", { colour: 1 } as never)).toBe(false);
   });
 
+  it("setGen clears an optional knob given undefined or null, back to its style's default, but not a G4 knob", () => {
+    const seq = new Sequencer(defaultSong());
+    expect(seq.setGen(0, "layer1", { style: "drift", shape: "rise", phrase: 2, slide: 0.5, accent: 0.5 })).toBe(true);
+    expect(seq.setGen(0, "layer1", { style: undefined, shape: null, phrase: undefined, slide: null })).toBe(true);
+    const g = seq.song.sections[0].layer1.gen;
+    for (const k of ["style", "shape", "phrase", "slide"]) expect(k in g, k).toBe(false);
+    expect(g.accent).toBe(0.5);
+    expect(validateSong(seq.song)).toEqual([]);
+    expect(seq.setGen(0, "layer1", { density: undefined } as never)).toBe(false);
+    expect(seq.setGen(0, "layer1", { lock: null } as never)).toBe(false);
+    expect(seq.song.sections[0].layer1.gen.density).toBe(defaultSong().sections[0].layer1.gen.density);
+  });
+
   it("the song keeps the lead's style and knobs, and refuses bad ones", () => {
     const song = defaultSong();
     song.sections[0].layer1.gen = { ...song.sections[0].layer1.gen, style: "phrase", shape: "rise", phrase: 2, noteLength: 0.3, variation: 0.7, repeats: 0.1, slide: 0.2, accent: 0.4, range: 0.5, register: 0.2 };
