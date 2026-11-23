@@ -31,20 +31,21 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 ### P1. One row of sections, no scrolling, the Now view
 
-- Spec 8.6 in full: Advanced never scrolls vertically at 360 x 640 and up and uses pages with large chips; Simple never scrolls or swipes in any direction; no text wraps or is cut off on any tile, chip, button, dial or pill.
+- Spec 8.6 in full: Advanced never scrolls vertically at 360 x 640 and up and uses pages with large chips; Simple never scrolls or swipes in any direction; text always fits its tile (never wraps, clips or overflows; drawn smaller down to 10 px, then shortened).
 - Fix every existing label that wraps today (the Play grid's "hold a column for options" tile is one).
-- One section strip everywhere; the Play grid's header is the strip. Tap always means play next bar; "Edit without playing" by hold, kept for Advanced.
+- The bottom-up layout of spec 8.6: header, content, section strip, transport bar, tab bar, on every tab; the Play grid sits on the strip.
+- One section strip everywhere. Tap always means play next bar; "Edit without playing" by hold, kept for Advanced.
 - The three section states with their looks and words, and the four-dot bar indicator.
 - The Simple Play tab ("Now"): four section buttons, five instrument buttons, hold to open a tab, and room kept under them for the vibe control that P3 adds. The grid stays as the Advanced Play tab.
 - The last jam survives a reload.
 - Until P2 lands the mode toggle, a temporary switch on the Play tab chooses Now or Song.
-- Smoke test: at 360 x 640 and 412 x 915, on every tab and page in both modes, the document does not scroll, no control is cut off, and no tile, chip, button, dial or pill has wrapped or clipped text.
+- Smoke test: at 360 x 640 and 412 x 915, on every tab and page in both modes, the document does not scroll, no control is cut off, and no tile, chip, button, dial or pill has text that wraps, clips or overflows its box; the strip and transport bar sit directly above the tab bar.
 
 **Done when:** no tab scrolls at either size (tested); there is one row of sections on every screen; a section tap means the same thing everywhere; the Now view runs a whole jam; a reload brings the jam back; `check` and `smoke` pass.
 
 ### P2. Simple and Advanced
 
-- Spec 8.1 and 8.3: the app-wide toggle in the transport bar, remembered; Simple as the first-run default.
+- Spec 8.1 and 8.3: the app-wide toggle in the header, remembered; Simple as the first-run default.
 - Simple instrument tabs: one picker and four macro dials each, as in the 8.3 table, plus the XY pad. Macro mappings as data; macro positions stored in the song.
 - Advanced tabs are the tabs built in G2 to G4, re-laid to the no-scroll rule.
 - Simple uses plain words only: check every visible string in Simple against 8.1.
@@ -61,7 +62,7 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 - The beats, bass rhythms and patches those eight need, as data, using the engine as it is.
 - Bpm range 60 to 180.
 - The vibe control on the Simple Play tab (spec 8.6): current vibe with an arrow each side, arrows step on the next bar, the middle opens the picker.
-- The vibe picker as the opening screen: a two-column grid that fits all 24 tiles on one screen without scrolling (unbuilt styles are not shown until they exist), Continue last jam first; New jam from style in the transport bar; loading lands on the next bar; Previous jam kept.
+- The vibe picker as the opening screen: a two-column grid that fits all 24 tiles on one screen without scrolling (unbuilt styles are not shown until they exist), Continue last jam first; New jam from style in the header; loading lands on the next bar; Previous jam kept.
 - Move the existing presets (moods, drum presets, bass and synth rhythms) to data files in the same way, with pickers that list whatever exists.
 
 **Done when:** each of the eight styles loads and plays with every instrument audible in its groove section (smoke test loops all of them); adding another style is one new file and no other change (shown by a test fixture); loading a style mid-jam lands on the bar; `check` and `smoke` pass. Whether each style sounds like its name is Pedro's call.

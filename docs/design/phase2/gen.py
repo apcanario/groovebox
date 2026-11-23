@@ -357,4 +357,75 @@ page("6-vibe-picker",
      + f'<div class="vgrid">{tiles}</div>'
      + '<div class="cap" style="text-align:center;margin-top:auto;padding-bottom:16px">One tap loads a full groove on the next bar</div>')
 
+# ---- revision 2: sections and transport sit at the bottom, in thumb reach ----
+CSS += """
+.content{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.secs.big .sec{height:74px}
+.tabs{margin-top:0}
+"""
+
+def aligned_strip(states):
+    names_ = ["Intro", "Groove", "Break", "Outro"]
+    words_ = {"playing": "Playing", "next": "Next", "edit": "✎ Editing"}
+    out = '<div class="grid"><div class="cap" style="display:flex;align-items:center">Sections</div>'
+    for i, st in enumerate(states):
+        out += f'<div class="sec {st}" style="height:56px"><b>{"ABCD"[i]}</b><span>{words_.get(st, names_[i])}</span></div>'
+    return out + "</div>"
+
+def screen(name, mode, content, states, tab, big=False, aligned=False):
+    st = aligned_strip(states) if aligned else strip(states, big)
+    page(name, header(mode) + f'<div class="content">{content}</div>' + st + transport(mode) + tabs(tab))
+
+screen("1-simple-play", "simple",
+       '<div class="cap">Vibe</div>'
+       '<div class="stepper"><div class="arrow">‹</div><div class="cur"><b>Deep house</b><span>tap for all 24 vibes</span></div><div class="arrow">›</div></div>'
+       '<div style="flex:1"></div><div class="cap">Playing now · tap to switch on or off · hold to open</div>'
+       f'<div style="display:flex;flex-direction:column;gap:8px">{rows}</div>',
+       ["", "playing", "next", ""], "Play", big=True)
+
+screen("2-simple-layer", "simple",
+       f'<div class="title"><h1><span style="color:{v}">Layer 1</span></h1><div class="tog" style="background:{v}"><i></i></div></div>'
+       + chips(["Lead", "Arp", "Pad"], "Lead", v, 3)
+       + '<div class="cap">Lead style</div>' + chips(["Hook", "Phrase", "Roll", "Drift", "Pulse"], "Hook", v, 5)
+       + d2
+       + f'<div class="btns"><div class="btn">↶ Back</div><div class="btn" style="background:{v};color:#0a0a0c">✦ New idea</div></div>'
+       + xy(62, 45, "BRIGHT"),
+       ["", "playing", "", ""], "Layer 1")
+
+screen("3-simple-chords", "simple",
+       f'<div class="title"><h1><span style="color:{C["blue"]}">Chords</span></h1>'
+       '<div class="chip" style="margin-left:auto;height:32px;padding:0 12px;color:#f2f2f4">Deep house ▾</div></div>'
+       + '<div class="cap">Feel</div>' + chips(["Bright", "Warm", "Dreamy", "Dark", "Tense", "Uplifting"], "Dreamy", C["blue"], 3)
+       + '<div class="cap">Dreamy · 1 of 2</div>'
+       + f'<div style="display:flex;flex-direction:column;gap:8px">{cards4}</div>'
+       + '<div class="btns" style="grid-template-columns:1fr 1.2fr 1fr;margin-top:auto"><div class="btn">− Lower</div><div class="btn" style="color:#6aa3c9">More chords ›</div><div class="btn">Higher +</div></div>',
+       ["", "playing", "", ""], "Chords")
+
+g2 = '<div class="grid" style="margin-top:auto">'
+for n, col in INST:
+    g2 += f'<div class="rl" style="color:{col}">{n}<i>›</i></div>'
+    for i, o in enumerate(on[n]):
+        if n == "Bass" and i == 2:
+            g2 += f'<div class="cell next" style="--c:{col}"></div>'
+        else:
+            g2 += f'<div class="cell"{f" style=background:{col}" if o else ""}></div>'
+g2 += "</div>"
+legend2 = (
+    '<div class="legend" style="padding:12px 14px;gap:7px">'
+    '<div><i style="background:#2a9d8f"></i>Filled: playing now</div>'
+    '<div><i style="outline:2px dashed #2a9d8f;outline-offset:-2px"></i>Dashed: starts on the next bar</div>'
+    '<div><i style="outline:2px solid #e9c46a;outline-offset:-2px"></i>Pencil: editing without playing</div></div>'
+)
+screen("4-advanced-play", "advanced", legend2 + g2, ["", "playing", "next", "edit"], "Play", aligned=True)
+
+screen("5-advanced-layer", "advanced",
+       f'<div class="title"><h1><span style="color:{v}">Layer 1</span></h1>'
+       f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center"><div class="chip" style="height:30px;padding:0 10px;color:#f2f2f4">↶ Back</div><div class="chip" style="height:30px;padding:0 10px;background:{v};color:#0a0a0c">✦ New</div><div class="tog" style="background:{v};margin-left:0"><i></i></div></div></div>'
+       + chips(["Lead", "Arp", "Pad"], "Lead", v, 3)
+       + chips(["Hook", "Phrase", "Roll", "Drift", "Pulse"], "Phrase", v, 5)
+       + '<div style="display:flex;align-items:center;gap:8px"><div class="cap">Page</div><div style="flex:1">' + chips(["Notes", "Feel", "Sound"], "Notes", "#f2f2f4", 3) + "</div></div>"
+       + f'<div><div class="steps">{steps}</div><div class="cap" style="margin-top:6px">Phrase · bar 2 of 4</div></div>'
+       + d6 + xy(58, 45, "CUTOFF"),
+       ["", "playing", "", "edit"], "Layer 1")
+
 print("ok")

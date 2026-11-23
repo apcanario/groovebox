@@ -133,7 +133,7 @@ Settled on 23 Nov 2026 after Pedro played bundles 1 to 3. Where this section dif
 
 ### 8.1 Two modes, one song
 
-- **One toggle, app-wide,** in the transport bar: Simple or Advanced. It is remembered between launches. A new install starts in Simple.
+- **One toggle, app-wide,** in the header: Simple or Advanced. It is remembered between launches. A new install starts in Simple.
 - **The mode changes what is shown, never what is heard.** Same song document, same engine. Switching mode mid-jam makes no sound change and loses nothing.
 - **Simple** uses plain words only. No scale names, chord degrees, Euclidean, envelope or any term a non-musician would have to look up.
 - **Advanced** is every control the app has: all of sections 3 to 5, plus what this section adds.
@@ -157,7 +157,7 @@ A style is a complete starting point: one tap gives a full groove.
 - **A style sets everything:** bpm, swing, key and mood, its chord progression, drum beat, bass rhythm, synth rhythm, the five patches, each layer's mode and lead style, send and mix settings, and four sections arranged as intro, groove, break and outro with different instruments on in each.
 - **A style is one data file** under `src/styles/`. Adding a style, a drum beat, a bass rhythm, a patch or a progression needs no engine or UI code; pickers list whatever exists.
 - **Opening the app** shows the vibe picker: all 24 as tiles in two columns on one screen, coloured by family, with "Continue last jam" first when there is one. It does not scroll. Tapping a tile loads it and starts playing.
-- **New jam from style** is always one tap away from the transport bar. Loading a style while playing lands on the next bar line. The jam it replaces stays available as "Previous jam" until the next one replaces it.
+- **New jam from style** is always one tap away, in the header. Loading a style while playing lands on the next bar line. The jam it replaces stays available as "Previous jam" until the next one replaces it.
 - **Bpm range becomes 60 to 180** so Lo-fi and Ambient fit.
 - **No samples, ever** (replaces the mention of sampled breaks in section 3). Every sound and effect is synthesized in code. No audio files ship with the app.
 
@@ -231,19 +231,29 @@ The six images in `docs/design/phase2/` are the reference for these screens: Sim
 - A tab with more controls than fit uses pages, switched by large page chips at the top of the tab. Advanced is where the fine control lives.
 - The saved-jams list is the one thing that scrolls. It contains only tappable rows.
 
-**No text wraps or is cut off on a tile, chip, button, dial or pill,** at 360 px wide and up. A label that does not fit is shortened in the source, not shrunk or wrapped. Help text goes under a control or in a sheet, never inside a tile.
+**Text always fits its tile.** On a tile, chip, button, dial or pill, at 360 px wide and up, text never wraps, is never cut off and never overflows the edge. Text that is too wide is drawn smaller until it fits, down to 10 px. A label that still does not fit at 10 px is shortened in the source. Help text goes under a control or in a sheet, never inside a tile.
+
+**The controls used most sit at the bottom, in thumb reach.** Every screen is laid out in this order, top to bottom:
+
+1. Header: New jam and the Simple / Advanced switch.
+2. The tab's own content. Within it, the control touched most (the XY pad, the instrument buttons, the grid) sits lowest.
+3. The section strip.
+4. The transport bar: play and stop, bpm, vibe or key, the beat dots, record.
+5. The tab bar.
+
+The strip and the transport bar are in the same place on every tab. On the Advanced Play tab the strip is indented to line up under the grid's four columns, so the strip is the grid's column labels.
 
 **One row of sections.**
-- The section strip appears once on every screen. On the Play tab the grid's column headers are that strip; there is no second row.
+- The section strip appears once on every screen, above the transport bar. On the Play tab the grid sits directly on top of it and uses it as its column labels; there is no second row.
 - Tapping a section always means the same thing: play it from the next bar line. The edited section follows the playing one.
 - Editing a section that is not playing is Advanced only: hold a section and choose "Edit without playing". It then carries a pencil mark until it is played or released.
 - Three states, each with its own look and a word under the letter the first times it appears: playing (filled), next (outlined, pulsing), editing (pencil).
 - A bar indicator of four beat dots sits by the play button, so it is visible when "next bar" arrives.
 
 **Play tab.**
-- **Simple, "Now":** four large section buttons and five large instrument buttons for the playing section. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
-- **The vibe control** sits on the Simple Play tab under the instrument buttons: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
-- **Advanced, "Song":** the instruments-by-sections grid built in G2, with the strip as its header.
+- **Simple, "Now":** the vibe control at the top, then five large instrument buttons for the playing section, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
+- **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
+- **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
 
 **The last jam survives a reload** (kept on the phone automatically), ahead of the full save screen of row G5.
 
