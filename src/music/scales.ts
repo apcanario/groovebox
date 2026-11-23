@@ -1,10 +1,8 @@
-/** Keys, scales and moods (spec section 3). No audio dependency. */
+/** Keys, scales and moods (spec section 3). Moods are data files (P3). No audio dependency. */
+import { checkNamed, readData, type MoodDef } from "./data.ts";
 
 export const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 export type KeyName = (typeof NOTE_NAMES)[number];
-
-export const MOODS = ["major", "minor", "house", "deep", "dark"] as const;
-export type Mood = (typeof MOODS)[number];
 
 export type Voicing = "triads" | "extended" | "low";
 
@@ -16,13 +14,25 @@ export const SCALES = {
 } as const;
 export type ScaleName = keyof typeof SCALES;
 
-export const MOOD_TABLE: Record<Mood, { scale: ScaleName; voicing: Voicing; label: string }> = {
-  major: { scale: "major", voicing: "triads", label: "Major" },
-  minor: { scale: "minor", voicing: "triads", label: "Minor" },
-  house: { scale: "minor", voicing: "extended", label: "House" },
-  deep: { scale: "dorian", voicing: "extended", label: "Deep" },
-  dark: { scale: "phrygian", voicing: "low", label: "Dark" },
-};
+/** A mood's id: the name of its file in `src/data/moods/` (P3: moods are data). */
+export type Mood = string;
+
+const moods = readData<MoodDef>(import.meta.glob("../data/moods/*.ts", { eager: true }), (m) => {
+  const out = checkNamed(m);
+  if (!(m.scale in SCALES)) out.push("scale: unknown");
+  if (!["triads", "extended", "low"].includes(m.voicing)) out.push("voicing: unknown");
+  return out;
+});
+
+/** Every mood, in picker order. */
+export const MOODS: readonly Mood[] = moods.ids;
+
+export const MOOD_TABLE: Record<Mood, { scale: ScaleName; voicing: Voicing; label: string; simple: string }> = Object.fromEntries(
+  moods.ids.map((id) => {
+    const m = moods.byId[id];
+    return [id, { scale: m.scale, voicing: m.voicing, label: m.name, simple: m.simple ?? m.name }];
+  }),
+);
 
 export function keyIndex(key: KeyName): number {
   return NOTE_NAMES.indexOf(key);

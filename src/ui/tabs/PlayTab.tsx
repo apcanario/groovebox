@@ -10,6 +10,7 @@ import { useLongPress } from "../components.tsx";
 import { nowTile, sectionLetter } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane, Playhead } from "../lanes.tsx";
+import { VibeControl } from "../vibes.tsx";
 
 function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   const { engine, song, pending, pos } = ctx;
@@ -79,5 +80,16 @@ function SongView({ ctx }: { ctx: Ctx }) {
 }
 
 export function PlayTab({ ctx }: { ctx: Ctx }) {
-  return <section class={`playtab ${ctx.advanced ? "song" : "nowview"}`}>{ctx.advanced ? <SongView ctx={ctx} /> : <NowView ctx={ctx} />}</section>;
+  return (
+    <section class={`playtab ${ctx.advanced ? "song" : "nowview"}`}>
+      {ctx.advanced ? (
+        <SongView ctx={ctx} />
+      ) : (
+        <>
+          <VibeControl ctx={ctx} onOpen={ctx.openVibes} />
+          <NowView ctx={ctx} />
+        </>
+      )}
+    </section>
+  );
 }

@@ -1,55 +1,58 @@
-/** Bass rhythm, synth rhythm and drum presets. 16 steps per bar. No audio dependency. */
+/**
+ * Bass rhythms, synth rhythms and drum beats (P3: data files, one per entry, under `src/data/bass/`,
+ * `src/data/synth/` and `src/data/beats/`). A new file is a new entry in every picker; nothing else changes.
+ * 16 steps per bar. No audio dependency.
+ */
+import {
+  DRUM_VOICES,
+  checkGrid,
+  checkHits,
+  checkNamed,
+  readData,
+  type BassRhythmDef,
+  type BeatDef,
+  type DrumGrid,
+  type DrumVoice,
+  type Named,
+  type RhythmHit,
+  type SynthRhythmDef,
+} from "./data.ts";
 
-export interface RhythmHit {
-  step: number; // 0..15
-  len: number; // in steps
-  vel: number; // 0..1
-}
+export { DRUM_VOICES, type DrumGrid, type DrumVoice, type RhythmHit };
 
-export const BASS_PRESETS = ["offbeat", "rolling", "long", "dnbSub"] as const;
-export type BassPreset = (typeof BASS_PRESETS)[number];
+const bass = readData<BassRhythmDef>(import.meta.glob("../data/bass/*.ts", { eager: true }), (e) => {
+  const out = checkNamed(e);
+  checkHits(e.hits, out);
+  return out;
+});
+const synth = readData<SynthRhythmDef>(import.meta.glob("../data/synth/*.ts", { eager: true }), (e) => {
+  const out = checkNamed(e);
+  checkHits(e.hits, out);
+  return out;
+});
+const beats = readData<BeatDef>(import.meta.glob("../data/beats/*.ts", { eager: true }), (e) => {
+  const out = checkNamed(e);
+  if (!(e.swing >= 0 && e.swing <= 0.5)) out.push("swing: must be 0..0.5");
+  checkGrid(e.grid, out);
+  return out;
+});
 
-export const BASS_RHYTHMS: Record<BassPreset, RhythmHit[]> = {
-  offbeat: [2, 6, 10, 14].map((step) => ({ step, len: 1.6, vel: 0.9 })),
-  rolling: [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15].map((step) => ({
-    step,
-    len: 0.8,
-    vel: step % 2 === 0 ? 0.9 : 0.7,
-  })),
-  long: [
-    { step: 0, len: 7.5, vel: 0.9 },
-    { step: 8, len: 7.5, vel: 0.85 },
-  ],
-  dnbSub: [
-    { step: 0, len: 6, vel: 0.95 },
-    { step: 10, len: 5.5, vel: 0.9 },
-  ],
-};
+/** A bass rhythm's id: its file name. */
+export type BassPreset = string;
+/** A synth rhythm's id: its file name. */
+export type SynthPreset = string;
+/** A drum beat's id: its file name. */
+export type DrumPreset = string;
 
-export const SYNTH_PRESETS = ["stabs", "offbeat", "sustained"] as const;
-export type SynthPreset = (typeof SYNTH_PRESETS)[number];
+/** Every bass rhythm, in picker order. */
+export const BASS_PRESETS: readonly BassPreset[] = bass.ids;
+export const BASS_RHYTHMS: Record<BassPreset, RhythmHit[]> = Object.fromEntries(bass.ids.map((id) => [id, bass.byId[id].hits]));
 
-export const SYNTH_RHYTHMS: Record<SynthPreset, RhythmHit[]> = {
-  stabs: [
-    { step: 0, len: 1.4, vel: 0.9 },
-    { step: 3, len: 1.4, vel: 0.65 },
-    { step: 6, len: 1.4, vel: 0.65 },
-    { step: 11, len: 1.4, vel: 0.65 },
-    { step: 14, len: 1.4, vel: 0.65 },
-  ],
-  offbeat: [2, 6, 10, 14].map((step) => ({ step, len: 1.2, vel: 0.75 })),
-  // Sustained holds the chord; the sequencer stretches it to the chord's length.
-  sustained: [{ step: 0, len: 16, vel: 0.7 }],
-};
-
-export const DRUM_VOICES = ["kick", "clap", "hat", "open"] as const;
-export type DrumVoice = (typeof DRUM_VOICES)[number];
-
-export const DRUM_PRESETS = ["fourFloor", "houseShuffle", "techno", "twoStep", "dnb"] as const;
-export type DrumPreset = (typeof DRUM_PRESETS)[number];
-
-/** Velocity per step (0 = off), 16 steps per voice. */
-export type DrumGrid = Record<DrumVoice, number[]>;
+/** Every synth rhythm, in picker order. */
+export const SYNTH_PRESETS: readonly SynthPreset[] = synth.ids;
+export const SYNTH_RHYTHMS: Record<SynthPreset, RhythmHit[]> = Object.fromEntries(synth.ids.map((id) => [id, synth.byId[id].hits]));
+/** Synth rhythms that hold the chord for its whole length. */
+export const SYNTH_HOLD: ReadonlySet<SynthPreset> = new Set(synth.ids.filter((id) => synth.byId[id].hold));
 
 export interface DrumPattern {
   grid: DrumGrid;
@@ -57,57 +60,22 @@ export interface DrumPattern {
   swing: number;
 }
 
-function row(hits: Record<number, number>): number[] {
-  return Array.from({ length: 16 }, (_, i) => hits[i] ?? 0);
-}
+/** Every drum beat, in picker order. */
+export const DRUM_PRESETS: readonly DrumPreset[] = beats.ids;
+export const DRUM_PATTERNS: Record<DrumPreset, DrumPattern> = Object.fromEntries(
+  beats.ids.map((id) => [id, { grid: beats.byId[id].grid, swing: beats.byId[id].swing }]),
+);
 
-export const DRUM_PATTERNS: Record<DrumPreset, DrumPattern> = {
-  fourFloor: {
-    swing: 0,
-    grid: {
-      kick: row({ 0: 1, 4: 1, 8: 1, 12: 1 }),
-      clap: row({ 4: 0.9, 12: 0.9 }),
-      hat: row({ 1: 0.3, 3: 0.3, 5: 0.3, 7: 0.3, 9: 0.3, 11: 0.3, 13: 0.3, 15: 0.3 }),
-      open: row({ 2: 0.8, 6: 0.8, 10: 0.8, 14: 0.8 }),
-    },
-  },
-  houseShuffle: {
-    swing: 0.18,
-    grid: {
-      kick: row({ 0: 1, 4: 1, 8: 1, 12: 1 }),
-      clap: row({ 4: 0.9, 12: 0.9, 15: 0.3 }),
-      hat: row({ 1: 0.4, 3: 0.5, 5: 0.4, 7: 0.5, 9: 0.4, 11: 0.5, 13: 0.4, 15: 0.5 }),
-      open: row({ 2: 0.7, 6: 0.7, 10: 0.7, 14: 0.7 }),
-    },
-  },
-  techno: {
-    swing: 0,
-    grid: {
-      kick: row({ 0: 1, 4: 1, 8: 1, 12: 1 }),
-      clap: row({ 12: 0.6 }),
-      hat: row(Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i, i % 4 === 2 ? 0 : i % 2 ? 0.35 : 0.2]))),
-      open: row({ 2: 0.7, 6: 0.7, 10: 0.7, 14: 0.7 }),
-    },
-  },
-  twoStep: {
-    swing: 0.22,
-    grid: {
-      kick: row({ 0: 1, 7: 0.7, 10: 0.9 }),
-      clap: row({ 4: 0.9, 12: 0.9 }),
-      hat: row({ 1: 0.3, 2: 0.6, 5: 0.3, 6: 0.6, 9: 0.3, 10: 0.6, 13: 0.3, 14: 0.6 }),
-      open: row({ 15: 0.5 }),
-    },
-  },
-  dnb: {
-    swing: 0,
-    grid: {
-      kick: row({ 0: 1, 10: 0.95 }),
-      clap: row({ 4: 1, 12: 1, 15: 0.3 }),
-      hat: row({ 0: 0.3, 2: 0.5, 4: 0.3, 6: 0.5, 8: 0.3, 10: 0.5, 12: 0.3 }),
-      open: row({ 14: 0.6 }),
-    },
-  },
-};
+/** The picker words of every entry: `name` in Advanced, `simple` in Simple. */
+export interface PresetNames {
+  name: string;
+  simple: string;
+}
+const names = (byId: Record<string, Named>): Record<string, PresetNames> =>
+  Object.fromEntries(Object.entries(byId).map(([id, e]) => [id, { name: e.name, simple: e.simple ?? e.name }]));
+export const BEAT_NAMES: Record<DrumPreset, PresetNames> = names(beats.byId);
+export const BASS_NAMES: Record<BassPreset, PresetNames> = names(bass.byId);
+export const SYNTH_NAMES: Record<SynthPreset, PresetNames> = names(synth.byId);
 
 // ---- 8-step sequencer (G3) ------------------------------------------------------
 

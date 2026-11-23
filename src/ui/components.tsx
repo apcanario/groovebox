@@ -1,6 +1,6 @@
 /** Reusable controls: Dial, XYPad, SendBar, Toggle, and the drag and long-press hooks. No hover states. */
 import type { ComponentChildren } from "preact";
-import { useRef } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import { Icon, iconThing, type IconThing } from "./icons.tsx";
 import { dragValue, fraction } from "./logic.ts";
 
@@ -344,6 +344,66 @@ export function Chips<T extends string>({
           {label(o)}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Most chips one row holds before the rest go to further pages (P3: pickers list whatever exists). */
+export const CHIPS_PER_ROW = 5;
+
+/**
+ * A picker that lists whatever exists without scrolling (spec 8.6): up to CHIPS_PER_ROW chips in one row; when
+ * there are more, the row shows a page of them and a last chip, More, that turns to the next page (wrapping).
+ * It opens on the page holding the chosen value.
+ */
+export function PagedChips<T extends string>({
+  name,
+  options,
+  value,
+  label,
+  onPick,
+  what,
+}: {
+  name: string;
+  options: readonly T[];
+  value: T | null;
+  label: (v: T) => string;
+  onPick: (v: T) => void;
+  /** What the options are, for the More chip's label ("beats"). */
+  what: string;
+}) {
+  const per = CHIPS_PER_ROW - 1;
+  const pages = options.length <= CHIPS_PER_ROW ? 1 : Math.ceil(options.length / per);
+  const at = value === null ? -1 : options.indexOf(value);
+  const [page, setPage] = useState(at < 0 || pages === 1 ? 0 : Math.floor(at / per));
+  if (pages === 1) return <Chips name={name} options={options} value={value} label={label} onPick={onPick} />;
+  const p = Math.min(page, pages - 1);
+  const shown = options.slice(p * per, p * per + per);
+  return (
+    <div class="chips" style={{ gridTemplateColumns: `repeat(${CHIPS_PER_ROW}, minmax(0, 1fr))` }}>
+      {shown.map((o) => (
+        <button
+          key={o}
+          class={`chip${value === o ? " on" : ""}`}
+          {...{ [`data-${name}`]: o }}
+          aria-pressed={value === o}
+          onClick={() => onPick(o)}
+        >
+          {label(o)}
+        </button>
+      ))}
+      {Array.from({ length: per - shown.length }, (_, i) => (
+        <i key={`gap${i}`} aria-hidden="true" />
+      ))}
+      <button
+        class="chip more"
+        data-more={name}
+        data-page-of={`${p + 1}/${pages}`}
+        aria-label={`More ${what}: page ${p + 1} of ${pages}, tap for the next`}
+        onClick={() => setPage((p + 1) % pages)}
+      >
+        More
+      </button>
     </div>
   );
 }

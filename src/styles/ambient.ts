@@ -1,0 +1,61 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Ambient: slow, major, long chords on a swelling pad, a slow arp, a sparse pulse only in the groove. */
+export default {
+  order: 2,
+  name: "Ambient",
+  family: "slow",
+  bpm: 70,
+  key: "E",
+  mood: "major",
+  patches: {
+    drums: "soft",
+    bass: "sub",
+    synth: "padSwell",
+    layer1: "softSine",
+    layer2: { patch: "airyPad", set: { reverb: 0.85 } },
+  },
+  mix: { sweep: 0, pump: 0.1, saturation: 0 },
+  sections: [
+    {
+      name: "Intro",
+      on: ["synth", "layer2"],
+      chords: [[0, 2], [3, 2]],
+      beat: "none",
+      bass: "pedal",
+      synth: "sustained",
+      layer1: { mode: "arp", arp: { direction: "up", rate: 4, octaves: 2, gate: 1 } },
+      layer2: { mode: "pad", pad: { attack: 3, release: 6, motion: 0.5 } },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 2], [3, 2], [5, 2], [4, 2]],
+      beat: "halftime",
+      bass: "pedal",
+      synth: "sustained",
+      layer1: { mode: "arp", arp: { direction: "updown", rate: 4, octaves: 2, gate: 1 } },
+      layer2: { mode: "pad", pad: { attack: 3, release: 6, motion: 0.5 } },
+    },
+    {
+      name: "Break",
+      on: ["layer1", "layer2"],
+      chords: [[5, 2], [3, 2]],
+      beat: "none",
+      bass: "pedal",
+      synth: "sustained",
+      layer1: { mode: "arp", arp: { direction: "random", rate: 4, octaves: 3, gate: 1 } },
+      layer2: { mode: "pad", pad: { attack: 4, release: 8, motion: 0.7 } },
+    },
+    {
+      name: "Outro",
+      on: ["synth", "layer2"],
+      chords: [[0, 2], [3, 2]],
+      beat: "none",
+      bass: "pedal",
+      synth: "sustained",
+      layer1: { mode: "arp", arp: { direction: "up", rate: 4, octaves: 2, gate: 1 } },
+      layer2: { mode: "pad", pad: { attack: 3, release: 8 } },
+    },
+  ],
+} satisfies StyleDef;

@@ -5,7 +5,7 @@
  * change; it never touches audio.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Engine, type LaneBar, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
+import { Engine, LIMITS, type LaneBar, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
 import type { Keeper } from "../store/keeper.ts";
 import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
 import { startFit } from "./fit.ts";
@@ -13,6 +13,7 @@ import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
 import { SectionSheet, SongsSheet } from "./sheets.tsx";
+import { VibePicker } from "./vibes.tsx";
 import { loadMode, saveMode } from "./mode.ts";
 import { TABS, TAB_COLOR, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PlayTab } from "./tabs/PlayTab.tsx";
@@ -44,6 +45,10 @@ export interface Ctx {
    * not, instrument tabs give them a page of their own, so nothing scrolls.
    */
   roomy: boolean;
+  /** Start the audio (from a tap); false when it failed (the error is shown). */
+  startAudio: () => Promise<boolean>;
+  /** Open the vibe picker. */
+  openVibes: () => void;
 }
 
 /** Tab body height (CSS px) from which the XY pad and sends sit under every page. */
@@ -206,11 +211,12 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   };
   const [held, setHeld] = useState<number | null>(null);
   const [songs, setSongs] = useState(false);
+  // The vibe picker opens the app (spec 8.2).
+  const [vibes, setVibes] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [take, setTake] = useState<NamedTake | null>(null);
   const [saveFailed, setSaveFailed] = useState(keeper.failed);
-  const [idle, setIdle] = useState(keeper.idle());
   const bodyRef = useRef<HTMLElement | null>(null);
   const roomy = useRoomy(bodyRef);
   const rec = useRecordInfo(engine);
@@ -230,14 +236,12 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
       setSong(engine.getSong());
       setPending(engine.pendingShown());
       setPos(engine.position());
-      setIdle(keeper.idle());
     });
     return () => {
       offPos();
       offChange();
     };
   }, [engine, keeper]);
-  useEffect(() => setIdle(keeper.idle()), [keeper, pos.playing, rec.state]);
 
   // Text fits its tile: re-fitted after any change on screen and on resize (display only).
   useEffect(() => startFit(document.body), []);
@@ -274,25 +278,46 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
     if (keep !== chosen) setChosen(keep);
   }, [chosen, count, playing, advanced]);
 
-  const togglePlay = async (): Promise<void> => {
-    if (engine.playing) {
-      engine.stop();
-      return;
-    }
+  const startAudio = async (): Promise<boolean> => {
+    if (engine.ready) return true;
     setStarting(true);
     try {
       await engine.init(hint);
-      engine.play();
       setError(null);
+      return true;
     } catch (err) {
       setError(`Audio failed to start: ${String(err)}`);
+      return false;
     } finally {
       setStarting(false);
     }
   };
 
-  const bpmDrag = useVerticalDrag(song.bpm, 80, 180, (v) => (engine.bpm = v), 1, 400);
-  const ctx: Ctx = { engine, song, pos, pending, edit, playing, lanes, goTab: setTab, hint, keeper, advanced, roomy };
+  const togglePlay = async (): Promise<void> => {
+    if (engine.playing) {
+      engine.stop();
+      return;
+    }
+    if (await startAudio()) engine.play();
+  };
+
+  const bpmDrag = useVerticalDrag(song.bpm, LIMITS.bpm[0], LIMITS.bpm[1], (v) => (engine.bpm = v), 1, 400);
+  const ctx: Ctx = {
+    engine,
+    song,
+    pos,
+    pending,
+    edit,
+    playing,
+    lanes,
+    goTab: setTab,
+    hint,
+    keeper,
+    advanced,
+    roomy,
+    startAudio,
+    openVibes: () => setVibes(true),
+  };
   const taking = rec.state === "recording" || rec.state === "finishing";
   const lights = beatLights(pos.playing, pos.step);
   // On the Advanced Play tab the strip is the grid's column labels: indented under its four columns.
@@ -305,9 +330,8 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
         <button
           class="btn hb"
           id="new-jam"
-          aria-label="New jam: start a new song; this one stays in Songs"
-          disabled={!idle}
-          onClick={() => void keeper.create()}
+          aria-label="New jam: pick a vibe; this jam stays in Songs"
+          onClick={() => setVibes(true)}
         >
           <Icon thing="New jam" />
           <span>New jam</span>
@@ -430,6 +454,7 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
         ))}
       </nav>
 
+      {vibes && <VibePicker ctx={ctx} onClose={() => setVibes(false)} />}
       {take && <TakeSheet take={take} onClose={() => setTake(null)} />}
       {songs && <SongsSheet ctx={ctx} onClose={() => setSongs(false)} />}
       {held !== null && (

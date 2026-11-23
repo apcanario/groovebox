@@ -208,9 +208,11 @@ export interface Song {
   log?: EventLog;
   /** Optional (P2): positions 0..1 of the macro dials that act on the patches ("bass.bright"). */
   macros?: Record<string, number>;
+  /** Optional (P3): the vibe (style id, a file in `src/styles/`) the song was started from. */
+  style?: string;
 }
 
-export const LIMITS = { bpm: [80, 180], sections: [1, 4], chords: [1, 8] } as const;
+export const LIMITS = { bpm: [60, 180], sections: [1, 4], chords: [1, 8] } as const;
 export const CHORD_LENGTHS = [0.5, 1, 2] as const;
 export const MAX_SECTION_NAME = 12;
 
@@ -457,11 +459,12 @@ export function validateSong(doc: unknown): string[] {
   if (doc.mix !== undefined) checkMix(doc.mix, "mix", errors);
   if (doc.log !== undefined) checkLog(doc.log, "log", errors);
   if (doc.macros !== undefined) checkMacros(doc.macros, "macros", errors);
+  if (doc.style !== undefined && (typeof doc.style !== "string" || !doc.style)) errors.push("style: must be a style id");
   if (doc.version !== 1) errors.push("version: must be 1");
   if (typeof doc.name !== "string") errors.push("name: must be a string");
   if (!oneOf(doc.key, NOTE_NAMES)) errors.push("key: unknown key");
   if (!oneOf(doc.mood, MOODS)) errors.push("mood: unknown mood");
-  if (!isNum(doc.bpm) || !inRange(doc.bpm, LIMITS.bpm[0], LIMITS.bpm[1])) errors.push("bpm: must be 80..180");
+  if (!isNum(doc.bpm) || !inRange(doc.bpm, LIMITS.bpm[0], LIMITS.bpm[1])) errors.push(`bpm: must be ${LIMITS.bpm[0]}..${LIMITS.bpm[1]}`);
   if (!isObj(doc.patches)) errors.push("patches: not an object");
   else for (const id of INSTRUMENTS) checkPatch(doc.patches[id], `patches.${id}`, errors);
   if (!Array.isArray(doc.sections) || doc.sections.length < LIMITS.sections[0] || doc.sections.length > LIMITS.sections[1])

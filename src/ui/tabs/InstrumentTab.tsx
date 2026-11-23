@@ -21,8 +21,8 @@ import {
   type InstrumentId,
 } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, GroupLabel, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
-import { KNOB_PAGES, PRESET_LABEL, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
+import { Chips, Dial, GroupLabel, PagedChips, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
+import { KNOB_PAGES, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 
@@ -135,11 +135,12 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
   const edited = drums.grid !== undefined;
   return (
     <>
-      <Chips
+      <PagedChips
         name="preset"
+        what="beats"
         options={DRUM_PRESETS}
         value={edited ? null : drums.preset}
-        label={(p) => PRESET_LABEL[p]}
+        label={(p) => presetName("beat", p)}
         onPick={(p) => engine.setDrumPreset(edit, p)}
       />
       <GroupLabel thing="Sequencer">
@@ -155,7 +156,7 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
           class="chip"
           id="drums-revert"
           disabled={!edited}
-          aria-label={edited ? `Back to the ${PRESET_LABEL[drums.preset]} preset` : "The beat is the preset"}
+          aria-label={edited ? `Back to the ${presetName("beat", drums.preset)} preset` : "The beat is the preset"}
           onClick={() => engine.revertDrums(edit)}
         >
           Reset
@@ -232,20 +233,22 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           )}
           {page === "rhythm" && <GroupLabel thing="Rhythm" />}
           {page === "rhythm" && inst === "bass" && (
-            <Chips
+            <PagedChips
               name="rhythm"
+              what="rhythms"
               options={BASS_PRESETS}
               value={section.bass.rhythm}
-              label={(p) => PRESET_LABEL[p]}
+              label={(p) => presetName("bass", p)}
               onPick={(p) => engine.setBassRhythm(edit, p)}
             />
           )}
           {page === "rhythm" && inst === "synth" && (
-            <Chips
+            <PagedChips
               name="rhythm"
+              what="rhythms"
               options={SYNTH_PRESETS}
               value={section.synth.rhythm}
-              label={(p) => PRESET_LABEL[p]}
+              label={(p) => presetName("synth", p)}
               onPick={(p) => engine.setSynthRhythm(edit, p)}
             />
           )}

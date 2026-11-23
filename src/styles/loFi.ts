@@ -1,0 +1,61 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Lo-fi: slow and swung, jazzy sevenths, a crunchy boom bap, long bass notes, soft keys and a quiet sine lead. */
+export default {
+  order: 1,
+  name: "Lo-fi",
+  family: "slow",
+  bpm: 80,
+  key: "D",
+  mood: "deep",
+  patches: {
+    drums: "crunchy",
+    bass: "warmBass",
+    synth: "softKeys",
+    layer1: "softSine",
+    layer2: { patch: "warmPad", set: { cutoff: 0.35 } },
+  },
+  mix: { sweep: -0.2, pump: 0.2, saturation: 0.35 },
+  sections: [
+    {
+      name: "Intro",
+      on: ["synth", "layer2"],
+      chords: [[3, 1], [4, 1], [0, 2]],
+      beat: "boomBap",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[3, 1], [4, 1], [0, 2]],
+      beat: "boomBap",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative", gen: { hits: 4, length: 9, density: 0.7, tension: 0.5 } },
+      layer2: { mode: "pad", pad: { brightness: 0.3 } },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1"],
+      chords: [[5, 2], [4, 2]],
+      beat: "boomBap",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative", gen: { hits: 3, length: 16 } },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "synth"],
+      chords: [[3, 1], [4, 1], [0, 2]],
+      beat: "boomBap",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

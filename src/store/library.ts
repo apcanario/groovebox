@@ -4,7 +4,7 @@
  * rewriting a long log. Storage is behind a small key-value interface: IndexedDB on the phone,
  * a Map in the tests. No audio dependency.
  */
-import { defaultSong, validateSong, type EventLog, type Song } from "../engine/song.ts";
+import { cleanName, defaultSong, MAX_SONG_NAME, validateSong, type EventLog, type Song } from "../engine/song.ts";
 
 /** The song-name rule lives with the song (G5 review M5); re-exported for the UI and the tests. */
 export { cleanName, MAX_SONG_NAME } from "../engine/song.ts";
@@ -43,6 +43,18 @@ export interface SongEntry {
 export function nextName(names: readonly string[]): string {
   const taken = new Set(names.map((n) => n.trim().toLowerCase()));
   for (let i = 1; ; i++) if (!taken.has(`song ${i}`)) return `Song ${i}`;
+}
+
+/** A song name not taken yet: `base`, else "base 2", "base 3"..., kept within MAX_SONG_NAME characters. */
+export function freeName(base: string, names: readonly string[]): string {
+  const taken = new Set(names.map((n) => n.trim().toLowerCase()));
+  const b = cleanName(base) ?? "Song";
+  if (!taken.has(b.toLowerCase())) return b;
+  for (let i = 2; ; i++) {
+    const tail = ` ${i}`;
+    const n = `${b.slice(0, MAX_SONG_NAME - tail.length).trimEnd()}${tail}`;
+    if (!taken.has(n.toLowerCase())) return n;
+  }
 }
 
 export class Library {
@@ -101,8 +113,11 @@ export class Library {
     await this.kv.put("meta", "last", id);
   }
 
-  /** The song to open on launch: the last one, else the newest, else a new default song. */
-  async open(): Promise<{ id: string; doc: Song }> {
+  /**
+   * The song to open on launch: the last one, else the newest, else a new default song (`fresh` set: there was
+   * no jam to continue).
+   */
+  async open(): Promise<{ id: string; doc: Song; fresh?: boolean }> {
     const last = await this.kv.get<string>("meta", "last");
     if (last) {
       const doc = await this.load(last);
@@ -115,7 +130,7 @@ export class Library {
         return { id: e.id, doc };
       }
     }
-    return this.fresh();
+    return { ...(await this.fresh()), fresh: true };
   }
 
   /** A new default song named "Song N". */

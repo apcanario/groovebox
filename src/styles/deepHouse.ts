@@ -1,0 +1,55 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Deep house: dorian sevenths and ninths, a shuffled beat, offbeat bass, warm stabs, a bell lead over a pad. */
+export default {
+  order: 1,
+  name: "Deep house",
+  family: "house",
+  bpm: 122,
+  key: "F",
+  mood: "deep",
+  patches: { drums: "punchy", bass: "round", synth: "warmStab", layer1: "bell", layer2: "warmPad" },
+  mix: { sweep: 0, pump: 0.6, saturation: 0.1 },
+  sections: [
+    {
+      name: "Intro",
+      on: ["drums", "layer2"],
+      chords: [[0, 2], [3, 2]],
+      beat: "fourFloor",
+      bass: "offbeat",
+      synth: "stabs",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 1], [3, 1], [2, 1], [3, 1]],
+      beat: "houseShuffle",
+      bass: "offbeat",
+      synth: "stabs",
+      layer1: { mode: "generative", gen: { hits: 6, length: 7, density: 0.8 } },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1", "layer2"],
+      chords: [[5, 2], [3, 2]],
+      beat: "houseShuffle",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "arp", arp: { direction: "updown", rate: 2, octaves: 2 } },
+      layer2: { mode: "pad", pad: { attack: 1.2, release: 2.5 } },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer2"],
+      chords: [[0, 2], [3, 2]],
+      beat: "houseShuffle",
+      bass: "offbeat",
+      synth: "stabs",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

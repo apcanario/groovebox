@@ -14,6 +14,7 @@ import {
   DRUM_VOICES,
   SEQ_STEPS,
   SEQ_VELOCITY,
+  SYNTH_HOLD,
   SYNTH_PRESETS,
   SYNTH_RHYTHMS,
   copyGrid,
@@ -96,6 +97,8 @@ export interface StepResult {
    * sets the layer's envelope and pad filter from this on every step, so pad dials act at once.
    */
   pads: Record<LayerInstrument, PadParams | null>;
+  /** A queued song (queueSong) landed on this step: every held note lets go and the new patches apply here. */
+  loaded: boolean;
 }
 
 /**
@@ -213,6 +216,8 @@ export class Sequencer {
   private prevRec: BarRecord | null = null;
   /** Look-ahead copies keep their record but take no snapshots of their own. */
   private snaps = true;
+  /** A whole song waiting for the next bar line (P3: a vibe loaded while playing), and the section it starts in. */
+  private nextSong: { song: Song; section: number } | null = null;
 
   constructor(song: Song) {
     this.song = song;
@@ -237,6 +242,7 @@ export class Sequencer {
 
   stop(): void {
     this.running = false;
+    this.nextSong = null;
     this.rec = null;
     this.prevRec = null;
     this.sounding.clear();
@@ -511,12 +517,30 @@ export class Sequencer {
     this.queue.remap(fn);
   }
 
-  load(song: Song): void {
+  /** Replace the song at once; `section`: the section to play from (else the current one, if it still exists). */
+  load(song: Song, section?: number): void {
     this.song = song;
+    this.nextSong = null;
     this.leads.clear();
     this.queue.clear();
-    this.current = Math.min(this.current, song.sections.length - 1);
+    this.current = Math.max(0, Math.min(section ?? this.current, song.sections.length - 1));
     this.enterSection(this.current);
+  }
+
+  /**
+   * Replace the whole song on the next bar line (P3: a vibe loads as a new song and lands on the bar), starting
+   * in `section`. While stopped it loads at once. Switches queued for the old song are dropped; a second song
+   * queued before the bar line replaces the first.
+   */
+  queueSong(song: Song, section = 0): void {
+    if (!this.running) return this.load(song, section);
+    this.nextSong = { song, section: Math.max(0, Math.min(section, song.sections.length - 1)) };
+    this.queue.clear();
+  }
+
+  /** A song is waiting for the next bar line. */
+  get songQueued(): boolean {
+    return this.nextSong !== null;
   }
 
   /** Switch section: on the next bar line while running, at once when stopped. */
@@ -552,7 +576,20 @@ export class Sequencer {
     // The state at the bar line, kept for the lanes of the instruments that are off (a few small copies a bar).
     const snap = step === 0 && this.snaps ? this.copy(this.song) : null;
     let applied: Pending | null = null;
-    if (step === 0 && !this.queue.empty) {
+    let loaded = false;
+    if (step === 0 && this.nextSong) {
+      // A queued song lands on this bar line: it replaces the old one whole and starts its section afresh.
+      const { song, section } = this.nextSong;
+      this.nextSong = null;
+      this.song = song;
+      this.leads.clear();
+      this.queue.clear();
+      this.retrigger = false;
+      this.restart.clear();
+      this.enterSection(section);
+      applied = { section, toggles: [] };
+      loaded = true;
+    } else if (step === 0 && !this.queue.empty) {
       applied = this.queue.flush();
       this.applyPending(applied);
     }
@@ -601,7 +638,7 @@ export class Sequencer {
 
     if (now.has("synth")) {
       const rhythm = section.synth.rhythm;
-      if (rhythm === "sustained") {
+      if (SYNTH_HOLD.has(rhythm)) {
         if (chordStart || entered.has("synth") || restart.has("synth")) events.push({ inst: "synth", notes: pos.chord.notes, len: pos.remaining, vel: 0.7, shift });
       } else {
         for (const hit of SYNTH_RHYTHMS[rhythm]) {
@@ -621,7 +658,7 @@ export class Sequencer {
     const restarted = [...restart].filter((id) => now.has(id));
     const pads = {} as Record<LayerInstrument, PadParams | null>;
     for (const id of LAYER_IDS) pads[id] = section[id].mode === "pad" ? { ...section[id].pad } : null;
-    const result: StepResult = { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads };
+    const result: StepResult = { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads, loaded };
     this.record(result, now, snap);
     return result;
   }
@@ -674,6 +711,7 @@ export class Sequencer {
     c.sounding = new Set(this.sounding);
     c.retrigger = this.retrigger;
     c.restart = new Set(this.restart);
+    c.nextSong = this.nextSong && { song: cloneSong(this.nextSong.song), section: this.nextSong.section };
     c.rec = this.rec && { ...this.rec, notes: cloneNotes(this.rec.notes), snap: null };
     c.prevRec = null;
     c.snaps = false;

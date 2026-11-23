@@ -1,0 +1,55 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** 2-step: a swung skipping beat and bass, organ chords pushed ahead of the beat, a bell lead over a pad. */
+export default {
+  order: 2,
+  name: "2-step",
+  family: "breaks",
+  bpm: 132,
+  key: "G",
+  mood: "house",
+  patches: { drums: "punchy", bass: "round", synth: "organ", layer1: "bell", layer2: "warmPad" },
+  mix: { sweep: 0, pump: 0.45, saturation: 0.05 },
+  sections: [
+    {
+      name: "Intro",
+      on: ["drums", "synth"],
+      chords: [[0, 1], [5, 1], [3, 1], [4, 1]],
+      beat: "twoStep",
+      bass: "garageSkip",
+      synth: "push",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 1], [5, 1], [3, 1], [4, 1]],
+      beat: "twoStep",
+      bass: "garageSkip",
+      synth: "push",
+      layer1: { mode: "generative", gen: { hits: 5, length: 6, tension: 0.45 } },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer2"],
+      chords: [[3, 2], [4, 2]],
+      beat: "twoStep",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad", pad: { brightness: 0.55 } },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer1"],
+      chords: [[0, 1], [5, 1], [3, 1], [4, 1]],
+      beat: "twoStep",
+      bass: "garageSkip",
+      synth: "push",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

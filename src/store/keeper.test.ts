@@ -4,6 +4,7 @@ import { defaultSong, type EventLog, type Song } from "../engine/song.ts";
 import type { Engine, RecordState } from "../engine/index.ts";
 import { Keeper } from "./keeper.ts";
 import { Library, MemoryKv } from "./library.ts";
+import { vibeSong } from "../music/styles.ts";
 
 class FakeEngine {
   song: Song = defaultSong();
@@ -11,6 +12,7 @@ class FakeEngine {
   playing = false;
   state: RecordState = "off";
   getDocument(): Song {
+    if (this.queued) return { ...this.queued };
     const d: Song = { ...this.song };
     if (this.log) d.log = this.log;
     return d;
@@ -21,9 +23,22 @@ class FakeEngine {
   recordInfo() {
     return { state: this.state, error: null, seconds: 0, bytes: 0 };
   }
+  queued: Song | null = null;
   loadSong(s: Song): void {
     this.song = { ...s };
     this.log = s.log ?? null;
+  }
+  /** Playing: waits for the "bar line" (land()); stopped: at once. */
+  loadAtBar(s: Song): void {
+    if (this.playing) this.queued = { ...s };
+    else this.loadSong(s);
+  }
+  pendingLoad() {
+    return this.queued && { name: this.queued.name, style: this.queued.style };
+  }
+  land(): void {
+    if (this.queued) this.loadSong(this.queued);
+    this.queued = null;
   }
   onChange(): () => void {
     return () => undefined;
@@ -85,5 +100,44 @@ describe("Keeper", () => {
     expect(keeper.id).toBe(first.id);
     expect(engine.song.name).toBe(first.doc.name);
     expect((await lib.list()).map((e) => e.id)).toEqual([first.id]);
+  });
+
+  it("a vibe starts a new song named after it; the jam it replaces stays in Songs (P3)", async () => {
+    const { lib, engine, keeper, first } = await setup();
+    const vibe = { ...vibeSong("deepHouse")! };
+    expect(await keeper.startVibe(vibe, 1)).toBe(true);
+    expect(keeper.id).not.toBe(first.id);
+    expect(engine.song.style).toBe("deepHouse");
+    expect(engine.song.name).toBe("Deep house");
+    expect(await keeper.startVibe(vibe, 1)).toBe(true);
+    expect(engine.song.name).toBe("Deep house 2");
+    const names = (await lib.list()).map((e) => e.name).sort();
+    expect(names).toEqual(["Deep house", "Deep house 2", first.doc.name].sort());
+    expect(await lib.load(keeper.id)).toMatchObject({ style: "deepHouse", name: "Deep house 2" });
+  });
+
+  it("a vibe over the untouched first-launch song replaces it; refused while a take records", async () => {
+    const { lib, engine, keeper } = await setup();
+    keeper.scratch = true;
+    expect(await keeper.startVibe(vibeSong("loFi")!, 1)).toBe(true);
+    expect((await lib.list()).map((e) => e.name)).toEqual(["Lo-fi"]);
+    engine.state = "recording";
+    expect(await keeper.startVibe(vibeSong("ambient")!, 1)).toBe(false);
+    engine.state = "armed";
+    expect(await keeper.startVibe(vibeSong("ambient")!, 1)).toBe(true);
+  });
+
+  it("while playing, the new song waits for the bar line and is saved as it will play; a second vibe before then replaces it", async () => {
+    const { lib, engine, keeper, first } = await setup();
+    engine.playing = true;
+    expect(await keeper.startVibe(vibeSong("loFi")!, 1)).toBe(true);
+    expect(engine.song.name).toBe(first.doc.name);
+    expect(await keeper.startVibe(vibeSong("ambient")!, 1)).toBe(true);
+    const list = (await lib.list()).map((e) => e.name).sort();
+    expect(list).toEqual(["Ambient", first.doc.name].sort());
+    await keeper.flush();
+    expect((await lib.load(keeper.id))!.style).toBe("ambient");
+    engine.land();
+    expect(engine.song.style).toBe("ambient");
   });
 });

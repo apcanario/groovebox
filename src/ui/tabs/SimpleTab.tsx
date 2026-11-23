@@ -6,10 +6,10 @@
  */
 import { BASS_PRESETS, DRUM_PRESETS, LAYER_MODES, MACROS, WAVES, type InstrumentId, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, GroupLabel, XYPad } from "../components.tsx";
+import { Chips, Dial, GroupLabel, PagedChips, XYPad } from "../components.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
-import { LAYER_MODE_LABEL, LAYER_MODE_ORDER, MACRO_COLOR, SIMPLE_WAVE_LABEL, simplePreset, seedHeard, simpleXYReadout } from "../logic.ts";
+import { LAYER_MODE_LABEL, LAYER_MODE_ORDER, MACRO_COLOR, SIMPLE_WAVE_LABEL, presetName, seedHeard, simpleXYReadout } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
 import { HeadRow, InstToggle } from "./InstrumentTab.tsx";
 
@@ -68,11 +68,12 @@ function Picker({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
     return (
       <>
         <GroupLabel thing="Beat">{section.drums.grid ? "Beat · changed in Advanced" : "Beat"}</GroupLabel>
-        <Chips
+        <PagedChips
           name="preset"
+          what="beats"
           options={DRUM_PRESETS}
           value={section.drums.grid ? null : section.drums.preset}
-          label={(p) => simplePreset(p)}
+          label={(p) => presetName("beat", p, true)}
           onPick={(p) => engine.setDrumPreset(edit, p)}
         />
       </>
@@ -81,7 +82,14 @@ function Picker({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
     return (
       <>
         <GroupLabel thing="Rhythm" />
-        <Chips name="rhythm" options={BASS_PRESETS} value={section.bass.rhythm} label={(p) => simplePreset(p)} onPick={(p) => engine.setBassRhythm(edit, p)} />
+        <PagedChips
+          name="rhythm"
+          what="rhythms"
+          options={BASS_PRESETS}
+          value={section.bass.rhythm}
+          label={(p) => presetName("bass", p, true)}
+          onPick={(p) => engine.setBassRhythm(edit, p)}
+        />
       </>
     );
   return (

@@ -1,5 +1,7 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
 import type { ChordStep, InstrumentId, NumericPatchKey, Song } from "../engine/song.ts";
+import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
+import { MOODS, MOOD_TABLE } from "../music/scales.ts";
 
 export const MAX_CHORDS = 8;
 const LENGTHS: ChordStep["bars"][] = [1, 2, 0.5];
@@ -324,26 +326,13 @@ export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
   ],
 };
 
-/** Preset names as shown on the chips. */
-export const PRESET_LABEL: Record<string, string> = {
-  fourFloor: "Four floor",
-  houseShuffle: "Shuffle",
-  techno: "Techno",
-  twoStep: "2-step",
-  dnb: "DnB",
-  offbeat: "Offbeat",
-  rolling: "Rolling",
-  long: "Long notes",
-  dnbSub: "DnB sub",
-  stabs: "Stabs",
-  sustained: "Held",
-};
-
-/** Preset names Simple shows in other words: no abbreviations (P2 review M6). */
-export const SIMPLE_PRESET_LABEL: Record<string, string> = { dnb: "Breakbeat", dnbSub: "Deep" };
-
-/** A preset's name in Simple. */
-export const simplePreset = (p: string): string => SIMPLE_PRESET_LABEL[p] ?? PRESET_LABEL[p];
+/** A picker entry's word: Advanced shows its name, Simple its plain word (P2 review M6: no abbreviations). */
+export type PresetKind = "beat" | "bass" | "synth";
+const PRESET_NAMES: Record<PresetKind, Record<string, PresetNames>> = { beat: BEAT_NAMES, bass: BASS_NAMES, synth: SYNTH_NAMES };
+export function presetName(kind: PresetKind, id: string, simple = false): string {
+  const n = PRESET_NAMES[kind][id];
+  return n ? (simple ? n.simple : n.name) : id;
+}
 
 export const WAVE_LABEL: Record<string, string> = { sawtooth: "Saw", square: "Square", triangle: "Tri", sine: "Sine" };
 
@@ -376,7 +365,7 @@ export function seedHeard(layer: { mode: string; arp: { direction: string } }): 
 }
 
 /** Moods by how they feel, for Simple (no scale names; spec 8.1). */
-export const SIMPLE_MOOD_LABEL: Record<string, string> = { major: "Bright", minor: "Sad", house: "Warm", deep: "Deep", dark: "Dark" };
+export const SIMPLE_MOOD_LABEL: Record<string, string> = Object.fromEntries(MOODS.map((m) => [m, MOOD_TABLE[m].simple]));
 
 /** Sweep display in Simple: "Dark 40" left of centre (the highs go), "Thin 40" right (the lows go), "Open" at centre. */
 export function simpleSweepLabel(v: number): string {
@@ -401,9 +390,9 @@ export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string>
 /** What an instrument plays in a section, in a word or two (the Now tile's second line, a Simple screen). */
 export function plays(song: Song, sec: number, id: InstrumentId): string {
   const s = song.sections[sec];
-  if (id === "drums") return s.drums.grid ? `${simplePreset(s.drums.preset)}, edited` : simplePreset(s.drums.preset);
-  if (id === "bass") return simplePreset(s.bass.rhythm);
-  if (id === "synth") return PRESET_LABEL[s.synth.rhythm];
+  if (id === "drums") return s.drums.grid ? `${presetName("beat", s.drums.preset, true)}, edited` : presetName("beat", s.drums.preset, true);
+  if (id === "bass") return presetName("bass", s.bass.rhythm, true);
+  if (id === "synth") return presetName("synth", s.synth.rhythm, true);
   return LAYER_MODE_TITLE[s[id].mode];
 }
 

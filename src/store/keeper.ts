@@ -3,7 +3,7 @@
  * saves its event log, and leaving the page saves at once. Songs are switched only while stopped.
  */
 import type { Engine, EventLog, Song } from "../engine/index.ts";
-import type { Library, SongEntry } from "./library.ts";
+import { freeName, type Library, type SongEntry } from "./library.ts";
 
 /** Edits closer together than this share one save (a knob drag saves once it rests). */
 export const SAVE_DELAY_MS = 400;
@@ -15,6 +15,13 @@ export class Keeper {
   private listeners = new Set<() => void>();
   /** The last save failed (storage full, private mode): the UI says so. */
   failed = false;
+  /**
+   * The open song is the default one made on a first launch and nothing has been changed in it: a vibe
+   * loaded over it replaces it in Songs instead of keeping an empty "Song 1" (P3).
+   */
+  scratch = false;
+  /** The song a vibe started that is still waiting for its bar line. */
+  private queuedId: string | null = null;
 
   constructor(
     readonly engine: Engine,
@@ -99,6 +106,36 @@ export class Keeper {
     return true;
   }
 
+  /**
+   * Start a vibe (P3, spec 8.2): `doc` becomes a new song in Songs, named after the vibe, and loads on the next
+   * bar line while playing (at once when stopped), from `section`. The jam it replaces is saved and stays in
+   * Songs. Refused while a take is recording or finishing.
+   */
+  async startVibe(doc: Song, section: number): Promise<boolean> {
+    const st = this.engine.recordInfo().state;
+    if (st === "recording" || st === "finishing") return false;
+    // Replaced, not kept: the untouched first-launch song, or a vibe still waiting for its bar line (never heard).
+    const drop = this.scratch || (this.engine.pendingLoad() && this.queuedId === this.id) ? this.id : null;
+    this.scratch = false;
+    await this.flush();
+    const names = (await this.lib.list()).filter((e) => e.id !== drop).map((e) => e.name);
+    const named: Song = { ...doc, name: freeName(doc.name, names) };
+    const id = await this.lib.create(named);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.id = id;
+    this.engine.loadAtBar(named, section);
+    this.queuedId = this.engine.pendingLoad() ? id : null;
+    // Loading counts as a change; the new song is saved already.
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.savedLog = this.engine.getLog();
+    if (drop) await this.lib.remove(drop);
+    await this.lib.setLast(id);
+    this.emit();
+    return true;
+  }
+
   idle(): boolean {
     return !this.engine.playing && this.engine.recordInfo().state === "off";
   }
@@ -116,6 +153,7 @@ export class Keeper {
   }
 
   private schedule(): void {
+    this.scratch = false;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.flush(), SAVE_DELAY_MS);
   }

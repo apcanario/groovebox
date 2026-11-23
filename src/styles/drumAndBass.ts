@@ -1,0 +1,55 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Drum and bass: 174 bpm, a two-step break, a deep sub, soft keys, a pad and a bell lead. */
+export default {
+  order: 1,
+  name: "Drum and bass",
+  family: "breaks",
+  bpm: 174,
+  key: "F",
+  mood: "minor",
+  patches: { drums: "tight", bass: "sub", synth: "softKeys", layer1: "airyPad", layer2: "bell" },
+  mix: { sweep: 0, pump: 0.35, saturation: 0.1 },
+  sections: [
+    {
+      name: "Intro",
+      on: ["synth", "layer1"],
+      chords: [[0, 2], [5, 2]],
+      beat: "dnb",
+      bass: "dnbSub",
+      synth: "sustained",
+      layer1: { mode: "pad" },
+      layer2: { mode: "generative" },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 2], [5, 2], [2, 2], [6, 2]],
+      beat: "dnb",
+      bass: "dnbSub",
+      synth: "stabs",
+      layer1: { mode: "pad", pad: { brightness: 0.5, motion: 0.4 } },
+      layer2: { mode: "generative", gen: { hits: 4, length: 12, density: 0.75 } },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1", "layer2"],
+      chords: [[5, 2], [2, 2]],
+      beat: "dnb",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "pad", pad: { attack: 1.5, release: 3 } },
+      layer2: { mode: "generative", gen: { hits: 3, length: 16 } },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer1"],
+      chords: [[0, 2], [5, 2]],
+      beat: "dnb",
+      bass: "dnbSub",
+      synth: "stabs",
+      layer1: { mode: "pad" },
+      layer2: { mode: "generative" },
+    },
+  ],
+} satisfies StyleDef;

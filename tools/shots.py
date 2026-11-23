@@ -167,6 +167,12 @@ class Walk:
         self.page.click(f'[data-page="{keys[0]}"]')
 
 
+def close_picker(page) -> None:
+    """The vibe picker opens the app (P3): close it, keeping the song that opened."""
+    page.wait_for_selector("#vibe-close", timeout=5000)
+    page.click("#vibe-close")
+
+
 def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
     """Every tab and page, both modes, both sizes, with the song and every section renamed to the longest,
     widest names the app accepts (spec 8.6: user text fits too). Leaves the app in Simple on the Play tab at 390 x 844,
@@ -210,6 +216,10 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
             page.click("#songs-open")
             w.screen(size, f"{mode}-songs-sheet")
             page.click("#songs-close")
+            # P3: the vibe picker, from New jam in the header (it opens the app too).
+            page.click("#new-jam")
+            w.screen(size, f"{mode}-vibe-picker")
+            page.click("#vibe-close")
     page.evaluate("""(n) => { const e = window.__groovebox; e.renameSong(n[0]);
       n.slice(1).forEach((s, i) => e.renameSection(i, s)); }""", names)
     page.click('[data-appmode="simple"]')
@@ -245,6 +255,7 @@ def main() -> int:
             end = time.time() + 5
             while time.time() < end and not page.evaluate("!!window.__groovebox"):
                 time.sleep(0.05)
+            close_picker(page)
             page.click("#play")
             time.sleep(0.5)
             page.click('[data-strip="1"]')  # Groove: every instrument on

@@ -19,6 +19,7 @@ import {
   type MixState,
   INSTRUMENTS,
   LAYER_IDS,
+  LIMITS,
   validateSong,
   type InstrumentId,
   type LayerInstrument,
@@ -104,6 +105,8 @@ export interface Position {
 export interface LandedSwitch {
   bar: number;
   pending: Pending;
+  /** A whole song (a vibe) landed on this bar line: its name and style. */
+  loaded?: { name: string; style?: string };
 }
 
 export class Engine {
@@ -133,6 +136,10 @@ export class Engine {
   /** The last recording failure, shown by the transport; cleared when a take starts. */
   private recError: string | null = null;
   private takeListeners = new Set<(t: Take & { name: string }) => void>();
+  /** A song waiting for the next bar line (loadAtBar), with its mix; null when none. */
+  private queued: Song | null = null;
+  private queuedSection = 0;
+  private landedLoad: { name: string; style?: string } | null = null;
   /** Switches applied by the scheduler but not heard yet (the lookahead before their bar line). */
   private inFlight = new InFlight();
   /** Every bar line at which queued switches landed, newest last (kept short). */
@@ -173,8 +180,12 @@ export class Engine {
     return cloneSong(this.seq.song);
   }
 
-  /** The whole song document to save: the song, its mix and the last take's event log. */
+  /**
+   * The whole song document to save: the song, its mix and the last take's event log. While a song waits for
+   * the bar line (loadAtBar), that song: it is the one now kept under the open song's place in the library.
+   */
   getDocument(): Song {
+    if (this.queued) return cloneSong(this.queued);
     const doc: Song = { ...this.getSong(), mix: { ...this.mix } };
     if (this.log) doc.log = this.log;
     return doc;
@@ -185,20 +196,45 @@ export class Engine {
     return this.log;
   }
 
-  /** Throws, listing every problem, if the song is not valid; the playing song is then unchanged. */
-  loadSong(given: Song): void {
+  /**
+   * Throws, listing every problem, if the song is not valid; the playing song is then unchanged. `section`: the
+   * section to play from (else the current one, if the song has it).
+   */
+  loadSong(given: Song, section?: number): void {
     const errors = validateSong(given);
     if (errors.length) throw new Error(`invalid song: ${errors.join("; ")}`);
     // A song saved before P2 plays at P2's balance (P2 review S1).
     const song = migrateSong(given);
+    this.queued = null;
     this.takeDocument(song);
-    this.seq.load(bareSong(song));
+    this.seq.load(bareSong(song), section);
     if (this.graph) {
       this.applyAll();
       Tone.getTransport().bpm.rampTo(song.bpm, 0.1);
     }
     this.emit({ ...this.pos, section: this.seq.section });
     this.changed(true);
+  }
+
+  /**
+   * Load a whole song on the next bar line (P3: a vibe), starting in `section`. While playing, the old song plays
+   * to the bar line and the new one, with its patches, mix and tempo, starts exactly on it; until then
+   * `pendingLoad()` names it. While stopped it loads at once. Throws on an invalid song, changing nothing.
+   */
+  loadAtBar(given: Song, section = 0): void {
+    if (!this.playing) return this.loadSong(given, section);
+    const errors = validateSong(given);
+    if (errors.length) throw new Error(`invalid song: ${errors.join("; ")}`);
+    const song = migrateSong(given);
+    this.queued = cloneSong(song);
+    this.queuedSection = section;
+    this.seq.queueSong(bareSong(song), section);
+    this.changed();
+  }
+
+  /** The song waiting for the next bar line (its name and style), or null. */
+  pendingLoad(): { name: string; style?: string } | null {
+    return this.queued ? { name: this.queued.name, style: this.queued.style } : null;
   }
 
   play(): void {
@@ -228,6 +264,9 @@ export class Engine {
     }
     this.graph.resetPump();
     this.inFlight.clear();
+    // A song still waiting for its bar line loads now.
+    const queued = this.queued;
+    if (queued) this.loadSong(queued, this.queuedSection);
     if (this.rec.state === "recording") {
       // Keep the tail, then close the take.
       this.rec.state = "finishing";
@@ -715,7 +754,7 @@ export class Engine {
 
   set bpm(v: number) {
     if (!Number.isFinite(v)) return;
-    const bpm = Math.max(80, Math.min(180, Math.round(v)));
+    const bpm = Math.max(LIMITS.bpm[0], Math.min(LIMITS.bpm[1], Math.round(v)));
     if (bpm !== this.seq.song.bpm) this.note("bpm", [bpm]);
     this.seq.song.bpm = bpm;
     if (this.graph) Tone.getTransport().bpm.rampTo(bpm, 0.05);
@@ -796,7 +835,26 @@ export class Engine {
     const g = this.graph!;
     const r: StepResult = this.seq.next();
     const bpm = Tone.getTransport().bpm.value;
-    const sixteenth = 60 / bpm / 4;
+    let sixteenth = 60 / bpm / 4;
+    let tempo = bpm;
+    if (r.loaded && this.queued) {
+      // A vibe lands on this bar line (P3): every held note lets go, and its patches, mix and tempo apply
+      // exactly here, on the audio clock, before this step's notes start (they wait on the same clock).
+      const doc = this.queued;
+      this.queued = null;
+      this.takeDocument(doc);
+      for (const id of INSTRUMENTS) g.instruments[id].releaseAll(time);
+      const ctx = Tone.getContext();
+      const apply = (): void => this.applyAll();
+      const wait = time - ctx.now() - 0.002;
+      if (wait <= 0) apply();
+      else ctx.setTimeout(apply, wait);
+      Tone.getTransport().bpm.setValueAtTime(doc.bpm, time);
+      tempo = doc.bpm;
+      sixteenth = 60 / tempo / 4;
+      this.landedLoad = { name: doc.name, style: doc.style };
+      Tone.getDraw().schedule(() => this.changed(true), time);
+    }
     for (const id of r.stopped) g.instruments[id].releaseAll(time);
     // A new bass or synth rhythm lets go of what the old one held; the sequencer restarts it.
     for (const id of r.restarted) g.instruments[id].releaseAll(time);
@@ -813,7 +871,7 @@ export class Engine {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
         case "drums":
-          g.instruments.drums.trigger(e.voice, t, e.vel, bpm, e.gap);
+          g.instruments.drums.trigger(e.voice, t, e.vel, tempo, e.gap);
           if (e.voice === "kick") g.pump(t);
           break;
         case "bass":
@@ -828,7 +886,8 @@ export class Engine {
     }
     if (r.applied) {
       this.inFlight.land(r.bar, r.applied);
-      this.landed.push({ bar: r.bar, pending: r.applied });
+      this.landed.push(this.landedLoad ? { bar: r.bar, pending: r.applied, loaded: this.landedLoad } : { bar: r.bar, pending: r.applied });
+      this.landedLoad = null;
       if (this.landed.length > 16) this.landed.shift();
     }
     const p: Position = { playing: true, section: r.section, bar: r.bar, step: r.step };
