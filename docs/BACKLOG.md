@@ -129,11 +129,45 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
 
-## Bundle 9: retouch
+## Bundle 9: phase 3, the tablet layouts
+
+Spec section 9 is the brief for bundles 9 and 10. Read it in full, with section 8, before any row.
+
+### T1. Three layouts and the docked pads
+
+- Spec 9.1 to 9.3: the phone, tablet portrait and tablet landscape layouts chosen by screen size; rotation mid-jam with no gap in the audio.
+- Landscape: the pads half (grid as large pads with instrument, what it plays and a level meter per row; strip as column labels; transport) and the instrument half (rail of seven, panel under it). Space is left above the grid for the punch pads of T3.
+- Portrait: instrument panel on top, the dock at the bottom.
+- Simple panels on both tablet layouts.
+- The APK, if G6 is done: phones stay locked to portrait, tablets rotate.
+- Smoke test at 800 x 1280, 1280 x 800, 1024 x 768 and 768 x 1024, both modes: nothing scrolls, nothing is cut off, text fits its tile, and a rotation while playing leaves the transport running.
+
+**Done when:** all four sizes pass in both modes; the phone layout is unchanged (the phone smoke checks still pass); the pads and one instrument can be used without changing screen; `check` and `smoke` pass.
+
+### T2. Advanced without pages
+
+- Spec 9.2, the Advanced panels: every knob of an instrument visible at once on tablet landscape, and on tablet portrait where it fits.
+- Drums as one grid of every voice by 16 steps; Mix as faders with meters; Chords as editor and library side by side.
+- Pages remain only where a panel cannot fit at 1024 x 768, and the review report lists each such case.
+
+**Done when:** on 1280 x 800 no Advanced panel has pages; every control is at least 48 px; `check` and `smoke` pass.
+
+## Bundle 10: phase 3, performance
+
+### T3. Punch pads, movement and many fingers
+
+- Spec 9.4: the six punch pads, each landing in time as the table says, several at once; on the phone as a page of the Mix tab.
+- Spec 9.5: pads pulse from per-instrument meters, playing step shown, moved dials animate, one animation loop with an off switch, audio first.
+- Spec 9.6: multi-touch on every control, tested with simultaneous pointers (two dials; XY pad and a pad; three pads).
+- Measure the cost: worst stall and audio load with animation on and off, on the smoke test, reported.
+
+**Done when:** each punch pad starts and ends on the beat or bar the spec names (tested on the audio clock); two controls can be moved at once (tested); animation can be turned off; `check` and `smoke` pass. Whether it makes you want to jam for hours is Pedro's call.
+
+## Bundle 11: retouch
 
 ### G7. Retouch
 
-Runs only when the starter carries a `Notes:` line. After phase 2 and the install (P1 to P8, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P8, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
 
 **Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
 
@@ -144,11 +178,11 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **L1.** Advanced chord mode: 7ths, 9ths, borrowed chords, inversions.
 - **L2.** Patch polish pass, driven by Pedro's notes.
 - **L4.** Offline re-render of the event log, in chunks.
-- **L5.** Stutter and beat-repeat on the Mix tab.
 - **L6.** Knob snapshots per section.
 - **L7.** Morph between two saved generative patterns.
 - **L8.** One effect slot per instrument (chorus, phaser, bit-crush, tape wobble), all synthesized. The shared chorus and the lo-fi master come earlier, in P7.
-- **L9.** Transitions on a section switch: drum fill, riser, filter drop, chosen per style.
+- **L9.** Automatic transitions on a section switch (drum fill, filter drop), chosen per style. The manual Build pad comes earlier, in T3.
+- **L12.** Autopilot: the jam slowly changes itself (leads evolve, sections rotate) when left alone.
 - **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch.
 - **L11.** Take one part from another style (only its drums, only its chords, only its sounds).
 

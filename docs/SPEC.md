@@ -274,3 +274,69 @@ Everything here is data that pickers list, apart from the engine additions at th
 - A tempo-synced LFO on the filter, for Wobble bass and pad motion.
 - Chorus on the shared sends, and a lo-fi master option (bit-crush, slow pitch wobble, a noise layer), each switchable off. This brings forward part of row L8.
 - All within the phone CPU budget of section 4: voice cap unchanged, every addition switchable off.
+
+## 9. Phase 3: tablet
+
+Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad controller you want to jam on for hours: more on screen at once, fewer taps, things that move with the music. Sections 1 to 8 still hold; this section says what changes when the screen is larger. `docs/design/phase2/groovebox-7-tablet-landscape.jpg` and `groovebox-8-tablet-portrait.jpg` are the reference.
+
+### 9.1 Three layouts
+
+| Layout | When | Orientation |
+|---|---|---|
+| Phone | under 600 px wide | portrait only |
+| Tablet portrait | 600 px wide or more, taller than wide | free |
+| Tablet landscape | 900 px wide or more, wider than tall | free |
+
+- **Rotating mid-jam** changes the layout with no gap in the audio and nothing lost.
+- **Extra space shows more at once.** It is not used to make the phone layout bigger.
+- **Nothing scrolls on a tablet in either mode,** the saved-jams list excepted. Advanced uses pages only where a panel cannot fit at 1024 x 768.
+- The text-fit rule and the thumb-reach order of section 8.6 apply. On a tablet held in two hands the bottom corners are the thumb zones: sections and transport bottom left, the XY pad bottom right in landscape.
+
+### 9.2 Tablet landscape: the desk
+
+Two halves, both always on screen.
+
+- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument, what it is playing and a level meter; then the section strip as the grid's column labels; then the transport bar.
+- **Right: one instrument.** A rail of seven buttons (Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix) and the chosen one's panel under it.
+- **Advanced panels show everything at once, with no pages:**
+  - Layers: mode and lead style, the phrase row, the Notes and Feel groups of six knobs side by side, the XY pad and the Sound group.
+  - Drums: every voice by 16 steps as one grid, with the voice controls beside it.
+  - Bass and Synth: all patch knobs, the rhythm picker and the XY pad.
+  - Mix: a fader and meter per instrument, the master controls and the lo-fi master.
+  - Chords: the editor and the progression library side by side.
+- **Simple panels** are the picker, the four macro dials at a large size, and the XY pad.
+- The header carries New jam, the vibe control and the mode switch.
+
+### 9.3 Tablet portrait
+
+- **Top:** the chosen instrument's panel, laid out as in landscape where it fits, otherwise in two rows.
+- **Bottom dock, always on screen:** the punch pads; the five instrument buttons in one row (Simple) or the pad grid (Advanced); the section strip; the transport bar; the tab bar.
+
+### 9.4 Punch pads
+
+Six momentary performance effects, all synthesized, all landing in time.
+
+| Pad | While held or after a tap |
+|---|---|
+| Drop | Drums and bass go silent while held; they return on the next bar line after release. |
+| Filter | The master filter sweeps down while held and opens again on the next beat after release. |
+| Stutter | The last half beat repeats while held; normal play resumes on the next beat. |
+| Echo | One tap throws the mix into the delay for a bar. |
+| Wash | One tap throws the mix into the reverb for a bar. |
+| Build | One tap starts an eight-bar rise (noise sweep, snare roll, filter opening) that ends on a bar line. |
+
+- Several can be held at once.
+- On a phone they are a page of the Mix tab.
+- Stutter replaces row L5; Build covers part of row L9.
+
+### 9.5 It moves with the music
+
+- A pad pulses when its instrument sounds, from a level meter per instrument.
+- Step rows and the drum grid show the playing step.
+- A dial moved by a macro, the filter wobble or a punch pad shows that movement.
+- One animation loop drives all of it. Audio comes first: under load the animation drops frames or switches off, and it can be switched off in the Mix tab.
+
+### 9.6 Many fingers
+
+- Any number of controls can be used at once: two dials, the XY pad and a pad, several pads together.
+- No control cancels another's touch.
