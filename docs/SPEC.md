@@ -252,7 +252,7 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 - A bar indicator of four beat dots sits by the play button, so it is visible when "next bar" arrives.
 
 **Play tab.**
-- **Simple, "Now":** the vibe control at the top, then five large instrument buttons for the playing section, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
+- **Simple, "Now":** the vibe control at the top, then five large instrument buttons for the playing section, then the DROP button (section 8.9), directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
 - **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
 
@@ -304,6 +304,33 @@ Things that make a sound weird and fun. All synthesized, all switchable while pl
 - **Cost:** a slot that is off is disconnected and costs nothing. At most two effects per instrument. The row that builds this measures the phone load with all ten slots on and reports it; if that is too much, the cap drops to six active slots across the app and the spec says so.
 - **Each vibe sets its slots,** so Lo-fi can arrive with Crush and Chorus on the keys and Dub techno with Echo on the chords.
 
+### 8.9 The Drop
+
+One large button, DROP, that turns whatever section is playing into its biggest moment: a build, a cliffhanger, a swoosh, then everything at once.
+
+**What happens after a press,** all on the audio clock and starting on the next bar line:
+
+1. **Build** (2, 4 or 8 bars, set by the vibe). The bass is filtered out, the drums thin and a snare or clap roll speeds up, a noise riser sweeps upward, the reverb grows, the lead climbs.
+2. **Cliffhanger** (the last beat or half bar of the build). One of: Gap (silence), Hold (a single filtered chord hangs), Brake (the tempo sags and the pitch falls, then snaps back).
+3. **Swoosh and impact** on the bar line: a falling noise sweep, a sub hit and a bright noise burst.
+4. **The drop** (8 or 16 bars, set by the vibe): every instrument of the section, plus extra layers.
+   - Synth: a second, wider, detuned layer an octave up.
+   - Bass: added sub and grit.
+   - Drums: more punch on the kick, open hats, a ride or crash layer, extra percussion.
+   - Layers: the lead an octave up and busier; the pad wider and brighter.
+   - Mix: deeper pump, filter fully open, a little more saturation.
+5. **Return:** at the end of the drop everything goes back to exactly what it was.
+
+**Rules**
+- **The extra layers are an overlay.** They sit on top of the song for the length of the drop and change nothing in the song document. After the drop, every knob is where it was.
+- **Pressing again cancels** a build (back to normal on the next bar line) or ends a drop early (on the next bar line).
+- **The button counts down** the bars of the build and shows the bars left in the drop.
+- **Each vibe has its own recipe,** as data in its style file: build length, which build parts it uses, the cliffhanger, the impact, which extra layers and how strong, the drop length. Deep techno's is restrained (hats out, filter down, kick back in). Ambient's is a bloom with no drums. Lo-fi's is a tape stop and the beat falling back in. EDM's and Trance's are the full thing.
+- **It must be bigger without clipping.** The build removes low end so the return feels large; the drop may sit up to 3 dB above the section, through the limiter.
+- **Where it is:** Simple, on the Play tab between the instruments and the section strip, full width. Advanced shows the same button and adds a Drop page on the Mix tab: build length, cliffhanger, drop length and one Size knob.
+- **Recorded as one event,** so a saved jam replays it identically.
+- Brake changes the tempo for under a bar. If it cannot be made to land back exactly on the bar line, it is left out and the vibes that asked for it use Hold.
+
 ## 9. Phase 3: tablet
 
 Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad controller you want to jam on for hours: more on screen at once, fewer taps, things that move with the music. Sections 1 to 8 still hold; this section says what changes when the screen is larger. `docs/design/phase2/groovebox-7-tablet-landscape.jpg` and `groovebox-8-tablet-portrait.jpg` are the reference.
@@ -325,7 +352,7 @@ Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad con
 
 Two halves, both always on screen.
 
-- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument, what it is playing and a level meter; then the section strip as the grid's column labels; then the transport bar.
+- **Left: the pads.** The punch pads and the DROP button on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument, what it is playing and a level meter; then the section strip as the grid's column labels; then the transport bar.
 - **Right: one instrument.** A rail of seven buttons (Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix) and the chosen one's panel under it.
 - **Advanced panels show everything at once, with no pages:**
   - Layers: mode and lead style, the phrase row, the Notes and Feel groups of six knobs side by side, the XY pad and the Sound group.
@@ -340,7 +367,7 @@ Two halves, both always on screen.
 ### 9.3 Tablet portrait
 
 - **Top:** the chosen instrument's panel, laid out as in landscape where it fits, otherwise in two rows.
-- **Bottom dock, always on screen:** the punch pads; the five instrument buttons in one row (Simple) or the pad grid (Advanced); the section strip; the transport bar; the tab bar.
+- **Bottom dock, always on screen:** the punch pads and the DROP button; the five instrument buttons in one row (Simple) or the pad grid (Advanced); the section strip; the transport bar; the tab bar.
 
 ### 9.4 Punch pads
 
@@ -348,16 +375,17 @@ Six momentary performance effects, all synthesized, all landing in time.
 
 | Pad | While held or after a tap |
 |---|---|
-| Drop | Drums and bass go silent while held; they return on the next bar line after release. |
+| Cut | Drums and bass go silent while held; they return on the next bar line after release. |
 | Filter | The master filter sweeps down while held and opens again on the next beat after release. |
 | Stutter | The last half beat repeats while held; normal play resumes on the next beat. |
 | Echo | One tap throws the mix into the delay for a bar. |
 | Wash | One tap throws the mix into the reverb for a bar. |
-| Build | One tap starts an eight-bar rise (noise sweep, snare roll, filter opening) that ends on a bar line. |
+| Brake | The tempo and pitch sag while held and snap back on the next bar line after release. Left out if section 8.9's Brake was. |
 
 - Several can be held at once.
 - On a phone they are a page of the Mix tab.
-- Stutter replaces row L5; Build covers part of row L9.
+- Stutter replaces row L5.
+- The DROP button of section 8.9 sits beside the punch pads on both tablet layouts, larger than a pad.
 
 ### 9.5 It moves with the music
 

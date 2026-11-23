@@ -123,7 +123,20 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** all 24 styles load and play (smoke test loops them); every list meets its count; every name fits its tile (tested); `check` and `smoke` pass. Whether each vibe sounds like its name is Pedro's call.
 
-## Bundle 9: keep it and install it
+## Bundle 9: phase 2, the Drop
+
+### P10. The Drop
+
+- Spec 8.9 in full: the conductor that runs build, cliffhanger, impact, drop and return on the audio clock; the overlay that adds the extra layers without touching the song document; cancel and early end; the countdown on the button.
+- The build and impact voices (noise riser, falling sweep, sub hit, noise burst, snare roll), synthesized.
+- A recipe for every one of the 24 vibes, as data in its style file.
+- Simple: the button on the Play tab. Advanced: the same button and the Drop page on the Mix tab.
+- Try Brake. If it cannot land back on the bar line every time (tested over 50 runs at three tempos), remove it and use Hold where a recipe asked for it.
+- Measure the cost of the overlay's extra voices and stay inside the voice cap, raising it only with the measured load reported.
+
+**Done when:** after a full build and drop the song document is identical to before the press (tested); every stage starts on its bar line or beat (tested on the audio clock); a second press cancels or ends it on the next bar line (tested); the master never clips during a drop in any vibe (smoke test loops all 24); `check` and `smoke` pass. Whether it goes BAM is Pedro's call, vibe by vibe.
+
+## Bundle 10: keep it and install it
 
 ### G5. Save and record
 
@@ -143,9 +156,9 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
 
-## Bundle 10: phase 3, the tablet layouts
+## Bundle 11: phase 3, the tablet layouts
 
-Spec section 9 is the brief for bundles 10 and 11. Read it in full, with section 8, before any row.
+Spec section 9 is the brief for bundles 11 and 12. Read it in full, with section 8, before any row.
 
 ### T1. Three layouts and the docked pads
 
@@ -166,22 +179,22 @@ Spec section 9 is the brief for bundles 10 and 11. Read it in full, with section
 
 **Done when:** on 1280 x 800 no Advanced panel has pages; every control is at least 48 px; `check` and `smoke` pass.
 
-## Bundle 11: phase 3, performance
+## Bundle 12: phase 3, performance
 
 ### T3. Punch pads, movement and many fingers
 
-- Spec 9.4: the six punch pads, each landing in time as the table says, several at once; on the phone as a page of the Mix tab.
+- Spec 9.4: the six punch pads (Cut, Filter, Stutter, Echo, Wash, Brake), each landing in time as the table says, several at once; on the phone as a page of the Mix tab. The DROP button of P10 placed beside them on both tablet layouts.
 - Spec 9.5: pads pulse from per-instrument meters, playing step shown, moved dials animate, one animation loop with an off switch, audio first.
 - Spec 9.6: multi-touch on every control, tested with simultaneous pointers (two dials; XY pad and a pad; three pads).
 - Measure the cost: worst stall and audio load with animation on and off, on the smoke test, reported.
 
 **Done when:** each punch pad starts and ends on the beat or bar the spec names (tested on the audio clock); two controls can be moved at once (tested); animation can be turned off; `check` and `smoke` pass. Whether it makes you want to jam for hours is Pedro's call.
 
-## Bundle 12: retouch
+## Bundle 13: retouch
 
 ### G7. Retouch
 
-Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P9, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P10, T1 to T3, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
 
 **Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
 
@@ -194,7 +207,7 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **L4.** Offline re-render of the event log, in chunks.
 - **L6.** Knob snapshots per section.
 - **L7.** Morph between two saved generative patterns.
-- **L9.** Automatic transitions on a section switch (drum fill, filter drop), chosen per style. The manual Build pad comes earlier, in T3.
+- **L9.** Automatic transitions on a section switch (drum fill, filter drop), chosen per style.
 - **L12.** Autopilot: the jam slowly changes itself (leads evolve, sections rotate) when left alone.
 - **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch.
 - **L11.** Take one part from another style (only its drums, only its chords, only its sounds).

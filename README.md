@@ -46,20 +46,21 @@ Being built now (row G5): saving songs on the phone, recording a jam and exporti
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
-**Phase 2: Simple and Advanced** (rows P1 to P9)
+**Phase 2: Simple and Advanced** (rows P1 to P10)
 - **One switch for the whole app.** Simple uses plain words and a few large controls. Advanced has every control. The switch changes what is shown, never what is heard, and every Simple move is visible in Advanced.
 - **Vibes:** 24 complete starting grooves (Deep house, Deep techno, Lo-fi, Drum and bass, Ambient, Trance and more). One tap loads tempo, chords, beat, bass, sounds, leads and four arranged sections, and it plays.
 - **Simple chords:** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting) and tap a progression. No scales or chord names needed.
 - **Four more lead styles** beside the current one: Hook, Phrase, Roll and Drift, shaped by twelve knobs (among them Shape, Range, Register, Note length, Phrase, Variation, Slide and Accent), with New idea and Back buttons.
 - **Screens that never scroll,** text that always fits its tile, one row of sections, and the most-used controls at the bottom in thumb reach.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
+- **DROP:** one large button that builds for a few bars, hangs, then brings the section back with extra layers on everything. Each vibe has its own version.
 - **More beats, bass rhythms, synth rhythms and sounds,** with the engine additions they need: two more drum voices, 16-step beats, noise and FM oscillators, a tempo-synced filter wobble and a lo-fi master.
 
 **Install** (row G6): an Android APK built by GitHub Actions.
 
 **Phase 3: tablet** (rows T1 to T3)
 - Layouts for tablet portrait and landscape. In landscape the pads and one instrument share the screen, and Advanced shows every knob of an instrument at once.
-- **Punch pads:** Drop, Filter, Stutter, Echo, Wash and Build, momentary effects that land in time.
+- **Punch pads:** Cut, Filter, Stutter, Echo, Wash and Brake, momentary effects that land in time.
 - Pads that pulse with the music, dials that show their movement, and several controls usable at once.
 
 ## What it will not do
@@ -75,7 +76,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 |---|---|---|
 | G0 to G4 | Sound spike, engine, shell, instrument tabs, layers | Done |
 | G5 | Save and record | In progress |
-| P1 to P9 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects | Planned |
+| P1 to P10 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
