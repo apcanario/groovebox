@@ -20,6 +20,7 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C2. G3 listen items for C1** (23 Nov 2026): the bass lost its second filter (listen for crackle on a saw bass with Env amt high); the drum filter still tops at 18 kHz, not the 10 kHz of the other filters. If C1 crackle persists, these are the next suspects after buffer size.
 - **C3. G3 sound defaults changed** (23 Nov 2026): default bass cutoff 0.3 with env amount 0.45, kick now about 0.2 s, drum level and sub dials max out at the C1 trims, defaults moved up the dial. Pedro's ears judge them.
 - **C4. G4 listen items** (23 Nov 2026): Layer 1 in Pad mode measures about 12 dB louder than the other modes (solo about -14 dB against -30 dB for the synth), and Layer 2 sits 10 to 16 dB under Layer 1. Levels untouched, no spec rule; Pedro's ears judge them. Pad filter now opens slowly over the pad's release when leaving Pad: listen for a smooth tail.
+- **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
 
 ## By hand (Pedro)
@@ -39,23 +40,12 @@ All rows of this bundle are Done.
 
 Spec section 8 is the brief for bundles 4 to 7, and `docs/design/look/` shows where it is going. Read sections 8.1, 8.3, 8.6 and 8.12 in full before any row of this bundle.
 
-### P1b. The look
-
-- Spec 8.12 in full, across the whole app: 3 px corners and 2 px gaps; the on, off and next-bar states (hatched frame); square-cut dials with ticks and pointer; the dot-grid XY pad; sentence case.
-- DM Sans only, by the type table, bundled with the app; Space Mono removed everywhere.
-- Icons by the spec's table: Material Symbols outlined, weight 300, bundled as SVG, always beside a word.
-- The lanes: the engine reports each instrument's current bar as notes; the Simple Play tab's Now view becomes five lanes with one playhead; every instrument tab shows its own lane above its controls.
-- Motion by the spec's table for what exists at this row (sounding, queued, lanes, labels, dials, beat lights, record, tab marker), in one loop, with the reduce-motion setting and an off switch on the Mix tab. DROP and Morph motion arrive with P10 and P11.
-- The reviewer runs `tools/shots.py` and compares each tab with the images in `docs/design/look/`, listing every visible difference as a finding.
-
-**Done when:** every lane matches what its instrument is playing (tested against the engine's notes) and the playhead keeps time; no font but DM Sans is loaded (tested); every icon in the spec's table is used where the table says; with motion off every state is still told apart by fill and hatching; the reviewer's screenshot comparison has no open finding; `check` and `smoke` pass. Whether it has the wow is Pedro's call.
-
 ### P2. Simple and Advanced
 
 - Spec 8.1 and 8.3: the app-wide toggle in the header, remembered (P1 left the switch unremembered and doubling as the temporary Now/Song switch; this row replaces that); Simple as the first-run default.
 - Simple instrument tabs: one picker and four macro dials each, as in the 8.3 table, plus the XY pad. Macro mappings as data; macro positions stored in the song.
 - Advanced tabs are the tabs built in G2 to G4, re-laid to the no-scroll rule.
-- Simple uses plain words only: check every visible string in Simple against 8.1.
+- Simple uses plain words only: check every visible string in Simple against 8.1. The P1b review also leaves for this row: the Simple Layer tab's macro dials, Back, the XY pad and the lane row.
 - New idea and Back on both layers, with the eight-seed history, in both modes.
 - Clear C4 (layer level balance) here, since the Level and Space macros expose it.
 
@@ -94,6 +84,7 @@ Read spec 8.2, 8.4 and 8.5 in full before any row of this bundle.
 
 ### P6. Lead screens
 
+- P1b kept `leadSteps` and `preview` in the engine for this row's step row; use them or remove them, and say which in the changelog.
 - Advanced Layer tab: style selector, the Notes and Feel pages of six knobs, Pulse's own three knobs on a third page, the step row showing phrase bar and note lengths, New idea and Back.
 - Simple Layer tab: style picker, Busy, Evolve, Bright, Space, New idea, Back.
 - Each launch style of P3 gets a fitting lead style and settings on its layers.
@@ -238,3 +229,4 @@ Kept here so no row disappears without a record.
 - **G4. Layer 1 and Layer 2** (23 Nov 2026). Built, reviewed (fix: 0 errors, 1 should-fix, 6 minor, 5 minor and the should-fix applied, loudness minor carried as C4 as a listen item), pushed. Report in `docs/reviews/G4.md`. Bundle 3 is done.
 - **G5. Save and record** (23 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 8 minor, all applied; the error was a Tone oscillator leak), pushed. Report in `docs/reviews/G5.md`. Ten-minute take: valid MP3, 600.11 s for 600.01 s, heap +0.6 MB.
 - **P1. The frame** (23 Nov 2026). Built, reviewed (fix: 2 errors, 4 should-fix, 5 minor, all applied except M1 and M2, which belong to P3 and P2 and stay in those rows), pushed. Report in `docs/reviews/P1.md`.
+- **P1b. The look** (23 Nov 2026). Built, reviewed (fix: 1 error, 4 should-fix, 11 minor, all applied), pushed. Report in `docs/reviews/P1b.md`. Whether it has the wow is Pedro's call.

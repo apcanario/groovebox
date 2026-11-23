@@ -26,9 +26,10 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5 and P1, 22 and 23 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1 and P1b, 22 and 23 Nov 2026):
 
 - **One frame on every tab (P1):** header (New jam, Songs, Simple/Advanced), content, one row of sections, a transport bar with four beat lights and the bar counter, then the tab bar. Tapping a section plays it from the next bar; holding one opens its sheet. Nothing scrolls, and text shrinks to fit its tile.
+- **The look (P1b):** flat, 3 px corners, a hatched frame on anything queued for the next bar, square-cut dials with ticks, a dot-grid XY pad, DM Sans only, Material line icons beside the words. Each instrument shows the bar it is playing as a lane of notes under one playhead, five lanes together in Simple's Now view and one above the controls on each instrument tab. Motion marks what sounds and what is queued; it stops with the phone's reduce-motion setting or the Moving/Still switch on the Mix tab, and every state still reads by fill and hatching.
 
 - **Play tab:** in Advanced, a grid of instruments by sections on top of the section row: tap a cell to turn an instrument on or off in that section, hold a section to rename, copy, add or delete it or edit it without playing. In Simple (for now the header switch), five on/off tiles; tap to switch at the next bar, hold to open the tab.
 - **Chords tab:** choose a key and a mood (Major, Minor, House, Deep, Dark), then build a sequence of up to eight chords from seven in-key buttons, with lengths of half a bar, one bar or two.
@@ -54,7 +55,6 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 - **Vibes:** 24 complete starting grooves (Deep house, Deep techno, Lo-fi, Drum and bass, Ambient, Drone, Trance and more). One tap loads tempo, chords, beat, bass, sounds, leads and four arranged sections, and it plays.
 - **Simple chords:** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting) and tap a progression. No scales or chord names needed.
 - **Four more lead styles** beside the current one: Hook, Phrase, Roll and Drift, shaped by twelve knobs (among them Shape, Range, Register, Note length, Phrase, Variation, Slide and Accent), with New idea and Back buttons.
-- **A new look** where you can see the music: every instrument shows the bar it is playing as a lane of notes, with one playhead sweeping across them. Line icons beside every name, one typeface, and movement that shows what is playing and what is queued.
 - **Screens that never scroll,** text that always fits its tile, one row of sections, and the most-used controls at the bottom in thumb reach.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
 - **DROP:** one large button that builds for a few bars, hangs, then brings the section back wider, with extra layers on everything, and stays there until you switch it off. Bigger by width, not volume. Each vibe has its own version.
@@ -80,8 +80,8 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame | Done |
-| P1b to P11 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
+| G0 to G5, P1, P1b | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame | Done |
+| P2 to P11 | Phase 2: Simple and Advanced, vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
