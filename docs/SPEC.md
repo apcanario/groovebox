@@ -143,10 +143,20 @@ Settled on 23 Nov 2026 after Pedro played bundles 1 to 3. Where this section dif
 
 A style is a complete starting point: one tap gives a full groove.
 
-- **Launch set (10):** Deep house, Deep techno, Melodic techno, Lo-fi, Drum and bass, 2-step, Tropical house, Ambient, IDM, EDM.
+- **Launch set (24), in five families:**
+
+| Family | Styles |
+|---|---|
+| House | Deep house, Tropical house, Progressive, Acid house, Afro house |
+| Techno | Deep techno, Melodic techno, Minimal techno, Dub techno, Detroit techno |
+| Breaks | Drum and bass, 2-step, Breakbeat, Dubstep, Future garage |
+| Slow | Lo-fi, Ambient, Downtempo, Synthwave, Trap |
+| Other | IDM, EDM, Trance, Electro |
+
+- **A style's name is at most 14 characters,** so it fits a tile on one line. In Simple the word on screen is "Vibe".
 - **A style sets everything:** bpm, swing, key and mood, its chord progression, drum beat, bass rhythm, synth rhythm, the five patches, each layer's mode and lead style, send and mix settings, and four sections arranged as intro, groove, break and outro with different instruments on in each.
 - **A style is one data file** under `src/styles/`. Adding a style, a drum beat, a bass rhythm, a patch or a progression needs no engine or UI code; pickers list whatever exists.
-- **Opening the app** shows the style picker: large cards, one per style, with "Continue last jam" first when there is one. Tapping a style loads it and starts playing.
+- **Opening the app** shows the vibe picker: all 24 as tiles in two columns on one screen, coloured by family, with "Continue last jam" first when there is one. It does not scroll. Tapping a tile loads it and starts playing.
 - **New jam from style** is always one tap away from the transport bar. Loading a style while playing lands on the next bar line. The jam it replaces stays available as "Previous jam" until the next one replaces it.
 - **Bpm range becomes 60 to 180** so Lo-fi and Ambient fit.
 - **No samples, ever** (replaces the mention of sampled breaks in section 3). Every sound and effect is synthesized in code. No audio files ship with the app.
@@ -169,8 +179,8 @@ Each instrument tab in Simple shows one picker and four large dials, on one scre
 
 ### 8.4 Chords
 
-- **Simple:** no scales, no degrees. Pick a style (it starts on the song's style), pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting), then tap one of the progression cards. Each card has a plain name and shows its chords as coloured blocks. A tapped card plays from the next bar line. A "Higher / Lower" control transposes the song by a semitone, with no note names shown.
-- **The library:** at least six progressions per style and at least 60 in all, each tagged with one or more feels. Each is stored as degrees, mood and voicing, so it transposes and stays in key. Names are neutral. No artist, song or label names, and no claim that a progression comes from any track.
+- **Simple:** no scales, no degrees. Pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting), then tap one of four progression cards. A "More chords" button shows the next four; nothing scrolls. Each card has a plain name and shows its chords as coloured blocks. A tapped card plays from the next bar line. The cards are those that suit the song's vibe; a button in the tab's title opens the vibe picker to borrow another vibe's chords. "Lower" and "Higher" transpose the song by a semitone, with no note names shown.
+- **The library:** at least 120 progressions, each tagged with one or more feels and the vibes it suits, so that every vibe has at least four for every feel. Each is stored as degrees, mood and voicing, so it transposes and stays in key. Names are neutral. No artist, song or label names, and no claim that a progression comes from any track.
 - **Advanced:** the degree editor built in G2 (what section 3 calls easy mode), unchanged. Row L1 still adds 7ths, 9ths, borrowed chords and inversions later.
 - A Simple progression opens in the Advanced editor as ordinary chords.
 
@@ -210,10 +220,18 @@ The generative mode gets a style selector. Each style is its own pure, seeded ge
 
 ### 8.6 Screens
 
-**No vertical scrolling on any control screen.**
-- Every tab fits the screen at 360 x 640 CSS px and up without scrolling. The page itself never scrolls.
-- A tab with more controls than fit uses pages, switched by large page chips at the top of the tab.
-- Lists are the only things that scroll (styles, progression cards, saved jams). A scrolling list contains only tappable rows, never a dial, slider or XY pad.
+The six images in `docs/design/phase2/` are the reference for these screens: Simple Play, Simple Layer, Simple Chords, the vibe picker, Advanced Play, Advanced Layer. Names and values in them are placeholders.
+
+**Simple never scrolls and never swipes, in any direction.**
+- Every Simple screen shows everything it has at 360 x 640 CSS px and up. Where there is more than fits (progressions), a visible button pages to the next set.
+- Simple is complete on its own: a whole jam, from picking a vibe to changing chords, beats, sounds and leads, without opening Advanced.
+
+**Advanced never scrolls vertically.**
+- Every tab fits the screen at 360 x 640 and up. The page itself never scrolls.
+- A tab with more controls than fit uses pages, switched by large page chips at the top of the tab. Advanced is where the fine control lives.
+- The saved-jams list is the one thing that scrolls. It contains only tappable rows.
+
+**No text wraps or is cut off on a tile, chip, button, dial or pill,** at 360 px wide and up. A label that does not fit is shortened in the source, not shrunk or wrapped. Help text goes under a control or in a sheet, never inside a tile.
 
 **One row of sections.**
 - The section strip appears once on every screen. On the Play tab the grid's column headers are that strip; there is no second row.
@@ -224,7 +242,25 @@ The generative mode gets a style selector. Each style is its own pure, seeded ge
 
 **Play tab.**
 - **Simple, "Now":** four large section buttons and five large instrument buttons for the playing section. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
-- **The vibe row** sits on the Simple Play tab in the space under the instrument buttons: one large chip per style, in a row that scrolls sideways, with the current style lit. Tapping a chip loads that style from the next bar line, the same as the style picker, and the replaced jam stays as Previous jam. In Simple the word on screen is "Vibe", not "Style". Nothing else on the screen.
+- **The vibe control** sits on the Simple Play tab under the instrument buttons: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam stays as Previous jam. Nothing else on the screen.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, with the strip as its header.
 
 **The last jam survives a reload** (kept on the phone automatically), ahead of the full save screen of row G5.
+
+### 8.7 Sounds, beats and rhythms
+
+Everything here is data that pickers list, apart from the engine additions at the end. All of it is synthesized.
+
+- **Beats (at least 24):** Four on the floor, House shuffle, Techno, Minimal, Dub, Acid, Afro, Tropical, Progressive, 2-step, Garage shuffle, Breakbeat, DnB two-step, DnB roller, Halftime, Dubstep, Boom bap, Trap, Electro, Trance, EDM, Downtempo, Synthwave, Glitch, and None.
+- **Bass rhythms (at least 14):** Offbeat, Rolling, Long notes, DnB sub, Octave bounce, Acid line, Dub, Reese hold, Wobble, 808 glide, Arp bass, Pedal, Garage skip, Walking.
+- **Synth rhythms (at least 10):** Stabs, Offbeat, Sustained, Dub chord, Pluck eighths, Gate, Skank, Swell, Broken chord, Push.
+- **Patches (at least 8 per instrument):** for example Sub, Round, Acid, Reese, Wobble, 808, Pluck and Rubber for bass; Warm stab, Dub chord, Organ, Pluck, Supersaw, Soft keys, Glass and Brass for synth; Soft sine, Square, Acid, Pluck, Bell, Saw, Whistle and Airy for leads; Warm, Dark, Airy, Strings, Shimmer, Choir-like, Glass and Tape for pads.
+- **Names:** at most 14 characters, plain, one line.
+
+**Engine additions these need:**
+- Two more drum voices, Perc (a tuned tom or conga-like hit) and Shaker, in presets and in the Advanced sequencer.
+- Drum presets on 16 steps with repeats (hat rolls), and a 16-step switch on the Advanced sequencer. Simple shows only the beat picker.
+- A noise oscillator and a two-operator FM wave for patches (airy pads, bells, glassy keys).
+- A tempo-synced LFO on the filter, for Wobble bass and pad motion.
+- Chorus on the shared sends, and a lo-fi master option (bit-crush, slow pitch wobble, a noise layer), each switchable off. This brings forward part of row L8.
+- All within the phone CPU budget of section 4: voice cap unchanged, every addition switchable off.

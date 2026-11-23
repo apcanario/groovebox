@@ -31,13 +31,14 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 ### P1. One row of sections, no scrolling, the Now view
 
-- Spec 8.6 in full: no vertical scrolling on any tab at 360 x 640 and up, pages with large chips where a tab needs more room, lists as the only scrolling areas.
+- Spec 8.6 in full: Advanced never scrolls vertically at 360 x 640 and up and uses pages with large chips; Simple never scrolls or swipes in any direction; no text wraps or is cut off on any tile, chip, button, dial or pill.
+- Fix every existing label that wraps today (the Play grid's "hold a column for options" tile is one).
 - One section strip everywhere; the Play grid's header is the strip. Tap always means play next bar; "Edit without playing" by hold, kept for Advanced.
 - The three section states with their looks and words, and the four-dot bar indicator.
-- The Simple Play tab ("Now"): four section buttons, five instrument buttons, hold to open a tab, and room kept under them for the vibe row that P3 adds. The grid stays as the Advanced Play tab.
+- The Simple Play tab ("Now"): four section buttons, five instrument buttons, hold to open a tab, and room kept under them for the vibe control that P3 adds. The grid stays as the Advanced Play tab.
 - The last jam survives a reload.
 - Until P2 lands the mode toggle, a temporary switch on the Play tab chooses Now or Song.
-- Smoke test: at 360 x 640 and 412 x 915, on every tab and page, the document does not scroll and no control is cut off.
+- Smoke test: at 360 x 640 and 412 x 915, on every tab and page in both modes, the document does not scroll, no control is cut off, and no tile, chip, button, dial or pill has wrapped or clipped text.
 
 **Done when:** no tab scrolls at either size (tested); there is one row of sections on every screen; a section tap means the same thing everywhere; the Now view runs a whole jam; a reload brings the jam back; `check` and `smoke` pass.
 
@@ -56,18 +57,18 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 ### P3. Styles
 
-- Spec 8.2: the style format as one data file per style under `src/styles/`, and the ten launch styles, each a complete groove with four arranged sections.
-- New synthesized drum beats, bass rhythms and patches as the styles need them (Lo-fi swung beat, broken IDM beat, EDM, Tropical house, a near-empty Ambient kit). All as data.
+- Spec 8.2: the style format as one data file per style under `src/styles/`, and the first eight styles, each a complete groove with four arranged sections: Deep house, Tropical house, Deep techno, Melodic techno, Drum and bass, 2-step, Lo-fi, Ambient. The other sixteen come in P8.
+- The beats, bass rhythms and patches those eight need, as data, using the engine as it is.
 - Bpm range 60 to 180.
-- The vibe row on the Simple Play tab (spec 8.6): style chips in a sideways-scrolling row, current one lit, tap loads on the next bar.
-- The style picker as the opening screen, with Continue last jam first; New jam from style in the transport bar; loading lands on the next bar; Previous jam kept.
+- The vibe control on the Simple Play tab (spec 8.6): current vibe with an arrow each side, arrows step on the next bar, the middle opens the picker.
+- The vibe picker as the opening screen: a two-column grid that fits all 24 tiles on one screen without scrolling (unbuilt styles are not shown until they exist), Continue last jam first; New jam from style in the transport bar; loading lands on the next bar; Previous jam kept.
 - Move the existing presets (moods, drum presets, bass and synth rhythms) to data files in the same way, with pickers that list whatever exists.
 
-**Done when:** each of the ten styles loads and plays with every instrument audible in its groove section (smoke test loops all ten); adding an eleventh style is one new file and no other change (shown by a test fixture); loading a style mid-jam lands on the bar; `check` and `smoke` pass. Whether each style sounds like its name is Pedro's call.
+**Done when:** each of the eight styles loads and plays with every instrument audible in its groove section (smoke test loops all of them); adding another style is one new file and no other change (shown by a test fixture); loading a style mid-jam lands on the bar; `check` and `smoke` pass. Whether each style sounds like its name is Pedro's call.
 
 ### P4. Simple chords
 
-- Spec 8.4: the Simple Chords tab (style, feel, progression cards, Higher / Lower) and the progression library, at least six per style and 60 in all, tagged by feel, stored as degrees with mood and voicing.
+- Spec 8.4: the Simple Chords tab (feel, four cards, More chords, Lower and Higher, the vibe button) and the progression library: at least 120, tagged by feel and by the vibes they suit, at least four per feel for every one of the 24 vibes, stored as degrees with mood and voicing.
 - The Advanced Chords tab is the G2 editor.
 - A test walks the whole library: every progression is in its mood's scale or marked as borrowing, has 2 to 8 chords, and transposes to all twelve keys inside the instruments' ranges.
 
@@ -90,7 +91,24 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** every lead knob can be turned while playing with no stuck note or click; both modes fit without scrolling; `check` and `smoke` pass. Whether the leads now have enough variety is Pedro's call.
 
-## Bundle 7: keep it and install it
+## Bundle 7: phase 2, sounds and the other vibes
+
+### P7. Sound additions
+
+- Spec 8.7, engine additions: Perc and Shaker drum voices; 16-step drum presets with repeats and the 16-step switch on the Advanced sequencer; noise oscillator and two-operator FM wave; tempo-synced filter LFO; chorus on the sends; the lo-fi master option. Each switchable off.
+- Measure the cost: report the smoke test's worst stall and audio load with everything on, against the same measure before the row.
+
+**Done when:** each addition is audible and can be turned off; nothing clicks when one is switched while playing; the voice cap holds; `check` and `smoke` pass.
+
+### P8. The other sixteen vibes and the library
+
+- The remaining styles of spec 8.2: Progressive, Acid house, Afro house, Minimal techno, Dub techno, Detroit techno, Breakbeat, Dubstep, Future garage, Downtempo, Synthwave, Trap, IDM, EDM, Trance, Electro.
+- The full lists of spec 8.7: at least 24 beats, 14 bass rhythms, 10 synth rhythms and 8 patches per instrument, all as data, all with names of 14 characters or fewer.
+- Revisit the first eight styles where the new sounds serve them (Lo-fi gets the lo-fi master, Ambient the airy pads).
+
+**Done when:** all 24 styles load and play (smoke test loops them); every list meets its count; every name fits its tile (tested); `check` and `smoke` pass. Whether each vibe sounds like its name is Pedro's call.
+
+## Bundle 8: keep it and install it
 
 ### G5. Save and record
 
@@ -110,11 +128,11 @@ Spec section 8 is the brief for bundles 4 to 6. Read it in full before any row.
 
 **Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
 
-## Bundle 8: retouch
+## Bundle 9: retouch
 
 ### G7. Retouch
 
-Runs only when the starter carries a `Notes:` line. After phase 2 and the install (P1 to P6, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+Runs only when the starter carries a `Notes:` line. After phase 2 and the install (P1 to P8, G5, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
 
 **Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
 
@@ -128,7 +146,7 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **L5.** Stutter and beat-repeat on the Mix tab.
 - **L6.** Knob snapshots per section.
 - **L7.** Morph between two saved generative patterns.
-- **L8.** One effect slot per instrument (chorus, phaser, bit-crush, tape wobble) and a lo-fi master option (crush, wobble, noise layer), all synthesized.
+- **L8.** One effect slot per instrument (chorus, phaser, bit-crush, tape wobble), all synthesized. The shared chorus and the lo-fi master come earlier, in P7.
 - **L9.** Transitions on a section switch: drum fill, riser, filter drop, chosen per style.
 - **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch.
 - **L11.** Take one part from another style (only its drums, only its chords, only its sounds).
