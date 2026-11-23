@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { Sequencer, type StepResult } from "../engine/sequencer.ts";
 import { INSTRUMENTS, LIMITS, defaultSong, validateSong, type InstrumentId } from "../engine/song.ts";
-import { checkGrid, checkNamed, readData, type BeatDef, type DataFiles, type PatchDef } from "./data.ts";
+import { FEELS, checkGrid, checkNamed, readData, type BeatDef, type DataFiles, type PatchDef } from "./data.ts";
 import {
   BASS_NAMES,
   BASS_PRESETS,
@@ -30,6 +30,8 @@ import {
   vibeTiles,
 } from "./styles.ts";
 import { freeName } from "../store/library.ts";
+import { PROGRESSIONS, findProgression, progressionsFor } from "./progressions.ts";
+import type { Mood } from "./scales.ts";
 
 const LAUNCH = ["Deep house", "Tropical house", "Deep techno", "Melodic techno", "Drum and bass", "2-step", "Lo-fi", "Ambient"];
 
@@ -102,17 +104,33 @@ describe("patch files (P3 review M2)", () => {
 describe("adding a style is one new file (spec 8.2)", () => {
   it("a style file dropped in the folder is listed, loads and plays, with no other change", () => {
     const withFixture = readStyles({ ...appStyles, ...fixtureStyles });
-    expect(withFixture.ids).toContain("testVibe");
-    expect(STYLE_IDS).not.toContain("testVibe");
+    expect(withFixture.ids).toContain("progressive");
+    expect(STYLE_IDS).not.toContain("progressive");
     const tiles = vibeTiles(withFixture.ids, withFixture.byId);
     expect(tiles.map((t) => t.name)).toEqual([...LAUNCH, "Test vibe"]);
-    const song = styleSong("testVibe", withFixture.byId.testVibe);
+    const song = styleSong("progressive", withFixture.byId.progressive);
     expect(validateSong(song)).toEqual([]);
     const seq = new Sequencer(song);
     seq.load(song, 1);
     seq.start();
     expect([...heard(seq, 1)].sort()).toEqual([...INSTRUMENTS].sort());
-    expect(stepVibe("ambient", 1, tiles)).toBe("testVibe");
+    expect(stepVibe("ambient", 1, tiles)).toBe("progressive");
+  });
+
+  it("the dropped-in style also passes the P4 library checks: four cards per feel, every section a progression tagged with it", () => {
+    const withFixture = readStyles({ ...appStyles, ...fixtureStyles });
+    const problems: string[] = [];
+    for (const id of withFixture.ids) {
+      for (const f of FEELS) if (progressionsFor(id, f).length < 4) problems.push(`${id}/${f}: ${progressionsFor(id, f).length}`);
+      const style = withFixture.byId[id];
+      style.sections.forEach((s, i) => {
+        const found = findProgression(style.mood as Mood, s.chords.map(([degree, bars]) => ({ degree, bars })));
+        if (!found) problems.push(`${id} section ${i}: not in the library`);
+        else if (!PROGRESSIONS[found].vibes.includes(id)) problems.push(`${id} section ${i}: ${found} is not tagged ${id}`);
+      });
+    }
+    expect(withFixture.ids.length).toBe(STYLE_IDS.length + 1);
+    expect(problems).toEqual([]);
   });
 
   it("a broken style file is refused, naming the file and the problem", () => {

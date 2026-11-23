@@ -34,19 +34,19 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5 and P6,
 
 - **Simple chords (P4):** pick a feel (Bright, Warm, Dreamy, Dark, Tense, Uplifting), then one of four cards, each a progression shown as colour blocks with a name; a tapped card plays from the next bar and sets the mood for the song. More chords brings the next four, Lower and Higher move the pitch, and the vibe button borrows another vibe's progressions without loading it. A library of 137 progressions, one data file each, tagged by feel and vibe. No scale or chord names in Simple; Advanced is the chord editor.
 
-- **Vibes (P3):** eight complete starting grooves, one data file each (Deep house, Tropical house, Deep techno, Melodic techno, Drum and bass, 2-step, Lo-fi, Ambient), each with four arranged sections. The vibe picker opens the app (Continue last jam first); a tap loads the vibe as a new song and plays, landing on the next bar with its sounds, mix and tempo. On the Simple Play tab the vibe control steps with an arrow each side, the middle opens the picker. New jam opens the picker, also while playing. Tempo runs 60 to 180. Beats, bass and synth rhythms, moods and patches are data files too, and pickers list whatever exists.
+- **Vibes (P3):** eight complete starting grooves, one data file each (Deep house, Tropical house, Deep techno, Melodic techno, Drum and bass, 2-step, Lo-fi, Ambient), each with four arranged sections. The vibe picker opens the app (Continue last jam first); a tap loads the vibe as a new song and plays, landing on the next bar with its sounds, mix and tempo. On the Simple Play tab the vibe control steps with an arrow each side, the middle opens the picker. New jam opens the picker, also while playing. Tempo runs 60 to 180. Beats, bass and synth rhythms, moods and patches are data files too, and pickers list whatever exists (patches get their picker in P7).
 - **One frame on every tab (P1):** header (New jam, Songs, Simple/Advanced), content, one row of sections, a transport bar with four beat lights and the bar counter, then the tab bar. Tapping a section plays it from the next bar; holding one opens its sheet. Nothing scrolls, and text shrinks to fit its tile.
 - **Simple and Advanced (P2):** one switch in the header, remembered, Simple on first launch. Simple instrument tabs have one picker, four macro dials and the XY pad, in plain words; Simple Layer tabs have Busy, Evolve, Bright and Space. Advanced has every control, and every Simple move shows there. Switching changes nothing you hear. New idea and Back on both layers keep the last eight seeds, and Back restores the earlier lead note for note.
 - **The look (P1b):** flat, 3 px corners, a hatched frame on anything queued for the next bar, square-cut dials with ticks, a dot-grid XY pad, DM Sans only, Material line icons beside the words. Each instrument shows the bar it is playing as a lane of notes under one playhead, five lanes together in Simple's Now view and one above the controls on each instrument tab. Motion marks what sounds and what is queued; it stops with the phone's reduce-motion setting or the Moving/Still switch on the Mix tab, and every state still reads by fill and hatching.
 
 - **Play tab:** in Advanced, a grid of instruments by sections on top of the section row: tap a cell to turn an instrument on or off in that section, hold a section to rename, copy, add or delete it or edit it without playing. In Simple, the five instrument lanes: tap a label to switch it at the next bar, hold to open its tab.
-- **Chords tab:** choose a key and a mood (Major, Minor, House, Deep, Dark), then build a sequence of up to eight chords from seven in-key buttons (in Simple, seven unlabelled colour blocks, so the key is read by feel), with lengths of half a bar, one bar or two.
-- **Drums tab:** five beats (including 2-step and drum and bass), an 8-step sequencer per drum voice, level and decay per voice, kick pitch and drive.
+- **Chords tab:** in Advanced, choose a key and a mood (Major, Minor, House, Deep, Dark), then build a sequence of up to eight chords from seven in-key degree buttons, with lengths of half a bar, one bar or two. In Simple, the feel and card screen of P4 above: no key, scale or chord names.
+- **Drums tab:** eleven beats (data files, None among them, including 2-step and drum and bass), an 8-step sequencer per drum voice, level and decay per voice, kick pitch and drive.
 - **Bass and Synth tabs:** rhythm and wave pickers, envelope, filter, drive, sub level and glide for the bass; detune, attack, decay, release and filter envelope for the synth.
 - **Layer tabs:** three modes each.
   - *Arp:* direction, rate, octaves, gate.
   - *Pad:* attack, release, brightness, slow filter motion.
-  - *Lead:* a generative lead written by six knobs (Lock, Hits, Rotate, Length, Tension, Density) from a stored seed, shown in the layer's lane as it plays; New idea and Back change the seed.
+  - *Lead:* five styles (Hook, Phrase, Roll, Drift, Pulse) written from a stored seed, always in key, shaped on the Notes and Feel pages (six knobs each) and, for Pulse, its own Pulse page; shown in the layer's lane as it plays; New idea and Back change the seed.
 - **An XY pad on every instrument** for filter cutoff and resonance, and delay and reverb sends into one shared delay and one shared reverb.
 - **Mix tab:** a one-knob filter sweep over the whole mix, sidechain pump on the kick, saturation, a level per instrument and a master meter.
 - **The screen stays awake while playing.**
@@ -62,7 +62,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 - **Sixteen more vibes** (P8), to make 24: Drone, Trance, Acid house, Dubstep and more.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
 - **DROP:** one large button that builds for a few bars, hangs, then brings the section back wider, with extra layers on everything, and stays there until you switch it off. Bigger by width, not volume. Each vibe has its own version.
-- **Ambient and Drone:** two vibes for coasting, with drones, swooping pads and very slow movement.
+- **Drone, and Ambient reworked with drones** (P7, P8): for coasting, with drones, swooping pads and very slow movement.
 - **Morph:** a switch that lets the jam change by itself, slowly, so it can be left playing.
 - **More beats, bass rhythms, synth rhythms and sounds,** with the engine additions they need: two more drum voices, 16-step beats, noise and FM oscillators, a tempo-synced filter wobble and a lo-fi master.
 
@@ -85,7 +85,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 | Row | What | State |
 |---|---|---|
 | G0 to G5, P1, P1b, P2, P3, P4, P5, P6 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens | Done |
-| P7 to P11 | Phase 2: vibes, chords, leads, sounds, effects, the Drop, Morph | Planned |
+| P7 to P11 | Phase 2: sounds, effects, sixteen more vibes, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |

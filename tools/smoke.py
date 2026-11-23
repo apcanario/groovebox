@@ -29,23 +29,11 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import simple_words, walk_frame  # noqa: E402
+from shots import SMALL, simple_words, walk_frame  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
 TABS = ["play", "chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
-
-# Every visible control, with its size; anything under 48 px on either side is a failure.
-SMALL = """() => {
-  const bad = [];
-  for (const el of document.querySelectorAll('button, a, input, [role=slider], [role=switch], [role=group]')) {
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 && r.height === 0) continue;
-    if (r.width < 47.5 || r.height < 47.5)
-      bad.push(`${el.tagName.toLowerCase()}.${el.className} ${JSON.stringify(el.dataset)} ${r.width.toFixed(0)}x${r.height.toFixed(0)}`);
-  }
-  return bad;
-}"""
 
 # Controls whose right edge passes the viewport (clipped, or reachable only by a sideways swipe),
 # and labels wider than their own button.

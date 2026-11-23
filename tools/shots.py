@@ -5,7 +5,10 @@ of each into shots/ (not committed). At every screen it checks the no-scroll rul
 - the document does not scroll, and no tab body, page or sheet holds more than it shows;
 - no control is cut off (outside the viewport or outside a clipping parent);
 - no tile, chip, button, dial or pill has text that wraps, clips or overflows, or is drawn under 10 px;
-- one row of sections, and the strip and transport bar directly above the tab bar, in the same place on every tab.
+- one row of sections, and the strip and transport bar directly above the tab bar, in the same place on every tab;
+- no control under 48 px on either side (SMALL, shared with tools/smoke.py).
+
+Screenshots left from an earlier run are deleted first, so shots/ holds only the current build.
 
 tools/smoke.py runs the same walk (without screenshots) while the transport plays.
 
@@ -20,8 +23,20 @@ import time
 SIZES = [(360, 640), (412, 915)]
 TABS = ["play", "chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
 LAYER_MODES = ["generative", "arp", "pad"]
-# Lead styles the frame walk shows (P6): a planned style, and Pulse with its own page.
-LEAD_WALK = ["hook", "pulse"]
+# Lead styles the frame walk shows (P6): all five, Pulse with its own page.
+LEAD_WALK = ["hook", "phrase", "roll", "drift", "pulse"]
+
+# Every visible control, with its size; anything under 48 px on either side is a failure.
+SMALL = """() => {
+  const bad = [];
+  for (const el of document.querySelectorAll('button, a, input, [role=slider], [role=switch], [role=group]')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;
+    if (r.width < 47.5 || r.height < 47.5)
+      bad.push(`${el.tagName.toLowerCase()}.${el.className} ${JSON.stringify(el.dataset)} ${r.width.toFixed(0)}x${r.height.toFixed(0)}`);
+  }
+  return bad;
+}"""
 
 # Must match FIT_CONTROLS in src/ui/fit.ts.
 CHECK = r"""() => {
@@ -145,6 +160,8 @@ class Walk:
         where = f"{size[0]}x{size[1]} {label}"
         for b in self.page.evaluate(CHECK):
             self.failures.append(f"{where}: {b}")
+        for b in self.page.evaluate(SMALL):
+            self.failures.append(f"{where}: control under 48 px: {b}")
         if label.startswith("simple"):
             for b in simple_words(self.page):
                 self.failures.append(f"{where}: {b}")
@@ -217,7 +234,7 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                     for m in LAYER_MODES:
                         page.click(f'[data-mode="{tab}:{m}"]')
                         if m == "generative":
-                            # P6: Lead in a planned style (Notes and Feel pages) and in Pulse (its own page too).
+                            # P6: Lead in every style (Notes and Feel pages), Pulse with its own page too.
                             style = page.evaluate(f"window.__groovebox.getSong().sections[{sec}].{tab}.gen.style ?? null")
                             for st in LEAD_WALK:
                                 page.click(f'[data-leadstyle="{st}"]')
@@ -269,6 +286,9 @@ def main() -> int:
     root = sys.argv[1] if len(sys.argv) > 1 else "dist"
     out = sys.argv[2] if len(sys.argv) > 2 else "shots"
     os.makedirs(out, exist_ok=True)
+    for f in os.listdir(out):  # stale screens of earlier rows must not pass for the current build
+        if f.endswith(".png"):
+            os.remove(os.path.join(out, f))
     port = 4181
     server = subprocess.Popen(
         [sys.executable, "-m", "http.server", str(port), "--directory", root],

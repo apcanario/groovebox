@@ -156,6 +156,7 @@ A style is a complete starting point: one tap gives a full groove.
 - **A style's name is at most 14 characters,** so it fits a tile on one line. In Simple the word on screen is "Vibe".
 - **A style sets everything:** bpm, swing, key and mood, its chord progression, drum beat, bass rhythm, synth rhythm, the five patches, each layer's mode and lead style, send and mix settings, and four sections arranged as intro, groove, break and outro with different instruments on in each.
 - **A style is one data file** under `src/styles/`. Adding a style, a drum beat, a bass rhythm, a patch or a progression needs no engine or UI code; pickers list whatever exists.
+- **A style's section chords are library progressions tagged with it** (spec 8.4). New chords for a style mean a new progression file next to the style file.
 - **Opening the app** shows the vibe picker: all 24 as tiles in two columns on one screen, coloured by family, with "Continue last jam" first when there is one. It does not scroll. Tapping a tile loads it and starts playing.
 - **New jam from style** is always one tap away, in the header. Loading a style while playing lands on the next bar line. A vibe loads as a new song, so the jam it replaces is kept in Songs.
 - **Bpm range becomes 60 to 180** so Lo-fi and Ambient fit.
