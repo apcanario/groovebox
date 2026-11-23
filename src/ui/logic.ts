@@ -227,9 +227,10 @@ export function knobValue(k: KnobCurve, pos: number): number {
   return lo * Math.pow(hi / lo, p);
 }
 
-/** "4 ms", "120 ms", "1.2 s". */
+/** "4ms", "120ms", "1.2 s". */
 export function secondsLabel(s: number): string {
-  return s < 1 ? `${Math.round(s * 1000)} ms` : `${s.toFixed(1)} s`;
+  // No space before "ms": a three-digit time fits the smallest dial at 10 px (spec 8.6: shortened in the source).
+  return s < 1 ? `${Math.round(s * 1000)}ms` : `${s.toFixed(1)} s`;
 }
 
 /** What the dial shows: seconds for times, 0..100 for amounts. */
@@ -341,9 +342,9 @@ export function meterFraction(db: number): number {
 
 // ---- Layers (G4) -----------------------------------------------------------------------
 
-/** Mode switch order and names, as in docs/design/layer1-tab.jpg; the title names the mode's role. */
-export const LAYER_MODE_ORDER = ["arp", "generative", "pad"] as const;
-export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Generative", pad: "Pad" };
+/** Mode switch order and names, as in docs/design/look/ (Lead, Arp, Pad; Drone comes later). */
+export const LAYER_MODE_ORDER = ["generative", "arp", "pad"] as const;
+export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], "Arp" | "Lead" | "Pad"> = { arp: "Arp", generative: "Lead", pad: "Pad" };
 export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Lead", pad: "Pad" };
 
 /** What an instrument plays in a section, in a word or two (the Now tile's second line). */
@@ -424,11 +425,6 @@ export const ARP_RATES = [1, 2, 4] as const;
 export const ARP_RATE_LABEL: Record<number, string> = { 1: "1/16", 2: "1/8", 4: "1/4" };
 export const ARP_OCTAVES = [1, 2, 3] as const;
 
-/** Class of one cell of the 16-step lead row: a hit that plays, a hit its density skips, the playing step. */
-export function leadCellClass(hit: boolean, plays: boolean, now: boolean): string {
-  return `st${hit ? " h" : ""}${hit && !plays ? " lo" : ""}${now ? " now" : ""}`;
-}
-
 // ---- Recording and songs (G5) ------------------------------------------------------
 
 /** Elapsed time of a take: "0:07", "12:34", "1:02:03" from an hour. */
@@ -453,4 +449,80 @@ export function recordLabel(state: "off" | "armed" | "recording" | "finishing"):
     recording: "Recording; tap to stop the take",
     finishing: "Finishing the take",
   }[state];
+}
+
+// ---- Lanes and motion (P1b) --------------------------------------------------------
+
+/** One note of a lane as drawn: left, width, top and height in % of the lane; start and end in steps. */
+export interface LaneRect {
+  x: number;
+  w: number;
+  y: number;
+  h: number;
+  /** Start and end in sixteenths (the note brightens while the playhead is between them). */
+  s: number;
+  e: number;
+}
+
+/** Drum voices top to bottom: hats over clap over kick. */
+const DRUM_ROW: Record<string, number> = { hat: 0, open: 0, clap: 1, kick: 2 };
+
+/**
+ * Where each note of a lane sits (spec 8.12): x by step on the 16-step grid, width by length (cut at the
+ * bar's end), y by pitch (high on top, the bar's own range) or by drum voice (hats, clap, kick).
+ */
+export function laneRects(
+  notes: readonly { step: number; len: number; shift: number; pitch?: number; voice?: string }[],
+  steps = 16,
+): LaneRect[] {
+  const unit = 100 / steps;
+  const pitches = notes.filter((n) => n.pitch !== undefined).map((n) => n.pitch!);
+  const hi = pitches.length ? Math.max(...pitches) : 60;
+  const lo = pitches.length ? Math.min(...pitches) : 60;
+  // A bar that holds one pitch draws it in the middle; wider bars spread over 10..82 % of the height.
+  const span = Math.max(hi - lo, 1);
+  const out: LaneRect[] = [];
+  for (const n of notes) {
+    const s = n.step + n.shift;
+    if (s >= steps) continue;
+    const e = Math.min(steps, s + Math.max(n.len, 0.05));
+    let y: number;
+    let h: number;
+    let w = (e - s) * unit;
+    if (n.voice !== undefined) {
+      const row = DRUM_ROW[n.voice] ?? 2;
+      h = row === 0 ? 14 : 20;
+      y = 12 + row * 28 + (row === 0 ? 3 : 0);
+      w = Math.min(unit * 0.32, w);
+    } else {
+      h = 12;
+      y = hi === lo ? 44 : 10 + ((hi - n.pitch!) / span) * 72;
+      w = Math.max(unit * 0.5, w - unit * 0.12);
+    }
+    out.push({ x: s * unit + unit * 0.06, w, y, h, s, e: n.voice !== undefined ? s + 1 : e });
+  }
+  return out;
+}
+
+/**
+ * Where the playhead is, in sixteenths of the bar (0..16): the step last heard plus the time since it,
+ * so it sweeps between steps and never runs past the next one. With motion off it jumps step to step.
+ */
+export function playhead(step: number, sinceMs: number, stepMs: number, still: boolean): number {
+  if (still || stepMs <= 0) return step;
+  return step + Math.max(0, Math.min(1, sinceMs / stepMs));
+}
+
+/**
+ * How bright an instrument's label flashes (0..1) at playhead `p` (in steps): full on a note's start,
+ * fading over 1.5 steps. Only notes that start in this bar count (not those held over).
+ */
+export function flashLevel(notes: readonly { step: number; shift: number; held?: boolean }[], p: number): number {
+  let best = Infinity;
+  for (const n of notes) {
+    if (n.held) continue;
+    const since = p - (n.step + n.shift);
+    if (since >= 0 && since < best) best = since;
+  }
+  return best === Infinity ? 0 : Math.max(0, 1 - best / 1.5);
 }

@@ -5,8 +5,10 @@ then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials,
 every G4 layer control (three modes, lead row, new seed, pattern and sound dials), G5 (two takes saved as MP3
 and walked frame by frame, the event log, songs surviving a reload, new and delete) and the P1 frame (header,
 one section strip whose tap always plays from the next bar, Simple's Now tiles, the frame walk of tools/shots.py
-at 360 x 640 and 412 x 915: nothing scrolls, no control cut off, no text that wraps, clips or overflows) with no
-page error, no control under 48 px and no more than six dials on one screen.
+at 360 x 640 and 412 x 915: nothing scrolls, no control cut off, no text that wraps, clips or overflows) and the
+P1b look (DM Sans only, the spec's icons where its table says, lanes that match the engine's notes, a playhead
+in time, sentence case, the motion switch and the states without motion) with no page error, no control under
+48 px and no more than six dials on one screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -594,6 +596,228 @@ def walk_g3(page, failures: list) -> None:
     page.evaluate(f"()=>{{const e=window.__groovebox;e.bpm={bpm};e.setDrumPreset({sec},'fourFloor');e.setBassRhythm({sec},'offbeat')}}")
 
 
+# ---- P1b: the look --------------------------------------------------------------------------
+
+LANE_MATCH = """([sel, id]) => {
+  const e = window.__groovebox, p = e.position(), l = e.lanes(p.playing ? p.bar : undefined);
+  const el = document.querySelector(sel);
+  if (!el) return {missing: true};
+  const want = l.notes[id].filter(n => n.step + n.shift < 16).length;
+  return {got: Number(el.dataset.notes), drawn: el.querySelectorAll('.n').length, want, on: l.on[id],
+          cls: el.classList.contains('on'), bar: p.bar, step: p.step};
+}"""
+
+
+def check_lane(page, sel: str, inst: str, failures: list, where: str) -> None:
+    """A lane draws exactly the notes the engine reports for its instrument this bar, greyed when off."""
+    for attempt in range(6):
+        r = page.evaluate(LANE_MATCH, [sel, inst])
+        if r.get("missing"):
+            failures.append(f"{where}: no lane for {inst}")
+            return
+        # A bar line may pass between the render and the read: read again away from the bar's last steps.
+        if r["step"] >= 14 or r["step"] <= 1:
+            time.sleep(0.15)
+            continue
+        if r["got"] != r["want"] or r["drawn"] != r["want"]:
+            if attempt < 5:
+                time.sleep(0.15)
+                continue
+            failures.append(f"{where}: {inst} lane draws {r['drawn']} notes, the engine plays {r['want']} (bar {r['bar']})")
+        if r["on"] != r["cls"]:
+            failures.append(f"{where}: {inst} lane shows {'on' if r['cls'] else 'off'}, the engine has it {'on' if r['on'] else 'off'}")
+        return
+    failures.append(f"{where}: could not read the {inst} lane away from a bar line")
+
+
+PLAYHEAD = """(sel) => {
+  const ph = document.querySelector(sel);
+  if (!ph) return null;
+  const w = ph.getBoundingClientRect().width;
+  const m = new DOMMatrixReadOnly(getComputedStyle(ph).transform);
+  const p = window.__groovebox.position();
+  return {at: (m.m41 / w) * 16, step: p.step, playing: p.playing,
+          p16: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--p16'))};
+}"""
+
+
+def check_playhead(page, sel: str, failures: list, where: str, still: bool = False) -> None:
+    """The playhead keeps time: it sits within about a step of the step heard, and sweeps the whole bar."""
+    seen = set()
+    bad = []
+    for _ in range(30):
+        time.sleep(0.05)
+        r = page.evaluate(PLAYHEAD, sel)
+        if r is None:
+            failures.append(f"{where}: no playhead")
+            return
+        d = (r["at"] - r["step"]) % 16
+        d = min(d, 16 - d)
+        if d > 1.6:
+            bad.append(f"{r['at']:.2f} at step {r['step']}")
+        if still and abs(r["at"] - round(r["at"])) > 0.02:
+            bad.append(f"moves between steps with motion off ({r['at']:.2f})")
+        seen.add(int(r["at"]) // 4)
+    if bad:
+        failures.append(f"{where}: playhead out of time: {bad[:4]}")
+    if len(seen) < 3:
+        failures.append(f"{where}: playhead does not sweep the bar (quarters seen {sorted(seen)})")
+
+
+FONTS = r"""() => {
+  const loaded = [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, ''));
+  const faces = [...document.fonts].map(f => f.family.replace(/"/g, ''));
+  const files = performance.getEntriesByType('resource').map(r => r.name).filter(n => /\.(woff2?|ttf|otf)(\?|$)|fonts\./.test(n));
+  const other = new Set();
+  for (const el of document.querySelectorAll('body *')) {
+    const f = getComputedStyle(el).fontFamily.replace(/"/g, '');
+    if (!f.startsWith('DM Sans')) other.add(f);
+  }
+  return {loaded, faces, files, other: [...other]};
+}"""
+
+
+def check_fonts(page, failures: list) -> None:
+    """No font but DM Sans is loaded, and it is the app's own file (spec 8.12)."""
+    r = page.evaluate(FONTS)
+    if set(r["faces"]) != {"DM Sans"} or "DM Sans" not in r["loaded"]:
+        failures.append(f"fonts: faces {r['faces']}, loaded {r['loaded']}; only DM Sans may be loaded")
+    for f in r["files"]:
+        if "localhost" not in f or "dm-sans" not in f:
+            failures.append(f"fonts: a font file other than the app's DM Sans was fetched: {f}")
+    if not r["files"]:
+        failures.append("fonts: the DM Sans file was not fetched")
+    if r["other"]:
+        failures.append(f"fonts: elements drawn in another face: {r['other']}")
+    print(f"fonts: {sorted(set(r['loaded']))} from {[f.rsplit('/', 1)[-1] for f in r['files']]}")
+
+
+# Spec 8.12's icon table, where each icon goes at this row (Drone, Notes, Feel, FX, Back, Morph, DROP and
+# the effects do not exist yet).
+ICON_PLACES = [
+    ('[data-tab="play"]', "grid_view"), ('[data-tab="chords"]', "piano"), ('[data-tab="drums"]', "adjust"),
+    ('[data-tab="bass"]', "graphic_eq"), ('[data-tab="synth"]', "airwave"), ('[data-tab="layer1"]', "layers"),
+    ('[data-tab="layer2"]', "stacks"), ('[data-tab="mix"]', "tune"), ("#new-jam", "add"),
+    ('[data-now="drums"]', "adjust"), ('[data-now="bass"]', "graphic_eq"), ('[data-now="synth"]', "airwave"),
+    ('[data-now="layer1"]', "layers"), ('[data-now="layer2"]', "stacks"),
+]
+LAYER_ICONS = [
+    ('[data-mode="layer1:generative"]', "show_chart"), ('[data-mode="layer1:arp"]', "stairs"),
+    ('[data-mode="layer1:pad"]', "cloud"), ('[data-page="layer1:sound"]', "tune"), ('[data-seed="layer1"]', "casino"),
+    (".headrow .head", "layers"),
+]
+
+CAPS = r"""() => {
+  const bad = [];
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+    if (!n.parentElement || !n.parentElement.getClientRects().length) continue;
+    for (const w of n.textContent.split(/[^A-Za-z]+/)) {
+      if (w.length > 1 && w === w.toUpperCase() && w !== 'DROP' && !/^[IV]+$/.test(w) && !/^W+$/.test(w)) bad.push(n.textContent.trim());
+    }
+    const tt = getComputedStyle(n.parentElement).textTransform;
+    if (tt === 'uppercase') bad.push(`uppercase: ${n.textContent.trim()}`);
+  }
+  return bad;
+}"""
+
+
+def check_icons(page, places: list, failures: list, where: str) -> None:
+    for sel, icon in places:
+        got = page.eval_on_selector_all(f"{sel} [data-icon]", "els => els.map(e => e.dataset.icon)")
+        if icon not in got:
+            failures.append(f"{where}: {sel} has icons {got}, the spec's table says {icon}")
+        # An icon always sits beside its word.
+        text = page.inner_text(sel).strip() if page.locator(sel).count() else ""
+        if not text:
+            failures.append(f"{where}: {sel} has an icon but no word")
+
+
+STATES = """() => {
+  const css = (sel, pseudo) => { const el = document.querySelector(sel); return el ? getComputedStyle(el, pseudo) : null; };
+  const on = css('[data-now].on'), off = css('[data-now].off:not(.pending)'), next = css('[data-now].pending');
+  const nextHatch = css('[data-now].pending', '::before');
+  const band = css('.sec.playing', '::before');
+  return {
+    on: on && on.backgroundPosition, off: off && [off.backgroundPosition, off.boxShadow],
+    next: next && next.backgroundPosition, hatch: nextHatch && nextHatch.backgroundImage,
+    march: nextHatch && nextHatch.backgroundPosition, band: band && band.display,
+    still: document.documentElement.classList.contains('still'),
+  };
+}"""
+
+
+def walk_look(page, failures: list) -> None:
+    """P1b, Simple, while playing: DM Sans only; the icons of the spec's table where it says; the five lanes
+    match the engine's notes, one playhead keeps time; sentence case; the motion switch on the Mix tab, and
+    with motion off every state still told apart by fill and hatching."""
+    check_fonts(page, failures)
+    page.click('[data-tab="play"]')
+    time.sleep(0.2)
+    check_icons(page, ICON_PLACES, failures, "Play tab")
+    for inst in LAYERS:
+        check_lane(page, f'[data-lane="{inst}"]', inst, failures, "Now view")
+    check_playhead(page, ".phcol .ph", failures, "Now view")
+    for b in page.evaluate(CAPS):
+        failures.append(f"all-capital text on the Play tab: {b!r}")
+    for tab in ["drums", "bass", "synth"]:
+        page.click(f'[data-tab="{tab}"]')
+        time.sleep(0.15)
+        check_lane(page, f'[data-lane="{tab}"]', tab, failures, f"{tab} tab")
+        check_icons(page, [(".headrow .head", {"drums": "adjust", "bass": "graphic_eq", "synth": "airwave"}[tab])], failures, f"{tab} tab")
+        for b in page.evaluate(CAPS):
+            failures.append(f"all-capital text on the {tab} tab: {b!r}")
+    page.click('[data-tab="layer1"]')
+    sec = page.evaluate("window.__groovebox.position().section")
+    mode = page.evaluate(f"{SONG}.sections[{sec}].layer1.mode")
+    page.click('[data-mode="layer1:generative"]')
+    time.sleep(0.15)
+    check_icons(page, LAYER_ICONS, failures, "Layer 1 tab")
+    check_lane(page, '[data-lane="layer1"]', "layer1", failures, "layer1 tab")
+    page.click(f'[data-mode="layer1:{mode}"]')
+
+    # The motion switch: off, nothing moves; the states still read by fill and hatching.
+    page.click('[data-tab="mix"]')
+    page.click('[data-page="mix:audio"]')
+    page.click('[data-motion="off"]')
+    page.click('[data-tab="play"]')
+    time.sleep(0.2)
+    wait_for(page, "window.__groovebox.position().step === 2", 3.0)
+    page.click('[data-now="layer2"]')  # queued: Next bar
+    time.sleep(0.05)
+    st = page.evaluate(STATES)
+    if not st["still"]:
+        failures.append("motion off: the root is not still")
+    if st["band"] != "none":
+        failures.append(f"motion off: the moving band still shows ({st['band']})")
+    if not st["hatch"] or "repeating-linear-gradient" not in st["hatch"]:
+        failures.append(f"motion off: Next bar is not hatched ({st['hatch']})")
+    if st["on"] == st["off"][0] if st["off"] else False:
+        failures.append("motion off: on and off tiles have the same fill")
+    if st["off"] and "inset" not in st["off"][1]:
+        failures.append(f"motion off: an off tile has no edge of its colour ({st['off'][1]})")
+    if st["next"] == st["on"]:
+        failures.append("motion off: a Next bar tile is filled like an on tile")
+    m1 = st["march"]
+    time.sleep(0.3)
+    m2 = page.evaluate(STATES)["march"]
+    if m1 != m2:
+        failures.append(f"motion off: the hatching still marches ({m1} -> {m2})")
+    check_playhead(page, ".phcol .ph", failures, "Now view, motion off", still=True)
+    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+    page.click('[data-now="layer2"]')
+    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+    page.click('[data-tab="mix"]')
+    page.click('[data-page="mix:audio"]')
+    page.click('[data-motion="on"]')
+    page.click('[data-page="mix:master"]')
+    page.click('[data-tab="play"]')
+    time.sleep(0.2)
+    if page.evaluate("document.documentElement.classList.contains('still')"):
+        failures.append("motion on again: the root stays still")
+    print(f"look: DM Sans only, {len(ICON_PLACES) + len(LAYER_ICONS)} icons placed, 5 lanes match the engine, playhead in time, motion switch")
+
+
 def walk_g4(page, failures: list) -> None:
     """G4: Layer 1 and Layer 2 while the transport runs: every mode makes sound, every pattern dial and
     chip reaches the section, the lead row follows the playing step, new seed, the Sound page's patch dials."""
@@ -608,16 +832,9 @@ def walk_g4(page, failures: list) -> None:
         time.sleep(0.1)
         if page.evaluate(f"{L}.mode") != "generative":
             failures.append(f"{lid}: generative mode did not take")
-        cells = page.eval_on_selector_all(f"#steps-{lid} .st", "els => els.length")
-        if cells != 16:
-            failures.append(f"{lid}: lead row has {cells} cells, not 16")
-        seen = set()
-        for _ in range(12):
-            time.sleep(0.07)
-            now = page.eval_on_selector_all(f"#steps-{lid} .st", "els => els.findIndex(e => e.classList.contains('now'))")
-            seen.add(now)
-        if len(seen - {-1}) < 3:
-            failures.append(f"{lid}: lead row does not follow the playing step ({sorted(seen)})")
+        # The layer's own lane above its controls, matching the engine's notes, with its playhead in time (P1b).
+        check_lane(page, f'[data-lane="{lid}"]', lid, failures, f"{lid} tab")
+        check_playhead(page, f'[data-lane="{lid}"] .ph', failures, f"{lid} tab")
         ids = dials_on_screen(page, f"{lid} generative", failures)
         if len(ids) != 6:
             failures.append(f"{lid}: generative page has {len(ids)} dials, not 6")
@@ -945,6 +1162,7 @@ def main() -> int:
             page.click("#play")
             time.sleep(0.5)
             walk_now(page, failures)
+            walk_look(page, failures)
             # The rest of the walk uses Advanced's controls (the Song grid, Edit without playing).
             page.click('[data-appmode="advanced"]')
 

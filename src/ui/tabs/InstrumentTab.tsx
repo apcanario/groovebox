@@ -1,5 +1,5 @@
 /**
- * Instrument tabs. Drums, Bass and Synth (G3): pattern choice, patch dials (at most six per page),
+ * Instrument tabs. Drums, Bass and Synth (G3): the instrument's lane (P1b), pattern choice, patch dials (at most six per page),
  * filter XY pad and sends. Layer 1 and Layer 2 have their own tab (LayerTab, G4). Nothing scrolls
  * (P1): pages by chips at the top; the XY pad and sends sit lowest, under every page when the
  * screen is tall enough, else on a Filter page of their own.
@@ -21,7 +21,8 @@ import {
 import type { Ctx } from "../App.tsx";
 import { Chips, Dial, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
 import { KNOB_PAGES, PRESET_LABEL, WAVE_LABEL, hzLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
-import { INST_COLOR, INST_NAME } from "../theme.tsx";
+import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
+import { Lane } from "../lanes.tsx";
 
 const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open" };
 
@@ -96,7 +97,9 @@ export function HeadRow({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   return (
     <div class="headrow">
       <h1 class="head">
-        <em style={{ color: INST_COLOR[inst] }}>{INST_NAME[inst]}</em>
+        <em style={{ color: INST_COLOR[inst] }}>
+          <InstName id={inst} />
+        </em>
         <span class="sub">
           {sectionLetter(edit)} · {queued ? (on ? "off at the next bar" : "on at the next bar") : song.sections[edit].name}
         </span>
@@ -193,8 +196,9 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const page = shownPage(pages, chosen);
   const knobPages = KNOB_PAGES[inst] ?? [];
   return (
-    <section class={`insttab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst] }}>
+    <section class={`insttab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
       <HeadRow ctx={ctx} inst={inst} />
+      <Lane id={inst} lanes={ctx.lanes} playhead />
       <Pager id={inst} pages={pages} page={page} onPage={setPage} />
       {page !== "filter" && (
         <div class="page" data-shown={`${inst}:${page}`}>

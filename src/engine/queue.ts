@@ -65,6 +65,14 @@ export class SwitchQueue {
   clear(): void {
     this.flush();
   }
+
+  /** An independent copy (for the lanes' look-ahead). `toggles: false` leaves the copy's toggles out. */
+  clone(toggles = true): SwitchQueue {
+    const c = new SwitchQueue();
+    c.section = this.section;
+    if (toggles) for (const [k, t] of this.toggles) c.toggles.set(k, { ...t });
+    return c;
+  }
 }
 
 /** Merge two pending sets: the section of `b` wins when it has one; toggles of both, each once. */

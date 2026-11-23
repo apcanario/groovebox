@@ -1,6 +1,6 @@
 /**
- * Layer 1 and Layer 2 (G4), laid out after docs/design/layer1-tab.jpg: title and on/off, the mode
- * switch, the mode's controls (Generative: the 16-step row, new seed and six dials; Arp: direction,
+ * Layer 1 and Layer 2 (G4), laid out after docs/design/look/: title and on/off, the mode switch, the
+ * layer's lane (P1b; New idea beside it in Lead mode), the mode's controls (Lead: six dials; Arp: direction,
  * rate, octaves and gate; Pad: four dials), then the filter XY pad and the sends. A second page,
  * Sound (its switch below the sends), holds the patch dials the three modes share (wave, envelope, drive).
  * Patterns belong to the edited section; the patch belongs to the instrument. Nothing scrolls (P1):
@@ -25,7 +25,6 @@ import {
   knobPos,
   knobText,
   knobValue,
-  leadCellClass,
   sectionLetter,
   shownPage,
   withFilterPage,
@@ -33,26 +32,14 @@ import {
 } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
 import { FilterPanel, HeadRow, InstToggle } from "./InstrumentTab.tsx";
+import { Icon } from "../icons.tsx";
+import { Lane } from "../lanes.tsx";
 
 function Generative({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
-  const { engine, song, edit, pos, playing } = ctx;
+  const { engine, song, edit } = ctx;
   const gen = song.sections[edit][id].gen;
-  const live = pos.playing && edit === playing;
-  const steps = engine.leadSteps(edit, id, live ? pos.step : undefined);
   return (
     <>
-      <div class="leadrow">
-        <div class="steps" id={`steps-${id}`} aria-label="Lead pattern, this bar">
-          {steps.map((s, i) => (
-            <div key={i} class={leadCellClass(s.hit, s.plays, live && pos.step === i)} data-lead={i} />
-          ))}
-        </div>
-        <button class="btn seed" data-seed={id} aria-label="New seed: new notes" onClick={() => engine.newSeed(edit, id)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" />
-          </svg>
-        </button>
-      </div>
       <div class="dials n6">
         {GEN_KNOBS.map((k) => (
           <Dial
@@ -199,7 +186,7 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const pages = withFilterPage(base, roomy);
   const page = shownPage(pages, chosen);
   return (
-    <section class={`insttab layertab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[id] }}>
+    <section class={`insttab layertab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}>
       {/* On a short screen the name row gives way: the on/off switch joins the mode row. */}
       {roomy && <HeadRow ctx={ctx} inst={id} />}
       <div class={`modes${roomy ? "" : " withtog"}`}>
@@ -213,11 +200,22 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
               aria-checked={layer.mode === m}
               onClick={() => engine.setLayerMode(edit, id, m)}
             >
-              {LAYER_MODE_LABEL[m]}
+              <Icon thing={LAYER_MODE_LABEL[m]} />
+              <span>{LAYER_MODE_LABEL[m]}</span>
             </button>
           ))}
         </div>
         {!roomy && <InstToggle ctx={ctx} inst={id} />}
+      </div>
+      {/* The layer's lane; in Lead mode New idea (a new seed) sits beside it. */}
+      <div class="lanerow">
+        <Lane id={id} lanes={ctx.lanes} playhead />
+        {layer.mode === "generative" && (
+          <button class="btn idea" data-seed={id} aria-label="New idea: new notes for this lead" onClick={() => engine.newSeed(edit, id)}>
+            <Icon thing="New idea" />
+            <span>New idea</span>
+          </button>
+        )}
       </div>
       <Pager id={id} pages={pages} page={page} onPage={setPage} />
       {page !== "filter" && (

@@ -28,6 +28,7 @@ import { createRng, deriveSeed, type Rng } from "../music/random.ts";
 import { scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
 import { SwitchQueue, type Pending } from "./queue.ts";
 import {
+  cloneSong,
   INSTRUMENTS,
   LAYER_IDS,
   LAYER_MODES,
@@ -93,6 +94,65 @@ export interface StepResult {
   pads: Record<LayerInstrument, PadParams | null>;
 }
 
+/**
+ * One note of an instrument's lane (spec 8.12): where it starts in the bar (`step`, 0..15, plus the swing
+ * `shift`), how long it sounds in sixteenths (cut at the bar's end only when drawn), and what it is: a
+ * pitch (MIDI) or a drum voice. A note held over from the bar before starts at step 0 with `held` set.
+ */
+export interface LaneNote {
+  step: number;
+  len: number;
+  shift: number;
+  vel: number;
+  pitch?: number;
+  voice?: DrumVoice;
+  held?: boolean;
+}
+
+export type LaneNotes = Record<InstrumentId, LaneNote[]>;
+
+/**
+ * One bar of every instrument as notes, for the lanes. `on`: which instruments sound in this bar. For
+ * those, `notes` is what the scheduler plays (or will play, as the song stands now); for an instrument
+ * that is off, `notes` is what it would play if it were on, drawn greyed.
+ */
+export interface LaneBar {
+  /** Bars since play, from 0 (0 when stopped: the bar Play starts with). */
+  bar: number;
+  section: number;
+  playing: boolean;
+  on: Record<InstrumentId, boolean>;
+  notes: LaneNotes;
+}
+
+interface BarRecord {
+  bar: number;
+  section: number;
+  on: Record<InstrumentId, boolean>;
+  notes: LaneNotes;
+  /** The sequencer as it stood just before this bar's first step (for the off instruments' preview). */
+  snap: Sequencer | null;
+}
+
+function emptyNotes(): LaneNotes {
+  return { drums: [], bass: [], synth: [], layer1: [], layer2: [] };
+}
+
+/** Events of one step as lane notes. */
+function laneNotes(step: number, events: NoteEvent[], into: LaneNotes): void {
+  for (const e of events) {
+    if (e.inst === "drums") into.drums.push({ step, len: 1, shift: e.shift, vel: e.vel, voice: e.voice });
+    else if (e.inst === "bass") into.bass.push({ step, len: e.len, shift: e.shift, vel: e.vel, pitch: e.midi });
+    else for (const n of e.notes) into[e.inst].push({ step, len: e.len, shift: e.shift, vel: e.vel, pitch: n });
+  }
+}
+
+function cloneNotes(n: LaneNotes): LaneNotes {
+  const out = emptyNotes();
+  for (const id of INSTRUMENTS) out[id] = n[id].map((x) => ({ ...x }));
+  return out;
+}
+
 /** Clamp a number into [lo, hi]; null for anything that is not a finite number. */
 function num(v: unknown, lo: number, hi: number, int = false): number | null {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
@@ -144,6 +204,11 @@ export class Sequencer {
   private retrigger = false;
   /** Bass or synth rhythm changed in the playing section; consumed by the next step. */
   private restart = new Set<"bass" | "synth" | LayerInstrument>();
+  /** The bar being scheduled and the one before, as notes (spec 8.12, the lanes). */
+  private rec: BarRecord | null = null;
+  private prevRec: BarRecord | null = null;
+  /** Look-ahead copies keep their record but take no snapshots of their own. */
+  private snaps = true;
 
   constructor(song: Song) {
     this.song = song;
@@ -168,6 +233,8 @@ export class Sequencer {
 
   stop(): void {
     this.running = false;
+    this.rec = null;
+    this.prevRec = null;
     this.sounding.clear();
     this.retrigger = false;
     this.restart.clear();
@@ -436,6 +503,8 @@ export class Sequencer {
   next(): StepResult {
     const step = this.globalStep % STEPS_PER_BAR;
     const bar = Math.floor(this.globalStep / STEPS_PER_BAR);
+    // The state at the bar line, kept for the lanes of the instruments that are off (a few small copies a bar).
+    const snap = step === 0 && this.snaps ? this.copy(this.song) : null;
     let applied: Pending | null = null;
     if (step === 0 && !this.queue.empty) {
       applied = this.queue.flush();
@@ -506,7 +575,107 @@ export class Sequencer {
     const restarted = [...restart].filter((id) => now.has(id));
     const pads = {} as Record<LayerInstrument, PadParams | null>;
     for (const id of LAYER_IDS) pads[id] = section[id].mode === "pad" ? { ...section[id].pad } : null;
-    return { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads };
+    const result: StepResult = { bar, step, section: this.current, events, applied, stopped, retrigger, restarted, pads };
+    this.record(result, now, snap);
+    return result;
+  }
+
+  // ---- Lanes (P1b) ------------------------------------------------------------------
+
+  /**
+   * Keep the bar's notes as they are scheduled. Notes cut short by the engine (an instrument stopping,
+   * a rhythm restart, a new chord or section) are cut here too, so the lane shows what is heard.
+   */
+  private record(r: StepResult, now: Set<InstrumentId>, snap: Sequencer | null): void {
+    if (r.step === 0 || !this.rec) {
+      const notes = emptyNotes();
+      // Notes still sounding over the bar line carry on from step 0.
+      if (this.rec) {
+        for (const id of INSTRUMENTS) {
+          for (const n of this.rec.notes[id]) {
+            const end = n.step + n.shift + n.len;
+            if (end > STEPS_PER_BAR) notes[id].push({ ...n, step: 0, shift: 0, len: end - STEPS_PER_BAR, held: true });
+          }
+        }
+      }
+      const on = {} as Record<InstrumentId, boolean>;
+      for (const id of INSTRUMENTS) on[id] = now.has(id);
+      this.prevRec = this.rec;
+      this.rec = { bar: r.bar, section: r.section, on, notes, snap };
+    }
+    const cut = new Set<InstrumentId>([...r.stopped, ...r.restarted]);
+    if (r.retrigger || (r.applied && r.applied.section !== null)) for (const id of ["synth", "layer1", "layer2"] as const) cut.add(id);
+    if (r.retrigger) cut.add("bass");
+    for (const id of cut) {
+      this.rec.notes[id] = this.rec.notes[id]
+        .map((n) => (n.step + n.shift + n.len > r.step ? { ...n, len: r.step - n.step - n.shift } : n))
+        .filter((n) => n.len > 0);
+    }
+    laneNotes(r.step, r.events, this.rec.notes);
+  }
+
+  /** A copy of the whole sequencer on `song`, in the same state: it plays the same notes from here. */
+  private copy(song: Song, toggles = true): Sequencer {
+    const c = new Sequencer(song);
+    c.queue = this.queue.clone(toggles);
+    c.running = this.running;
+    c.current = this.current;
+    c.globalStep = this.globalStep;
+    c.sectionStep = this.sectionStep;
+    c.leads = new Map([...this.leads].map(([k, l]) => [k, l.clone()]));
+    c.arpIndex = new Map(this.arpIndex);
+    c.arpRng = new Map([...this.arpRng].map(([k, r]) => [k, r.clone()]));
+    c.sounding = new Set(this.sounding);
+    c.retrigger = this.retrigger;
+    c.restart = new Set(this.restart);
+    c.rec = this.rec && { ...this.rec, notes: cloneNotes(this.rec.notes), snap: null };
+    c.prevRec = null;
+    c.snaps = false;
+    return c;
+  }
+
+  /** Run a copy to the end of its bar and return that bar's record. */
+  private static finish(c: Sequencer): BarRecord {
+    do c.next();
+    while (c.globalStep % STEPS_PER_BAR !== 0);
+    return c.rec!;
+  }
+
+  /** What every instrument would play from `from` (a copy at a bar line) with all of them switched on. */
+  private ghost(from: Sequencer): LaneNotes {
+    const c = from.copy(cloneSong(this.song), false);
+    for (const s of c.song.sections) for (const id of INSTRUMENTS) s.on[id] = true;
+    c.rec = null;
+    return Sequencer.finish(c).notes;
+  }
+
+  /**
+   * One bar of every instrument as notes (spec 8.12). While playing, `bar` is the bar shown (the one heard,
+   * which trails the scheduler by the look-ahead): notes already scheduled as they were, the rest as the
+   * song stands now. When stopped: the first bar Play would start with.
+   */
+  lanes(bar?: number): LaneBar {
+    let actual: BarRecord;
+    let from: Sequencer;
+    const entry = this.running ? ([this.rec, this.prevRec].find((r) => r && r.bar === bar) ?? this.rec) : null;
+    if (!entry) {
+      const c = this.copy(cloneSong(this.song));
+      c.rec = null;
+      c.start();
+      from = c.copy(c.song);
+      actual = Sequencer.finish(c);
+      actual.bar = 0;
+    } else if (entry === this.rec && this.globalStep % STEPS_PER_BAR !== 0) {
+      actual = Sequencer.finish(this.copy(cloneSong(this.song)));
+      from = entry.snap ?? this.copy(this.song);
+    } else {
+      actual = entry;
+      from = entry.snap ?? this.copy(this.song);
+    }
+    const ghost = INSTRUMENTS.some((id) => !actual.on[id]) ? this.ghost(from) : null;
+    const notes = emptyNotes();
+    for (const id of INSTRUMENTS) notes[id] = cloneNotes(actual.on[id] || !ghost ? actual.notes : ghost)[id];
+    return { bar: actual.bar, section: actual.section, playing: this.running, on: { ...actual.on }, notes };
   }
 
   private layerEvent(

@@ -73,7 +73,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
             {NOTE_NAMES.map((k) => (
               <button
                 key={k}
-                class={`chip mono${song.key === k ? " on" : ""}`}
+                class={`chip${song.key === k ? " on" : ""}`}
                 data-key={k}
                 aria-pressed={song.key === k}
                 onClick={() => engine.setKeyMood(k, song.mood)}
@@ -135,7 +135,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 setSel(sel - 1);
               }}
             >
-              ◀
+              Left
             </button>
             <button
               class="btn"
@@ -148,7 +148,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 setSel(sel + 1);
               }}
             >
-              ▶
+              Right
             </button>
             <button class="btn" id="chord-length" disabled={sel === null} onClick={() => sel !== null && commit(cycleLength(seq, sel))}>
               {sel !== null ? lengthLabel(seq[sel].bars) : "Length"}
@@ -164,7 +164,7 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
                 setSel(null);
               }}
             >
-              ✕
+              Remove
             </button>
           </div>
         </div>

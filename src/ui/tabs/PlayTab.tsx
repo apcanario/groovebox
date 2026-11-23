@@ -1,13 +1,15 @@
 /**
- * Play tab (spec 8.6). Simple, "Now": the five instruments of the playing section as tiles; a tap
- * turns one on or off at the next bar, a hold opens its tab (P1b turns the tiles into lanes).
+ * Play tab (spec 8.6). Simple, "Now": the five instruments of the playing section as five lanes (spec
+ * 8.12): a label block on the left (name and what it plays; a tap turns it on or off at the next bar, a
+ * hold opens its tab) and the bar it plays to its right, with one playhead across all five.
  * Advanced, "Song": instruments by sections, sitting on the section strip, which is its column labels.
  */
 import { INSTRUMENTS, type InstrumentId } from "../../engine/song.ts";
 import type { Ctx } from "../App.tsx";
 import { useLongPress } from "../components.tsx";
 import { nowTile, sectionLetter } from "../logic.ts";
-import { INST_COLOR, INST_NAME } from "../theme.tsx";
+import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
+import { Lane, Playhead } from "../lanes.tsx";
 
 function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   const { engine, song, pending, pos } = ctx;
@@ -19,14 +21,17 @@ function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   );
   return (
     <button
-      class={`tile now-tile${on ? " on" : ""}${queued ? " pending" : ""}`}
-      style={{ "--c": INST_COLOR[id] }}
+      class={`tile now-tile${on ? " on" : " off"}${queued ? " pending" : ""}`}
+      style={{ "--c": INST_COLOR[id], "--f": `var(--f-${id})` }}
       data-now={id}
       aria-pressed={on}
       aria-label={`${INST_NAME[id]}: ${on ? "on" : "off"}${queued ? ", switching on the next bar" : ""}. Tap to switch at the next bar, hold to open`}
       {...press}
     >
-      <b>{INST_NAME[id]}</b>
+      <i class="flash" aria-hidden="true" />
+      <b>
+        <InstName id={id} />
+      </b>
       <span>{sub}</span>
     </button>
   );
@@ -35,9 +40,10 @@ function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
 function NowView({ ctx }: { ctx: Ctx }) {
   return (
     <div class="nowlist">
-      {INSTRUMENTS.map((id) => (
-        <NowTile key={id} ctx={ctx} id={id} />
-      ))}
+      {INSTRUMENTS.map((id) => [<NowTile key={id} ctx={ctx} id={id} />, <Lane key={`${id}-lane`} id={id} lanes={ctx.lanes} />])}
+      <div class="phcol" aria-hidden="true">
+        <Playhead />
+      </div>
     </div>
   );
 }
@@ -51,14 +57,14 @@ function SongView({ ctx }: { ctx: Ctx }) {
     <div class="grid" style={{ gridTemplateColumns: `var(--rowhead) repeat(${cols}, minmax(0, 1fr))` }}>
       {INSTRUMENTS.map((id) => [
         <button key={id} class="rowhead" data-row={id} style={{ "--c": INST_COLOR[id] }} onClick={() => ctx.goTab(id)}>
-          {INST_NAME[id]}
+          <InstName id={id} />
         </button>,
         ...song.sections.map((s, i) => {
           const p = isPending(i, id);
           return (
             <button
               key={`${id}${i}`}
-              class={`cell${s.on[id] ? " on" : ""}${p ? " pending" : ""}${i === playing ? " live" : ""}`}
+              class={`cell${s.on[id] ? " on" : " off"}${p ? " pending" : ""}${i === playing ? " live" : ""}`}
               style={{ "--c": INST_COLOR[id] }}
               data-cell={`${i}:${id}`}
               aria-pressed={s.on[id]}

@@ -7,6 +7,7 @@ import { INSTRUMENTS, type Engine, type LatencyHint, type MixState } from "../..
 import type { Ctx } from "../App.tsx";
 import { Dial, Meter, Pager } from "../components.tsx";
 import { meterFraction, sweepLabel, type PageDef } from "../logic.ts";
+import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME } from "../theme.tsx";
 
 /** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
@@ -27,6 +28,25 @@ function MasterMeter({ engine }: { engine: Engine }) {
   }, [engine]);
   const text = Number.isFinite(m.peak) ? `${m.peak.toFixed(1)} dB` : "–";
   return <Meter fill={meterFraction(m.rms)} peak={meterFraction(m.peak)} text={text} />;
+}
+
+/** The app's own motion switch (spec 8.12): off, nothing moves and every state reads by fill and hatching. */
+function MotionSwitch() {
+  const [on, setOn] = useState(motionWanted);
+  useEffect(() => onMotionPref(() => setOn(motionWanted())), []);
+  return (
+    <>
+      <div class="glabel">Motion</div>
+      <div class="seg two">
+        {([true, false] as const).map((v) => (
+          <button key={String(v)} class={on === v ? "on" : ""} data-motion={v ? "on" : "off"} aria-pressed={on === v} onClick={() => setMotionOn(v)}>
+            {v ? "Moving" : "Still"}
+          </button>
+        ))}
+      </div>
+      <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>
+    </>
+  );
 }
 
 const BUFFERS = [
@@ -101,6 +121,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
           <p class="note">Audio buffer: if it crackles, try a larger one. The page reloads; the song is kept.</p>
           {pos.playing && <p class="note">Stop to change it.</p>}
           {armed && !pos.playing && <p class="note">Tap again to reload.</p>}
+          <MotionSwitch />
         </>
       )}
     </section>

@@ -1,7 +1,11 @@
 /** Reusable controls: Dial, XYPad, SendBar, Toggle, and the drag and long-press hooks. No hover states. */
 import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
+import { Icon, type IconThing } from "./icons.tsx";
 import { dragValue, fraction } from "./logic.ts";
+
+/** Page chips that carry an icon (spec 8.12's table), and mode switches named by their mode. */
+const PAGE_ICONS = new Set(["Notes", "Feel", "Sound", "FX", "Lead", "Arp", "Pad", "Drone"]);
 
 type PE = PointerEvent & { currentTarget: HTMLElement };
 
@@ -92,13 +96,23 @@ export function useLongPress(onTap: () => void, onLong: () => void, ms = 500) {
 
 // ---- Dial -------------------------------------------------------------------------
 
-const R = 32;
-const pt = (a: number): [number, number] => [39 + R * Math.cos((a * Math.PI) / 180), 39 + R * Math.sin((a * Math.PI) / 180)];
+/** Ring radius and centre in the dial's 78 x 78 drawing. */
+const R = 30;
+const C = 39;
+const pt = (a: number, r = R): [number, number] => [C + r * Math.cos((a * Math.PI) / 180), C + r * Math.sin((a * Math.PI) / 180)];
 function arc(a0: number, a1: number): string {
   const [x0, y0] = pt(a0);
   const [x1, y1] = pt(a1);
   return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
 }
+/** A short radial line at angle `a` from radius r0 to r1. */
+function tick(a: number, r0: number, r1: number): string {
+  const [x0, y0] = pt(a, r0);
+  const [x1, y1] = pt(a, r1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}L${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+/** The three tick marks (minimum, middle, maximum), outside the ring. */
+const TICKS = [135, 270, 405].map((a) => tick(a, R + 6, R + 9)).join("");
 
 export interface DialProps {
   label: string;
@@ -115,7 +129,11 @@ export interface DialProps {
   id?: string;
 }
 
-/** A large dial turned by dragging up and down from anywhere on it, never by tracing a circle. */
+/**
+ * A large dial turned by dragging up and down from anywhere on it, never by tracing a circle. Drawn as
+ * spec 8.12 says: a square-cut arc on a dark track, three ticks, a short white pointer at the value,
+ * the value in the middle and the name under it.
+ */
 export function Dial({ label, value, min, max, step = 0, display, color, onChange, bipolar, id }: DialProps) {
   const drag = useVerticalDrag(value, min, max, onChange, step);
   const f = fraction(value, min, max);
@@ -137,12 +155,14 @@ export function Dial({ label, value, min, max, step = 0, display, color, onChang
     >
       <div class="knob">
         <svg viewBox="0 0 78 78" aria-hidden="true">
+          <path d={TICKS} class="ticks" />
           <path d={arc(135, 405)} class="track" />
           {to - from > 0.5 && <path d={arc(from, to)} style={{ stroke: color }} class="arc" />}
+          <path d={tick(end, R - 5, R + 5)} class="pointer" />
         </svg>
         <div class="val">{text}</div>
       </div>
-      <label style={{ color }}>{label}</label>
+      <label>{label}</label>
     </div>
   );
 }
@@ -186,16 +206,19 @@ export function XYPad({ x, y, onChange, xLabel, yLabel, readout, id }: XYPadProp
       onPointerUp={() => (active.current = null)}
       onPointerCancel={() => (active.current = null)}
     >
-      <div class="gx" style={{ top: "33.3%" }} />
-      <div class="gx" style={{ top: "66.6%" }} />
-      <div class="gy" style={{ left: "25%" }} />
-      <div class="gy" style={{ left: "50%" }} />
-      <div class="gy" style={{ left: "75%" }} />
+      <svg class="dots" aria-hidden="true">
+        <defs>
+          <pattern id={`xy-dots-${id ?? "pad"}`} width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="10" cy="10" r="1.1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#xy-dots-${id ?? "pad"})`} />
+      </svg>
       <div class="hx" />
       <div class="hy" />
       <div class="dot" />
-      <div class="ly">{yLabel} ↑</div>
-      <div class="lx">{xLabel} →</div>
+      <div class="ly">{yLabel}</div>
+      <div class="lx">{xLabel}</div>
       {readout && <div class="rv">{readout}</div>}
     </div>
   );
@@ -247,6 +270,7 @@ export function SendBar({ label, value, color, onChange, id }: SendBarProps) {
 
 // ---- Toggle ---------------------------------------------------------------------------
 
+/** An instrument's on/off for a section: filled when on, dark with its colour's edge when off, hatched while it waits for the bar. */
 export function Toggle({
   on,
   pending,
@@ -264,7 +288,7 @@ export function Toggle({
 }) {
   return (
     <button
-      class={`tog${on ? " on" : ""}${pending ? " pending" : ""}`}
+      class={`tog${on ? " on" : " off"}${pending ? " pending" : ""}`}
       style={{ "--c": color }}
       role="switch"
       aria-checked={on}
@@ -272,7 +296,7 @@ export function Toggle({
       data-toggle={id}
       onClick={onToggle}
     >
-      <i />
+      {pending ? "Next bar" : on ? "On" : "Off"}
     </button>
   );
 }
@@ -339,7 +363,8 @@ export function Pager<K extends string>({
     <div class="seg pager" style={{ gridTemplateColumns: `repeat(${pages.length}, minmax(0, 1fr))` }}>
       {pages.map(([k, label]) => (
         <button key={k} class={k === page ? "on" : ""} data-page={`${id}:${k}`} aria-pressed={k === page} onClick={() => onPage(k)}>
-          {label}
+          {PAGE_ICONS.has(label.split(" ")[0]) && <Icon thing={label.split(" ")[0] as IconThing} />}
+          <span>{label}</span>
         </button>
       ))}
     </div>

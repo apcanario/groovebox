@@ -7,6 +7,8 @@ export interface Rng {
   /** True with probability p. */
   chance(p: number): boolean;
   pick<T>(items: readonly T[]): T;
+  /** An independent copy that goes on with exactly the same numbers (for the lanes' look-ahead). */
+  clone(): Rng;
 }
 
 export function createRng(seed: number): Rng {
@@ -23,6 +25,7 @@ export function createRng(seed: number): Rng {
     int: (n) => Math.floor(next() * n),
     chance: (p) => next() < p,
     pick: (items) => items[Math.floor(next() * items.length)],
+    clone: () => createRng(a),
   };
 }
 

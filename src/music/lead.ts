@@ -86,6 +86,15 @@ export class GenerativeLead {
     return this.seed;
   }
 
+  /** An independent copy in the same state: it plays the same notes from here (for the lanes' look-ahead). */
+  clone(): GenerativeLead {
+    const c = Object.create(GenerativeLead.prototype) as GenerativeLead;
+    Object.assign(c, this);
+    c.slots = [...this.slots];
+    c.mutate = this.mutate.clone();
+    return c;
+  }
+
   /** Back to the state right after construction. */
   reset(): void {
     const fresh = new GenerativeLead(this.seed);

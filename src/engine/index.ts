@@ -8,7 +8,7 @@ import { Graph } from "./audio.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { InFlight, type Pending } from "./queue.ts";
-import { Sequencer, STEPS_PER_BAR, type StepResult } from "./sequencer.ts";
+import { Sequencer, STEPS_PER_BAR, type LaneBar, type StepResult } from "./sequencer.ts";
 import {
   clampPatchValue,
   cleanName,
@@ -53,6 +53,7 @@ export {
 export { ARP_DIRECTIONS, type ArpDirection, type ArpParams } from "../music/arp.ts";
 export { LOCK_FROZEN, type LeadParams, type LeadStepView } from "../music/lead.ts";
 export type { Pending, PendingToggle } from "./queue.ts";
+export type { LaneBar, LaneNote, LaneNotes } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { MP3_KBPS, type Take } from "./recorder.ts";
 
@@ -603,6 +604,14 @@ export class Engine {
    */
   pendingShown(): Pending {
     return this.inFlight.shown(this.seq.pending());
+  }
+
+  /**
+   * Every instrument's bar as notes, for the lanes (spec 8.12): `bar` is the bar shown (position().bar).
+   * Read by the screen when the bar or the song changes; the audio callback only appends to a list.
+   */
+  lanes(bar?: number): LaneBar {
+    return this.seq.lanes(bar);
   }
 
   /** What is audible now (updated in step with the sound, not with the scheduler). */

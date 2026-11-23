@@ -5,13 +5,15 @@
  * change; it never touches audio.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Engine, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
+import { Engine, type LaneBar, type LatencyHint, type Pending, type Position, type RecordInfo, type Song, type Take } from "../engine/index.ts";
 import type { Keeper } from "../store/keeper.ts";
 import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
 import { startFit } from "./fit.ts";
+import { Icon } from "./icons.tsx";
+import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
 import { SectionSheet, SongsSheet } from "./sheets.tsx";
-import { TABS, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
+import { TABS, TAB_COLOR, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PlayTab } from "./tabs/PlayTab.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
 import { InstrumentTab } from "./tabs/InstrumentTab.tsx";
@@ -28,6 +30,8 @@ export interface Ctx {
   edit: number;
   /** Section heard now (or the one Play starts from). */
   playing: number;
+  /** Every instrument's bar as notes (spec 8.12): the bar shown, or the first bar Play starts with. */
+  lanes: LaneBar;
   goTab: (t: Tab) => void;
   hint: LatencyHint;
   keeper: Keeper;
@@ -231,6 +235,15 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
 
   // Text fits its tile: re-fitted after any change on screen and on resize (display only).
   useEffect(() => startFit(document.body), []);
+  // One loop for every movement on screen (spec 8.12, Motion).
+  useEffect(() => startMotion(engine), [engine]);
+
+  // The lanes: read from the engine when the bar shown or the song changes, never per frame.
+  const lanes = useMemo(
+    () => engine.lanes(pos.playing ? pos.bar : undefined),
+    [engine, song, pos.bar, pos.playing, pos.section],
+  );
+  useEffect(() => showLanes(lanes), [lanes]);
 
   useWakeLock(pos.playing);
 
@@ -262,7 +275,7 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   };
 
   const bpmDrag = useVerticalDrag(song.bpm, 80, 180, (v) => (engine.bpm = v), 1, 400);
-  const ctx: Ctx = { engine, song, pos, pending, edit, playing, goTab: setTab, hint, keeper, advanced, roomy };
+  const ctx: Ctx = { engine, song, pos, pending, edit, playing, lanes, goTab: setTab, hint, keeper, advanced, roomy };
   const taking = rec.state === "recording" || rec.state === "finishing";
   const lights = beatLights(pos.playing, pos.step);
   // On the Advanced Play tab the strip is the grid's column labels: indented under its four columns.
@@ -279,7 +292,7 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
           disabled={!idle}
           onClick={() => void keeper.create()}
         >
-          <span class="plus" aria-hidden="true">+</span>
+          <Icon thing="New jam" />
           <span>New jam</span>
         </button>
         <button class="btn hb" id="songs-open" aria-label={`Songs: ${song.name}`} onClick={() => setSongs(true)}>
@@ -373,9 +386,25 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
         </button>
       </div>
 
-      <nav class="tabs">
+      <nav
+        class="tabs"
+        style={{
+          "--ti": TABS.indexOf(tab),
+          "--ti4x": TABS.indexOf(tab) % 4,
+          "--ti4y": Math.floor(TABS.indexOf(tab) / 4),
+          "--tc": TAB_COLOR[tab],
+        }}
+      >
+        <i class="marker" aria-hidden="true" />
         {TABS.map((t) => (
-          <button key={t} class={`tab${t === tab ? " on" : ""}`} data-tab={t} aria-current={t === tab} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            class={`tab${t === tab ? " on" : ""}`}
+            style={{ "--c": TAB_COLOR[t] }}
+            data-tab={t}
+            aria-current={t === tab}
+            onClick={() => setTab(t)}
+          >
             <TabIcon tab={t} />
             <span>{TAB_NAME[t]}</span>
           </button>

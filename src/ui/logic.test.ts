@@ -6,7 +6,6 @@ import {
   LAYER_PATCH_KNOBS,
   PAD_KNOBS,
   genText,
-  leadCellClass,
   barLabel,
   beatLights,
   chordName,
@@ -254,7 +253,7 @@ describe("patch knobs (G3)", () => {
     const a = { key: "drive" as const, label: "D" };
     expect(knobValue(a, 0.3)).toBe(0.3);
     expect(knobText(a, 0.42)).toBe("42");
-    expect(knobText(k, 0.004)).toBe("4 ms");
+    expect(knobText(k, 0.004)).toBe("4ms");
     expect(secondsLabel(1.25)).toBe("1.3 s");
   });
   it("no page holds more than six dials, and every dial names a patch key", () => {
@@ -295,11 +294,6 @@ describe("layer tab (G4)", () => {
     expect(GEN_KNOBS.length).toBeLessThanOrEqual(6);
     expect(PAD_KNOBS.length).toBeLessThanOrEqual(6);
     expect(LAYER_PATCH_KNOBS.length).toBeLessThanOrEqual(6);
-  });
-  it("lead row cells: hit, skipped hit, playing step", () => {
-    expect(leadCellClass(false, false, false)).toBe("st");
-    expect(leadCellClass(true, true, false)).toBe("st h");
-    expect(leadCellClass(true, false, true)).toBe("st h lo now");
   });
   it("pad times map both ways on their curve", () => {
     for (const k of PAD_KNOBS) for (const p of [0, 0.3, 1]) expect(knobPos(k, knobValue(k, p))).toBeCloseTo(p);
