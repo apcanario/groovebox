@@ -194,7 +194,8 @@ export function XYPad({ x, y, onChange, xLabel, yLabel, readout, id }: XYPadProp
       data-xy={id}
       role="group"
       aria-label={`${xLabel} and ${yLabel}`}
-      style={{ "--x": `${x * 100}%`, "--y": `${(1 - y) * 100}%` }}
+      data-value={`${Math.round(x * 100)} ${Math.round(y * 100)}`}
+      style={{ "--fx": x, "--fy": 1 - y }}
       onPointerDown={(e: PE) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         active.current = e.pointerId;

@@ -1,12 +1,14 @@
 /**
  * Chords tab, easy mode (spec section 3) on two pages so nothing scrolls (P1): Chords (seven in-key
- * degree buttons, the section's sequence and its tools) and Key (mood and key).
+ * degree buttons, the section's sequence and its tools) and Key (mood and key). In Simple each chord is a
+ * coloured block, its colour fixed by its place in the key, with no number or name (spec 8.1; P4 replaces it).
  */
 import { useEffect, useState } from "preact/hooks";
 import { MOODS, MOOD_TABLE, NOTE_NAMES, degreeChords } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Pager } from "../components.tsx";
 import {
+  CHORD_COLOR,
   MAX_CHORDS,
   addChord,
   chordName,
@@ -113,13 +115,15 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
             {chords.map((c) => (
               <button
                 key={c.degree}
-                class="degree"
+                class={`degree${advanced ? "" : " block"}`}
                 data-degree={c.degree}
+                style={{ "--dc": CHORD_COLOR[c.degree] }}
                 disabled={sel === null && full}
+                aria-label={advanced ? undefined : sel !== null ? "Put this chord in its place" : "Add this chord"}
                 onClick={() => tapDegree(c.degree)}
               >
-                {/* Simple: the chord's number in the key, no degree or note names (spec 8.1). */}
-                <b>{advanced ? c.label : c.degree + 1}</b>
+                {/* Simple: each chord a coloured block, no number, degree or note name (spec 8.1; P2 review E2). */}
+                {advanced && <b>{c.label}</b>}
                 {advanced && <span>{chordName(c.bass % 12, c.label, NOTE_NAMES)}</span>}
               </button>
             ))}
@@ -130,12 +134,13 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
               return (
                 <button
                   key={i}
-                  class={`step${sel === i ? " on" : ""}`}
+                  class={`step${sel === i ? " on" : ""}${advanced ? "" : " block"}`}
                   data-seq={i}
+                  style={{ "--dc": CHORD_COLOR[c.degree] }}
                   aria-pressed={sel === i}
                   onClick={() => setSel(sel === i ? null : i)}
                 >
-                  <b>{advanced ? chord.label : c.degree + 1}</b>
+                  {advanced && <b>{chord.label}</b>}
                   <span>{lengthLabel(c.bars)}</span>
                 </button>
               );

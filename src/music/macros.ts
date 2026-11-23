@@ -18,7 +18,8 @@ export type MacroInstrument = "drums" | "bass" | "synth" | "layer1" | "layer2";
 export type MacroTarget =
   | { kind: "patch"; key: NumericPatchKey; from: number; to: number; exp?: boolean }
   | { kind: "gen"; key: "density" | "hits" | "lock"; from: number; to: number; whole?: boolean }
-  | { kind: "arp"; key: "rate"; from: number; to: number }
+  /** An arp setting with a few values: the dial picks one of `steps`, in order, in equal bands. */
+  | { kind: "arp"; key: "rate" | "octaves"; steps: readonly number[] }
   | { kind: "pad"; key: "motion" | "brightness"; from: number; to: number }
   | { kind: "swing"; from: number; to: number };
 
@@ -47,16 +48,20 @@ const busy: MacroDef = {
   targets: [
     { kind: "gen", key: "hits", from: 3, to: 14, whole: true },
     { kind: "gen", key: "density", from: 0.4, to: 1 },
-    { kind: "arp", key: "rate", from: 4, to: 1 },
+    { kind: "arp", key: "rate", steps: [4, 2, 1] },
   ],
 };
-/** Evolve: the inverse of Lock (spec 8.3); on a pad, how far its filter drifts. */
+/**
+ * Evolve: the inverse of Lock (spec 8.3); on a pad, how far its filter drifts; on an arp, how many octaves
+ * it climbs through (P2 review M3: so the dial is heard in every mode).
+ */
 const evolve: MacroDef = {
   id: "evolve",
   label: "Evolve",
   targets: [
     { kind: "gen", key: "lock", from: 1, to: 0 },
     { kind: "pad", key: "motion", from: 0, to: 1 },
+    { kind: "arp", key: "octaves", steps: [1, 2, 3] },
   ],
 };
 
@@ -141,7 +146,7 @@ export const MACROS: Record<MacroInstrument, readonly MacroDef[]> = {
 export function targetValue(t: MacroTarget, pos: number): number {
   const p = Math.max(0, Math.min(1, pos));
   if (t.kind === "patch" && t.exp) return t.from * Math.pow(t.to / t.from, p);
-  if (t.kind === "arp") return p < 1 / 3 ? 4 : p < 2 / 3 ? 2 : 1;
+  if (t.kind === "arp") return t.steps[Math.min(t.steps.length - 1, Math.floor(p * t.steps.length))];
   const v = t.from + (t.to - t.from) * p;
   return t.kind === "gen" && t.whole ? Math.round(v) : v;
 }
@@ -150,7 +155,10 @@ export function targetValue(t: MacroTarget, pos: number): number {
 export function targetPos(t: MacroTarget, v: number): number {
   let p: number;
   if (t.kind === "patch" && t.exp) p = Math.log(Math.max(1e-6, v) / t.from) / Math.log(t.to / t.from);
-  else if (t.kind === "arp") p = v >= 4 ? 0 : v >= 2 ? 0.5 : 1;
+  else if (t.kind === "arp") {
+    const i = t.steps.indexOf(v);
+    p = i < 0 ? 0 : i / Math.max(1, t.steps.length - 1);
+  }
   else p = t.to === t.from ? 0 : (v - t.from) / (t.to - t.from);
   return Math.max(0, Math.min(1, p));
 }

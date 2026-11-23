@@ -470,6 +470,37 @@ export function validateSong(doc: unknown): string[] {
   return errors;
 }
 
+/** Layer 2's envelope before P2: a pad's (C4 changed it with its level; see defaultPatch). */
+export const OLD_LAYER2_ENVELOPE = { attack: 0.7, decay: 0.6, sustain: 0.8, release: 1.8 } as const;
+/** Layer 2's level before P2. */
+export const OLD_LAYER2_LEVEL = 0.22;
+
+/**
+ * Bring a song saved before P2 to P2's balance (P2 review S1). P2 trims every pad 12 dB (PAD_TRIM) and moved
+ * Layer 2's default level (0.22 to 0.7) and envelope (a pad's 0.7 s attack to a short one) to match. A song saved
+ * before keeps Layer 2's old envelope, which no dial sets exactly: where it does, the envelope takes the new
+ * default and the level rises by the same ratio (0.7 / 0.22, +10 dB, at most 1), so its pad sits where it did
+ * (about 2 dB under) and its lead and arp sit level with Layer 1's, as in a new song. Returns the song itself
+ * when nothing needs changing, else a migrated copy. The take's start song in a log migrates the same way.
+ */
+export function migrateSong<T extends Song>(song: T): T {
+  const p = song.patches.layer2;
+  const old = (Object.keys(OLD_LAYER2_ENVELOPE) as (keyof typeof OLD_LAYER2_ENVELOPE)[]).every((k) => p[k] === OLD_LAYER2_ENVELOPE[k]);
+  const log = song.log ? migrateSong(song.log.start) : undefined;
+  if (!old && log === song.log?.start) return song;
+  const out: T = { ...song };
+  if (old) {
+    const now = defaultPatch("layer2");
+    const level = Math.min(1, Math.round(((p.level * now.level) / OLD_LAYER2_LEVEL) * 1e6) / 1e6);
+    out.patches = {
+      ...song.patches,
+      layer2: { ...p, attack: now.attack, decay: now.decay, sustain: now.sustain, release: now.release, level },
+    };
+  }
+  if (song.log && log) out.log = { ...song.log, start: log };
+  return out;
+}
+
 /** Parse and validate a song from JSON. Throws with every problem listed. */
 export function parseSong(json: string): Song {
   const doc: unknown = JSON.parse(json);

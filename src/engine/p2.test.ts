@@ -1,12 +1,26 @@
 /** P2: Simple and Advanced. Macros (spec 8.3), Back with the eight-seed history, swing by hand, the C4 trim, the mode switch. */
 import { describe, expect, it } from "vitest";
+import oldSongJson from "./fixtures/p1b-default-song.json?raw";
 import { MACROS, MACRO_KEYS, sectionScoped, targetPos, targetValue, type MacroInstrument, type MacroTarget } from "../music/macros.ts";
 import { PAD_TRIM } from "../music/sound.ts";
 import { loadMode, saveMode } from "../ui/mode.ts";
+import { ARP_OCTAVES, ARP_RATES, GEN_KNOBS, KNOB_PAGES, LAYER_PATCH_KNOBS, PAD_KNOBS, seedHeard } from "../ui/logic.ts";
 import { Engine } from "./index.ts";
 import { targetNow } from "./macro.ts";
 import { Sequencer, type StepResult } from "./sequencer.ts";
-import { INSTRUMENTS, SEED_HISTORY, cloneSong, defaultSong, sectionSwing, validateSong, type Song } from "./song.ts";
+import {
+  INSTRUMENTS,
+  OLD_LAYER2_ENVELOPE,
+  SEED_HISTORY,
+  cloneSong,
+  defaultPatch,
+  defaultSong,
+  migrateSong,
+  parseSong,
+  sectionSwing,
+  validateSong,
+  type Song,
+} from "./song.ts";
 
 const run = (seq: Sequencer, steps: number): StepResult[] => Array.from({ length: steps }, () => seq.next());
 
@@ -40,6 +54,8 @@ describe("macros (spec 8.3)", () => {
   it("each macro at minimum and at maximum changes every value it maps", () => {
     for (const inst of INSTRUMENTS)
       for (const m of MACROS[inst as MacroInstrument]) {
+        // A macro with no targets would pass the loop below without testing anything (P2 review M2).
+        expect(m.targets.length, `${inst} ${m.id}`).toBeGreaterThan(0);
         const e = new Engine(defaultSong());
         expect(e.setMacro(1, inst, m.id, 0)).toBe(true);
         const lo = e.getSong();
@@ -55,6 +71,46 @@ describe("macros (spec 8.3)", () => {
         }
         expect(validateSong(hi)).toEqual([]);
       }
+  });
+
+  it("every value a macro moves has a control in Advanced (spec 8.1; P2 review E1)", () => {
+    // What Advanced shows, by instrument: the patch dial pages (Drums, Bass, Synth) or the layers' Sound page,
+    // the Filter panel every instrument has (XY pad and sends), the Mix tab's level per instrument; per section,
+    // the generative dials, the arp chips and gate, the pad dials and the Swing dial on the drums' Hats page.
+    const filterPanel = ["cutoff", "resonance", "delay", "reverb"];
+    const mixLevels = ["level"];
+    for (const inst of INSTRUMENTS) {
+      const patchDials = inst === "layer1" || inst === "layer2" ? LAYER_PATCH_KNOBS.map((k) => k.key) : (KNOB_PAGES[inst] ?? []).flatMap((p) => p.knobs.map((k) => k.key));
+      const shown: Record<MacroTarget["kind"], string[]> = {
+        patch: [...patchDials, ...filterPanel, ...mixLevels],
+        gen: GEN_KNOBS.map((k) => k.key),
+        arp: ["direction", "gate", ...(ARP_RATES.length ? ["rate"] : []), ...(ARP_OCTAVES.length ? ["octaves"] : [])],
+        pad: PAD_KNOBS.map((k) => k.key),
+        swing: inst === "drums" ? ["swing"] : [],
+      };
+      for (const m of MACROS[inst as MacroInstrument])
+        for (const t of m.targets) {
+          const key = "key" in t ? t.key : "swing";
+          expect(shown[t.kind], `${inst} ${m.id} moves ${t.kind} ${key}, which Advanced does not show`).toContain(key);
+        }
+    }
+  });
+
+  it("the Simple XY pad lets a Bright dial read the cutoff again (P2 review S2)", () => {
+    const e = new Engine(defaultSong());
+    e.setMacro(1, "bass", "bright", 0.9);
+    e.setMacro(1, "bass", "weight", 0.2);
+    e.setMacro(1, "layer1", "bright", 0.9);
+    e.setParams("bass", { cutoff: 0.3, resonance: 0.5 });
+    expect(e.releaseMacros("bass", "cutoff")).toBe(true);
+    // Bright now reads the cutoff the pad set; Weight (not on the cutoff) and the other instruments keep theirs.
+    expect(e.macroPos(1, "bass", "bright")).toBeCloseTo(targetPos(MACROS.bass[0].targets[0], 0.3), 6);
+    expect(e.macroPos(1, "bass", "weight")).toBe(0.2);
+    expect(e.macroPos(1, "layer1", "bright")).toBe(0.9);
+    expect(e.releaseMacros("bass", "cutoff")).toBe(false);
+    expect(e.releaseMacros("layer1", "cutoff")).toBe(true);
+    expect(e.getSong().macros).toEqual({ "bass.weight": 0.2 });
+    expect(validateSong(e.getDocument())).toEqual([]);
   });
 
   it("a macro writes only ordinary values plus its own position: Advanced reads every move", () => {
@@ -110,6 +166,22 @@ describe("macros (spec 8.3)", () => {
       e.setMacro(1, "layer1", "evolve", p);
       expect(e.getSong().sections[1].layer1.gen.lock).toBeCloseTo(1 - p, 6);
     }
+  });
+
+  it("Evolve is heard on an arp: it widens the octaves the arp climbs (P2 review M3)", () => {
+    const song = leadSong();
+    song.sections[0].layer1.mode = "arp";
+    song.sections[0].layer1.arp = { direction: "up", rate: 1, octaves: 1, gate: 0.5 };
+    const notes = (pos: number): number[] => {
+      const e = new Engine(cloneSong(song));
+      e.setMacro(0, "layer1", "evolve", pos);
+      const seq = new Sequencer(e.getSong());
+      seq.start();
+      return run(seq, 32).flatMap((r) => r.events.filter((x) => x.inst === "layer1").flatMap((x) => (x as unknown as { notes: number[] }).notes));
+    };
+    const lo = notes(0);
+    const hi = notes(1);
+    expect(Math.max(...hi) - Math.max(...lo)).toBe(24);
   });
 
   it("targets map back to their position (exp curves and whole numbers included)", () => {
@@ -173,6 +245,57 @@ describe("New idea and Back (spec 8.3)", () => {
     expect(seq.prevSeed(0, "layer1")).toBeNull();
   });
 
+  it("Back through the engine, pressed mid-bar: the lead plays its old notes from the next bar line (P2 review M1)", () => {
+    // The path the UI takes: Engine.newSeed and Engine.prevSeed, on the sequencer the engine plays.
+    const e = new Engine(leadSong());
+    const seq = (e as unknown as { seq: Sequencer }).seq;
+    seq.start();
+    const first = leadNotes(seq, 4);
+    const seed = e.getSong().sections[0].layer1.gen.seed;
+    run(seq, 3);
+    expect(e.newSeed(0, "layer1")).not.toBe(seed);
+    expect(leadNotes(seq, 4)).not.toEqual(first);
+    // Bar 9 (the first of the chord loop's third pass), eighth step: Back mid-bar.
+    run(seq, 16 * 8 + 7 - (64 + 3 + 64));
+    expect(e.prevSeed(0, "layer1")).toBe(seed);
+    expect(e.getSong().sections[0].layer1.gen.seed).toBe(seed);
+    run(seq, 16 - 7);
+    // From bar 10 (the chord loop's second bar) the lead plays what it played in bars 2 to 4, note for note.
+    expect(leadNotes(seq, 3)).toEqual(first.slice(16));
+    expect(e.prevSeed(0, "layer1")).toBeNull();
+  });
+
+  it("New idea and Back are heard on a random arp, and offered only where a seed is heard (P2 review S3)", () => {
+    const song = leadSong();
+    song.sections[0].layer1.mode = "arp";
+    song.sections[0].layer1.arp = { direction: "random", rate: 1, octaves: 3, gate: 0.5 };
+    const seq = new Sequencer(song);
+    seq.start();
+    const arpNotes = (): string => run(seq, 32).map((r) => (r.events.find((x) => x.inst === "layer1") as { notes: number[] } | undefined)?.notes.join(",") ?? "-").join(" ");
+    run(seq, 32);
+    const sameSeed = (() => {
+      const c = new Sequencer(cloneSong(song));
+      c.start();
+      run(c, 32);
+      return run(c, 32).map((r) => (r.events.find((x) => x.inst === "layer1") as { notes: number[] } | undefined)?.notes.join(",") ?? "-").join(" ");
+    })();
+    const seed = seq.song.sections[0].layer1.gen.seed;
+    seq.newSeed(0, "layer1");
+    expect(arpNotes()).not.toEqual(sameSeed);
+    // Back returns the arp to its old seed at once: the notes it draws come from that seed again.
+    expect(seq.prevSeed(0, "layer1")).toBe(seed);
+    const back = arpNotes();
+    const fresh = new Sequencer(cloneSong(song));
+    fresh.start();
+    expect(back).toEqual(run(fresh, 32).map((r) => (r.events.find((x) => x.inst === "layer1") as { notes: number[] } | undefined)?.notes.join(",") ?? "-").join(" "));
+    // The buttons: a lead and a random arp use the seed; a pad and an ordered arp do not.
+    const arp = { direction: "random" };
+    expect(seedHeard({ mode: "generative", arp })).toBe(true);
+    expect(seedHeard({ mode: "arp", arp })).toBe(true);
+    expect(seedHeard({ mode: "arp", arp: { direction: "up" } })).toBe(false);
+    expect(seedHeard({ mode: "pad", arp })).toBe(false);
+  });
+
   it("keeps the last eight seeds per layer per section", () => {
     const seq = new Sequencer(defaultSong());
     const seeds = [seq.song.sections[1].layer1.gen.seed];
@@ -222,6 +345,57 @@ describe("C4: layer levels", () => {
     const pad = run(seq, 1)[0].events.find((e) => e.inst === "layer1")!;
     expect(pad.vel).toBeCloseTo(0.7 * PAD_TRIM, 6);
     expect(20 * Math.log10(PAD_TRIM)).toBeCloseTo(-12, 0);
+  });
+});
+
+describe("C4 for songs saved before P2 (P2 review S1)", () => {
+  const old = (): Song => parseSong(oldSongJson);
+
+  it("the fixture is the P1b default song: Layer 2 at level 0.22 with a pad's envelope", () => {
+    const p = old().patches.layer2;
+    expect(p.level).toBe(0.22);
+    expect({ attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release }).toEqual(OLD_LAYER2_ENVELOPE);
+  });
+
+  it("an old song loads with Layer 2 at P2's level and envelope, as a new song has them", () => {
+    const now = defaultPatch("layer2");
+    for (const e of [new Engine(old()), (() => { const x = new Engine(); x.loadSong(old()); return x; })()]) {
+      const p = e.getSong().patches.layer2;
+      expect(p).toEqual({ ...old().patches.layer2, attack: now.attack, decay: now.decay, sustain: now.sustain, release: now.release, level: now.level });
+      // Its pad sits where it did before P2, within 2 dB: level times the trim, against the old level untrimmed.
+      expect(Math.abs(20 * Math.log10((p.level * PAD_TRIM) / 0.22))).toBeLessThan(2.1);
+      expect(validateSong(e.getDocument())).toEqual([]);
+      // Everything else is as saved.
+      expect({ ...e.getSong(), patches: { ...e.getSong().patches, layer2: null } }).toEqual({ ...old(), patches: { ...old().patches, layer2: null } });
+    }
+  });
+
+  it("an old song whose Layer 2 level was moved keeps it relative (+10 dB, at most 1)", () => {
+    const s = old();
+    s.patches.layer2.level = 0.1;
+    expect(migrateSong(s).patches.layer2.level).toBeCloseTo(0.1 * (0.7 / 0.22), 6);
+    s.patches.layer2.level = 0.5;
+    expect(migrateSong(s).patches.layer2.level).toBe(1);
+  });
+
+  it("a song saved since P2 is left as it is, and a migrated song does not move again", () => {
+    const now = defaultSong();
+    expect(migrateSong(now)).toBe(now);
+    const once = migrateSong(old());
+    expect(migrateSong(once)).toBe(once);
+    // A song whose envelope was moved off the old default by hand is not touched.
+    const moved = old();
+    moved.patches.layer2.attack = 0.5;
+    expect(migrateSong(moved)).toBe(moved);
+  });
+
+  it("the start song of an old take's log migrates too", () => {
+    const s = old();
+    s.log = { recorded: new Date(0).toISOString(), seconds: 1, section: 0, start: old(), events: [] };
+    expect(validateSong(s)).toEqual([]);
+    const m = migrateSong(s);
+    expect(m.log!.start.patches.layer2.level).toBe(0.7);
+    expect(m.patches.layer2.level).toBe(0.7);
   });
 });
 

@@ -145,6 +145,9 @@ export function fitSize(start: number, fits: (px: number) => boolean, min = 10, 
 
 // ---- Chord sequence edits (each returns a new array, or the same one when refused) ----
 
+/** Each chord of the key by colour, its place in the key fixing it (Simple draws chords as coloured blocks, spec 8.4). */
+export const CHORD_COLOR: readonly string[] = ["var(--coral)", "var(--orange)", "var(--yellow)", "var(--teal)", "var(--blue)", "var(--purple)", "var(--text)"];
+
 export function addChord(seq: ChordStep[], degree: number): ChordStep[] {
   if (seq.length >= MAX_CHORDS) return seq;
   return [...seq, { degree, bars: 1 }];
@@ -297,6 +300,8 @@ export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
       name: "Patch",
       knobs: [
         { key: "envAmount", label: "Env amt" },
+        // P2 review E1: the Simple Punch dial moves the bass attack, so Advanced shows it.
+        { key: "attack", label: "Attack", seconds: [0.001, 0.1] },
         { key: "decay", label: "Decay", seconds: [0.03, 1.5] },
         { key: "drive", label: "Drive" },
         { key: "sub", label: "Sub" },
@@ -334,6 +339,12 @@ export const PRESET_LABEL: Record<string, string> = {
   sustained: "Held",
 };
 
+/** Preset names Simple shows in other words: no abbreviations (P2 review M6). */
+export const SIMPLE_PRESET_LABEL: Record<string, string> = { dnb: "Breakbeat", dnbSub: "Deep" };
+
+/** A preset's name in Simple. */
+export const simplePreset = (p: string): string => SIMPLE_PRESET_LABEL[p] ?? PRESET_LABEL[p];
+
 export const WAVE_LABEL: Record<string, string> = { sawtooth: "Saw", square: "Square", triangle: "Tri", sine: "Sine" };
 
 // ---- Simple (P2): plain words only (spec 8.1) ------------------------------------------
@@ -354,9 +365,14 @@ export const MACRO_COLOR: Record<string, string> = {
   level: "var(--teal)",
 };
 
-/** The Simple XY pad's readout: Bright and Edge as 0..100, no hertz. */
+/** The Simple XY pad's readout: Tone and Edge as 0..100, no hertz. */
 export function simpleXYReadout(x: number, y: number): string {
   return `${Math.round(x * 100)} · ${Math.round(y * 100)}`;
+}
+
+/** New idea and Back change what a layer plays: a lead, or an arp in random order (a pad and an ordered arp do not use the seed). */
+export function seedHeard(layer: { mode: string; arp: { direction: string } }): boolean {
+  return layer.mode === "generative" || (layer.mode === "arp" && layer.arp.direction === "random");
 }
 
 /** Moods by how they feel, for Simple (no scale names; spec 8.1). */
@@ -382,11 +398,11 @@ export const LAYER_MODE_ORDER = ["generative", "arp", "pad"] as const;
 export const LAYER_MODE_LABEL: Record<(typeof LAYER_MODE_ORDER)[number], "Arp" | "Lead" | "Pad"> = { arp: "Arp", generative: "Lead", pad: "Pad" };
 export const LAYER_MODE_TITLE: Record<(typeof LAYER_MODE_ORDER)[number], string> = { arp: "Arp", generative: "Lead", pad: "Pad" };
 
-/** What an instrument plays in a section, in a word or two (the Now tile's second line). */
+/** What an instrument plays in a section, in a word or two (the Now tile's second line, a Simple screen). */
 export function plays(song: Song, sec: number, id: InstrumentId): string {
   const s = song.sections[sec];
-  if (id === "drums") return s.drums.grid ? `${PRESET_LABEL[s.drums.preset]}, edited` : PRESET_LABEL[s.drums.preset];
-  if (id === "bass") return PRESET_LABEL[s.bass.rhythm];
+  if (id === "drums") return s.drums.grid ? `${simplePreset(s.drums.preset)}, edited` : simplePreset(s.drums.preset);
+  if (id === "bass") return simplePreset(s.bass.rhythm);
   if (id === "synth") return PRESET_LABEL[s.synth.rhythm];
   return LAYER_MODE_TITLE[s[id].mode];
 }

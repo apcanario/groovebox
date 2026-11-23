@@ -392,7 +392,16 @@ export class Sequencer {
     if (!s || !(LAYER_IDS as readonly string[]).includes(id)) return null;
     const seeds = [...(s[id].seeds ?? []), s[id].gen.seed].slice(-SEED_HISTORY);
     s[id] = { ...s[id], seeds, gen: { ...s[id].gen, seed: nextSeed(s[id].gen.seed) } };
+    this.reseedArp(section, id);
     return s[id].gen.seed;
+  }
+
+  /**
+   * A random arp draws its notes from the layer's seed: a new seed (New idea, Back) in the playing section
+   * reseeds it at once, so the change is heard there too (P2 review S3), not only from the next section entry.
+   */
+  private reseedArp(section: number, id: LayerInstrument): void {
+    if (section === this.current) this.arpRng.set(id, createRng(deriveSeed(this.song.sections[section][id].gen.seed, 7)));
   }
 
   /**
@@ -412,6 +421,7 @@ export class Sequencer {
     s[id] = next;
     // Start the lead from the seed even when the same seed is cached (it may have drifted with Lock).
     this.leads.delete(`${section}:${id}`);
+    this.reseedArp(section, id);
     return seed;
   }
 
@@ -743,14 +753,16 @@ export class Sequencer {
     }
     const key = `${this.current}:${id}`;
     let lead = this.leads.get(key);
+    const ctx = { chordTones: pos.chord.tones, scale: scalePitchClasses(this.song.key, this.song.mood) };
     if (!lead || lead.seedValue !== p.gen.seed) {
-      lead = new GenerativeLead(p.gen.seed, step); // aligned to the bar even when made mid-bar (G4 review M1)
+      // Made mid-bar (New idea, Back while playing): it runs silently through the steps before this one, so it
+      // stands as if it had begun at the bar line, mutations included (G4 review M1). Back pressed mid-bar then
+      // plays the old lead note for note from the next bar line (P2 review M1).
+      lead = new GenerativeLead(p.gen.seed);
+      for (let s = 0; s < step; s++) lead.step(s, p.gen, ctx);
       this.leads.set(key, lead);
     }
-    const note = lead.step(step, p.gen, {
-      chordTones: pos.chord.tones,
-      scale: scalePitchClasses(this.song.key, this.song.mood),
-    });
+    const note = lead.step(step, p.gen, ctx);
     if (!note) return null;
     return { inst: id, mode: "generative", notes: [note.midi], len: 0.8, vel: note.vel, shift };
   }

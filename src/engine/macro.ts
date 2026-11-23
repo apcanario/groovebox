@@ -13,7 +13,7 @@ export function targetNow(song: Song, section: number, inst: InstrumentId, t: Ma
     case "gen":
       return inst === "layer1" || inst === "layer2" ? s[inst].gen[t.key] : 0;
     case "arp":
-      return inst === "layer1" || inst === "layer2" ? s[inst].arp.rate : 2;
+      return inst === "layer1" || inst === "layer2" ? s[inst].arp[t.key] : 0;
     case "pad":
       return inst === "layer1" || inst === "layer2" ? s[inst].pad[t.key] : 0;
   }

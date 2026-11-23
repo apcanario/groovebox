@@ -9,7 +9,7 @@ import type { Ctx } from "../App.tsx";
 import { Chips, Dial, GroupLabel, XYPad } from "../components.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
-import { LAYER_MODE_LABEL, LAYER_MODE_ORDER, MACRO_COLOR, PRESET_LABEL, SIMPLE_WAVE_LABEL, simpleXYReadout } from "../logic.ts";
+import { LAYER_MODE_LABEL, LAYER_MODE_ORDER, MACRO_COLOR, SIMPLE_WAVE_LABEL, simplePreset, seedHeard, simpleXYReadout } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
 import { HeadRow, InstToggle } from "./InstrumentTab.tsx";
 
@@ -38,7 +38,10 @@ function Macros({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   );
 }
 
-/** The filter XY pad in plain words: Bright across, Edge up. */
+/**
+ * The filter XY pad in plain words: Tone across, Edge up. Its X axis is the cutoff a Bright dial also moves, so
+ * a move here lets those dials read the value again (P2 review S2): one value, one answer on the screen.
+ */
 function SimpleXY({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const patch = ctx.song.patches[inst];
   return (
@@ -46,10 +49,13 @@ function SimpleXY({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
       id={inst}
       x={patch.cutoff}
       y={patch.resonance}
-      xLabel="Bright"
+      xLabel="Tone"
       yLabel="Edge"
       readout={simpleXYReadout(patch.cutoff, patch.resonance)}
-      onChange={(x, y) => ctx.engine.setParams(inst, { cutoff: x, resonance: y })}
+      onChange={(x, y) => {
+        ctx.engine.setParams(inst, { cutoff: x, resonance: y });
+        ctx.engine.releaseMacros(inst, "cutoff");
+      }}
     />
   );
 }
@@ -66,7 +72,7 @@ function Picker({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
           name="preset"
           options={DRUM_PRESETS}
           value={section.drums.grid ? null : section.drums.preset}
-          label={(p) => PRESET_LABEL[p]}
+          label={(p) => simplePreset(p)}
           onPick={(p) => engine.setDrumPreset(edit, p)}
         />
       </>
@@ -75,7 +81,7 @@ function Picker({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
     return (
       <>
         <GroupLabel thing="Rhythm" />
-        <Chips name="rhythm" options={BASS_PRESETS} value={section.bass.rhythm} label={(p) => PRESET_LABEL[p]} onPick={(p) => engine.setBassRhythm(edit, p)} />
+        <Chips name="rhythm" options={BASS_PRESETS} value={section.bass.rhythm} label={(p) => simplePreset(p)} onPick={(p) => engine.setBassRhythm(edit, p)} />
       </>
     );
   return (
@@ -102,21 +108,21 @@ export function SimpleInstrumentTab({ ctx, inst }: { ctx: Ctx; inst: "drums" | "
 export function SeedButtons({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
   const layer = song.sections[edit][id];
-  // A pad holds the chord: a seed changes nothing it plays.
-  const pad = layer.mode === "pad";
+  // A pad holds the chord, and an arp in order plays its chord's notes: a seed changes nothing they play.
+  const inert = !seedHeard(layer);
   return (
     <>
       <button
         class="btn seedbtn"
         data-back={id}
-        disabled={pad || !layer.seeds?.length}
+        disabled={inert || !layer.seeds?.length}
         aria-label="Back: the notes this layer played before the last new idea"
         onClick={() => engine.prevSeed(edit, id)}
       >
         <Icon thing="Back" />
         <span>Back</span>
       </button>
-      <button class="btn seedbtn idea" data-seed={id} disabled={pad} aria-label="New idea: new notes for this layer" onClick={() => engine.newSeed(edit, id)}>
+      <button class="btn seedbtn idea" data-seed={id} disabled={inert} aria-label="New idea: new notes for this layer" onClick={() => engine.newSeed(edit, id)}>
         <Icon thing="New idea" />
         <span>New idea</span>
       </button>

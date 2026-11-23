@@ -92,13 +92,41 @@ CHECK = r"""() => {
   return bad;
 }"""
 
+# Words Simple never shows (spec 8.1: plain words only): synth, generator and scale terms and abbreviations.
+JARGON = ["Cutoff", "Resonance", "Euclid", "Envelope", "Env amt", "Filt env", "Attack", "Decay", "Release", "Sustain", "Hz",
+          "Lock", "Hits", "Rotate", "Tension", "Density", "Detune", "Saw", "Tri", "4/4", "Filter", "DnB", "Saturate",
+          "Major", "Minor", "Dorian", "Phrygian", "Degree"]
+
+# Simple's visible words, line by line (the body, any sheet, the header and the transport), and any chord tile
+# whose text is a lone digit 1 to 7: a scale degree by another name (P2 review E2, S4).
+SIMPLE_TEXT = r"""() => {
+  const lines = document.body.innerText.split('\n').map((t) => t.trim()).filter(Boolean);
+  const degrees = [...document.querySelectorAll('.chordtab .degree, .chordtab .step')]
+    .filter((el) => el.getClientRects().length && el.innerText.split('\n').some((t) => /^[1-7]$/.test(t.trim())))
+    .map((el) => `${el.className} "${el.innerText.trim()}"`);
+  return { lines, degrees };
+}"""
+
+
+def simple_words(page) -> list:
+    """What on the screen Simple must not show: Advanced words, and chord tiles numbered as degrees."""
+    got = page.evaluate(SIMPLE_TEXT)
+    bad = [f"shows the word {w!r}" for w in JARGON if any(t == w or t.startswith(w + " ") for t in got["lines"])]
+    return bad + [f"a chord tile shows a degree: {d}" for d in got["degrees"]]
+
+
 # The strip's bottom and the transport bar's top (the Simple Play tab's strip is taller, upwards).
 FRAME_Y = """() => [Math.round(document.querySelector('.secs').getBoundingClientRect().bottom), Math.round(document.querySelector('.top').getBoundingClientRect().top)]"""
 
 
 def _settle(page) -> None:
-    # Two frames: the render, then the text fit.
+    # Two frames: the render, then the text fit. Then every CSS transition ends (a chip's or mode button's wipe
+    # takes 0.14 s), so a screenshot never catches one half done and shows a stray sliver (P2 review M8).
     page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    page.evaluate("""() => Promise.race([
+      Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => null))),
+      new Promise((r) => setTimeout(r, 500)),
+    ])""")
     time.sleep(0.05)
 
 
@@ -115,6 +143,9 @@ class Walk:
         where = f"{size[0]}x{size[1]} {label}"
         for b in self.page.evaluate(CHECK):
             self.failures.append(f"{where}: {b}")
+        if label.startswith("simple"):
+            for b in simple_words(self.page):
+                self.failures.append(f"{where}: {b}")
         if self.out:
             self.page.screenshot(path=os.path.join(self.out, f"{size[0]}x{size[1]}-{label}.png"))
         self.count += 1

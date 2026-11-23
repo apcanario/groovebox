@@ -1,6 +1,6 @@
 import "./style.css";
 import { render } from "preact";
-import { Engine, type LatencyHint } from "./engine/index.ts";
+import { Engine, MACROS, type LatencyHint } from "./engine/index.ts";
 import { App } from "./ui/App.tsx";
 import { openIdb } from "./store/idb.ts";
 import { Keeper } from "./store/keeper.ts";
@@ -39,7 +39,9 @@ async function boot(): Promise<void> {
   keeper.start();
   render(<App engine={engine} hint={hint} keeper={keeper} />, document.querySelector<HTMLDivElement>("#app")!);
   // Exposed for automated smoke tests.
-  const w = window as unknown as { __groovebox: Engine; __keeper: Keeper };
+  const w = window as unknown as { __groovebox: Engine; __keeper: Keeper; __macros: typeof MACROS };
+  // The macro mapping, for the smoke test's read-back of every Simple move in Advanced.
+  w.__macros = MACROS;
   w.__groovebox = engine;
   w.__keeper = keeper;
 }

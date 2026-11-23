@@ -24,6 +24,8 @@ import {
   type LayerInstrument,
   type LayerMode,
   type PadParams,
+  migrateSong,
+  type NumericPatchKey,
   type Patch,
   type Song,
   type Wave,
@@ -33,7 +35,7 @@ import type { KeyName, Mood } from "../music/scales.ts";
 import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
 import type { ArpParams } from "../music/arp.ts";
 import type { LeadParams, LeadStepView } from "../music/lead.ts";
-import { findMacro, macroKey, sectionScoped, targetValue, type MacroId } from "../music/macros.ts";
+import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
 
 export * from "./song.ts";
@@ -136,7 +138,9 @@ export class Engine {
   /** Every bar line at which queued switches landed, newest last (kept short). */
   readonly landed: LandedSwitch[] = [];
 
-  constructor(song: Song = defaultSong()) {
+  constructor(given: Song = defaultSong()) {
+    // A song saved before P2 plays at P2's balance (P2 review S1).
+    const song = migrateSong(given);
     this.seq = new Sequencer(bareSong(song));
     this.takeDocument(song);
   }
@@ -182,9 +186,11 @@ export class Engine {
   }
 
   /** Throws, listing every problem, if the song is not valid; the playing song is then unchanged. */
-  loadSong(song: Song): void {
-    const errors = validateSong(song);
+  loadSong(given: Song): void {
+    const errors = validateSong(given);
     if (errors.length) throw new Error(`invalid song: ${errors.join("; ")}`);
+    // A song saved before P2 plays at P2's balance (P2 review S1).
+    const song = migrateSong(given);
     this.takeDocument(song);
     this.seq.load(bareSong(song));
     if (this.graph) {
@@ -558,13 +564,34 @@ export class Engine {
       if (t.kind === "patch") this.applyParam(inst, t.key, v);
       else if (t.kind === "swing") this.seq.setSwing(section, v);
       else if (t.kind === "gen") this.seq.setGen(section, layer, { [t.key]: v });
-      else if (t.kind === "arp") this.seq.setArp(section, layer, { rate: v as 1 | 2 | 4 });
+      else if (t.kind === "arp") this.seq.setArp(section, layer, { [t.key]: v });
       else this.seq.setPad(section, layer, { [t.key]: v });
     }
     const key = macroKey(inst, id);
     if (sectionScoped(def)) s.macros = { ...s.macros, [key]: p };
     else this.seq.song.macros = { ...this.seq.song.macros, [key]: p };
     this.note("setMacro", [section, inst, id, p]);
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Forget the stored position of every song-wide macro of `inst` whose first value is the patch key `key`, so
+   * those dials read the value again (P2 review S2: the Simple XY pad moves the cutoff a Bright dial shows).
+   * Returns whether any position was forgotten.
+   */
+  releaseMacros(inst: InstrumentId, key: NumericPatchKey): boolean {
+    const stored = this.seq.song.macros;
+    if (!stored) return false;
+    const drop = (MACROS[inst as MacroInstrument] ?? [])
+      .filter((m) => !sectionScoped(m) && m.targets[0].kind === "patch" && m.targets[0].key === key)
+      .map((m) => macroKey(inst, m.id))
+      .filter((k) => k in stored);
+    if (!drop.length) return false;
+    const rest = Object.fromEntries(Object.entries(stored).filter(([k]) => !drop.includes(k)));
+    if (Object.keys(rest).length) this.seq.song.macros = rest;
+    else delete this.seq.song.macros;
+    this.note("releaseMacros", [inst, key]);
     this.changed();
     return true;
   }

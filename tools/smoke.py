@@ -14,6 +14,7 @@ Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
 It checks that sound is produced and nothing throws. It cannot judge how it sounds.
 """
+import math
 import os
 import subprocess
 import sys
@@ -23,7 +24,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import walk_frame  # noqa: E402
+from shots import simple_words, walk_frame  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -973,6 +974,62 @@ def walk_c4(page, failures: list) -> None:
     wait_for(page, "window.__groovebox.position().section === 0", 4.0)
 
 
+def jsround(x: float) -> int:
+    """Math.round: halves go up (Python's round goes to even)."""
+    return math.floor(x + 0.5)
+
+
+def advanced_read(page, sec: int, inst: str, t: dict) -> tuple:
+    """In Advanced, on the tab already shown: what the control of a macro target shows, and what it should show
+    for the song's value. Goes to the page (and for a layer, the mode) that holds the control."""
+    S = f"{SONG}.sections[{sec}]"
+    layer = inst in ("layer1", "layer2")
+
+    def go(page_key: str) -> None:
+        sel = f'[data-page="{inst}:{page_key}"]'
+        if page.locator(sel).count():
+            page.click(sel)
+
+    def dial(dial_id: str) -> str:
+        return page.get_attribute(f'[data-dial="{dial_id}"]', "aria-valuetext")
+
+    kind, key = t["kind"], t.get("key")
+    if kind == "swing":
+        go("hats")
+        return dial("drums:swing"), str(page.evaluate(f"Math.round(window.__groovebox.getSong().sections[{sec}].drums.swing * 100)"))
+    if kind in ("gen", "arp", "pad"):
+        page.click(f'[data-mode="{inst}:{ {"gen": "generative", "arp": "arp", "pad": "pad"}[kind] }"]')
+        go("pattern")
+        v = page.evaluate(f"{S}.{inst}.{kind}.{key}")
+        if kind == "arp":
+            name = {"rate": "arprate", "octaves": "arpoct"}[key]
+            on = page.eval_on_selector_all(f'.body [data-{name}][aria-pressed="true"]', f"els => els.map(e => e.dataset.{name})")
+            return ",".join(on), str(v)
+        want = str(jsround(v)) if key == "hits" else str(jsround(v * 100))
+        return dial(f"{inst}:{kind}:{key}"), want
+    v = page.evaluate(f"{SONG}.patches.{inst}.{key}")
+    if key in ("cutoff", "resonance"):
+        go("filter")
+        x, y = page.get_attribute(f'.body [data-xy="{inst}"]', "data-value").split()
+        return (x if key == "cutoff" else y), str(jsround(v * 100))
+    if key in ("delay", "reverb"):
+        go("filter")
+        return page.get_attribute(f'.body [data-send="{key}"]', "aria-valuenow"), str(jsround(v * 100))
+    if key == "level":
+        page.click('[data-tab="mix"]')
+        page.click('[data-page="mix:levels"]')
+        got = dial(f"level:{inst}")
+        page.click(f'[data-tab="{inst}"]')
+        return got, str(jsround(v * 100))
+    # A patch dial: the drums' Kick or Hats page, the Bass and Synth Sound page.
+    for p in ["kick", "hats", "sound"]:
+        go(p)
+        if page.locator(f'.body [data-dial="{inst}:{key}"]').count():
+            seconds = page.evaluate(f"document.querySelector('[data-dial=\"{inst}:{key}\"] label').textContent.endsWith(' ms')")
+            return dial(f"{inst}:{key}"), str(jsround(v * 1000)) if seconds else str(jsround(v * 100))
+    return None, f"{key} (no dial in Advanced)"
+
+
 def walk_p2(page, failures: list) -> None:
     """P2, while playing, starting in Simple: switching mode changes nothing in the song document; each Simple
     tab shows one picker, four macro dials and the XY pad; each macro dial moves its values, and Advanced
@@ -992,8 +1049,6 @@ def walk_p2(page, failures: list) -> None:
     print(f"mode switched on all {len(TABS)} tabs: the song document identical before and after")
 
     # Simple instrument tabs: one picker (drums, bass, synth), four dials, the XY pad, plain words.
-    jargon = ["Cutoff", "Resonance", "Euclid", "Envelope", "Env amt", "Attack", "Decay", "Release", "Sustain", "Hz",
-              "Lock", "Hits", "Rotate", "Tension", "Density", "Detune", "Saw", "Tri", "4/4"]
     for inst in LAYERS:
         page.click(f'[data-tab="{inst}"]')
         time.sleep(0.1)
@@ -1008,10 +1063,8 @@ def walk_p2(page, failures: list) -> None:
             n = page.locator(".body .chips").count()
             if n != 1:
                 failures.append(f"Simple {inst}: {n} pickers, not one")
-        lines = [t.strip() for t in page.inner_text(".body").split("\n")]
-        for w in jargon:
-            if any(t == w or t.startswith(w + " ") for t in lines):
-                failures.append(f"Simple {inst}: shows the word {w!r}")
+        for b in simple_words(page):
+            failures.append(f"Simple {inst}: {b}")
         check_sizes(page, f"Simple {inst}", failures)
         for d in ids:
             song = page.evaluate(SONG)
@@ -1021,28 +1074,27 @@ def walk_p2(page, failures: list) -> None:
                 failures.append(f"macro dial {d} changed nothing in the song")
     print("Simple tabs: one picker, four macro dials and the XY pad each; every macro dial moves the song")
 
-    # Every Simple move is visible in Advanced: a few dials read in Advanced after a Simple move.
-    S = f"{SONG}.sections[{sec}]"
-    checks = [
-        ("bass", "weight", "bass:sub", f"Math.round({SONG}.patches.bass.sub * 100)", "bass:sound"),
-        ("layer1", "busy", "layer1:gen:hits", f"{S}.layer1.gen.hits", "layer1:pattern"),
-        ("drums", "swing", "drums:swing", f"Math.round(window.__groovebox.getSong().sections[{sec}].drums.swing * 100)", "drums:hats"),
-    ]
-    for inst, macro, adv, expr, adv_page in checks:
-        page.click(f'[data-tab="{inst}"]')
-        if inst == "layer1":
-            page.click('[data-mode="layer1:generative"]')
-        turn(page, f'[data-dial="{inst}:macro:{macro}"]')
-        want = str(page.evaluate(expr))
-        page.click('[data-appmode="advanced"]')
-        page.click(f'[data-page="{adv_page}"]')
-        got = page.get_attribute(f'[data-dial="{adv}"]', "aria-valuetext")
-        if got != want:
-            failures.append(f"Simple {inst} {macro}: Advanced dial {adv} shows {got}, the song holds {want}")
-        page.click('[data-appmode="simple"]')
-    print("Simple macro moves read back on the Advanced dials (bass sub, lead hits, swing)")
+    # Every Simple move is visible in Advanced (spec 8.1; P2 review E1): after each macro turn, every value the
+    # macro maps reads on its Advanced control as the song holds it.
+    n = 0
+    modes = {lid: page.evaluate(f"{SONG}.sections[{sec}].{lid}.mode") for lid in ["layer1", "layer2"]}
+    for inst in LAYERS:
+        for m in page.evaluate(f"window.__macros['{inst}']"):
+            page.click(f'[data-tab="{inst}"]')
+            turn(page, f'[data-dial="{inst}:macro:{m["id"]}"]')
+            page.click('[data-appmode="advanced"]')
+            for t in m["targets"]:
+                got, want = advanced_read(page, sec, inst, t)
+                n += 1
+                if got != want:
+                    failures.append(f"Simple {inst} {m['id']}: Advanced shows {t.get('key', t['kind'])} as {got}, the song holds {want}")
+            page.click('[data-appmode="simple"]')
+        if inst in modes:
+            page.click(f'[data-mode="{inst}:{modes[inst]}"]')
+    print(f"every Simple macro move read back on its Advanced control ({n} values)")
 
     # New idea and Back on both layers, in both modes.
+    S = f"{SONG}.sections[{sec}]"
     for mode in ["simple", "advanced"]:
         page.click(f'[data-appmode="{mode}"]')
         for lid in ["layer1", "layer2"]:
