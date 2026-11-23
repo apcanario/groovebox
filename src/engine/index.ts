@@ -20,10 +20,24 @@ import {
   type ChordStep,
 } from "./song.ts";
 import type { KeyName, Mood } from "../music/scales.ts";
+import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
 export { degreeChords, type Chord } from "../music/chords.ts";
+export {
+  BASS_PRESETS,
+  DRUM_PATTERNS,
+  DRUM_PRESETS,
+  DRUM_VOICES,
+  SEQ_STEPS,
+  SYNTH_PRESETS,
+  eighthOn,
+  type BassPreset,
+  type DrumPreset,
+  type DrumVoice,
+  type SynthPreset,
+} from "../music/presets.ts";
 export type { Pending, PendingToggle } from "./queue.ts";
 export type { MixState } from "./audio.ts";
 
@@ -186,6 +200,41 @@ export class Engine {
     return ok;
   }
 
+  /** Pick a section's drum preset; drops its sequencer edit. Acts at once. */
+  setDrumPreset(section: number, preset: DrumPreset): boolean {
+    const ok = this.seq.setDrumPreset(section, preset);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Flip one of the eight sequencer steps of a drum voice; the first edit opens the preset. Acts at once. */
+  toggleDrumStep(section: number, voice: DrumVoice, step: number): boolean {
+    const ok = this.seq.toggleDrumStep(section, voice, step);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Drop a section's sequencer edit: back to its preset. */
+  revertDrums(section: number): boolean {
+    const ok = this.seq.revertDrums(section);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Pick a section's bass rhythm. Acts at once; a held note restarts in the new rhythm. */
+  setBassRhythm(section: number, rhythm: BassPreset): boolean {
+    const ok = this.seq.setBassRhythm(section, rhythm);
+    if (ok) this.changed();
+    return ok;
+  }
+
+  /** Pick a section's synth rhythm. Acts at once; a held chord restarts in the new rhythm. */
+  setSynthRhythm(section: number, rhythm: SynthPreset): boolean {
+    const ok = this.seq.setSynthRhythm(section, rhythm);
+    if (ok) this.changed();
+    return ok;
+  }
+
   renameSection(index: number, name: string): boolean {
     const ok = this.seq.renameSection(index, name);
     if (ok) this.changed();
@@ -315,8 +364,11 @@ export class Engine {
     if (!this.seq.isRunning) return;
     const g = this.graph!;
     const r: StepResult = this.seq.next();
-    const sixteenth = 60 / Tone.getTransport().bpm.value / 4;
+    const bpm = Tone.getTransport().bpm.value;
+    const sixteenth = 60 / bpm / 4;
     for (const id of r.stopped) g.instruments[id].releaseAll(time);
+    // A new bass or synth rhythm lets go of what the old one held; the sequencer restarts it.
+    for (const id of r.restarted) g.instruments[id].releaseAll(time);
     // A new section starts its own chords, and a key, mood or chord edit restarts them: held chords
     // and pads let go (with their release).
     if (r.retrigger || (r.applied && r.applied.section !== null)) {
@@ -328,7 +380,7 @@ export class Engine {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
         case "drums":
-          g.instruments.drums.trigger(e.voice, t, e.vel);
+          g.instruments.drums.trigger(e.voice, t, e.vel, bpm);
           if (e.voice === "kick") g.pump(t);
           break;
         case "bass":

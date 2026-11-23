@@ -10,6 +10,13 @@ import {
   fraction,
   hzLabel,
   keepChosen,
+  KNOB_PAGES,
+  knobPos,
+  knobText,
+  knobValue,
+  meterFraction,
+  paginate,
+  secondsLabel,
   moveChord,
   removeChord,
   replaceChord,
@@ -17,6 +24,7 @@ import {
   sweepLabel,
 } from "./logic.ts";
 import { NOTE_NAMES } from "../music/scales.ts";
+import { PATCH_KEYS } from "../engine/song.ts";
 
 const seq = [
   { degree: 0, bars: 1 as const },
@@ -120,5 +128,43 @@ describe("section strip", () => {
       sub: "Intro",
     });
     expect(stripState(3, { chosen: 3, playing: 0, edit: 3, running: false, name: "Drop" }).sub).toBe("Editing");
+  });
+});
+
+describe("patch knobs (G3)", () => {
+  it("time dials are exponential and round-trip; amounts are 0..1", () => {
+    const k = { key: "attack" as const, label: "A", seconds: [0.002, 2] as [number, number] };
+    expect(knobValue(k, 0)).toBeCloseTo(0.002);
+    expect(knobValue(k, 1)).toBeCloseTo(2);
+    expect(knobValue(k, 0.5)).toBeCloseTo(Math.sqrt(0.004));
+    for (const p of [0, 0.25, 0.7, 1]) expect(knobPos(k, knobValue(k, p))).toBeCloseTo(p);
+    expect(knobPos(k, 0.0001)).toBe(0);
+    expect(knobPos(k, 10)).toBe(1);
+    const a = { key: "drive" as const, label: "D" };
+    expect(knobValue(a, 0.3)).toBe(0.3);
+    expect(knobText(a, 0.42)).toBe("42");
+    expect(knobText(k, 0.004)).toBe("4 ms");
+    expect(secondsLabel(1.25)).toBe("1.3 s");
+  });
+  it("no page holds more than six dials, and every dial names a patch key", () => {
+    for (const [inst, pages] of Object.entries(KNOB_PAGES)) {
+      for (const p of pages!) {
+        expect(p.knobs.length, inst).toBeLessThanOrEqual(6);
+        for (const k of p.knobs) expect(PATCH_KEYS).toContain(k.key);
+      }
+    }
+    expect(KNOB_PAGES.drums).toHaveLength(2);
+    const drumKeys = KNOB_PAGES.drums!.flatMap((p) => p.knobs.map((k) => k.key));
+    for (const k of ["kickLevel", "kickDecay", "clapLevel", "clapDecay", "hatLevel", "hatDecay", "openLevel", "openDecay", "pitch", "drive"])
+      expect(drumKeys).toContain(k);
+  });
+  it("paginate splits by six", () => {
+    expect(paginate([1, 2, 3, 4, 5, 6, 7, 8]).map((p) => p.length)).toEqual([6, 2]);
+    expect(paginate([])).toEqual([[]]);
+  });
+  it("meter maps -60..0 dB to 0..1", () => {
+    expect(meterFraction(-Infinity)).toBe(0);
+    expect(meterFraction(-30)).toBe(0.5);
+    expect(meterFraction(3)).toBe(1);
   });
 });

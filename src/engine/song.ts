@@ -35,6 +35,25 @@ export interface Patch {
   delay: number; // send
   reverb: number; // send
   level: number;
+  /** Filter envelope amount (bass, synth). */
+  envAmount: number;
+  /** Oscillator detune spread (synth). */
+  detune: number;
+  /** Sub oscillator level (bass). */
+  sub: number;
+  /** Glide between notes (bass). */
+  glide: number;
+  /** Kick pitch (drums). */
+  pitch: number;
+  /** Per drum voice level and decay (drums). Levels default to 0.75, decays to 0.5. */
+  kickLevel: number;
+  kickDecay: number;
+  clapLevel: number;
+  clapDecay: number;
+  hatLevel: number;
+  hatDecay: number;
+  openLevel: number;
+  openDecay: number;
 }
 export type NumericPatchKey = Exclude<keyof Patch, "wave">;
 export const PATCH_KEYS: readonly NumericPatchKey[] = [
@@ -48,6 +67,19 @@ export const PATCH_KEYS: readonly NumericPatchKey[] = [
   "delay",
   "reverb",
   "level",
+  "envAmount",
+  "detune",
+  "sub",
+  "glide",
+  "pitch",
+  "kickLevel",
+  "kickDecay",
+  "clapLevel",
+  "clapDecay",
+  "hatLevel",
+  "hatDecay",
+  "openLevel",
+  "openDecay",
 ];
 /** Allowed range per numeric patch key. */
 export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
@@ -61,6 +93,19 @@ export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
   delay: [0, 1],
   reverb: [0, 1],
   level: [0, 1],
+  envAmount: [0, 1],
+  detune: [0, 1],
+  sub: [0, 1],
+  glide: [0, 1],
+  pitch: [0, 1],
+  kickLevel: [0, 1],
+  kickDecay: [0, 1],
+  clapLevel: [0, 1],
+  clapDecay: [0, 1],
+  hatLevel: [0, 1],
+  hatDecay: [0, 1],
+  openLevel: [0, 1],
+  openDecay: [0, 1],
 };
 
 /** A patch value forced into its allowed range; null for an unknown wave or a non-number. */
@@ -97,7 +142,8 @@ export interface DrumsPattern {
   preset: DrumPreset;
   /**
    * Set when the preset was opened in the sequencer and edited. Stored at 16 steps (sixteenths) so
-   * the presets' sixteenth hats survive an edit; the 8-step editor of G3 edits the even steps.
+   * the presets' sixteenth hats survive an edit. The 8-step editor shows a step as lit when either of
+   * its two sixteenths plays (see `toggleEighth`).
    */
   grid?: DrumGrid;
 }
@@ -160,12 +206,25 @@ export function defaultPatch(id: InstrumentId): Patch {
     delay: 0,
     reverb: 0,
     level: 0.8,
+    envAmount: 0.3,
+    detune: 0.37,
+    sub: 0.75,
+    glide: 0,
+    pitch: 0.4,
+    kickLevel: 0.75,
+    kickDecay: 0.5,
+    clapLevel: 0.75,
+    clapDecay: 0.5,
+    hatLevel: 0.75,
+    hatDecay: 0.5,
+    openLevel: 0.75,
+    openDecay: 0.5,
   };
   switch (id) {
     case "drums":
       return { ...base, wave: "sine", cutoff: 1, resonance: 0, drive: 0.4, reverb: 0.1, level: 0.9 };
     case "bass":
-      return { ...base, decay: 0.2, release: 0.08, cutoff: 0.45, resonance: 0.25, level: 0.7 };
+      return { ...base, decay: 0.2, release: 0.08, cutoff: 0.3, resonance: 0.25, envAmount: 0.45, level: 0.7 };
     case "synth":
       return { ...base, attack: 0.004, decay: 0.24, sustain: 0.1, release: 0.3, delay: 0.3, reverb: 0.3, level: 0.45 };
     case "layer1":

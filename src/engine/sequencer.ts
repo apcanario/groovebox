@@ -6,7 +6,23 @@
 import { arpNote } from "../music/arp.ts";
 import { buildChord, type Chord } from "../music/chords.ts";
 import { GenerativeLead } from "../music/lead.ts";
-import { BASS_RHYTHMS, DRUM_PATTERNS, DRUM_VOICES, SYNTH_RHYTHMS, type DrumVoice } from "../music/presets.ts";
+import {
+  BASS_PRESETS,
+  BASS_RHYTHMS,
+  DRUM_PATTERNS,
+  DRUM_PRESETS,
+  DRUM_VOICES,
+  SEQ_STEPS,
+  SEQ_VELOCITY,
+  SYNTH_PRESETS,
+  SYNTH_RHYTHMS,
+  copyGrid,
+  toggleEighth,
+  type BassPreset,
+  type DrumPreset,
+  type DrumVoice,
+  type SynthPreset,
+} from "../music/presets.ts";
 import { createRng, deriveSeed, type Rng } from "../music/random.ts";
 import { scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
 import { SwitchQueue, type Pending } from "./queue.ts";
@@ -63,6 +79,11 @@ export interface StepResult {
    * chords and pads should let go, and this step restarts them on the new chord.
    */
   retrigger: boolean;
+  /**
+   * Bass or synth whose rhythm preset changed in the playing section since the last step: held
+   * notes should let go, and this step restarts any note the new rhythm holds now.
+   */
+  restarted: InstrumentId[];
 }
 
 export interface ChordPosition {
@@ -103,6 +124,8 @@ export class Sequencer {
   private sounding = new Set<InstrumentId>();
   /** Set by a key, mood or chord change; consumed by the next step. */
   private retrigger = false;
+  /** Bass or synth rhythm changed in the playing section; consumed by the next step. */
+  private restart = new Set<"bass" | "synth">();
 
   constructor(song: Song) {
     this.song = song;
@@ -128,6 +151,57 @@ export class Sequencer {
     this.running = false;
     this.sounding.clear();
     this.retrigger = false;
+    this.restart.clear();
+  }
+
+  /** Pick a section's drum preset. Acts at once and drops any sequencer edit of that section. */
+  setDrumPreset(section: number, preset: DrumPreset): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(DRUM_PRESETS as readonly string[]).includes(preset)) return false;
+    s.drums = { preset };
+    return true;
+  }
+
+  /**
+   * Flip one of the eight sequencer steps of a drum voice. The first edit opens the section's preset
+   * in the sequencer (copies its grid); the preset's swing stays. Acts at once.
+   */
+  toggleDrumStep(section: number, voice: DrumVoice, step: number): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(DRUM_VOICES as readonly string[]).includes(voice) || !Number.isInteger(step) || step < 0 || step >= SEQ_STEPS)
+      return false;
+    const grid = s.drums.grid ?? copyGrid(DRUM_PATTERNS[s.drums.preset].grid);
+    grid[voice] = toggleEighth(grid[voice], step, SEQ_VELOCITY[voice]);
+    s.drums.grid = grid;
+    return true;
+  }
+
+  /** Drop a section's sequencer edit: it plays its preset again. */
+  revertDrums(section: number): boolean {
+    const s = this.song.sections[section];
+    if (!s || !s.drums.grid) return false;
+    s.drums = { preset: s.drums.preset };
+    return true;
+  }
+
+  /** Pick a section's bass rhythm. Acts at once; in the playing section held bass notes restart. */
+  setBassRhythm(section: number, rhythm: BassPreset): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(BASS_PRESETS as readonly string[]).includes(rhythm)) return false;
+    if (s.bass.rhythm === rhythm) return true;
+    s.bass.rhythm = rhythm;
+    if (this.running && section === this.current) this.restart.add("bass");
+    return true;
+  }
+
+  /** Pick a section's synth rhythm. Acts at once; in the playing section held chords restart. */
+  setSynthRhythm(section: number, rhythm: SynthPreset): boolean {
+    const s = this.song.sections[section];
+    if (!s || !(SYNTH_PRESETS as readonly string[]).includes(rhythm)) return false;
+    if (s.synth.rhythm === rhythm) return true;
+    s.synth.rhythm = rhythm;
+    if (this.running && section === this.current) this.restart.add("synth");
+    return true;
   }
 
   /** Change the song's key and mood. Acts at once: held chords restart on the next step. */
@@ -248,6 +322,9 @@ export class Sequencer {
     }
     const retrigger = this.retrigger;
     this.retrigger = false;
+    // A section switch on this step starts its own rhythms; a restart queued before it is moot.
+    const restart = applied?.section != null ? new Set<"bass" | "synth">() : new Set(this.restart);
+    this.restart.clear();
     const section = this.song.sections[this.current];
     const events: NoteEvent[] = [];
     const now = new Set<InstrumentId>(INSTRUMENTS.filter((id) => section.on[id]));
@@ -273,7 +350,7 @@ export class Sequencer {
       }
       // A key, mood or chord edit cuts the held bass note (the engine releases it): a note that
       // started earlier in this chord and is still sounding goes on at the new root for the rest of its hit.
-      if (retrigger) {
+      if (retrigger || restart.has("bass")) {
         const held = BASS_RHYTHMS[section.bass.rhythm].find(
           (h) => h.step < step && step - h.step <= pos.elapsed && h.step + h.len > step,
         );
@@ -287,7 +364,7 @@ export class Sequencer {
     if (now.has("synth")) {
       const rhythm = section.synth.rhythm;
       if (rhythm === "sustained") {
-        if (chordStart || entered.has("synth")) events.push({ inst: "synth", notes: pos.chord.notes, len: pos.remaining, vel: 0.7, shift });
+        if (chordStart || entered.has("synth") || restart.has("synth")) events.push({ inst: "synth", notes: pos.chord.notes, len: pos.remaining, vel: 0.7, shift });
       } else {
         for (const hit of SYNTH_RHYTHMS[rhythm]) {
           if (hit.step === step) events.push({ inst: "synth", notes: pos.chord.notes, len: hit.len, vel: hit.vel, shift });
@@ -303,7 +380,8 @@ export class Sequencer {
 
     this.globalStep++;
     this.sectionStep++;
-    return { bar, step, section: this.current, events, applied, stopped, retrigger };
+    const restarted = [...restart].filter((id) => now.has(id));
+    return { bar, step, section: this.current, events, applied, stopped, retrigger, restarted };
   }
 
   private layerEvent(

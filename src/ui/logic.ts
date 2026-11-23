@@ -1,5 +1,5 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
-import type { ChordStep } from "../engine/song.ts";
+import type { ChordStep, InstrumentId, NumericPatchKey } from "../engine/song.ts";
 
 export const MAX_CHORDS = 8;
 const LENGTHS: ChordStep["bars"][] = [1, 2, 0.5];
@@ -126,4 +126,125 @@ export function sweepLabel(v: number): string {
 
 export function hzLabel(hz: number): string {
   return hz >= 1000 ? `${(hz / 1000).toFixed(1)} kHz` : `${Math.round(hz)} Hz`;
+}
+
+// ---- Patch knobs (G3) ----------------------------------------------------------------
+
+/** One dial on an instrument tab: which patch key, and how its 0..1 dial position maps to the value. */
+export interface KnobSpec {
+  key: NumericPatchKey;
+  label: string;
+  /** Seconds on an exponential curve from lo to hi; absent for plain 0..1 amounts. */
+  seconds?: [number, number];
+}
+
+/** Dial position 0..1 of a patch value. */
+export function knobPos(k: KnobSpec, v: number): number {
+  if (!k.seconds) return Math.max(0, Math.min(1, v));
+  const [lo, hi] = k.seconds;
+  return Math.max(0, Math.min(1, Math.log(Math.max(lo, v) / lo) / Math.log(hi / lo)));
+}
+
+/** Patch value at a dial position 0..1. */
+export function knobValue(k: KnobSpec, pos: number): number {
+  const p = Math.max(0, Math.min(1, pos));
+  if (!k.seconds) return p;
+  const [lo, hi] = k.seconds;
+  return lo * Math.pow(hi / lo, p);
+}
+
+/** "4 ms", "120 ms", "1.2 s". */
+export function secondsLabel(s: number): string {
+  return s < 1 ? `${Math.round(s * 1000)} ms` : `${s.toFixed(1)} s`;
+}
+
+/** What the dial shows: seconds for times, 0..100 for amounts. */
+export function knobText(k: KnobSpec, v: number): string {
+  return k.seconds ? secondsLabel(v) : String(Math.round(v * 100));
+}
+
+/** At most six dials per screen (spec section 5): split a list into pages of `size`. */
+export function paginate<T>(items: readonly T[], size = 6): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out.length ? out : [[]];
+}
+
+export interface KnobPage {
+  name: string;
+  knobs: KnobSpec[];
+}
+
+/** The patch dials of the Drums, Bass and Synth tabs, page by page; no page holds more than six. */
+export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
+  drums: [
+    {
+      name: "Kick · Clap",
+      knobs: [
+        { key: "kickLevel", label: "Kick" },
+        { key: "kickDecay", label: "K decay" },
+        { key: "pitch", label: "K pitch" },
+        { key: "drive", label: "K drive" },
+        { key: "clapLevel", label: "Clap" },
+        { key: "clapDecay", label: "C decay" },
+      ],
+    },
+    {
+      name: "Hats",
+      knobs: [
+        { key: "hatLevel", label: "Hat" },
+        { key: "hatDecay", label: "H decay" },
+        { key: "openLevel", label: "Open" },
+        { key: "openDecay", label: "O decay" },
+      ],
+    },
+  ],
+  bass: [
+    {
+      name: "Patch",
+      knobs: [
+        { key: "envAmount", label: "Env amt" },
+        { key: "decay", label: "Decay", seconds: [0.03, 1.5] },
+        { key: "drive", label: "Drive" },
+        { key: "sub", label: "Sub" },
+        { key: "glide", label: "Glide" },
+      ],
+    },
+  ],
+  synth: [
+    {
+      name: "Patch",
+      knobs: [
+        { key: "detune", label: "Detune" },
+        { key: "attack", label: "Attack", seconds: [0.002, 2] },
+        { key: "decay", label: "Decay", seconds: [0.02, 2] },
+        { key: "release", label: "Release", seconds: [0.02, 4] },
+        { key: "envAmount", label: "Filt env" },
+        { key: "drive", label: "Drive" },
+      ],
+    },
+  ],
+};
+
+/** Preset names as shown on the chips. */
+export const PRESET_LABEL: Record<string, string> = {
+  fourFloor: "4/4",
+  houseShuffle: "Shuffle",
+  techno: "Techno",
+  twoStep: "2-step",
+  dnb: "DnB",
+  offbeat: "Offbeat",
+  rolling: "Rolling",
+  long: "Long",
+  dnbSub: "DnB sub",
+  stabs: "Stabs",
+  sustained: "Held",
+};
+
+export const WAVE_LABEL: Record<string, string> = { sawtooth: "Saw", square: "Square", triangle: "Tri", sine: "Sine" };
+
+/** Meter fill 0..1 for a level in dB: -60 dB empty, 0 dB full. */
+export function meterFraction(db: number): number {
+  if (!Number.isFinite(db)) return 0;
+  return Math.max(0, Math.min(1, (db + 60) / 60));
 }

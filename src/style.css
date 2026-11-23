@@ -780,3 +780,82 @@ button:disabled {
 .tab.on {
   color: var(--purple);
 }
+
+/* ---- Instrument tabs (G3): chips, pages, drum sequencer, meter ---- */
+.chips {
+  display: grid;
+  gap: 6px;
+}
+.chips .chip {
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pager button {
+  font-size: 13px;
+  font-weight: 600;
+}
+.drumseq {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.drumseq .cell {
+  min-height: 56px;
+  min-width: var(--hit);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--dim);
+}
+.drumseq .cell.on {
+  background: var(--coral);
+  color: var(--bg);
+  box-shadow: none;
+}
+.drumseq .cell.now {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+.meter {
+  position: relative;
+  height: var(--hit);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.meter .fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--teal);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.meter .pk {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--coral);
+}
+.meter span,
+.meter b {
+  position: relative;
+}
+.meter b {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+}

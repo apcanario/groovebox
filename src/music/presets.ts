@@ -108,3 +108,32 @@ export const DRUM_PATTERNS: Record<DrumPreset, DrumPattern> = {
     },
   },
 };
+
+// ---- 8-step sequencer (G3) ------------------------------------------------------
+
+/** Steps of the drum sequencer: eight per bar, each covering two sixteenths of the stored grid. */
+export const SEQ_STEPS = 8;
+
+/** Velocity a step gets when it is switched on in the sequencer. */
+export const SEQ_VELOCITY: Record<DrumVoice, number> = { kick: 1, clap: 0.9, hat: 0.4, open: 0.7 };
+
+/** A sequencer step is lit when either of its two sixteenths plays. */
+export function eighthOn(row: readonly number[], i: number): boolean {
+  return (row[2 * i] ?? 0) > 0 || (row[2 * i + 1] ?? 0) > 0;
+}
+
+/** Flip one sequencer step: a lit step clears both its sixteenths; an unlit one sets the first. */
+export function toggleEighth(row: readonly number[], i: number, vel: number): number[] {
+  const out = [...row];
+  if (i < 0 || i >= SEQ_STEPS) return out;
+  if (eighthOn(row, i)) {
+    out[2 * i] = 0;
+    out[2 * i + 1] = 0;
+  } else out[2 * i] = vel;
+  return out;
+}
+
+/** A deep copy of a drum grid, so an edited section never shares rows with a preset. */
+export function copyGrid(g: DrumGrid): DrumGrid {
+  return { kick: [...g.kick], clap: [...g.clap], hat: [...g.hat], open: [...g.open] };
+}

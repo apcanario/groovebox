@@ -285,3 +285,63 @@ export function Sheet({ children, onClose }: { children: ComponentChildren; onCl
     </div>
   );
 }
+
+// ---- Chips and pages (G3) -------------------------------------------------------------
+
+/** One row of choices, one of them on. `data-<name>` carries each value for tests. */
+export function Chips<T extends string>({
+  name,
+  options,
+  value,
+  label,
+  onPick,
+  cols,
+}: {
+  name: string;
+  options: readonly T[];
+  value: T | null;
+  label: (v: T) => string;
+  onPick: (v: T) => void;
+  cols?: number;
+}) {
+  return (
+    <div class="chips" style={{ gridTemplateColumns: `repeat(${cols ?? options.length}, 1fr)` }}>
+      {options.map((o) => (
+        <button
+          key={o}
+          class={`chip${value === o ? " on" : ""}`}
+          {...{ [`data-${name}`]: o }}
+          aria-pressed={value === o}
+          onClick={() => onPick(o)}
+        >
+          {label(o)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Page switch inside a tab: where an instrument needs more than six dials. */
+export function Pager({ pages, page, onPage, id }: { pages: string[]; page: number; onPage: (i: number) => void; id: string }) {
+  return (
+    <div class="seg pager" style={{ gridTemplateColumns: `repeat(${pages.length}, 1fr)` }}>
+      {pages.map((p, i) => (
+        <button key={p} class={i === page ? "on" : ""} data-page={`${id}:${i}`} aria-pressed={i === page} onClick={() => onPage(i)}>
+          {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A horizontal level meter: `fill` 0..1, `peak` 0..1 marked as a line. */
+export function Meter({ fill, peak, text }: { fill: number; peak: number; text: string }) {
+  return (
+    <div class="meter" id="meter" aria-label={`Master level ${text}`}>
+      <div class="fill" style={{ width: `${fill * 100}%` }} />
+      <div class="pk" style={{ left: `${peak * 100}%` }} />
+      <span>Master</span>
+      <b>{text}</b>
+    </div>
+  );
+}

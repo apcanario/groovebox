@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Headless smoke test: serve a built folder, press Play, check that audio runs and switches land on the bar,
-then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials, section menu) with no page error
-and no control under 48 px.
+then walk the shell (every tab, section strip, Play grid, chords, XY pad, dials, section menu) and every G3 control
+(drum presets and sequencer, bass and synth rhythms, waves and dials, mix levels and meter, DnB at 174 bpm) with no
+page error, no control under 48 px and no more than six dials on one screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -221,6 +222,166 @@ def walk_shell(page, failures: list) -> None:
     print(f"copied section A while Groove plays: {names}")
 
 
+def turn(page, selector: str) -> float:
+    """Drag a dial up (or down when it sits high) and return how far its value moved."""
+    before = float(page.get_attribute(selector, "aria-valuenow"))
+    lo = float(page.get_attribute(selector, "aria-valuemin"))
+    hi = float(page.get_attribute(selector, "aria-valuemax"))
+    up = before < (lo + hi) / 2
+    drag(page, selector, 0, -70 if up else 70)
+    time.sleep(0.03)
+    return abs(float(page.get_attribute(selector, "aria-valuenow")) - before)
+
+
+def dials_on_screen(page, where: str, failures: list) -> list:
+    ids = page.eval_on_selector_all(".body [data-dial]", "els => els.map(e => e.dataset.dial)")
+    if len(ids) > 6:
+        failures.append(f"{len(ids)} dials on one screen on {where}")
+    return ids
+
+
+def turn_all(page, where: str, failures: list) -> int:
+    """Turn every dial on screen; each must move, and the patch or mix must follow."""
+    ids = dials_on_screen(page, where, failures)
+    for d in ids:
+        song = page.evaluate(SONG)
+        mix = page.evaluate("window.__groovebox.getMix()")
+        if turn(page, f'[data-dial="{d}"]') < 0.05:
+            failures.append(f"dial {d} on {where} did not move")
+        if page.evaluate(SONG)["patches"] == song["patches"] and page.evaluate("window.__groovebox.getMix()") == mix:
+            failures.append(f"dial {d} on {where} changed nothing in the engine")
+    check_sizes(page, where, failures)
+    return len(ids)
+
+
+def solo_level(page, layer: str, seconds: float = 2.0, settle: float = 0.4) -> float:
+    """Loudest master reading with one instrument soloed, after `settle` seconds (the shared reverb tail)."""
+    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
+    page.evaluate(solo, layer)
+    time.sleep(settle)
+    peak = -999.0
+    for _ in range(int(seconds / 0.1)):
+        time.sleep(0.1)
+        v = page.evaluate("window.__groovebox.level()")
+        if v is not None:
+            peak = max(peak, v)
+    page.evaluate(solo, None)
+    return peak
+
+
+def walk_g3(page, failures: list) -> None:
+    """G3: every control of the Drums, Bass, Synth and Mix tabs, used while the transport runs."""
+    sec = page.evaluate("window.__groovebox.position().section")
+    S = f"{SONG}.sections[{sec}]"
+
+    # Drums: the five presets, the sequencer for each voice, revert, both dial pages.
+    page.click('[data-tab="drums"]')
+    for preset in ["fourFloor", "houseShuffle", "techno", "twoStep", "dnb"]:
+        page.click(f'[data-preset="{preset}"]')
+        time.sleep(0.1)
+        if page.evaluate(f"{S}.drums.preset") != preset:
+            failures.append(f"drum preset {preset} did not take")
+    page.click('[data-preset="fourFloor"]')
+    for voice in ["kick", "clap", "hat", "open"]:
+        page.click(f'[data-voice="{voice}"]')
+        before = page.evaluate(f"{S}.drums.grid ? {S}.drums.grid.{voice} : null")
+        page.click(f'[data-step="{voice}:5"]')
+        after = page.evaluate(f"{S}.drums.grid && {S}.drums.grid.{voice}")
+        if not after or after == before:
+            failures.append(f"sequencer step did not change the {voice} row")
+        check_sizes(page, f"drums sequencer {voice}", failures)
+    if page.evaluate(f"{S}.drums.preset") != "fourFloor" or not page.evaluate(f"!!{S}.drums.grid"):
+        failures.append("the sequencer did not open the preset")
+    time.sleep(0.6)  # hear the edited beat
+    page.click("#drums-revert")
+    if page.evaluate(f"{S}.drums.grid !== undefined"):
+        failures.append("revert did not drop the sequencer edit")
+    n = turn_all(page, "drums page 1", failures)
+    page.click('[data-page="drums:1"]')
+    n += turn_all(page, "drums page 2", failures)
+    page.click('[data-page="drums:0"]')
+    if n != 10:
+        failures.append(f"drums tab has {n} dials, expected 10 over two pages")
+
+    # Drum level is audible: the kick, clap and hats down to 0 silence the drum solo.
+    loud = solo_level(page, "drums")
+    saved = page.evaluate(f"{SONG}.patches.drums")
+    page.evaluate("()=>{for(const v of ['kick','clap','hat','open'])window.__groovebox.setParam('drums', v+'Level', 0)}")
+    quiet = solo_level(page, "drums", settle=4.0)
+    page.evaluate("(p)=>{for(const v of ['kick','clap','hat','open'])window.__groovebox.setParam('drums', v+'Level', p[v+'Level'])}", saved)
+    print(f"drums solo {loud:.1f} dB, every voice level 0: {quiet:.1f} dB")
+    if not quiet < loud - 20:
+        failures.append(f"drum voice levels did not silence the drums ({loud:.1f} -> {quiet:.1f} dB)")
+
+    # Bass and Synth: every rhythm, every wave, every dial.
+    for inst, rhythms in [("bass", ["offbeat", "rolling", "long", "dnbSub"]), ("synth", ["stabs", "offbeat", "sustained"])]:
+        page.click(f'[data-tab="{inst}"]')
+        for r in rhythms:
+            page.click(f'[data-rhythm="{r}"]')
+            time.sleep(0.25)
+            if page.evaluate(f"{S}.{inst}.rhythm") != r:
+                failures.append(f"{inst} rhythm {r} did not take")
+        page.click(f'[data-rhythm="{rhythms[0]}"]')
+        for w in ["square", "triangle", "sine", "sawtooth"]:
+            page.click(f'[data-wave="{w}"]')
+            time.sleep(0.25)
+            if page.evaluate(f"{SONG}.patches.{inst}.wave") != w:
+                failures.append(f"{inst} wave {w} did not take")
+        k = turn_all(page, f"{inst} tab", failures)
+        print(f"{inst}: {len(rhythms)} rhythms, 4 waves, {k} dials")
+        lvl = solo_level(page, inst)
+        if lvl < -60:
+            failures.append(f"{inst} went silent after its controls were moved ({lvl:.1f} dB)")
+
+    # Mix: the meter reads, both pages of dials, the levels act.
+    page.click('[data-tab="mix"]')
+    time.sleep(0.3)
+    meter = page.inner_text("#meter")
+    if "db" not in meter.lower():
+        failures.append(f"master meter shows no level: {meter!r}")
+    page.click('[data-page="mix:1"]')
+    ids = dials_on_screen(page, "mix levels", failures)
+    if sorted(ids) != sorted(f"level:{i}" for i in LAYERS):
+        failures.append(f"mix levels page has {ids}")
+    for i in LAYERS:
+        before = page.evaluate(f"{SONG}.patches.{i}.level")
+        turn(page, f'[data-dial="level:{i}"]')
+        if abs(page.evaluate(f"{SONG}.patches.{i}.level") - before) < 0.05:
+            failures.append(f"mix level {i} did not move")
+    check_sizes(page, "mix levels", failures)
+    bass = solo_level(page, "bass")
+    lvl = page.evaluate(f"{SONG}.patches.bass.level")
+    page.evaluate("window.__groovebox.setParam('bass','level',0)")
+    muted = solo_level(page, "bass", settle=4.0)
+    page.evaluate(f"window.__groovebox.setParam('bass','level',{lvl})")
+    print(f"master meter {meter.split()[-2:]}; bass solo {bass:.1f} dB, level 0: {muted:.1f} dB")
+    if not muted < bass - 20:
+        failures.append(f"bass level 0 did not silence the bass ({bass:.1f} -> {muted:.1f} dB)")
+    page.click('[data-page="mix:0"]')
+    if len(dials_on_screen(page, "mix master", failures)) != 3:
+        failures.append("mix master page lost its dials")
+
+    # Drum and bass tempo: the DnB beat and sub at 174 bpm, then back.
+    bpm = page.evaluate(f"{SONG}.bpm")
+    page.evaluate(f"()=>{{const e=window.__groovebox;e.bpm=174;e.setDrumPreset({sec},'dnb');e.setBassRhythm({sec},'dnbSub')}}")
+    peaks = []
+    levels = []
+    for _ in range(12):
+        time.sleep(0.2)
+        levels.append(page.evaluate("window.__groovebox.level()"))
+        peaks.append(page.evaluate("window.__groovebox.peak()"))
+    print(f"at 174 bpm, dnb + dnbSub: level up to {max(levels):.1f} dB, peak {max(peaks):.1f} dBFS")
+    if max(levels) < -40:
+        failures.append("drum and bass at 174 bpm is silent")
+    if max(peaks) >= 0:
+        failures.append(f"drum and bass at 174 bpm clips ({max(peaks):.1f} dBFS)")
+    for name in ["drums", "bass"]:
+        lv = solo_level(page, name, 1.2)
+        if lv < -60:
+            failures.append(f"{name} silent at 174 bpm ({lv:.1f} dB)")
+    page.evaluate(f"()=>{{const e=window.__groovebox;e.bpm={bpm};e.setDrumPreset({sec},'fourFloor');e.setBassRhythm({sec},'offbeat')}}")
+
+
 def wait_for(page, expr: str, timeout: float) -> bool:
     end = time.time() + timeout
     while time.time() < end:
@@ -343,6 +504,7 @@ def main() -> int:
             page.evaluate(solo, None)
 
             walk_shell(page, failures)
+            walk_g3(page, failures)
             narrow_pass(page, failures)
             if not page.evaluate("window.__groovebox.playing"):
                 failures.append("the transport stopped during the shell walk")
