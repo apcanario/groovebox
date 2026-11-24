@@ -9,6 +9,7 @@ import { Dial, GroupLabel, Meter, Pager } from "../components.tsx";
 import { knobPos, knobValue, meterFraction, secondsText, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
+import { Icon } from "../icons.tsx";
 
 /** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
 function MasterMeter({ engine }: { engine: Engine }) {
@@ -135,12 +136,21 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
             <Dial id="air" label="Air" value={mixValue(mix, "air")} min={0} max={1} color="var(--blue)" onChange={set("air")} />
           </div>
           <GroupLabel thing="Master">Lo-fi</GroupLabel>
-          <div class="seg two">
-            {([false, true] as const).map((v) => (
-              <button key={String(v)} class={lofi === v ? "on" : ""} data-lofi={v ? "on" : "off"} aria-pressed={lofi === v} onClick={() => engine.setMix("lofi", v ? 1 : 0)}>
-                {v ? "Lo-fi on" : "Clean"}
-              </button>
-            ))}
+          {/* P9 (spec 8.8): the lo-fi master as one on/off. */}
+          <div class="fxrow one">
+            <button
+              class={`tog fxbtn${lofi ? " on" : " off"}`}
+              style={{ "--c": "var(--coral)" }}
+              role="switch"
+              aria-checked={lofi}
+              aria-label={`Lo-fi ${lofi ? "on" : "off"}`}
+              id="lofi"
+              data-lofi={lofi ? "on" : "off"}
+              onClick={() => engine.setMix("lofi", lofi ? 0 : 1)}
+            >
+              <Icon thing="Master" />
+              <span>Lo-fi</span>
+            </button>
           </div>
           <p class="note">Tail is how long the reverb rings. Air is a soft breath of noise. Lo-fi wobbles, crunches and hisses.</p>
         </>

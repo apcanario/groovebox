@@ -46,6 +46,17 @@ export const ICON_FOR = {
   Wash: "water",
   Riser: "trending_up",
   Chorus: "blur_on",
+  // P9: the other effects (spec 8.8), each beside its name on the effect buttons; Echo and Chorus are above.
+  Phaser: "cyclone",
+  Flanger: "flight",
+  Fuzz: "local_fire_department",
+  Crush: "texture",
+  Tremolo: "earthquake",
+  Pan: "swap_horiz",
+  Gate: "fence",
+  Ring: "notifications",
+  Vowel: "record_voice_over",
+  Shifter: "moving",
   // Page chips and group headings that are not in P6's set (P1b review M1, M2).
   Beat: "apps",
   "Kick · Clap": "radio_button_checked",

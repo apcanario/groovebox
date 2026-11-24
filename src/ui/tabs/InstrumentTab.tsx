@@ -27,6 +27,7 @@ import { SoundPicker } from "./SimpleTab.tsx";
 import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
+import { FxPage } from "./fx.tsx";
 
 const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open", perc: "Perc", shaker: "Shaker" };
 
@@ -252,23 +253,23 @@ function SwingDial({ ctx }: { ctx: Ctx }) {
   );
 }
 
-type InstPage = "beat" | "steps" | "rhythm" | "sound" | "kick" | "hats" | "kit" | "mod" | "filter";
+type InstPage = "beat" | "steps" | "rhythm" | "sound" | "kick" | "hats" | "kit" | "mod" | "fx" | "filter";
 
 /**
  * The pages of the Drums, Bass and Synth tabs, before the Filter page. P7: Drums gets Steps (the sequencer, 8 or 16
- * steps, Perc and Shaker), Kit (Perc and Shaker dials) and its sounds on the Beat page; Bass and Synth get Mod. With
- * six chips on a short screen, "Kick · Clap" is shortened to "Kick".
+ * steps, Perc and Shaker), Kit (Perc and Shaker dials) and its sounds on the Beat page; Bass and Synth get Mod. P9: every
+ * instrument gets FX; with six chips or more "Kick · Clap" is shortened to "Kick".
  */
-function basePages(inst: InstrumentId, roomy: boolean): PageDef<InstPage>[] {
-  if (inst === "drums") return [["beat", "Beat"], ["steps", "Steps"], ["kick", roomy ? KNOB_PAGES.drums![0].name : "Kick"], ["hats", KNOB_PAGES.drums![1].name], ["kit", "Kit"]];
-  return [["rhythm", "Rhythm"], ["sound", "Sound"], ["mod", "Mod"]];
+function basePages(inst: InstrumentId): PageDef<InstPage>[] {
+  if (inst === "drums") return [["beat", "Beat"], ["steps", "Steps"], ["kick", "Kick"], ["hats", KNOB_PAGES.drums![1].name], ["kit", "Kit"], ["fx", "FX"]];
+  return [["rhythm", "Rhythm"], ["sound", "Sound"], ["mod", "Mod"], ["fx", "FX"]];
 }
 
 export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const { engine, edit, roomy } = ctx;
   const section = ctx.song.sections[edit];
   const [chosen, setPage] = useState<InstPage>(inst === "drums" ? "beat" : "rhythm");
-  const pages = withFilterPage(basePages(inst, roomy), roomy);
+  const pages = withFilterPage(basePages(inst), roomy);
   const page = shownPage(pages, chosen);
   const knobPages = KNOB_PAGES[inst] ?? [];
   return (
@@ -313,6 +314,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           {page === "sound" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
           {page === "kit" && <Knobs ctx={ctx} inst={inst} knobs={KIT_KNOBS} />}
           {page === "mod" && <Knobs ctx={ctx} inst={inst} knobs={MOD_KNOBS} />}
+          {page === "fx" && <FxPage ctx={ctx} inst={inst} />}
         </div>
       )}
       {(roomy || page === "filter") && <FilterPanel ctx={ctx} inst={inst} />}

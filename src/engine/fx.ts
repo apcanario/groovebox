@@ -179,13 +179,17 @@ export function loadFxWorklet(): Promise<void> {
   return workletReady;
 }
 
+/** Worklet nodes made here (Tone's context wraps the native one, so `instanceof AudioWorkletNode` does not hold). */
+const worklets = new WeakSet<AudioNode>();
+
 function worklet(name: string, params: Record<string, number>, mono = false): AudioNode {
-  const ctx = raw();
-  if (!workletLoaded) return ctx.createGain();
-  return new AudioWorkletNode(ctx as AudioContext, name, { parameterData: params, ...(mono ? { outputChannelCount: [1] } : {}) });
+  if (!workletLoaded) return raw().createGain();
+  const n = Tone.getContext().createAudioWorkletNode(name, { parameterData: params, ...(mono ? { outputChannelCount: [1] } : {}) });
+  worklets.add(n);
+  return n;
 }
 function wparam(n: AudioNode, name: string): AudioParam | null {
-  return n instanceof AudioWorkletNode ? (n.parameters.get(name) ?? null) : null;
+  return worklets.has(n) ? ((n as AudioWorkletNode).parameters.get(name) ?? null) : null;
 }
 
 // ---- LFOs for the effects --------------------------------------------------------------------
@@ -275,7 +279,7 @@ abstract class Effect {
       } catch {
         // already gone
       }
-      if (n instanceof AudioWorkletNode) n.port.close();
+      if (worklets.has(n)) (n as AudioWorkletNode).port.close();
     }
   }
 }
@@ -460,7 +464,7 @@ class Fuzz extends Blend {
     this.tone.type = "lowpass";
     this.tone.Q.value = 0.5;
     const post = this.own(ctx.createGain());
-    post.gain.value = 0.3;
+    post.gain.value = 0.15;
     this.input.connect(this.pre);
     this.pre.connect(shaper);
     shaper.connect(this.tone);

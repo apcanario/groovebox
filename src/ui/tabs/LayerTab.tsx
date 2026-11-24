@@ -37,6 +37,7 @@ import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
 import { SeedButtons, SoundPicker } from "./SimpleTab.tsx";
 import { LeadDials, LeadStyles, leadStyleOf, type LeadPage } from "./lead.tsx";
+import { FxPage } from "./fx.tsx";
 
 function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
@@ -191,7 +192,7 @@ function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string 
   );
 }
 
-type LayerPage = "pattern" | LeadPage | "sound" | "mod" | "filter";
+type LayerPage = "pattern" | LeadPage | "sound" | "mod" | "fx" | "filter";
 
 /** The mode switch (Lead, Arp, Pad), with the layer's on/off switch at its end where `toggle` is set. */
 export function ModeRow({ ctx, id, toggle }: { ctx: Ctx; id: LayerInstrument; toggle: boolean }) {
@@ -232,12 +233,13 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const layer = ctx.song.sections[edit][id];
   const lead = layer.mode === "generative";
   const pulse = lead && leadStyleOf(ctx, id) === "pulse";
-  // On a short screen the first page chip names the edited section (the name row gives way), unless five chips
-  // share the row (Lead in Pulse): there the strip's Editing mark says it.
-  const short = (label: string) => (roomy || pulse ? label : `${label} · ${sectionLetter(edit)}`);
+  // On a short screen the first page chip names the edited section (the name row gives way), unless six chips or
+  // more share the row (Lead): there the strip's Editing mark says it.
+  // P9: with the FX page a Lead has six chips or more, so there too the strip's mark says it.
+  const short = (label: string) => (roomy || lead ? label : `${label} · ${sectionLetter(edit)}`);
   const base: PageDef<LayerPage>[] = lead
-    ? [["notes", short("Notes")], ["feel", "Feel"], ...(pulse ? [["pulse", "Pulse"] as PageDef<LayerPage>] : []), ["sound", "Sound"], ["mod", "Mod"]]
-    : [["pattern", short(LAYER_MODE_LABEL[layer.mode])], ["sound", "Sound"], ["mod", "Mod"]];
+    ? [["notes", short("Notes")], ["feel", "Feel"], ...(pulse ? [["pulse", "Pulse"] as PageDef<LayerPage>] : []), ["sound", "Sound"], ["mod", "Mod"], ["fx", "FX"]]
+    : [["pattern", short(LAYER_MODE_LABEL[layer.mode])], ["sound", "Sound"], ["mod", "Mod"], ["fx", "FX"]];
   const pages = withFilterPage(base, roomy);
   // The chosen page while it exists; the first page of the mode otherwise (Notes stays chosen across modes).
   const page = shownPage(pages, chosen === "pattern" && lead ? "notes" : (chosen === "notes" || chosen === "feel" || chosen === "pulse") && !lead ? "pattern" : chosen);
@@ -268,6 +270,7 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
           {page === "pattern" && (layer.mode === "pad" || layer.mode === "drone") && <Pad ctx={ctx} id={id} />}
           {page === "mod" && <Mod ctx={ctx} id={id} />}
           {page === "sound" && <Sound ctx={ctx} id={id} mode={layer.mode} />}
+          {page === "fx" && <FxPage ctx={ctx} inst={id} />}
         </div>
       )}
       {(roomy || page === "filter") && <FilterPanel ctx={ctx} inst={id} />}

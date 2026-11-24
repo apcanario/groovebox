@@ -2035,8 +2035,14 @@ COST_SCENE = """async (extras) => {
   e.setArp(sec, 'layer1', { rate: 1, octaves: 3 });
   for (const id of ['bass', 'synth', 'layer1', 'layer2']) { e.setParam(id, 'drive', 0.5); e.setParam(id, 'delay', 0.5); e.setParam(id, 'reverb', 0.5); }
   e.setMix('saturation', 0.5);
+  // P9: "fx" in the list switches on all ten effect slots (two per instrument, ten of the twelve effects; Pan and
+  // Gate, the cheapest, are left out), on top of whatever else is asked; "all" is every P7 addition.
+  if (extras && extras !== true && extras.includes('fx') && e.setFx) {
+    const pick = { drums: ['crush', 'echo'], bass: ['fuzz', 'phaser'], synth: ['chorus', 'shifter'], layer1: ['flanger', 'vowel'], layer2: ['ring', 'tremolo'] };
+    for (const [id, fx] of Object.entries(pick)) fx.forEach((f, i) => e.setFx(id, i, { effect: f, on: true }));
+  }
   if (!extras || !e.p7) return false;
-  const all = extras === true;
+  const all = extras === true || extras.includes('all');
   const want = (k) => all || extras.includes(k);
   if (want('drums')) { e.setDrumPreset(sec, 'trap'); for (const k of [3, 6, 11, 14]) e.toggleDrumStep(sec, 'perc', k, true); }
   if (want('fm')) e.setParam('synth', 'wave', 'fm');

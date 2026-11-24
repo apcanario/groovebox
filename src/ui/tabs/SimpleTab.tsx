@@ -14,6 +14,7 @@ import { Lane } from "../lanes.tsx";
 import { MACRO_COLOR, patchName, patchOf, presetName, seedHeard, simpleXYReadout } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
 import { HeadRow } from "./InstrumentTab.tsx";
+import { FxButtons } from "./fx.tsx";
 
 /** The four macro dials of an instrument (spec 8.3's table), for the edited section. */
 function Macros({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
@@ -116,14 +117,27 @@ export function SoundPicker({ ctx, inst, simple = false }: { ctx: Ctx; inst: Ins
   );
 }
 
+/**
+ * P9: the two effect buttons sit in a row of their own over the XY pad when the screen is tall enough, else
+ * stacked beside it (the row would push the pad off a short phone).
+ */
 export function SimpleInstrumentTab({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
+  const { roomy } = ctx;
   return (
-    <section class="insttab simple" style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }} data-simple={inst}>
+    <section class={`insttab simple${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }} data-simple={inst}>
       <HeadRow ctx={ctx} inst={inst} />
       <Lane id={inst} lanes={ctx.lanes} playhead />
       <Picker ctx={ctx} inst={inst} />
       <Macros ctx={ctx} inst={inst} />
-      <SimpleXY ctx={ctx} inst={inst} />
+      {roomy && <FxButtons ctx={ctx} inst={inst} />}
+      {roomy ? (
+        <SimpleXY ctx={ctx} inst={inst} />
+      ) : (
+        <div class="xyrow">
+          <SimpleXY ctx={ctx} inst={inst} />
+          <FxButtons ctx={ctx} inst={inst} column />
+        </div>
+      )}
     </section>
   );
 }
@@ -172,9 +186,12 @@ export function SimpleLayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
       {layer.mode === "generative" && <LeadStyles ctx={ctx} id={id} />}
       <Lane id={id} lanes={ctx.lanes} playhead section={edit} />
       <Macros ctx={ctx} inst={id} />
-      <div class="seedrow">
+      {/* P9: on a short phone the two effect buttons share Back and New idea's row. */}
+      <div class={`seedrow${roomy ? "" : " withfx"}`}>
         <SeedButtons ctx={ctx} id={id} />
+        {!roomy && <FxButtons ctx={ctx} inst={id} bare />}
       </div>
+      {roomy && <FxButtons ctx={ctx} inst={id} />}
       <SimpleXY ctx={ctx} inst={id} />
     </section>
   );

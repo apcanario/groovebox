@@ -28,8 +28,9 @@ from smoke import FIRST_SONG, PORT, SONG, measure_cost, wait_for  # noqa: E402
 def main() -> int:
     root = sys.argv[1] if len(sys.argv) > 1 else "dist"
     runs = int(sys.argv[2]) if len(sys.argv) > 2 else 7
-    # Optional: which P7 additions to switch on (comma-separated: drums,fm,noise,lfo,drone,drift,air,reverb,lofi),
-    # "none" for the base scene alone; all of them by default.
+    # Optional: which P7 additions to switch on (comma-separated: drums,fm,noise,lfo,drone,drift,air,reverb,lofi, or all),
+    # "none" for the base scene alone; all of them by default. P9: add "fx" to switch on all ten effect slots
+    # ("all,fx": everything on and every slot on; "all": everything on, every slot off).
     extras = True if len(sys.argv) <= 3 else (False if sys.argv[3] == "none" else sys.argv[3].split(","))
     server = subprocess.Popen([sys.executable, "-m", "http.server", str(PORT), "--directory", root],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -1839,3 +1839,115 @@ button:disabled {
     grid-auto-rows: 72px;
   }
 }
+
+/* ---- Effects (P9, spec 8.8): Simple's two on/off buttons, Advanced's FX page ---- */
+.fxrow {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.tog.fxbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  padding: 0 10px;
+  font-size: 15px;
+}
+.tog.fxbtn.off {
+  font-weight: 600;
+}
+.fxslots button span {
+  white-space: nowrap;
+}
+.dials.fxdials {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.dials.fxdials .tog.fxbtn,
+.btn.fxpick {
+  height: auto;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 4px;
+  min-width: 0;
+}
+.btn.fxpick span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+}
+.btn.fxpick b {
+  font-size: 15px;
+  font-weight: 800;
+}
+/* The effect picker sheet: twelve tiles, three across. */
+.fxgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.fxgrid .chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+/* Simple on a short phone: the two effect buttons stacked beside the XY pad. */
+.xyrow {
+  flex: 1 1 0;
+  min-height: 98px;
+  display: flex;
+  gap: var(--gap);
+}
+.xyrow .xy {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.fxrow.column {
+  flex: none;
+  width: 38%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(48px, 1fr);
+}
+/* Simple Layer on a short phone: Back, New idea and the two effects in one row. */
+.seedrow.withfx {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.seedrow.withfx .btn.seedbtn,
+.seedrow.withfx .tog.fxbtn {
+  padding: 0 4px;
+  gap: 4px;
+  font-size: 13px;
+}
+.seedrow.withfx .ic {
+  width: 16px;
+  height: 16px;
+}
+/* Seven page chips (Drums with FX, a Pulse lead with FX, on a short phone): the row takes the side margins and each
+   chip sets its icon over its word, as the tab bar does, so every chip stays 48 px wide. */
+.pager.many {
+  margin-left: calc(6px - var(--pad));
+  margin-right: calc(6px - var(--pad));
+  gap: 1px;
+}
+.pager.many button {
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 2px;
+  font-size: 11.5px;
+}
+.pager.many button .ic {
+  width: 15px;
+  height: 15px;
+}
+.fxrow.one {
+  grid-template-columns: minmax(0, 1fr);
+}
