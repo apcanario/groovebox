@@ -2102,8 +2102,9 @@ COST_SCENE = """async (extras) => {
   if (want('lofi')) e.setMix('lofi', 1);
   return true;
 }"""
-# P9 review S1: the six heaviest effects, by a one-at-a-time measure (tools/cost.py dist 3 all,fx1:<effect>).
-FX_HEAVIEST = ["crush", "shifter", "echo", "flanger", "vowel", "phaser"]
+# P9 review S1: the six heaviest effects, by a one-at-a-time measure (tools/cost.py dist 3 all,fx1:<effect>, 24 Nov
+# 2026: each adds 0 to 1.5 points over 64.7%, inside the measure's spread; these six had the highest medians).
+FX_HEAVIEST = ["shifter", "flanger", "tremolo", "vowel", "crush", "pan"]
 COST_SCENE = COST_SCENE % json.dumps(FX_HEAVIEST)
 
 
@@ -2747,13 +2748,30 @@ def walk_p9(page, failures: list) -> None:
         check_sizes(page, f"simple {inst} effect buttons", failures)
     page.click('[data-tab="mix"]')
     page.click('[data-page="mix:space"]')
+    # P9 review E3: the button's switch is click-checked on the master, with a steady sine alone in it (as in P7).
+    pump = page.evaluate(f"{E}.getMix().pump")
+    page.evaluate(f"{E}.setMix('pump', 0)")
+    page.evaluate(f"{E}.fxProbe({MASTER_PROBE_HZ}, ['layer2'], 1)")
+    time.sleep(1.0)
+    mref = steady_jumps(page, "master", 1.0)
     was = page.evaluate(f"{E}.getMix().lofi ?? 0")
+    read_jumps(page, "master")
     page.click("#lofi")
+    time.sleep(1.0)
+    r_on = read_jumps(page, "master")
+    mref = max(mref, steady_jumps(page, "master", 1.0))
+    lofi_jump = check_continuity(page, "master", mref, "P9: the Lo-fi button", failures, r_on)
     if (page.evaluate(f"{E}.getMix().lofi ?? 0") > 0) == (was > 0):
         failures.append("P9: the Mix tab's Lo-fi button did not switch the lo-fi master")
+    read_jumps(page, "master")
     page.click("#lofi")
+    time.sleep(1.0)
+    lofi_jump = max(lofi_jump, check_continuity(page, "master", mref, "P9: the Lo-fi button back", failures))
     if (page.evaluate(f"{E}.getMix().lofi ?? 0") > 0) != (was > 0):
         failures.append("P9: the Mix tab's Lo-fi button did not switch the lo-fi master back")
+    page.evaluate(f"{E}.fxProbe(null)")
+    page.evaluate(f"{E}.setMix('pump', {pump})")
+    print(f"P9: the Lo-fi button on and off: largest jump {lofi_jump:.2f} times its own reference (a click above {CLICK_FACTOR:.1f})")
 
     # Advanced: the FX page of each instrument: pick the effect from the sheet, switch the slot, turn its three knobs.
     page.click('[data-appmode="advanced"]')
