@@ -108,7 +108,10 @@ export const lfoDepthCents = (v: number): number => clamp01(v) * 3600;
 export function driftPeriod(v: number): number {
   return 120 * Math.pow(4 / 120, clamp01(v));
 }
-/** What the drift moves at full depth: the filter closes an octave, the pitch sinks 8 cents, the pan swings 0.6, the sends rise 0.3. */
+/**
+ * What the drift moves at full depth: the filter closes an octave, the pitch sinks 8 cents, the pan swings 0.6, the sends rise 0.3.
+ * Spec 8.10 lists "width"; the voices are mono into the channel, so the pan swing stands in for it (P7 review M3).
+ */
 export const DRIFT_MAX = { filterCents: 1200, pitchCents: 8, pan: 0.6, send: 0.3 } as const;
 
 /** Swoop (spec 8.10): the glide between chords, 0.25 s at 0 to 8 s at 1. A pad glides only when its Swoop is above 0. */
@@ -132,15 +135,44 @@ export function reverbPlan(decay: number): { length: number; feedback: number } 
 }
 
 /**
- * A stereo impulse of `seconds` at `rate`: seeded noise (never Math.random) under a 10 ms fade-in and an exponential
- * fall of 60 dB over `decay` seconds. Each channel draws its own noise.
+ * A stereo impulse of `seconds` at `rate`: seeded noise (never Math.random) under a 1 ms fade-in and an exponential
+ * fall of 60 dB over `decay` seconds. Each channel draws its own noise. The fade-in is 1 ms, not 10 (P7 review S2):
+ * a long reverb replays the impulse on every pass of its feedback loop, and a 10 ms fade left a near-gap of about
+ * 5 ms in the tail every pass.
  */
+export const REVERB_FADE_IN = 0.001;
 export function reverbImpulse(seconds: number, decay: number, rate: number, rng: { next(): number }): [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>] {
   const n = Math.max(1, Math.round(seconds * rate));
-  const fade = Math.max(1, Math.round(0.01 * rate));
+  const fade = Math.max(1, Math.round(REVERB_FADE_IN * rate));
   const k = (3 * Math.LN10) / Math.max(0.1, decay); // amplitude falls by 10^-3 over `decay`
   const out: [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>] = [new Float32Array(n), new Float32Array(n)];
   for (const ch of out)
     for (let i = 0; i < n; i++) ch[i] = (rng.next() * 2 - 1) * Math.exp((-k * i) / rate) * Math.min(1, i / fade);
   return out;
 }
+
+/**
+ * P7 review S2: a one-pole low-pass inside the long reverb's feedback loop, so each later pass is darker, as in a
+ * room, and the repeated noise is less audible as a cycle. Coefficients for a native IIRFilterNode: y[n] = (1 - a)
+ * x[n] + a y[n-1], a = e^(-2 pi fc / rate); unity gain at 0 Hz.
+ */
+export const REVERB_LOOP_HZ = 5500;
+export function loopLowpass(fc: number, rate: number): { feedforward: number[]; feedback: number[] } {
+  const a = Math.exp((-2 * Math.PI * Math.max(1, fc)) / rate);
+  return { feedforward: [1 - a], feedback: [1, -a] };
+}
+
+/** Gain of `loopLowpass` at `hz` (for the unit test). */
+export function loopLowpassGain(fc: number, rate: number, hz: number): number {
+  const { feedforward, feedback } = loopLowpass(fc, rate);
+  const w = (2 * Math.PI * hz) / rate;
+  const re = feedback[0] + feedback[1] * Math.cos(w);
+  const im = -feedback[1] * Math.sin(w);
+  return feedforward[0] / Math.hypot(re, im);
+}
+
+/**
+ * P7 review M4: the lo-fi master is on or off. Its wet path is delayed 8 ms (the wobble) and the dry path is not, so
+ * a value between would comb-filter; anything above 0 is on, as the Mix page's switch reads it.
+ */
+export const lofiAmount = (v: number): 0 | 1 => (v > 0 ? 1 : 0);

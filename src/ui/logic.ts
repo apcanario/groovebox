@@ -254,6 +254,12 @@ export function knobLabel(k: KnobCurve & { label: string }): string {
 
 /** P7: a time of up to 20 s, shown in seconds with one decimal (the unit is in the dial's name). */
 export const secondsText = (v: number): string => (v < 10 ? v.toFixed(1) : String(Math.round(v)));
+/**
+ * P7 review S3: an envelope time of 2 ms to 20 s in seconds, precise enough at the short end that a punchy attack
+ * (a few ms, the Simple Punch dial) does not read 0.0: ".075" under 0.1 s (four characters, as the ms dials had), two
+ * decimals under 1 s, then as secondsText.
+ */
+export const envSecondsText = (v: number): string => (v < 0.1 ? v.toFixed(3).slice(1) : v < 1 ? v.toFixed(2) : secondsText(v));
 
 /** At most six dials per screen (spec section 5): split a list into pages of `size`. */
 export function paginate<T>(items: readonly T[], size = 6): T[][] {
@@ -326,9 +332,10 @@ export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
       name: "Patch",
       knobs: [
         { key: "detune", label: "Detune" },
-        { key: "attack", label: "Attack", seconds: [0.002, 2] },
+        // P7 review S3 (spec 8.10): attack and release up to 20 s, shown in seconds, like the Pad page.
+        { key: "attack", label: "Attack s", seconds: [0.002, 20], text: envSecondsText },
         { key: "decay", label: "Decay", seconds: [0.02, 2] },
-        { key: "release", label: "Release", seconds: [0.02, 4] },
+        { key: "release", label: "Release s", seconds: [0.02, 20], text: envSecondsText },
         { key: "envAmount", label: "Filt env" },
         { key: "drive", label: "Drive" },
       ],
@@ -569,10 +576,11 @@ export function patchOf(inst: InstrumentId, patch: Patch, ids: readonly string[]
 
 /** Patch dials shared by the three layer modes (the wave is a chip row above them). */
 export const LAYER_PATCH_KNOBS: readonly KnobSpec[] = [
-  { key: "attack", label: "Attack", seconds: [0.002, 2] },
+  // P7 review S3 (spec 8.10): attack and release up to 20 s in every mode, shown in seconds.
+  { key: "attack", label: "Attack s", seconds: [0.002, 20], text: envSecondsText },
   { key: "decay", label: "Decay", seconds: [0.02, 2] },
   { key: "sustain", label: "Sustain" },
-  { key: "release", label: "Release", seconds: [0.02, 4] },
+  { key: "release", label: "Release s", seconds: [0.02, 20], text: envSecondsText },
   { key: "drive", label: "Drive" },
 ];
 

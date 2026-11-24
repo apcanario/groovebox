@@ -22,66 +22,20 @@ import {
   type InstrumentId,
 } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import {
-  Chips,
-  Dial,
-  GroupLabel,
-  PagedChips,
-  Pager,
-  SendBar,
-  Toggle,
-  XYPad,
-} from "../components.tsx";
+import { Chips, Dial, GroupLabel, PagedChips, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
 import { SoundPicker } from "./SimpleTab.tsx";
-import {
-  KIT_KNOBS,
-  KNOB_PAGES,
-  MOD_KNOBS,
-  presetName,
-  WAVE_LABEL,
-  hzLabel,
-  knobLabel,
-  knobPos,
-  knobText,
-  knobValue,
-  sectionLetter,
-  shownPage,
-  withFilterPage,
-  type KnobSpec,
-  type PageDef,
-} from "../logic.ts";
+import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 
-const VOICE_NAME: Record<DrumVoice, string> = {
-  kick: "Kick",
-  clap: "Clap",
-  hat: "Hat",
-  open: "Open",
-  perc: "Perc",
-  shaker: "Shaker",
-};
+const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open", perc: "Perc", shaker: "Shaker" };
 
 /** The sequencer's view (P7): eight steps of two sixteenths, or the 16-step grid shown half a bar at a time. */
 type SeqView = "8" | "16a" | "16b";
 const SEQ_VIEWS: readonly SeqView[] = ["8", "16a", "16b"];
-const SEQ_VIEW_LABEL: Record<SeqView, string> = {
-  "8": "8 steps",
-  "16a": "1–8",
-  "16b": "9–16",
-};
+const SEQ_VIEW_LABEL: Record<SeqView, string> = { "8": "8 steps", "16a": "1–8", "16b": "9–16" };
 
-function Knobs({
-  ctx,
-  inst,
-  knobs,
-  children,
-}: {
-  ctx: Ctx;
-  inst: InstrumentId;
-  knobs: readonly KnobSpec[];
-  children?: ComponentChildren;
-}) {
+function Knobs({ ctx, inst, knobs, children }: { ctx: Ctx; inst: InstrumentId; knobs: readonly KnobSpec[]; children?: ComponentChildren }) {
   const patch = ctx.song.patches[inst];
   return (
     <div class={`dials n${knobs.length}`}>
@@ -121,18 +75,8 @@ export function FilterPanel({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
         onChange={(x, y) => engine.setParams(inst, { cutoff: x, resonance: y })}
       />
       <div class="sends">
-        <SendBar
-          label="Delay"
-          value={patch.delay}
-          color="var(--blue)"
-          onChange={(v) => engine.setParam(inst, "delay", v)}
-        />
-        <SendBar
-          label="Reverb"
-          value={patch.reverb}
-          color="var(--teal)"
-          onChange={(v) => engine.setParam(inst, "reverb", v)}
-        />
+        <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => engine.setParam(inst, "delay", v)} />
+        <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => engine.setParam(inst, "reverb", v)} />
       </div>
     </>
   );
@@ -142,9 +86,7 @@ export function FilterPanel({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
 export function InstToggle({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const { engine, song, edit, pending } = ctx;
   const on = song.sections[edit].on[inst];
-  const queued = pending.toggles.some(
-    (t) => t.section === edit && t.instrument === inst,
-  );
+  const queued = pending.toggles.some((t) => t.section === edit && t.instrument === inst);
   return (
     <Toggle
       on={on}
@@ -161,20 +103,10 @@ export function InstToggle({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
  * Name of the instrument, the edited section, and its on/off switch. `children` replace the switch on the right
  * (the Advanced Layer tab puts Back and New idea there and its switch in the mode row, as docs/design/look/).
  */
-export function HeadRow({
-  ctx,
-  inst,
-  children,
-}: {
-  ctx: Ctx;
-  inst: InstrumentId;
-  children?: ComponentChildren;
-}) {
+export function HeadRow({ ctx, inst, children }: { ctx: Ctx; inst: InstrumentId; children?: ComponentChildren }) {
   const { song, edit, pending } = ctx;
   const on = song.sections[edit].on[inst];
-  const queued = pending.toggles.some(
-    (t) => t.section === edit && t.instrument === inst,
-  );
+  const queued = pending.toggles.some((t) => t.section === edit && t.instrument === inst);
   return (
     <div class="headrow">
       <h1 class="head">
@@ -182,12 +114,7 @@ export function HeadRow({
           <InstName id={inst} />
         </em>
         <span class="sub">
-          {sectionLetter(edit)} ·{" "}
-          {queued
-            ? on
-              ? "off at the next bar"
-              : "on at the next bar"
-            : song.sections[edit].name}
+          {sectionLetter(edit)} · {queued ? (on ? "off at the next bar" : "on at the next bar") : song.sections[edit].name}
         </span>
       </h1>
       {children ?? <InstToggle ctx={ctx} inst={inst} />}
@@ -216,9 +143,7 @@ function DrumPresets({ ctx }: { ctx: Ctx }) {
   const drums = song.sections[edit].drums;
   return (
     <>
-      <GroupLabel thing="Beat">
-        {drums.grid ? "Beat · edited in Steps" : "Beat"}
-      </GroupLabel>
+      <GroupLabel thing="Beat">{drums.grid ? "Beat · edited in Steps" : "Beat"}</GroupLabel>
       <PagedChips
         name="preset"
         what="beats"
@@ -244,39 +169,18 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <GroupLabel thing="Sequencer">
-        Sequencer · {edited ? "edited" : sixteen ? "16 steps" : "8 steps"} ·{" "}
-        {sectionSwing(song.sections[edit]) > 0 ? "swung" : "straight"}
+        Sequencer · {edited ? "edited" : sixteen ? "16 steps" : "8 steps"} · {sectionSwing(song.sections[edit]) > 0 ? "swung" : "straight"}
       </GroupLabel>
-      <div
-        class="chips"
-        style={{
-          gridTemplateColumns: `repeat(${DRUM_VOICES.length}, minmax(0, 1fr))`,
-        }}
-      >
+      <div class="chips" style={{ gridTemplateColumns: `repeat(${DRUM_VOICES.length}, minmax(0, 1fr))` }}>
         {DRUM_VOICES.map((v) => (
-          <button
-            key={v}
-            class={`chip${voice === v ? " on" : ""}`}
-            data-voice={v}
-            aria-pressed={voice === v}
-            onClick={() => setVoice(v)}
-          >
+          <button key={v} class={`chip${voice === v ? " on" : ""}`} data-voice={v} aria-pressed={voice === v} onClick={() => setVoice(v)}>
             {VOICE_NAME[v]}
           </button>
         ))}
       </div>
-      <div
-        class="chips"
-        style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
-      >
+      <div class="chips" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {SEQ_VIEWS.map((v) => (
-          <button
-            key={v}
-            class={`chip${view === v ? " on" : ""}`}
-            data-seqview={v}
-            aria-pressed={view === v}
-            onClick={() => setView(v)}
-          >
+          <button key={v} class={`chip${view === v ? " on" : ""}`} data-seqview={v} aria-pressed={view === v} onClick={() => setView(v)}>
             {SEQ_VIEW_LABEL[v]}
           </button>
         ))}
@@ -284,11 +188,7 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
           class="chip"
           id="drums-revert"
           disabled={!edited}
-          aria-label={
-            edited
-              ? `Back to the ${presetName("beat", drums.preset)} preset`
-              : "The beat is the preset"
-          }
+          aria-label={edited ? `Back to the ${presetName("beat", drums.preset)} preset` : "The beat is the preset"}
           onClick={() => engine.revertDrums(edit)}
         >
           Reset
@@ -300,8 +200,7 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
             // P7: one sixteenth per cell, half a bar at a time.
             const k = half + i;
             const lit = (row[k] ?? 0) > 0;
-            const now =
-              ctx.pos.playing && edit === ctx.playing && ctx.pos.step === k;
+            const now = ctx.pos.playing && edit === ctx.playing && ctx.pos.step === k;
             return (
               <button
                 key={`s${k}`}
@@ -316,10 +215,7 @@ function DrumBeat({ ctx }: { ctx: Ctx }) {
             );
           }
           const lit = eighthOn(row, i);
-          const now =
-            ctx.pos.playing &&
-            edit === ctx.playing &&
-            Math.floor(ctx.pos.step / 2) === i;
+          const now = ctx.pos.playing && edit === ctx.playing && Math.floor(ctx.pos.step / 2) === i;
           return (
             <button
               key={i}
@@ -356,16 +252,7 @@ function SwingDial({ ctx }: { ctx: Ctx }) {
   );
 }
 
-type InstPage =
-  | "beat"
-  | "steps"
-  | "rhythm"
-  | "sound"
-  | "kick"
-  | "hats"
-  | "kit"
-  | "mod"
-  | "filter";
+type InstPage = "beat" | "steps" | "rhythm" | "sound" | "kick" | "hats" | "kit" | "mod" | "filter";
 
 /**
  * The pages of the Drums, Bass and Synth tabs, before the Filter page. P7: Drums gets Steps (the sequencer, 8 or 16
@@ -373,35 +260,19 @@ type InstPage =
  * six chips on a short screen, "Kick · Clap" is shortened to "Kick".
  */
 function basePages(inst: InstrumentId, roomy: boolean): PageDef<InstPage>[] {
-  if (inst === "drums")
-    return [
-      ["beat", "Beat"],
-      ["steps", "Steps"],
-      ["kick", roomy ? KNOB_PAGES.drums![0].name : "Kick"],
-      ["hats", KNOB_PAGES.drums![1].name],
-      ["kit", "Kit"],
-    ];
-  return [
-    ["rhythm", "Rhythm"],
-    ["sound", "Sound"],
-    ["mod", "Mod"],
-  ];
+  if (inst === "drums") return [["beat", "Beat"], ["steps", "Steps"], ["kick", roomy ? KNOB_PAGES.drums![0].name : "Kick"], ["hats", KNOB_PAGES.drums![1].name], ["kit", "Kit"]];
+  return [["rhythm", "Rhythm"], ["sound", "Sound"], ["mod", "Mod"]];
 }
 
 export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const { engine, edit, roomy } = ctx;
   const section = ctx.song.sections[edit];
-  const [chosen, setPage] = useState<InstPage>(
-    inst === "drums" ? "beat" : "rhythm",
-  );
+  const [chosen, setPage] = useState<InstPage>(inst === "drums" ? "beat" : "rhythm");
   const pages = withFilterPage(basePages(inst, roomy), roomy);
   const page = shownPage(pages, chosen);
   const knobPages = KNOB_PAGES[inst] ?? [];
   return (
-    <section
-      class={`insttab${roomy ? " roomy" : ""}`}
-      style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}
-    >
+    <section class={`insttab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
       <HeadRow ctx={ctx} inst={inst} />
       <Lane id={inst} lanes={ctx.lanes} playhead />
       <Pager id={inst} pages={pages} page={page} onPage={setPage} />
@@ -410,9 +281,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           {page === "beat" && <DrumPresets ctx={ctx} />}
           {page === "beat" && <SoundPicker ctx={ctx} inst={inst} />}
           {page === "steps" && <DrumBeat ctx={ctx} />}
-          {page === "kick" && (
-            <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />
-          )}
+          {page === "kick" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
           {page === "hats" && (
             <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs}>
               <SwingDial ctx={ctx} />
@@ -441,9 +310,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
           )}
           {page === "rhythm" && <Waves ctx={ctx} inst={inst} />}
           {page === "sound" && <SoundPicker ctx={ctx} inst={inst} />}
-          {page === "sound" && (
-            <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />
-          )}
+          {page === "sound" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
           {page === "kit" && <Knobs ctx={ctx} inst={inst} knobs={KIT_KNOBS} />}
           {page === "mod" && <Knobs ctx={ctx} inst={inst} knobs={MOD_KNOBS} />}
         </div>

@@ -263,7 +263,11 @@ export const DEFAULT_MIX: MixState = { sweep: 0, pump: 0.6, saturation: 0 };
 export const MIX_KEYS = ["sweep", "pump", "saturation", "lofi", "air", "reverbDecay"] as const;
 export type MixKey = (typeof MIX_KEYS)[number];
 export const MIX_RANGES: Record<MixKey, [number, number]> = { sweep: [-1, 1], pump: [0, 0.95], saturation: [0, 1], lofi: [0, 1], air: [0, 1], reverbDecay: [1, 20] };
-export const MIX_DEFAULTS: Record<MixKey, number> = { sweep: 0, pump: 0.6, saturation: 0, lofi: 0, air: 0, reverbDecay: 3.2 };
+/**
+ * reverbDecay 1.9 s (P7 review S1): G1's Tone.Reverb({decay: 3.2}) shaped its impulse with a 0.27 s time constant,
+ * so it fell 60 dB in about 1.9 s; the P7 reverb falls 60 dB over exactly its decay, so 1.9 keeps the old tail.
+ */
+export const MIX_DEFAULTS: Record<MixKey, number> = { sweep: 0, pump: 0.6, saturation: 0, lofi: 0, air: 0, reverbDecay: 1.9 };
 /** A mix value, its default where the song does not set it. */
 export function mixValue(m: MixState, k: MixKey): number {
   return m[k] ?? MIX_DEFAULTS[k];

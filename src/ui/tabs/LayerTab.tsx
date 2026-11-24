@@ -8,13 +8,7 @@
  * screen the name row gives way (Back and New idea sit beside the lane) and the XY pad and sends get a Filter page.
  */
 import { useState } from "preact/hooks";
-import {
-  ARP_DIRECTIONS,
-  LAYER_MODES,
-  WAVES,
-  type ArpDirection,
-  type LayerInstrument,
-} from "../../engine/index.ts";
+import { ARP_DIRECTIONS, LAYER_MODES, WAVES, type ArpDirection, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Chips, Dial, GroupLabel, Pager } from "../components.tsx";
 import {
@@ -67,9 +61,7 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
             options={rates}
             value={String(arp.rate)}
             label={(r) => ARP_RATE_LABEL[Number(r)]}
-            onPick={(r) =>
-              engine.setArp(edit, id, { rate: Number(r) as 1 | 2 | 4 })
-            }
+            onPick={(r) => engine.setArp(edit, id, { rate: Number(r) as 1 | 2 | 4 })}
           />
         </div>
         <div class="group">
@@ -79,9 +71,7 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
             options={octs}
             value={String(arp.octaves)}
             label={(o) => `${o} oct`}
-            onPick={(o) =>
-              engine.setArp(edit, id, { octaves: Number(o) as 1 | 2 | 3 })
-            }
+            onPick={(o) => engine.setArp(edit, id, { octaves: Number(o) as 1 | 2 | 3 })}
           />
         </div>
       </div>
@@ -106,8 +96,7 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
   const layer = song.sections[edit][id];
   const pad = layer.pad;
-  const value = (k: (typeof PAD_KNOBS)[number]): number =>
-    k.key === "swoop" ? (pad.swoop ?? 0) : pad[k.key];
+  const value = (k: (typeof PAD_KNOBS)[number]): number => (k.key === "swoop" ? (pad.swoop ?? 0) : pad[k.key]);
   return (
     <>
       {layer.mode === "drone" && (
@@ -133,9 +122,7 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
             max={1}
             display={knobText(k, value(k))}
             color={INST_COLOR[id]}
-            onChange={(p) =>
-              engine.setPad(edit, id, { [k.key]: knobValue(k, p) })
-            }
+            onChange={(p) => engine.setPad(edit, id, { [k.key]: knobValue(k, p) })}
           />
         ))}
       </div>
@@ -176,15 +163,7 @@ function Mod({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
 }
 
 /** The patch dials shared by every mode: wave, envelope, drive. */
-function Sound({
-  ctx,
-  id,
-  mode,
-}: {
-  ctx: Ctx;
-  id: LayerInstrument;
-  mode: string;
-}) {
+function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string }) {
   const { roomy } = ctx;
   const { engine, song } = ctx;
   const patch = song.patches[id];
@@ -192,11 +171,7 @@ function Sound({
     <>
       {/* P7: the Sound picker (C8) sits where the wave chips were; the waves are on the Mod page. */}
       <SoundPicker ctx={ctx} inst={id} />
-      {roomy && (mode === "pad" || mode === "drone") && (
-        <p class="note">
-          Attack and release: the Pad page. Wave: the Mod page.
-        </p>
-      )}
+      {roomy && (mode === "pad" || mode === "drone") && <p class="note">Attack and release: the Pad page. Wave: the Mod page.</p>}
       <div class="dials n5">
         {LAYER_PATCH_KNOBS.map((k) => (
           <Dial
@@ -219,23 +194,13 @@ function Sound({
 type LayerPage = "pattern" | LeadPage | "sound" | "mod" | "filter";
 
 /** The mode switch (Lead, Arp, Pad), with the layer's on/off switch at its end where `toggle` is set. */
-export function ModeRow({
-  ctx,
-  id,
-  toggle,
-}: {
-  ctx: Ctx;
-  id: LayerInstrument;
-  toggle: boolean;
-}) {
+export function ModeRow({ ctx, id, toggle }: { ctx: Ctx; id: LayerInstrument; toggle: boolean }) {
   const { engine, edit } = ctx;
   const layer = ctx.song.sections[edit][id];
   return (
     <div class={`modes${toggle ? " withtog" : ""}`}>
       <div class="modegroup" role="radiogroup" aria-label="Mode">
-        {LAYER_MODE_ORDER.filter((m) =>
-          (LAYER_MODES as readonly string[]).includes(m),
-        ).map((m) => (
+        {LAYER_MODE_ORDER.filter((m) => (LAYER_MODES as readonly string[]).includes(m)).map((m) => (
           <button
             key={m}
             class={`mode${layer.mode === m ? " on" : ""}`}
@@ -269,36 +234,15 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const pulse = lead && leadStyleOf(ctx, id) === "pulse";
   // On a short screen the first page chip names the edited section (the name row gives way), unless five chips
   // share the row (Lead in Pulse): there the strip's Editing mark says it.
-  const short = (label: string) =>
-    roomy || pulse ? label : `${label} · ${sectionLetter(edit)}`;
+  const short = (label: string) => (roomy || pulse ? label : `${label} · ${sectionLetter(edit)}`);
   const base: PageDef<LayerPage>[] = lead
-    ? [
-        ["notes", short("Notes")],
-        ["feel", "Feel"],
-        ...(pulse ? [["pulse", "Pulse"] as PageDef<LayerPage>] : []),
-        ["sound", "Sound"],
-        ["mod", "Mod"],
-      ]
-    : [
-        ["pattern", short(LAYER_MODE_LABEL[layer.mode])],
-        ["sound", "Sound"],
-        ["mod", "Mod"],
-      ];
+    ? [["notes", short("Notes")], ["feel", "Feel"], ...(pulse ? [["pulse", "Pulse"] as PageDef<LayerPage>] : []), ["sound", "Sound"], ["mod", "Mod"]]
+    : [["pattern", short(LAYER_MODE_LABEL[layer.mode])], ["sound", "Sound"], ["mod", "Mod"]];
   const pages = withFilterPage(base, roomy);
   // The chosen page while it exists; the first page of the mode otherwise (Notes stays chosen across modes).
-  const page = shownPage(
-    pages,
-    chosen === "pattern" && lead
-      ? "notes"
-      : (chosen === "notes" || chosen === "feel" || chosen === "pulse") && !lead
-        ? "pattern"
-        : chosen,
-  );
+  const page = shownPage(pages, chosen === "pattern" && lead ? "notes" : (chosen === "notes" || chosen === "feel" || chosen === "pulse") && !lead ? "pattern" : chosen);
   return (
-    <section
-      class={`insttab layertab adv${roomy ? " roomy" : ""}${lead ? " lead" : ""}`}
-      style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}
-    >
+    <section class={`insttab layertab adv${roomy ? " roomy" : ""}${lead ? " lead" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}>
       {roomy && (
         <HeadRow ctx={ctx} inst={id}>
           <div class="seedpair">
@@ -319,17 +263,9 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
       <Pager id={id} pages={pages} page={page} onPage={setPage} />
       {page !== "filter" && (
         <div class="page" data-shown={`${id}:${page}`}>
-          {lead &&
-            (page === "notes" || page === "feel" || page === "pulse") && (
-              <LeadDials ctx={ctx} id={id} page={page} />
-            )}
-          {page === "pattern" && layer.mode === "arp" && (
-            <Arp ctx={ctx} id={id} />
-          )}
-          {page === "pattern" &&
-            (layer.mode === "pad" || layer.mode === "drone") && (
-              <Pad ctx={ctx} id={id} />
-            )}
+          {lead && (page === "notes" || page === "feel" || page === "pulse") && <LeadDials ctx={ctx} id={id} page={page} />}
+          {page === "pattern" && layer.mode === "arp" && <Arp ctx={ctx} id={id} />}
+          {page === "pattern" && (layer.mode === "pad" || layer.mode === "drone") && <Pad ctx={ctx} id={id} />}
           {page === "mod" && <Mod ctx={ctx} id={id} />}
           {page === "sound" && <Sound ctx={ctx} id={id} mode={layer.mode} />}
         </div>

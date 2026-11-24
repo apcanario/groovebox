@@ -3,15 +3,30 @@ import { describe, expect, it } from "vitest";
 import oldSongJson from "./fixtures/p1b-default-song.json?raw";
 import { createRng } from "../music/random.ts";
 import { DRUM_PATTERNS, DRUM_PRESETS, toggleSixteenth } from "../music/presets.ts";
-import { DRONE_SWOOP, FM_RATIOS, LFO_RATES, driftPeriod, fmRatio, lfoBeats, reverbImpulse, reverbPlan, swoopSeconds } from "../music/sound.ts";
+import {
+  DRONE_SWOOP,
+  FM_RATIOS,
+  LFO_RATES,
+  REVERB_LOOP_HZ,
+  driftPeriod,
+  fmRatio,
+  lfoBeats,
+  lofiAmount,
+  loopLowpassGain,
+  reverbImpulse,
+  reverbPlan,
+  swoopSeconds,
+} from "../music/sound.ts";
 import { PATCHES, PATCH_IDS, STYLES, patchFor, resolvePatch, vibeSong } from "../music/styles.ts";
-import { KIT_KNOBS, LAYER_MODE_ORDER, MOD_KNOBS, PAD_KNOBS, patchOf } from "../ui/logic.ts";
+import { KIT_KNOBS, KNOB_PAGES, LAYER_MODE_ORDER, LAYER_PATCH_KNOBS, MOD_KNOBS, PAD_KNOBS, knobPos, knobValue, patchOf, envSecondsText } from "../ui/logic.ts";
+import { fadeWait } from "./mods.ts";
 import { Engine } from "./index.ts";
 import { Sequencer, droneNotes, type NoteEvent, type StepResult } from "./sequencer.ts";
 import { buildChord } from "../music/chords.ts";
 import { DRUM_VOICES } from "../music/presets.ts";
 import {
   INSTRUMENTS,
+  MIX_DEFAULTS,
   P7_PATCH_DEFAULTS,
   defaultSong,
   migrateP7,
@@ -245,5 +260,61 @@ describe("Ambient uses what spec 8.10 adds", () => {
     expect(song.mix!.air).toBeGreaterThan(0);
     expect(song.mix!.reverbDecay).toBeGreaterThanOrEqual(10);
     expect(validateSong(song)).toEqual([]);
+  });
+});
+
+describe("P7 review fixes", () => {
+  it("S1: the default reverb falls 60 dB when G1's Tone.Reverb({decay: 3.2}) did (about 1.9 s), not over 3.2 s", () => {
+    // Tone.Reverb: exponentialApproachValueAtTime over decay - preDelay, a time constant of ln(rampTime + 1) / ln(200).
+    const tau = Math.log(3.2 - 0.01 + 1) / Math.log(200);
+    const g1 = tau * Math.log(1000);
+    expect(Math.abs(MIX_DEFAULTS.reverbDecay - g1)).toBeLessThan(0.1);
+  });
+
+  it("S2: the impulse is at full level 1 ms in (no 10 ms dip on every pass of the loop), and the loop darkens", () => {
+    const rate = 44100;
+    const one = { next: () => 1 };
+    const [l] = reverbImpulse(1, 1.9, rate, one);
+    const k = (3 * Math.LN10) / 1.9;
+    const i = Math.round(0.001 * rate);
+    expect(l[i]).toBeGreaterThan(0.99 * Math.exp((-k * i) / rate));
+    expect(l[Math.round(0.0005 * rate)]).toBeGreaterThan(0.4);
+    expect(loopLowpassGain(REVERB_LOOP_HZ, rate, 0)).toBeCloseTo(1, 6);
+    expect(loopLowpassGain(REVERB_LOOP_HZ, rate, 500)).toBeGreaterThan(0.99);
+    expect(loopLowpassGain(REVERB_LOOP_HZ, rate, 12000)).toBeLessThan(0.5);
+  });
+
+  it("S3: attack and release reach 20 s on the Synth and on the layers in every mode, shown in seconds", () => {
+    const synth = KNOB_PAGES.synth!.flatMap((p) => p.knobs);
+    for (const list of [synth, LAYER_PATCH_KNOBS])
+      for (const key of ["attack", "release"]) {
+        const k = list.find((x) => x.key === key)!;
+        expect(k.seconds![1]).toBe(20);
+        expect(k.text).toBe(envSecondsText);
+      }
+    // Ambient's synth (attack 3 s, release 8 s) sits inside its dials: a touch does not snap it down.
+    const attack = synth.find((x) => x.key === "attack")!;
+    const release = synth.find((x) => x.key === "release")!;
+    expect(knobValue(attack, knobPos(attack, 3))).toBeCloseTo(3, 6);
+    expect(knobValue(release, knobPos(release, 8))).toBeCloseTo(8, 6);
+    // A punchy attack still reads as a time, not 0.0 (P2 review E1: Advanced shows what Punch set).
+    expect(envSecondsText(0.003)).toBe(".003");
+    expect(envSecondsText(0.075)).toBe(".075");
+    expect(envSecondsText(0.25)).toBe("0.25");
+    expect(envSecondsText(3)).toBe("3.0");
+    expect(envSecondsText(12)).toBe("12");
+  });
+
+  it("S5: a fade scheduled past now is waited for from its start, not from now", () => {
+    expect(fadeWait(10.5, 10, 0.1, 0.03)).toBeCloseTo(0.5 + 0.1 + 0.03 + 0.05, 9);
+    expect(fadeWait(undefined, 10, 0.1, 0.03)).toBeCloseTo(0.18, 9);
+    expect(fadeWait(9, 10, 0.1, 0.03)).toBeCloseTo(0.18, 9);
+  });
+
+  it("M4: the lo-fi master is on or off, never between (its 8 ms wet path would comb-filter)", () => {
+    expect(lofiAmount(0)).toBe(0);
+    expect(lofiAmount(0.3)).toBe(1);
+    expect(lofiAmount(0.5)).toBe(1);
+    expect(lofiAmount(1)).toBe(1);
   });
 });

@@ -37,8 +37,8 @@ import {
   percHz,
   subGain,
 } from "../music/sound.ts";
-import { MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
-import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank } from "./mods.ts";
+import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
+import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 
 // Tone 15.1.22 leak (G5 review E1): Oscillator._start connects its frequency and detune signals to each new
 // native oscillator and never disconnects them, so every ended oscillator stays reachable from the
@@ -123,10 +123,12 @@ function nativeValue(param: unknown): number {
   return nativeParam(param).value;
 }
 
-/** Run `fn` once the audio clock's lookahead and a ramp have passed (Tone.now() runs ahead). */
-function afterRamp(fn: () => void): void {
-  const ctx = Tone.getContext();
-  ctx.setTimeout(fn, ctx.lookAhead + RAMP + 0.05);
+/**
+ * Run `fn` once a ramp from audio time `at` (else now) is done, past the lookahead (Tone.now() runs ahead).
+ * P7 review S5: timed from `at`, so a node is never cut before a fade scheduled past the lookahead starts.
+ */
+function afterRamp(fn: () => void, at?: number): void {
+  afterFade(fn, RAMP, at);
 }
 
 interface Buses {
@@ -157,6 +159,12 @@ interface Drift {
   reverb: ModRoute;
   /** Cents of pitch drift (-8 x depth at most), which the instrument wires into its voices' detune. */
   pitch: GainNode;
+  /**
+   * The pitch is fed and wired to the voices only while the drift is on (P7 review M5: off costs nothing). Off, it
+   * is cut from the LFO and from every voice, and `epoch` moves on, so the instrument wires its voices afresh.
+   */
+  wired: boolean;
+  epoch: number;
 }
 
 /** Filter (XY pad), optional drive, mute point, level and the two sends of one instrument. */
@@ -254,14 +262,14 @@ class Channel {
         if (gen !== this.lfoGen) return;
         this.syncStart(Tone.getContext().currentTime + 0.01);
         s.route.set(lfoDepthCents(this.lfoDepth));
-      });
+      }, at);
       return;
     }
     s.route.set(lfoDepthCents(depth), at);
     if (depth === 0)
       afterRamp(() => {
         if (gen === this.lfoGen && this.lfoDepth === 0) s.lfo.stop();
-      });
+      }, at);
   }
 
   /** Play starts at audio time `at` (bar 1, beat 1): the synced LFO restarts there, at the top of its cycle. */
@@ -287,7 +295,6 @@ class Channel {
       const lfo = new Lfo();
       const pitch = (Tone.getContext().rawContext as unknown as BaseAudioContext).createGain();
       pitch.gain.value = 0;
-      lfo.neg.connect(pitch);
       this.drift = {
         lfo,
         filter: new ModRoute(lfo.neg, nativeParam(this.filter.detune)),
@@ -295,10 +302,16 @@ class Channel {
         delay: new ModRoute(lfo.uni, nativeParam(this.delaySend.gain)),
         reverb: new ModRoute(lfo.uni, nativeParam(this.reverbSend.gain)),
         pitch,
+        wired: false,
+        epoch: 0,
       };
     }
     const dr = this.drift;
     if (!dr) return;
+    if (d > 0 && !dr.wired) {
+      dr.lfo.neg.connect(dr.pitch);
+      dr.wired = true;
+    }
     const hz = 1 / driftPeriod(this.driftRate);
     if (d > 0 && !dr.lfo.running) dr.lfo.start(Tone.getContext().currentTime, hz, 0);
     else if (dr.lfo.running && dr.lfo.frequency !== hz) dr.lfo.rate(hz);
@@ -309,8 +322,14 @@ class Channel {
     rampGain(dr.pitch, DRIFT_MAX.pitchCents * d, at);
     if (d === 0)
       afterRamp(() => {
-        if (gen === this.driftGen && this.driftDepth === 0) dr.lfo.stop();
-      });
+        if (gen !== this.driftGen || this.driftDepth !== 0) return;
+        dr.lfo.stop();
+        if (!dr.wired) return;
+        dr.lfo.neg.disconnect(dr.pitch);
+        dr.pitch.disconnect();
+        dr.wired = false;
+        dr.epoch++;
+      }, at);
   }
 
   /** Drive the filter from an envelope from now on. Its depth follows the envAmount key. */
@@ -436,7 +455,7 @@ class Channel {
         if (gen !== this.driveGen || !this.driveOn) return;
         this.filter.disconnect(drive);
         this.driveOn = false;
-      });
+      }, at);
   }
 }
 
@@ -454,10 +473,7 @@ class VoiceSets<T extends Tone.ToneAudioNode> {
   live: { synth: T; gain: Tone.Gain } | null = null;
   old: { synth: T; gain: Tone.Gain } | null = null;
 
-  constructor(
-    private readonly dest: Tone.InputNode,
-    private readonly onDrop?: (s: T) => void,
-  ) {}
+  constructor(private readonly dest: Tone.InputNode) {}
 
   /** `at`: the audio time from which the new set is used (the previous one's fade starts no earlier). */
   swap(make: () => T, at?: number): void {
@@ -485,10 +501,9 @@ class VoiceSets<T extends Tone.ToneAudioNode> {
   private drop(v: { synth: T; gain: Tone.Gain }, at?: number): void {
     ramp(v.gain.gain, 0, at);
     afterRamp(() => {
-      this.onDrop?.(v.synth);
       v.synth.dispose();
       v.gain.dispose();
-    });
+    }, at);
   }
 }
 
@@ -548,6 +563,8 @@ export abstract class Instrument {
   protected abstract setWave(w: Wave, at?: number): void;
   protected abstract setEnvelope(p: Patch): void;
   abstract releaseAll(time: number): void;
+  /** The transport starts or stops (P7 review M6: the noise wave's breath runs only while it plays). */
+  setPlaying(_on: boolean): void {}
 }
 
 export class Drums extends Instrument {
@@ -715,6 +732,7 @@ export class Bass extends Instrument {
   private lastHz: number | null = null;
   private fm = { ratio: 0.25, index: 0.3 };
   private breath: Breath | null = null;
+  private playing = false;
 
   constructor(buses: Buses) {
     super(new Channel(buses.duck, buses, [80, 6000], true, 0.75));
@@ -757,9 +775,19 @@ export class Bass extends Instrument {
         } as unknown as Partial<Tone.FMSynthOptions>) as unknown as Mono;
       return new Tone.Synth({ oscillator: { type: w === "noise" ? "sine" : w }, envelope: this.env } as Partial<Tone.SynthOptions>) as unknown as Mono;
     }, at);
-    if (w === "noise") (this.breath ??= new Breath(this.channel.input)).setOn(true);
+    if (w === "noise") (this.breath ??= new Breath(this.channel.input, this.playing)).setOn(true);
     else this.breath?.setOn(false, this.env.release);
     this.breath?.shape(this.env);
+  }
+
+  override setPlaying(on: boolean): void {
+    this.playing = on;
+    this.breath?.setPlaying(on);
+  }
+
+  /** The noise wave's breath runs now (for the smoke test). */
+  get breathing(): boolean {
+    return this.breath?.on ?? false;
   }
 
   protected setEnvelope(p: Patch): void {
@@ -813,13 +841,19 @@ export class Poly extends Instrument {
   private fm = { ratio: 0.25, index: 0.3 };
   private fmSets = new WeakSet<Tone.PolySynth>();
   private breath: Breath | null = null;
+  private playing = false;
   /**
    * P7: the notes a drone or a swooping pad holds (spec 8.10): each voice with the note it was started on (the key
-   * PolySynth knows it by). They glide to each new chord and let go only on releaseAll.
+   * PolySynth knows it by) and the note it sounds now (`midi`, after glides). They glide to each new chord and let
+   * go only on releaseAll. A wave change moves them to the new voice set (P7 review E1).
    */
-  private held: { poly: Tone.PolySynth; items: { key: number; voice: Tone.Synth }[] } | null = null;
-  /** P7: voices wired to the drift's pitch, so each is wired once and unwired before it is freed. */
-  private drifted = new WeakSet<object>();
+  private held: { poly: Tone.PolySynth; vel: number; items: { key: number; midi: number; voice: Tone.Synth }[] } | null = null;
+  /** P7: voices wired to the drift's pitch, with the drift's wiring epoch, so each is wired once per drift-on. */
+  private drifted = new WeakMap<object, number>();
+  /** Voices whose dispose already unwires them from the drift's pitch. */
+  private wrapped = new WeakSet<object>();
+  /** Held notes moved to a new voice set by a wave change (P7 review E1), for the smoke test. */
+  reholds = 0;
   /**
    * Layers only (G4): the pad filter after the voices. Open (10 kHz, the C1 top) outside Pad mode;
    * in Pad mode Brightness sets its top and Motion sweeps it down and back by up to two octaves,
@@ -852,7 +886,7 @@ export class Poly extends Instrument {
       this.pad = { filter, lfo, depth, at: "" };
       dest = filter as unknown as Tone.Gain;
     }
-    this.polys = new VoiceSets(dest, (p) => this.unwire(p));
+    this.polys = new VoiceSets(dest);
     this.setWave("sawtooth");
   }
 
@@ -901,34 +935,32 @@ export class Poly extends Instrument {
     }
   }
 
-  /** P7: wire every voice of every set to the drift's pitch (once each). */
+  /** P7: wire every voice of every set to the drift's pitch (once each) while the drift is on. */
   private wireAll(): void {
-    const pitch = this.channel.drift?.pitch;
-    if (!pitch) return;
+    const dr = this.channel.drift;
+    if (!dr?.wired) return;
     this.polys.each((p) => {
-      for (const v of (p as unknown as { _voices: Tone.Synth[] })._voices) this.wire(v, pitch);
+      for (const v of (p as unknown as { _voices: Tone.Synth[] })._voices) this.wire(v, dr.pitch, dr.epoch);
     });
   }
 
   /** Wire one voice's detune to the drift's pitch; PolySynth may free a voice itself, so unwire on its dispose. */
-  private wire(v: Tone.Synth, pitch: GainNode): void {
-    if (this.drifted.has(v)) return;
-    this.drifted.add(v);
+  private wire(v: Tone.Synth, pitch: GainNode, epoch: number): void {
+    if (this.drifted.get(v) === epoch) return;
+    this.drifted.set(v, epoch);
     const param = nativeParam(v.detune);
     pitch.connect(param);
+    if (this.wrapped.has(v)) return;
+    this.wrapped.add(v);
     const dispose = v.dispose.bind(v);
     v.dispose = () => {
       try {
         pitch.disconnect(param);
       } catch {
-        // already gone
+        // already gone (the drift went off and cut every voice)
       }
       return dispose();
     };
-  }
-
-  private unwire(_p: Tone.PolySynth): void {
-    // Each wired voice unwires itself in its own dispose (see wire).
   }
 
   /** Native sub-oscillator detunes of the live set's sounding voices, for the smoke test. */
@@ -993,9 +1025,49 @@ export class Poly extends Instrument {
       p.maxPolyphony = this.maxPolyphony;
       return p;
     }, at);
-    if (w === "noise") (this.breath ??= new Breath(this.polysDest())).setOn(true);
+    if (w === "noise") (this.breath ??= new Breath(this.polysDest(), this.playing)).setOn(true);
     else this.breath?.setOn(false, this.env.release);
     this.breath?.shape(this.env);
+    if (this.held?.items.length) this.rehold(at);
+  }
+
+  /**
+   * P7 review E1: a wave change while a drone or a swooping pad holds notes. The held voices are on the previous set,
+   * which the next wave change frees, so the held notes start on the new set at the change (with the envelope's
+   * attack) and the old ones let go with their release: a crossfade, and every later glide reaches them.
+   */
+  private rehold(at?: number): void {
+    // From the lookahead on (Tone.now()), not the audio clock's now: building the new voice set can take longer than
+    // a render quantum, and an attack scheduled in the past would start part-way up its ramp, a step.
+    const t = Math.max(at ?? 0, Tone.now());
+    this.atTime(t, () => {
+      const h = this.held;
+      const live = this.polys.live?.synth;
+      if (!h || !h.items.length || !live || h.poly === live) return;
+      const notes = h.items.map((i) => i.midi);
+      for (const i of h.items) {
+        try {
+          h.poly.triggerRelease(i.key, t);
+        } catch {
+          // the set was already freed
+        }
+      }
+      this.held = null;
+      this.attackHeld(notes, t, h.vel);
+      // To the noise wave: its breath holds with the notes (it is let go when the wave leaves noise).
+      if (this.wave === "noise") this.breath?.hold(midiToHz(Math.max(...notes)), t, h.vel);
+      this.reholds++;
+    });
+  }
+
+  override setPlaying(on: boolean): void {
+    this.playing = on;
+    this.breath?.setPlaying(on);
+  }
+
+  /** The noise wave's breath runs now (for the smoke test). */
+  get breathing(): boolean {
+    return this.breath?.on ?? false;
   }
 
   /** Where the voices go: the pad filter on the layers, the channel on the Synth. */
@@ -1109,11 +1181,11 @@ export class Poly extends Instrument {
     type Active = { _activeVoices: { midi: number; voice: Tone.Synth; released: boolean }[] };
     const before = new Set((poly as unknown as Active)._activeVoices.map((e) => e.voice));
     poly.triggerAttack(notes.map(midiToHz), time, vel);
-    if (!this.held || this.held.poly !== poly) this.held = { poly, items: [] };
+    if (!this.held || this.held.poly !== poly) this.held = { poly, vel, items: [] };
     for (const n of notes) {
       const key = Tone.Midi(midiToHz(n)).toMidi();
       const e = (poly as unknown as Active)._activeVoices.find((x) => !before.has(x.voice) && x.midi === key && !this.held!.items.some((h) => h.voice === x.voice));
-      if (e) this.held.items.push({ key: midiToHz(n), voice: e.voice });
+      if (e) this.held.items.push({ key: midiToHz(n), midi: n, voice: e.voice });
     }
     this.wireAll();
   }
@@ -1144,6 +1216,7 @@ export class Poly extends Instrument {
         const f = nativeParam(h.items[i].voice.frequency);
         f.cancelScheduledValues(t);
         f.setTargetAtTime(midiToHz(notes[i]), t, Math.max(0.01, seconds / 3));
+        h.items[i].midi = notes[i];
       }
       for (const spare of h.items.splice(n)) h.poly.triggerRelease(spare.key, time);
       if (notes.length > n) {
@@ -1236,7 +1309,7 @@ export class Graph {
 
     const duck = new Tone.Gain(1).connect(master);
     const drums = new Tone.Gain(1).connect(master);
-    const bank = new ReverbBank(duck, 3.2);
+    const bank = new ReverbBank(duck, MIX_DEFAULTS.reverbDecay);
     const delay = new Tone.FeedbackDelay({ delayTime: "8n.", feedback: 0.36, wet: 1 });
     delay.connect(duck);
     // The air layer goes to the drum bus (not ducked by the kick) and into the reverb.
@@ -1275,7 +1348,7 @@ export class Graph {
     const v = Math.max(lo, Math.min(hi, given));
     if (key === "lofi") return this.lofi.set(v, at);
     if (key === "air") return this.air.set(v, at);
-    if (key === "reverbDecay") return void (Math.abs(v - this.reverb.target) > 0.01 && this.reverb.setDecay(v));
+    if (key === "reverbDecay") return void (Math.abs(v - this.reverb.target) > 0.01 && this.reverb.setDecay(v, at));
     if (key === "pump") this.pumpDepth = Math.max(0, Math.min(0.95, v));
     else if (key === "saturation") ramp(this.sat.wet, Math.max(0, Math.min(1, v)), at);
     else {
@@ -1314,6 +1387,7 @@ export class Graph {
   setPlaying(on: boolean): void {
     this.lofi.setPlaying(on);
     this.air.setPlaying(on);
+    for (const id of INSTRUMENT_LIST) this.instruments[id].setPlaying(on);
   }
 
   /** P7: a new tempo from `at`, for the synced LFOs. */

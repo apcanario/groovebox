@@ -8,7 +8,7 @@
  */
 import * as Tone from "tone";
 import { createRng } from "../music/random.ts";
-import { reverbImpulse, reverbPlan } from "../music/sound.ts";
+import { REVERB_LOOP_HZ, lofiAmount, loopLowpass, reverbImpulse, reverbPlan } from "../music/sound.ts";
 
 const RAMP = 0.03;
 
@@ -27,10 +27,19 @@ export function glideParam(param: unknown, value: number, at?: number, tau = RAM
   p.setTargetAtTime(value, t, tau);
 }
 
-/** Run `fn` once the lookahead and a ramp have passed. */
-export function afterFade(fn: () => void, seconds = RAMP): void {
+/**
+ * Seconds to wait before freeing what a fade starting at audio time `at` (else now) silences: until the fade has
+ * started and run `seconds`, plus the lookahead and a margin. P7 review S5: timed from `at`, not from now, so a fade
+ * scheduled past the lookahead is never cut before it starts.
+ */
+export function fadeWait(at: number | undefined, now: number, lookAhead: number, seconds: number): number {
+  return Math.max(0, (at ?? now) - now) + lookAhead + seconds + 0.05;
+}
+
+/** Run `fn` once a fade of `seconds` from audio time `at` (else now) is done. */
+export function afterFade(fn: () => void, seconds = RAMP, at?: number): void {
   const ctx = Tone.getContext();
-  ctx.setTimeout(fn, ctx.lookAhead + seconds + 0.05);
+  ctx.setTimeout(fn, fadeWait(at, ctx.currentTime, ctx.lookAhead, seconds));
 }
 
 function raw(): BaseAudioContext {
@@ -42,12 +51,15 @@ function raw(): BaseAudioContext {
  * `neg` (-1..0). It can start at a given phase (radians of a cosine), so a tempo-synced LFO lines up with the bar.
  */
 export class Lfo {
+  /** Native sources (oscillator and offset) running over every Lfo, for the smoke test: 0 with everything off. */
+  static sources = 0;
   readonly bi: GainNode;
   readonly uni: GainNode;
   readonly neg: GainNode;
   private osc: OscillatorNode | null = null;
   private readonly half: GainNode;
-  private readonly lift: ConstantSourceNode;
+  /** The 0.5 offset of `uni` and `neg`: runs only while the oscillator does (P7 review M5: off costs nothing). */
+  private lift: ConstantSourceNode | null = null;
   private readonly drop: GainNode;
   private hz = 0.1;
 
@@ -58,17 +70,12 @@ export class Lfo {
     this.half.gain.value = 0.5;
     this.uni = ctx.createGain();
     this.neg = ctx.createGain();
-    this.lift = ctx.createConstantSource();
-    this.lift.offset.value = 0.5;
     this.drop = ctx.createGain();
     this.drop.gain.value = -1;
     this.bi.connect(this.half);
     this.half.connect(this.uni);
     this.half.connect(this.neg);
-    this.lift.connect(this.uni);
-    this.lift.connect(this.drop);
     this.drop.connect(this.neg);
-    this.lift.start();
   }
 
   get running(): boolean {
@@ -87,7 +94,14 @@ export class Lfo {
     osc.frequency.value = hz;
     osc.connect(this.bi);
     osc.start(at);
+    const lift = ctx.createConstantSource();
+    lift.offset.value = 0.5;
+    lift.connect(this.uni);
+    lift.connect(this.drop);
+    lift.start(at);
     this.osc = osc;
+    this.lift = lift;
+    Lfo.sources += 2;
     this.hz = hz;
   }
 
@@ -104,10 +118,16 @@ export class Lfo {
   stop(at?: number): void {
     const osc = this.osc;
     if (!osc) return;
+    const lift = this.lift;
     this.osc = null;
+    this.lift = null;
+    Lfo.sources -= 2;
     const t = Math.max(at ?? 0, raw().currentTime);
-    osc.stop(t);
-    osc.onended = () => osc.disconnect();
+    for (const n of [osc, lift]) {
+      if (!n) continue;
+      n.stop(t);
+      n.onended = () => n.disconnect();
+    }
   }
 }
 
@@ -132,18 +152,22 @@ export class ModRoute {
     }
     glideParam(this.gain.gain, depth, at);
     if (depth === 0 && this.on)
-      afterFade(() => {
-        if (gen !== this.gen || !this.on) return;
-        this.gain.disconnect();
-        this.on = false;
-      });
+      afterFade(
+        () => {
+          if (gen !== this.gen || !this.on) return;
+          this.gain.disconnect();
+          this.on = false;
+        },
+        RAMP,
+        at,
+      );
   }
 }
 
 /**
  * The noise wave's breath (spec 8.7): pink noise through a band-pass that follows the top note, shaped by the
  * instrument's envelope. One per instrument (it breathes with every note, not per voice), running only while the
- * noise wave is in use.
+ * noise wave is in use and the transport plays (P7 review M6).
  */
 export class Breath {
   private readonly noise = new Tone.Noise("pink");
@@ -152,10 +176,21 @@ export class Breath {
   private readonly out: Tone.Gain;
   private live = false;
   private gen = 0;
+  /** The noise wave is chosen; the transport plays; the release its stop waits for. */
+  private chosen = false;
+  private playing: boolean;
+  private releaseTime = 0.3;
 
-  constructor(dest: Tone.InputNode) {
-    this.out = new Tone.Gain(0.9).connect(dest);
+  constructor(dest: Tone.InputNode, playing: boolean) {
+    // Mono (Tone's noise buffers are stereo): the voices into the same filter are mono, and a stereo input arriving
+    // makes Chrome rebuild the filter's per-channel state, which cuts the sound for a moment (measured: a click on
+    // every switch to the noise wave while a drone held).
+    this.out = new Tone.Gain(0.9);
+    this.out.channelCount = 1;
+    this.out.channelCountMode = "explicit";
+    this.out.connect(dest);
     this.noise.chain(this.band, this.env, this.out);
+    this.playing = playing;
   }
 
   /** The band's centre for a note: an octave over it, never past 8 kHz (under C1's 10 kHz). */
@@ -163,18 +198,31 @@ export class Breath {
     return Math.min(8000, Math.max(200, hz * 2));
   }
 
+  /** The noise wave chosen or not; `release`: how long a note still sounding takes to fade. */
   setOn(on: boolean, release = 0.3): void {
+    this.chosen = on;
+    this.releaseTime = release;
+    this.update();
+  }
+
+  setPlaying(on: boolean): void {
+    this.playing = on;
+    this.update();
+  }
+
+  private update(): void {
+    const want = this.chosen && this.playing;
     const gen = ++this.gen;
-    if (on && !this.live) {
+    if (want && !this.live) {
       this.noise.start();
       this.live = true;
-    } else if (!on && this.live) {
+    } else if (!want && this.live) {
       this.env.triggerRelease(Tone.now());
       afterFade(() => {
         if (gen !== this.gen || !this.live) return;
         this.noise.stop();
         this.live = false;
-      }, release + 0.1);
+      }, this.releaseTime + 0.1);
     }
   }
 
@@ -219,22 +267,43 @@ export class Breath {
  * CPU: the impulse is never longer than REVERB_IR (3.2 s, the length G1 shipped); a longer decay feeds the output
  * back through a delay of the impulse's length (reverbPlan), so 20 s costs what 3.2 s does. A new decay builds a new
  * slot beside the old one; the sends cross over to it in a fade and the old one rings out, then is freed.
+ *
+ * P7 review E2: at most two slots live at once, the one sounding and one ringing out. When a third is needed (a drag
+ * of the Tail dial), the ringing one fades out over about 0.3 s and is freed before the new one is built.
+ * P7 review S2: inside the loop a one-pole low-pass darkens each pass, and the loop's delay swings by under a
+ * millisecond, so the tail is not the same noise repeated every 3.2 s.
  */
 interface ReverbSlot {
   gate: GainNode;
   conv: ConvolverNode;
   out: GainNode;
   delay: DelayNode | null;
+  tone: IIRFilterNode | null;
   loop: GainNode | null;
+  swing: OscillatorNode | null;
+  swingDepth: GainNode | null;
   decay: number;
+  freed: boolean;
 }
+
+/** How long the ringing reverb takes to fade when a third is needed, and the wait before it is freed (about -60 dB). */
+const REVERB_KILL_TAU = 0.06;
+const REVERB_KILL = 0.42;
 
 export class ReverbBank {
   readonly input = new Tone.Gain(1);
   private current: ReverbSlot;
+  /** The previous reverb, ringing out its tail; null once freed. */
+  private ringing: ReverbSlot | null = null;
+  /** A ringing reverb fading out early to make room; the next swap waits for it to be freed. */
+  private fading: ReverbSlot | null = null;
   private gen = 0;
   private wanted: number;
+  private wantedAt: number | undefined;
   private seed = 1;
+  /** Slots built and not yet freed, and the most there have been at once (for the smoke test: never above 2). */
+  slots = 0;
+  maxSlots = 0;
 
   constructor(
     private readonly dest: Tone.InputNode,
@@ -262,17 +331,34 @@ export class ReverbBank {
     conv.connect(out);
     Tone.connect(out, this.dest);
     let delay: DelayNode | null = null;
+    let tone: IIRFilterNode | null = null;
     let loop: GainNode | null = null;
+    let swing: OscillatorNode | null = null;
+    let swingDepth: GainNode | null = null;
     if (feedback > 0) {
+      const { feedforward, feedback: fb } = loopLowpass(REVERB_LOOP_HZ, ctx.sampleRate);
+      const len = buf.length / ctx.sampleRate;
       delay = ctx.createDelay(length + 0.1);
-      delay.delayTime.value = buf.length / ctx.sampleRate;
+      // 0.4 ms short of the impulse, swung by 0.4 ms each way once every 7.7 s: the passes never line up exactly.
+      delay.delayTime.value = len - 0.0004;
+      tone = ctx.createIIRFilter(feedforward, fb);
       loop = ctx.createGain();
       loop.gain.value = feedback;
       out.connect(delay);
-      delay.connect(loop);
+      delay.connect(tone);
+      tone.connect(loop);
       loop.connect(out);
+      swing = ctx.createOscillator();
+      swing.frequency.value = 0.13;
+      swingDepth = ctx.createGain();
+      swingDepth.gain.value = 0.0004;
+      swing.connect(swingDepth);
+      swingDepth.connect(delay.delayTime);
+      swing.start();
     }
-    return { gate, conv, out, delay, loop, decay };
+    this.slots++;
+    this.maxSlots = Math.max(this.maxSlots, this.slots);
+    return { gate, conv, out, delay, tone, loop, swing, swingDepth, decay, freed: false };
   }
 
   /** The decay now sounding, in seconds. */
@@ -285,31 +371,63 @@ export class ReverbBank {
     return this.wanted;
   }
 
-  /** Ask for a decay. Moves within 0.3 s of each other build one reverb, for the last of them. */
-  setDecay(seconds: number): void {
+  /**
+   * Ask for a decay from audio time `at` (else now; P7 review M2: a vibe's bar line). Moves within 0.3 s of each
+   * other build one reverb, for the last of them.
+   */
+  setDecay(seconds: number, at?: number): void {
     this.wanted = seconds;
+    this.wantedAt = at;
     const gen = ++this.gen;
     Tone.getContext().setTimeout(() => {
-      if (gen !== this.gen || Math.abs(seconds - this.current.decay) < 0.05) return;
-      this.swap(seconds);
+      if (gen === this.gen) this.change();
     }, 0.3);
   }
 
-  private swap(decay: number): void {
+  private change(): void {
+    if (this.fading) return; // it calls back once freed
+    if (Math.abs(this.wanted - this.current.decay) < 0.05) return;
+    const r = this.ringing;
+    if (r) {
+      // A third reverb is needed: the ringing one fades out and is freed first.
+      this.ringing = null;
+      this.fading = r;
+      glideParam(r.out.gain, 0, undefined, REVERB_KILL_TAU);
+      Tone.getContext().setTimeout(() => {
+        this.free(r);
+        this.fading = null;
+        this.change();
+      }, REVERB_KILL);
+      return;
+    }
+    this.swap(this.wanted, this.wantedAt);
+  }
+
+  private swap(decay: number, at?: number): void {
+    const now = Tone.getContext().currentTime;
+    const t = Math.max(at ?? 0, now);
     const old = this.current;
     const next = this.slot(decay, 0);
     this.current = next;
-    glideParam(next.gate.gain, 1, undefined, 0.05);
-    glideParam(old.gate.gain, 0, undefined, 0.05);
+    this.ringing = old;
+    glideParam(next.gate.gain, 1, t, 0.05);
+    glideParam(old.gate.gain, 0, t, 0.05);
     // The old reverb rings out its own tail, then is freed.
-    Tone.getContext().setTimeout(() => {
-      try {
-        this.input.disconnect(old.gate);
-      } catch {
-        // already gone
-      }
-      for (const n of [old.gate, old.conv, old.out, old.delay, old.loop]) n?.disconnect();
-    }, old.decay + 1);
+    Tone.getContext().setTimeout(() => this.free(old), t - now + old.decay + 1);
+  }
+
+  private free(s: ReverbSlot): void {
+    if (s.freed) return;
+    s.freed = true;
+    this.slots--;
+    if (this.ringing === s) this.ringing = null;
+    try {
+      this.input.disconnect(s.gate);
+    } catch {
+      // already gone
+    }
+    s.swing?.stop();
+    for (const n of [s.gate, s.conv, s.out, s.delay, s.tone, s.loop, s.swing, s.swingDepth]) n?.disconnect();
   }
 }
 
@@ -354,9 +472,9 @@ export class LoFi {
     this.wobbleDepth = new ModRoute(this.wobble.bi, nativeParam(this.delay.delayTime));
   }
 
-  /** 0 off, 1 on (a fade either way). */
+  /** 0 off, 1 on (a fade either way). Anything above 0 is on (P7 review M4: a value between would comb-filter). */
   set(v: number, at?: number): void {
-    const a = Math.max(0, Math.min(1, v));
+    const a = lofiAmount(v);
     if (a === this.amount) return;
     this.amount = a;
     const gen = ++this.gen;
@@ -370,12 +488,16 @@ export class LoFi {
     this.wobbleDepth.set(a * 0.002, at);
     this.setHiss(at);
     if (a === 0 && this.on)
-      afterFade(() => {
-        if (gen !== this.gen || !this.on) return;
-        this.input.disconnect(this.delay);
-        this.wobble.stop();
-        this.on = false;
-      });
+      afterFade(
+        () => {
+          if (gen !== this.gen || !this.on) return;
+          this.input.disconnect(this.delay);
+          this.wobble.stop();
+          this.on = false;
+        },
+        RAMP,
+        at,
+      );
   }
 
   setPlaying(on: boolean): void {
@@ -394,11 +516,15 @@ export class LoFi {
     }
     glideParam(this.hissGain.gain, want ? 0.012 * this.amount : 0, at);
     if (!want && this.hissOn)
-      afterFade(() => {
-        if (gen !== this.hissGen || !this.hissOn) return;
-        this.hiss.stop();
-        this.hissOn = false;
-      });
+      afterFade(
+        () => {
+          if (gen !== this.hissGen || !this.hissOn) return;
+          this.hiss.stop();
+          this.hissOn = false;
+        },
+        RAMP,
+        at,
+      );
   }
 
   get active(): boolean {
@@ -467,7 +593,7 @@ export class Air {
         this.sweepRoute.set(0);
         this.lungRoute.set(0);
         this.on = false;
-      }, 0.1);
+      }, 0.1, at);
   }
 
   get active(): boolean {

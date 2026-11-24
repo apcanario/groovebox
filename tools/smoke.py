@@ -84,6 +84,11 @@ def narrow_pass(page, failures: list, width: int = 360, height: int = 740) -> No
         page.click(f'[data-tab="{tab}"]')
         time.sleep(0.15)
         check_sizes(page, f"tab {tab} at {width} px", failures)
+        if tab in ("layer1", "layer2"):
+            # P7 review M8: the four modes beside the On switch are drawn at one size (fit.ts shrank "Drone").
+            sizes = page.evaluate("[...document.querySelectorAll('.modes .mode span')].filter(e => e.getClientRects().length).map(e => getComputedStyle(e).fontSize)")
+            if len(set(sizes)) > 1:
+                failures.append(f"tab {tab} at {width} px: the mode words are drawn at different sizes {sizes}")
     page.click('[data-tab="play"]')
     page.set_viewport_size({"width": 390, "height": 844})
     print(f"all {len(TABS)} tabs checked at {width} x {height}")
@@ -1177,6 +1182,15 @@ def jsround(x: float) -> int:
     return math.floor(x + 0.5)
 
 
+def env_seconds_text(v: float) -> str:
+    """src/ui/logic.ts envSecondsText: ".075" under 0.1 s, two decimals under 1 s, one under 10 s, then whole seconds."""
+    if v < 0.1:
+        return f"{v:.3f}"[1:]
+    if v < 1:
+        return f"{v:.2f}"
+    return f"{v:.1f}" if v < 10 else str(jsround(v))
+
+
 def advanced_read(page, sec: int, inst: str, t: dict) -> tuple:
     """In Advanced, on the tab already shown: what the control of a macro target shows, and what it should show
     for the song's value. Goes to the page (and for a layer, the mode) that holds the control."""
@@ -1232,8 +1246,10 @@ def advanced_read(page, sec: int, inst: str, t: dict) -> tuple:
     for p in ["kick", "hats", "sound"]:
         go(p)
         if page.locator(f'.body [data-dial="{inst}:{key}"]').count():
-            seconds = page.evaluate(f"document.querySelector('[data-dial=\"{inst}:{key}\"] label').textContent.endsWith(' ms')")
-            return dial(f"{inst}:{key}"), str(jsround(v * 1000)) if seconds else str(jsround(v * 100))
+            label = page.evaluate(f"document.querySelector('[data-dial=\"{inst}:{key}\"] label').textContent")
+            if label.endswith(" s"):  # P7 review S3: envelope times to 20 s, in seconds (envSecondsText)
+                return dial(f"{inst}:{key}"), env_seconds_text(v)
+            return dial(f"{inst}:{key}"), str(jsround(v * 1000)) if label.endswith(" ms") else str(jsround(v * 100))
     return None, f"{key} (no dial in Advanced)"
 
 
@@ -2037,19 +2053,33 @@ COST_SCENE = """async (extras) => {
 }"""
 
 
-def measure_cost(browser, page, label: str, extras) -> dict:
-    """Play the cost scene for six seconds under Chrome's webaudio trace and read the audio thread's load."""
+def trace_audio(browser, page, during) -> list:
+    """The audio thread's render callbacks traced while `during()` runs."""
     import json as _json
     import tempfile
-    had = page.evaluate(COST_SCENE, extras)
-    time.sleep(3.0)  # every change has landed and the reverb has been built
     path = os.path.join(tempfile.mkdtemp(), "trace.json")
     browser.start_tracing(page=page, path=path, categories=["webaudio"])
-    time.sleep(6.0)
+    during()
     browser.stop_tracing()
     data = _json.load(open(path))
     ev = data["traceEvents"] if isinstance(data, dict) else data
-    renders = [x for x in ev if x.get("name") == "AudioDestination::Render" and x.get("ph") == "X"]
+    return [x for x in ev if x.get("name") == "AudioDestination::Render" and x.get("ph") == "X"]
+
+
+def tail_drag(page) -> None:
+    """P7 review E2: the Tail dial dragged from 20 s down to 4 s, 19 moves 0.35 s apart (each builds a reverb)."""
+    for i in range(19):
+        page.evaluate("(v) => window.__groovebox.setMix('reverbDecay', v)", 20 - 16 * i / 18)
+        time.sleep(0.35)
+    time.sleep(1.0)
+
+
+def measure_cost(browser, page, label: str, extras, drag: bool = False) -> dict:
+    """Play the cost scene for six seconds under Chrome's webaudio trace and read the audio thread's load. With
+    `drag`, the trace covers a drag of the Tail dial instead (P7 review E2)."""
+    had = page.evaluate(COST_SCENE, extras)
+    time.sleep(3.0)  # every change has landed and the reverb has been built
+    renders = trace_audio(browser, page, (lambda: tail_drag(page)) if drag else (lambda: time.sleep(6.0)))
     out = {"label": label, "extras": had, "callbacks": len(renders)}
     if len(renders) > 2:
         t0 = min(x["ts"] for x in renders)
@@ -2085,6 +2115,14 @@ def walk_p7(page, failures: list) -> None:
     print(f"P7 Perc and Shaker alone: {lvl:.1f} dB")
     if lvl < -60:
         failures.append(f"P7: Perc and Shaker are silent ({lvl:.1f} dB)")
+    # P7 review S4: Perc and Shaker at level 0 read silent, as the four G1 voices do.
+    saved = page.evaluate(f"(()=>{{const p={E}.getSong().patches.drums;return {{perc:p.percLevel,shaker:p.shakerLevel}}}})()")
+    page.evaluate("()=>{for(const v of ['perc','shaker'])window.__groovebox.setParam('drums', v+'Level', 0)}")
+    gone = solo_level(page, "drums", settle=1.0)
+    print(f"P7 Perc and Shaker at level 0: {gone:.1f} dB")
+    if not gone < lvl - 20:
+        failures.append(f"P7: Perc and Shaker at level 0 did not go silent ({lvl:.1f} -> {gone:.1f} dB)")
+    page.evaluate("(s)=>{for(const v of ['perc','shaker'])window.__groovebox.setParam('drums', v+'Level', s[v])}", saved)
     page.evaluate("()=>{for(const v of ['kick','clap','hat','open'])window.__groovebox.setParam('drums', v+'Level', 1)}")
     page.evaluate(f"{E}.setDrumPreset({sec}, 'trap')")
     # The FM and noise waves sound.
@@ -2123,7 +2161,7 @@ def walk_p7(page, failures: list) -> None:
         ("synced LFO", "layer2", f"{E}.setParam('layer2', 'lfoDepth', 1)", f"{E}.setParam('layer2', 'lfoDepth', 0)", lambda s: s["lfo"]["layer2"]),
         ("lo-fi", "master", f"{E}.setMix('lofi', 1)", f"{E}.setMix('lofi', 0)", lambda s: s["lofi"]),
         ("air", "master", f"{E}.setMix('air', 1)", f"{E}.setMix('air', 0)", lambda s: s["air"]),
-        ("reverb 20 s", "master", f"{E}.setMix('reverbDecay', 20)", f"{E}.setMix('reverbDecay', 3.2)", lambda s: s["reverbDecay"] > 19),
+        ("reverb 20 s", "master", f"{E}.setMix('reverbDecay', 20)", f"{E}.setMix('reverbDecay', 1.9)", lambda s: s["reverbDecay"] > 19),
         ("swoop", "layer2", f"{E}.setPad({sec}, 'layer2', {{swoop: 1}})", f"{E}.setPad({sec}, 'layer2', {{swoop: 0.3}})", None),
         ("fifth", "layer2", f"{E}.setDrone({sec}, 'layer2', {{fifth: false}})", f"{E}.setDrone({sec}, 'layer2', {{fifth: true}})", None),
     ]
@@ -2140,15 +2178,84 @@ def walk_p7(page, failures: list) -> None:
         worst = max(worst, check_continuity(page, where, ref, f"P7: {name} off", failures))
         if running and running(st()):
             failures.append(f"P7: {name} still runs when switched off")
+    # P7 review S4: rate changes while the LFO and the drift move, and a mode change away from the drone and back.
+    for name, on, change, off in [
+        ("LFO rate", f"{E}.setParam('layer2', 'lfoDepth', 1)", [f"{E}.setParam('layer2', 'lfoRate', 0.9)", f"{E}.setParam('layer2', 'lfoRate', 0.3)"], f"{E}.setParam('layer2', 'lfoDepth', 0)"),
+        ("drift rate", f"{E}.setParam('layer2', 'drift', 1)", [f"{E}.setParam('layer2', 'driftRate', 1)", f"{E}.setParam('layer2', 'driftRate', 0.2)"], f"{E}.setParam('layer2', 'drift', 0)"),
+    ]:
+        page.evaluate(on)
+        time.sleep(1.2)
+        for c in change:
+            read_jumps(page, "layer2")
+            page.evaluate(c)
+            time.sleep(1.2)
+            worst = max(worst, check_continuity(page, "layer2", steady, f"P7: {name} change", failures))
+        page.evaluate(off)
+        time.sleep(1.2)
+    page.evaluate(f"{E}.setLayerMode({sec}, 'layer2', 'arp')")
+    time.sleep(2.5)
+    arp_steady = steady_jumps(page, "layer2", 1.5)
+    read_jumps(page, "layer2")
+    page.evaluate(f"{E}.setLayerMode({sec}, 'layer2', 'drone')")
+    time.sleep(1.5)
+    worst = max(worst, check_continuity(page, "layer2", max(steady, arp_steady), "P7: arp -> drone", failures))
+    time.sleep(1.5)
+    # The drone back: a wave change while it holds (E1). Two changes and a chord change later it still sounds at its
+    # level and holds its notes, now on the newest voice set.
+    s3 = st()
+    before = solo_level(page, "layer2", settle=0.3)
+    page.evaluate(f"{E}.setParam('layer2', 'wave', 'triangle')")
+    time.sleep(0.8)
+    page.evaluate(f"{E}.setParam('layer2', 'wave', 'sine')")
+    time.sleep(2.6)
+    s4 = st()
+    after = solo_level(page, "layer2", settle=0.3)
+    print(f"P7 drone over two wave changes and a chord change: {before:.1f} -> {after:.1f} dB, held {s4['held']['layer2']}, "
+          f"moved {s4['reholds']['layer2'] - s3['reholds']['layer2']} times, {s4['swoops']['layer2'] - s3['swoops']['layer2']} glides")
+    if abs(after - before) > 6:
+        failures.append(f"P7: the drone went from {before:.1f} to {after:.1f} dB over two wave changes (E1)")
+    if s4["held"]["layer2"] != 2 or s4["reholds"]["layer2"] - s3["reholds"]["layer2"] != 2:
+        failures.append(f"P7: after two wave changes the drone holds {s4['held']['layer2']} notes, moved {s4['reholds']['layer2'] - s3['reholds']['layer2']} times (want 2, 2)")
+    if s4["swoops"]["layer2"] <= s3["swoops"]["layer2"]:
+        failures.append("P7: no chord change reached the drone after two wave changes")
+    # Wave changes while it holds, through FM and noise: no click over either wave's own sound.
+    prev = steady_jumps(page, "layer2", 1.0)
+    for wave in ["sawtooth", "fm", "noise", "sawtooth"]:
+        read_jumps(page, "layer2")
+        page.evaluate(f"{E}.setParam('layer2', 'wave', '{wave}')")
+        time.sleep(1.2)
+        r = read_jumps(page, "layer2")
+        new = steady_jumps(page, "layer2", 1.0)
+        worst = max(worst, check_continuity(page, "layer2", max(prev, new), f"P7: wave to {wave} while the drone holds", failures, r) * max(prev, new) / steady)
+        prev = new
+        if wave == "noise" and not st()["breath"]["layer2"]:
+            failures.append("P7: the noise wave's breath is not running")
+    time.sleep(2.6)  # the pad release (2 s) of the breath
+    if st()["breath"]["layer2"]:
+        failures.append("P7: the breath noise still runs after the wave left noise")
+    page.evaluate(f"{E}.setParam('layer2', 'wave', 'sine')")
     s2 = st()
+    # Off costs nothing (P7 review M5): with the LFOs, the drift, the air and the lo-fi off, no LFO source runs and
+    # no drift pitch is wired to the voices.
+    if s2["lfoSources"] != 0 or any(s2["driftWired"].values()):
+        failures.append(f"P7: with every LFO off, {s2['lfoSources']} LFO sources run; drift pitch wired {s2['driftWired']}")
     for inst in ["synth", "layer1", "layer2"]:
         if s2["voices"][inst] > 2 * s2["cap"][inst]:
             failures.append(f"P7: {inst} has {s2['voices'][inst]} voices, over twice its cap of {s2['cap'][inst]} (live and ringing sets)")
     act = page.evaluate(f"{E}.activeVoices('layer2')")
     if act > s2["cap"]["layer2"]:
         failures.append(f"P7: layer2 sounds {act} voices, over its cap {s2['cap']['layer2']}")
-    print(f"P7: seven switches made while a drone sounds; largest jump {worst:.2f} times the steady sound's; voices {s2['voices']}, caps {s2['cap']}")
+    print(f"P7: switches made while a drone sounds; largest jump {worst:.2f} times the steady sound's; voices {s2['voices']}, caps {s2['cap']}")
+    # The breath runs only while the transport plays (P7 review M6).
+    page.evaluate(f"{E}.setParam('synth', 'wave', 'noise')")
+    time.sleep(0.3)
+    if not st()["breath"]["synth"]:
+        failures.append("P7: the synth's noise breath is not running while playing")
     page.click("#play")
+    time.sleep(1.5)
+    if st()["breath"]["synth"]:
+        failures.append("P7: the noise breath runs while stopped")
+    page.evaluate(f"{E}.setParam('synth', 'wave', 'sawtooth')")
 
 
 FIRST_SONG: list = []
@@ -2165,6 +2272,14 @@ def walk_cost(browser, page, failures: list) -> None:
     # Reported, not judged: the headless trace already shows callbacks longer than their period before P7.
     if out.get("worst_ms") is None:
         failures.append("cost: no audio render callbacks traced")
+    # P7 review E2: a drag of the Tail dial keeps at most two reverbs alive (it used to pile one up per move).
+    drag = measure_cost(browser, page, "everything on, Tail dial dragged", True, drag=True)
+    st = page.evaluate("window.__groovebox.p7State()")
+    print(f"cost: reverbs alive during the drag at most {st['reverbMaxSlots']}, now {st['reverbSlots']}")
+    if st["reverbMaxSlots"] > 2:
+        failures.append(f"cost: dragging the Tail dial kept {st['reverbMaxSlots']} reverbs alive at once (at most 2)")
+    if drag.get("load", 0) > out.get("load", 0) + 15:
+        failures.append(f"cost: dragging the Tail dial raised the audio load from {out.get('load', 0):.1f}% to {drag['load']:.1f}%")
     page.click("#play")
 
 

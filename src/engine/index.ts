@@ -5,6 +5,7 @@
  */
 import * as Tone from "tone";
 import { Graph } from "./audio.ts";
+import { Lfo } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { JumpWatch, type Jumps } from "./continuity.ts";
@@ -861,6 +862,13 @@ export class Engine {
     lofi: boolean;
     air: boolean;
     reverbDecay: number;
+    /** P7 review: the noise wave's breath running, held notes moved by a wave change, reverbs alive (now, most at once), LFO sources running, drift pitch wired. */
+    breath: Record<"bass" | LayerInstrument | "synth", boolean>;
+    reholds: Record<LayerInstrument | "synth", number>;
+    reverbSlots: number;
+    reverbMaxSlots: number;
+    lfoSources: number;
+    driftWired: Record<LayerInstrument | "synth", boolean>;
   } | null {
     const g = this.graph;
     if (!g) return null;
@@ -876,6 +884,12 @@ export class Engine {
       lofi: g.lofi.active,
       air: g.air.active,
       reverbDecay: g.reverb.decay,
+      breath: per(["bass", ...polys], (id) => g.instruments[id as "bass"].breathing) as Record<"bass" | LayerInstrument | "synth", boolean>,
+      reholds: per(polys, (id) => g.instruments[id as "synth"].reholds) as Record<LayerInstrument | "synth", number>,
+      reverbSlots: g.reverb.slots,
+      reverbMaxSlots: g.reverb.maxSlots,
+      lfoSources: Lfo.sources,
+      driftWired: per(polys, (id) => g.instruments[id as "synth"].channel.drift?.wired ?? false) as Record<LayerInstrument | "synth", boolean>,
     };
   }
 
