@@ -1843,6 +1843,7 @@ def walk_p3(page, failures: list) -> None:
     before = page.evaluate("window.__keeper.list().then(l => l.length)")
     vibes = page.evaluate("window.__vibes")
     timed = 0
+    fx_rates = 0
     for v in vibes:
         page.click("#new-jam")
         wait_for(page, f"{E}.position().step >= 2 && {E}.position().step <= 8", 6.0)
@@ -1865,6 +1866,8 @@ def walk_p3(page, failures: list) -> None:
         wanted = {i: [(x["effect"], x["on"]) for x in song_fx[i]] for i in LAYERS}
         if playing != wanted:
             failures.append(f"{v['id']}: the effect slots playing {playing} are not the vibe's {wanted}")
+        # P9 review S2: its synced effects run at its tempo.
+        fx_rates += check_fx_tempo(page, failures, f"{v['id']} at {v['bpm']} bpm")
         bar_s = 4 * 60 / v["bpm"]
         quiet = []
         for inst in LAYERS:
@@ -1876,7 +1879,7 @@ def walk_p3(page, failures: list) -> None:
         print(f"vibe {v['name']}: landed on the bar at {v['bpm']} bpm, every instrument audible")
     if timed < 3:
         failures.append(f"the synth cutoff was checked across only {timed} vibe landings, expected at least 3")
-    print(f"vibe landings: synth cutoff old before the bar line, new after it, on {timed} landings")
+    print(f"vibe landings: synth cutoff old before the bar line, new after it, on {timed} landings; synced effect rates at the vibe's tempo checked: {fx_rates}")
     after = page.evaluate("window.__keeper.list().then(l => l.length)")
     if after != before + len(vibes):
         failures.append(f"each vibe should be a new song kept in Songs: {before} songs before, {after} after {len(vibes)} vibes")
@@ -2394,7 +2397,8 @@ FX_CHECK_KNOBS = {
     "echo": [1, 0, 0],  # all wet, a sixteenth, no feedback
 }
 # When a timed switch lands: on a peak of the probe, and where the effect's sound differs from the dry one (Gate on
-# a closed sixteenth of Stab, Tremolo low in its cycle, Pan to a side, Ring's carrier away from 1).
+# a closed sixteenth of Stab, Tremolo low in its cycle, Pan to a side, Ring's carrier away from 1, Flanger's delayed
+# sound away from the dry one).
 FX_SWITCH_AT = """(a) => {
   const e = window.__groovebox, c = e.fxClock(), spb = 60 / c.bpm;
   const beats = (t) => c.beats + (t - c.now) / spb;
@@ -2408,6 +2412,11 @@ FX_SWITCH_AT = """(a) => {
     if (a.fx === 'tremolo') return Math.cos(2 * Math.PI * b) < -0.8;
     if (a.fx === 'pan') return Math.abs(Math.cos(2 * Math.PI * b)) > 0.8;
     if (a.fx === 'ring' && !a.on) return Math.sin(2 * Math.PI * 30 * (t - a.tOn)) < -0.6;
+    if (a.fx === 'flanger' && !a.on) {
+      // Its delay sweeps 3.3 to 10.3 ms from the top of a 0.05 Hz cycle at the switch on: off where wet and dry differ.
+      const D = 0.0068 + 0.0035 * Math.cos(2 * Math.PI * 0.05 * (t - a.tOn));
+      return Math.abs(0.707 * x(t - D) - 0.293 * x(t)) > 0.3;
+    }
     return true;
   };
   let t = c.now + 0.15;
@@ -2531,11 +2540,36 @@ def fx_click_checks(page, failures: list, effects: list) -> None:
 
 
 
+def check_fx_tempo(page, failures: list, where: str) -> int:
+    """P9 review S2: every synced effect that is on runs at the tempo: its LFO at bpm / 60 / its beats, Echo at its
+    beats of the bpm. Returns how many rates it checked."""
+    E = "window.__groovebox"
+    st = page.evaluate(f"{E}.fxState()")
+    bpm = page.evaluate(f"{E}.bpm")
+    n = 0
+    for i in LAYERS:
+        for s, x in enumerate(st["slots"][i]):
+            if not x["on"]:
+                continue
+            if x.get("beats") and x.get("lfoHz") is not None:
+                want = bpm / 60 / x["beats"]
+                n += 1
+                if abs(x["lfoHz"] - want) > 0.01 * want:
+                    failures.append(f"{where}: {x['effect']} in {i}'s slot {s + 1} moves at {x['lfoHz']:.3f} Hz, {bpm} bpm wants {want:.3f}")
+            if x.get("echoS") is not None:
+                want = x["echoBeats"] * 60 / bpm
+                n += 1
+                if abs(x["echoS"] - want) > 0.002:
+                    failures.append(f"{where}: Echo in {i}'s slot {s + 1} repeats every {x['echoS']:.3f} s, {bpm} bpm wants {want:.3f}")
+    return n
+
+
 def walk_p9(page, failures: list) -> None:
     """P9 (spec 8.8), on the first song's groove while playing. Every effect on every instrument is audible (its sound
-    after the slots differs from the sound going in) and an off slot is disconnected and passes the sound unchanged.
-    Switching each effect on and off, and changing a slot's effect, while a steady drone sounds makes no click (level
-    continuity), and the click check is shown to catch a stepped switch. The cap keeps six slots on, the newest, and
+    after the slots differs from the sound going in) and an off slot is disconnected and passes the sound unchanged;
+    slot 2 the same on Bass. The synced effects follow the tempo. Switching each effect on and off, turning each knob
+    and changing a slot's effect make no click on any instrument (fx_click_checks, on a steady sine), and the check
+    is shown to catch a stepped switch of every effect on every instrument. The cap keeps six slots on, the newest, and
     its switch-off makes no click. Simple: two on/off buttons per instrument tab named after its slots, and the lo-fi
     master as one on/off on the Mix tab. Advanced: the FX page of every instrument picks the effect, switches it and
     turns its three knobs."""
@@ -2569,7 +2603,8 @@ def walk_p9(page, failures: list) -> None:
             built = fs()["built"]
             page.evaluate(f"{E}.setFx('{inst}', 0, {{on: true}})")
             built_on += fs()["built"] - built
-            time.sleep(0.25)
+            # Echo is heard from its first repeat on (both sides: two of its times).
+            time.sleep(0.25 + 2 * (fs()["slots"][inst][0]["echoS"] or 0))
             r, ref = fx_diff(page, inst)
             weakest = min(weakest, (r, f"{fx} on {inst}"))
             if r < FX_AUDIBLE:
@@ -2579,14 +2614,59 @@ def walk_p9(page, failures: list) -> None:
                 failures.append(f"P9: {fx} on {inst}: the slot is {st}")
             page.evaluate(f"{E}.setFx('{inst}', 0, {{on: false}})")
         time.sleep(0.4)
+        # Echo rings on after it is switched off (review M7): the slot is cut once its repeats have died away.
+        wait_for(page, f"!window.__groovebox.fxState().slots.{inst}.some((x) => x.wired)", 6.0)
         st = fs()["slots"][inst]
         if any(x["wired"] for x in st):
             failures.append(f"P9: {inst}: a slot switched off is still connected: {st}")
         r, _ = fx_diff(page, inst, 0.4)
         if r > FX_BYPASS:
             failures.append(f"P9: {inst}: after its effects went off its sound still changes through the slots ({r:.4f})")
+    # P9 review M3: slot 2 too, on one instrument: every effect audible there, and off it passes the sound unchanged
+    # and is disconnected.
+    weakest2 = (9.0, "")
+    for fx in effects:
+        page.evaluate(f"{E}.setFx('bass', 1, {{effect: '{fx}'}})")
+        built = fs()["built"]
+        page.evaluate(f"{E}.setFx('bass', 1, {{on: true}})")
+        built_on += fs()["built"] - built
+        time.sleep(0.25 + 2 * (fs()["slots"]["bass"][1]["echoS"] or 0))
+        r, ref = fx_diff(page, "bass")
+        weakest2 = min(weakest2, (r, fx))
+        if r < FX_AUDIBLE:
+            failures.append(f"P9: {fx} in Bass's slot 2 is not audible (difference {r:.3f} of the input, wanted {FX_AUDIBLE})")
+        st = fs()["slots"]["bass"][1]
+        if not (st["on"] and st["wired"] and st["effect"] == fx):
+            failures.append(f"P9: {fx} in Bass's slot 2: the slot is {st}")
+        page.evaluate(f"{E}.setFx('bass', 1, {{on: false}})")
+    # Echo rings on after it is switched off (review M7): the slot is cut once its repeats have died away.
+    if not wait_for(page, "!window.__groovebox.fxState().slots.bass.some((x) => x.wired)", 6.0):
+        failures.append(f"P9: bass: slot 2 switched off is still connected: {fs()['slots']['bass']}")
+    r, _ = fx_diff(page, "bass", 0.4)
+    if r > FX_BYPASS:
+        failures.append(f"P9: bass: after slot 2's effects went off its sound still changes through the slots ({r:.4f})")
+    print(f"P9: slot 2 (on Bass): all {len(effects)} effects audible, weakest {weakest2[1]} at {weakest2[0]:.3f}; off passes the sound unchanged")
     if built_on:
         failures.append(f"P9: switching a slot on built {built_on} effects (they are built in advance)")
+
+    # P9 review S2: the synced effects follow the tempo. Tremolo at 1/4 and Echo at 1/8 on Drums, at 120 then 90 bpm.
+    was_bpm = page.evaluate(f"{E}.bpm")
+    page.evaluate(f"{E}.bpm = 120")
+    page.evaluate(f"{E}.setFx('drums', 0, {{effect: 'tremolo', knobs: [0.7, 4 / 7, 0.3], on: true}})")
+    page.evaluate(f"{E}.setFx('drums', 1, {{effect: 'echo', knobs: [0.45, 0.2, 0.45], on: true}})")
+    seen = []
+    for bpm, hz, sec_ in [(120, 2.0, 0.25), (90, 1.5, 1 / 3)]:
+        page.evaluate(f"{E}.bpm = {bpm}")
+        time.sleep(0.5)
+        sl = fs()["slots"]["drums"]
+        seen.append(f"{bpm} bpm: Tremolo {sl[0]['lfoHz']:.3f} Hz, Echo {sl[1]['echoS']:.3f} s")
+        if sl[0]["lfoHz"] is None or abs(sl[0]["lfoHz"] - hz) > 0.01 or sl[1]["echoS"] is None or abs(sl[1]["echoS"] - sec_) > 0.002:
+            failures.append(f"P9: at {bpm} bpm Tremolo at 1/4 runs at {sl[0]['lfoHz']} Hz (want {hz}) and Echo at 1/8 is {sl[1]['echoS']} s (want {sec_:.3f})")
+    n = check_fx_tempo(page, failures, "P9 at 90 bpm")
+    print(f"P9: the synced effects follow the tempo: {'; '.join(seen)} ({n} rates checked)")
+    page.evaluate(f"{E}.bpm = {was_bpm}")
+    all_fx_off(page)
+    time.sleep(0.3)
     print(f"P9: all {len(effects)} effects audible on all five instruments; weakest {weakest[1]} at {weakest[0]:.3f} of the input "
           f"(wanted {FX_AUDIBLE}); every slot off passes the sound unchanged and is disconnected")
 
@@ -2938,6 +3018,7 @@ def main() -> int:
             walk_p4(page, failures)
             walk_p7(page, failures)
             walk_p9(page, failures)
+            walk_fx_load(browser, page, failures)
             walk_cost(browser, page, failures)
             browser.close()
     finally:
