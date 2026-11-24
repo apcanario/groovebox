@@ -298,8 +298,8 @@ Things that make a sound weird and fun. All synthesized, all switchable while pl
 | Shifter | Frequency shift: detuned, alien. | Mix, Shift, Feedback |
 | Echo | A ping-pong delay of the instrument's own. | Mix, Time, Feedback |
 
-- **Simple:** each instrument tab shows its two slots as two large on/off buttons carrying the effect's name. The vibe decides which two effects are in the slots and how they are set. Nothing else to adjust.
-- **Advanced:** an FX page on each instrument tab: per slot, a picker for the effect, an on/off, and its three knobs.
+- **Simple:** each instrument tab shows its two slots as two large on/off buttons carrying the effect's name. The vibe decides which two effects are in the slots and how they are set. Nothing else to adjust. P9: on a short phone (360 x 640) they sit stacked beside the XY pad, and on the layers in the row of Back and New idea, so nothing scrolls.
+- **Advanced:** an FX page on each instrument tab: per slot, a picker for the effect, an on/off, and its three knobs. P9: two slot chips choose the slot shown; the picker opens as a sheet of the twelve, so the page fits a short phone.
 - **Rates are tempo-synced** where the effect moves in time (Tremolo, Pan, Gate, and Phaser and Flanger when set to a note value).
 - **Master effects** stay on the Mix tab: the filter sweep, pump, saturation, and the lo-fi master of 8.7. Simple shows the lo-fi master as one on/off.
 - **Cost:** a slot that is off is disconnected and costs nothing. At most two effects per instrument. P9 measured all ten slots on against all off with everything else on (24 Nov 2026, `tools/cost.py`, median of 5): audio load 77.5% against 64.2%, worst stall about the same (20.6 against 22.5 ms). That is too much for a phone, so **at most six slots are active at once across the app** (Pedro's decision, 24 Nov 2026). Every effect and both slots of every instrument stay to choose from; switching on a seventh slot turns off the slot switched on longest ago, with the same crossfade as any switch (no click) and no menu. A vibe arrives with six slots on at most.
