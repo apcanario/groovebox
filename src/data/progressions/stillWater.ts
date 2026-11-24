@@ -4,7 +4,7 @@ export default {
   order: 223,
   name: "Still water",
   feels: ["dreamy"],
-  vibes: ["loFi", "ambient", "drone", "downtempo"],
+  vibes: ["loFi", "downtempo"],
   mood: "major",
   voicing: "triads",
   chords: [[5, 2], [3, 2]],

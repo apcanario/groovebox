@@ -4,7 +4,7 @@ export default {
   order: 205,
   name: "Floating",
   feels: ["dreamy"],
-  vibes: ["ambient", "trance"],
+  vibes: ["trance"],
   mood: "major",
   voicing: "triads",
   chords: [[3, 2], [5, 2]],

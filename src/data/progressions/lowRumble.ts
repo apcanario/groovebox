@@ -4,7 +4,7 @@ export default {
   order: 421,
   name: "Low rumble",
   feels: ["tense"],
-  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "dubstep", "ambient", "drone"],
+  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "dubstep"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 2], [6, 2]],

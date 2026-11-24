@@ -4,7 +4,7 @@ export default {
   order: 102,
   name: "Velvet room",
   feels: ["warm"],
-  vibes: ["deepHouse", "afroHouse", "deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi", "ambient", "drone"],
+  vibes: ["deepHouse", "afroHouse", "deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi"],
   mood: "deep",
   voicing: "extended",
   chords: [[0, 2], [6, 2]],

@@ -4,7 +4,7 @@ export default {
   order: 307,
   name: "Deep water",
   feels: ["dark"],
-  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "dubstep", "ambient", "drone"],
+  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "dubstep"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 2], [5, 2]],

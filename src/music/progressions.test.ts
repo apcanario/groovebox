@@ -33,6 +33,18 @@ describe("the progression library", () => {
     expect(short).toEqual([]);
   });
 
+  it("gives Ambient and Drone only chords of four or eight bars (spec 8.10, P8 review E1), at least seven per feel", () => {
+    const short: string[] = [];
+    for (const v of ["ambient", "drone"] as const) {
+      for (const id of PROGRESSION_IDS) {
+        const p = PROGRESSIONS[id];
+        if (p.vibes.includes(v) && p.chords.some(([, bars]) => bars < 4)) short.push(`${v}: ${id}`);
+      }
+      for (const f of FEELS) expect(progressionsFor(v, f).length, `${v}/${f}`).toBeGreaterThanOrEqual(7);
+    }
+    expect(short).toEqual([]);
+  });
+
   it("tags each vibe by choice, not by blanket group (C10): no two vibes share a set of cards, none shares most of another's", () => {
     const sets = LAUNCH_VIBES.map((v) => new Set(PROGRESSION_IDS.filter((id) => PROGRESSIONS[id].vibes.includes(v))));
     const close: string[] = [];

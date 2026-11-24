@@ -5,7 +5,7 @@ export default {
   order: 902,
   name: "Wide horizon",
   feels: ["dreamy", "uplifting"],
-  vibes: ["ambient", "drone"],
+  vibes: ["ambient"],
   mood: "major",
   voicing: "triads",
   chords: [[0, 4], [3, 4], [5, 4], [4, 4]],

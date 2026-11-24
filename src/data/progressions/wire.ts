@@ -4,7 +4,7 @@ export default {
   order: 406,
   name: "Wire",
   feels: ["tense"],
-  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "ambient", "drone"],
+  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno"],
   mood: "dark",
   voicing: "low",
   chords: [[1, 2], [0, 2]],
