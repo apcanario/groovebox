@@ -2915,8 +2915,13 @@ def main() -> int:
                 args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"], **kwargs
             )
             page = browser.new_page(viewport={"width": 390, "height": 844})
-            # The error and where it was thrown (the first frames of its stack).
-            page.on("pageerror", lambda e: errors.append(f"{e} [{' | '.join((getattr(e, 'stack', '') or '').splitlines()[1:4])}]"))
+            # The error and where it was thrown (the first frames of its stack), also printed where it happens in the walk.
+            def page_error(e) -> None:
+                msg = f"{e} [{' | '.join(x.strip() for x in (getattr(e, 'stack', '') or '').splitlines()[1:9])}]"
+                errors.append(msg)
+                print(f"PAGE ERROR: {msg}")
+
+            page.on("pageerror", page_error)
             page.on(
                 "response",
                 lambda r: errors.append(f"{r.status} {r.url}")
