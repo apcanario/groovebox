@@ -54,6 +54,15 @@ function raw(): BaseAudioContext {
   return Tone.getContext().rawContext as unknown as BaseAudioContext;
 }
 const now = (): number => raw().currentTime;
+/**
+ * Seconds ahead of the context's time that a change made now starts. The time read here is already behind the audio
+ * thread when the change reaches it (by up to a callback, more under load), and a glide whose start has passed jumps
+ * to where it would be by then: a crossfade made at "now" stepped part of the way at once (the P9 smoke's click on
+ * an effect changed while on, about 3 in 100 changes on an idle machine). Starting this far ahead keeps the whole glide.
+ */
+const AHEAD = 0.03;
+/** When a change for audio time `at` (else now) starts: never before AHEAD from now. */
+const soon = (at?: number): number => Math.max(at ?? 0, now() + AHEAD);
 
 /** The transport as the synced effects read it: beats at an audio time (0 while stopped) and the tempo. */
 export interface FxClock {
@@ -69,7 +78,7 @@ export const fxDebug = { hard: false };
 
 /** Move a native parameter to `value` from `at` (else now), from wherever it is: no step. */
 function glide(p: AudioParam, value: number, at?: number, tau = RAMP / 4): void {
-  const t = Math.max(at ?? 0, now());
+  const t = soon(at);
   p.cancelScheduledValues(t);
   p.setTargetAtTime(value, t, tau);
 }
@@ -77,7 +86,7 @@ function glide(p: AudioParam, value: number, at?: number, tau = RAMP / 4): void 
 /** A slot's switch: a ramp, or (fxDebug.hard) a step. */
 function fade(p: AudioParam, value: number, at?: number): void {
   if (!fxDebug.hard) return glide(p, value, at);
-  const t = Math.max(at ?? 0, now());
+  const t = soon(at);
   p.cancelScheduledValues(t);
   p.setValueAtTime(value, t);
 }
@@ -557,7 +566,7 @@ abstract class WorkletBlend extends Blend {
     const p = this.node ? wparam(this.node, name) : null;
     if (!p) return;
     if (!step) return glide(p, value, at);
-    const t = Math.max(at ?? 0, now());
+    const t = soon(at);
     p.cancelScheduledValues(t);
     p.setValueAtTime(value, t);
   }
@@ -600,7 +609,7 @@ class Crush extends WorkletBlend {
     if (this.isRunning && Math.abs(bits - was) > 1) {
       // A jump of more than a bit (a dial's drag moves less): gliding there would sweep through every coarser
       // staircase on the way, a burst. The wet path closes, the bits change while it is shut, and it opens again.
-      const t = Math.max(at ?? 0, now());
+      const t = soon(at);
       const shut = t + (5 * RAMP) / 4;
       this.param("bits", bits, shut, true);
       const [, w] = mixGains(k[2]);
@@ -911,7 +920,7 @@ class Echo extends Effect {
     const s = this.seconds(bpm);
     if (Math.abs(s - this.secs) < 1e-6) return;
     this.secs = s;
-    const t = Math.max(at ?? 0, now());
+    const t = soon(at);
     const shut = t + 5 * RAMP / 4;
     for (const h of [this.hushL, this.hushR]) {
       h.gain.cancelScheduledValues(t);
@@ -1043,7 +1052,7 @@ export class FxSlotNode {
     this.on = on;
     const gen = ++this.gen;
     const v = this.cur;
-    const t = Math.max(at ?? 0, now());
+    const t = soon(at);
     if (on) {
       this.wire(v);
       const open = v.fx.isRunning ? t : t + v.fx.startDelay;
@@ -1102,7 +1111,7 @@ export class FxSlotNode {
       return;
     }
     // A crossfade from the old effect to the new one; the old one is freed once silent.
-    const t = Math.max(at ?? 0, now());
+    const t = soon(at);
     const open = t + next.fx.startDelay;
     this.wire(next);
     next.fx.start(t);

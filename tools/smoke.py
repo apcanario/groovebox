@@ -362,6 +362,22 @@ def read_level(page, seconds: float, settle: float) -> float:
     return peak
 
 
+def read_peak(page, seconds: float, settle: float) -> float:
+    """Loudest raw sample at the output over `seconds`, after `settle` seconds, in dBFS (-999 for silence). The scope
+    holds the last ~0.37 s and is read every 0.1 s, so every sample is seen. read_level's meter is an RMS of the last
+    256 samples (5 ms) at each read: a short hit between two reads is missed, and with the reads about 110 ms apart,
+    nine of them span a clap's beat at 122 bpm, so all of a 3 s window's claps can fall between reads (the smoke's
+    "drum voice clap alone is silent (-108.6 dB)", reproduced headlessly with every clap started)."""
+    time.sleep(settle)
+    peak = -999.0
+    for _ in range(int(seconds / 0.1)):
+        time.sleep(0.1)
+        v = page.evaluate("window.__groovebox.peak()")
+        if v is not None:
+            peak = max(peak, v)
+    return peak
+
+
 def solo_level(page, layer: str, seconds: float = 2.0, settle: float = 0.4) -> float:
     """Loudest master reading with one instrument soloed, after `settle` seconds (the shared reverb tail)."""
     solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
@@ -420,14 +436,14 @@ def walk_drum_levels(page, saved: dict, failures: list) -> None:
         g = wait_for_value(page, gain % v, TRIMS[v] * saved[v + "Level"])
         if abs(g - TRIMS[v] * saved[v + "Level"]) > 1e-3:
             failures.append(f"{v}Level back to {saved[v + 'Level']} left its gain at {g:.3f}")
-        alone = read_level(page, 3.0, settle=1.0)
+        alone = read_peak(page, 3.0, settle=1.0)
         page.evaluate(set_level, [v, 0])
-        gone = read_level(page, 2.2, settle=1.0)
+        gone = read_peak(page, 2.2, settle=1.0)
         gains = [round(page.evaluate(gain % o), 4) for o in DRUM_VOICES]
         if any(gains):
             failures.append(f"every drum level at 0 left gains {dict(zip(DRUM_VOICES, gains))}")
         report.append(f"{v} {alone:.1f} -> {gone:.1f}")
-        # Closed hats alone read about -45 to -65 dB (trim 0.22, velocity 0.3, high-passed); silence reads below -100.
+        # Read as the output's peak sample (read_peak): every hit is seen. Silence reads below -100 dBFS.
         if alone < -90:
             failures.append(f"drum voice {v} alone is silent ({alone:.1f} dB)")
         if not gone < alone - 20:
@@ -436,7 +452,7 @@ def walk_drum_levels(page, saved: dict, failures: list) -> None:
             page.evaluate(set_level, [o, saved[o + "Level"]])
     page.evaluate(solo, None)
     page.evaluate("(p)=>window.__groovebox.setParams('drums', p)", saved)
-    print("drum voices alone, level at setting -> 0 (dB): " + ", ".join(report))
+    print("drum voices alone, level at setting -> 0 (peak dBFS): " + ", ".join(report))
 
 
 def walk_held_synth(page, sec: int, failures: list) -> None:

@@ -77,4 +77,37 @@ describe("attack queue", () => {
     tone.tick(0.8);
     expect(log).toEqual(["now", "a", "d", "e"]);
   });
+
+  it("drops no attack: a clap queued behind earlier waiting hits, through slow ticks, starts once, in time order", () => {
+    // The smoke's silent clap (G3): every attack asked for must start, without a Stop. Hits at fixed, interleaved
+    // times (a roll's hits, swung hats, a clap at the same time as a waiting hit), started from steps that run late.
+    const tone = new FakeTone([]);
+    const q = new AttackQueue(tone);
+    const asked: { t: number; name: string }[] = [];
+    const started: { t: number; name: string }[] = [];
+    const ask = (t: number, name: string): void => {
+      asked.push({ t, name });
+      q.at(t, () => started.push({ t, name }));
+    };
+    for (let bar = 0; bar < 8; bar++) {
+      const b = 0.2 + bar * 0.48;
+      // A roll's four hits ahead, then a clap at the third hit's time and a hat between, asked later.
+      [0, 1, 2, 3].forEach((k) => ask(b + k * 0.03, `roll${k}`));
+      ask(b + 0.06, "clap");
+      ask(b + 0.045, "hat");
+      // Asked ahead, as the sequencer asks within the lookahead; a bar is 0.48 s of ticks, some held by a slow timeout.
+      tone.tick(0.05, 0.07);
+      ask(b + 0.24, "clap");
+      for (let i = 0; i < 6; i++) tone.tick(0.05);
+      tone.tick(0.03, 0.03);
+    }
+    for (let i = 0; i < 20; i++) tone.tick(0.05);
+    expect(q.size).toBe(0);
+    expect(started.length).toBe(asked.length);
+    expect(started.filter((s) => s.name === "clap").length).toBe(16);
+    // Each one exactly once, in audio-time order.
+    const key = (x: { t: number; name: string }): string => `${x.t.toFixed(4)} ${x.name}`;
+    expect(new Set(started.map(key)).size).toBe(asked.length);
+    for (let i = 1; i < started.length; i++) expect(started[i].t).toBeGreaterThanOrEqual(started[i - 1].t);
+  });
 });
