@@ -178,7 +178,7 @@ export function moveChord(seq: ChordStep[], i: number, dir: -1 | 1): ChordStep[]
   return out;
 }
 
-/** Cycle a chord's length: 1 bar, 2 bars, half a bar. */
+/** Cycle a chord's length: 1, 2, 4 and 8 bars, then half a bar. */
 export function cycleLength(seq: ChordStep[], i: number): ChordStep[] {
   if (i < 0 || i >= seq.length) return seq;
   const next = LENGTHS[(LENGTHS.indexOf(seq[i].bars) + 1) % LENGTHS.length];

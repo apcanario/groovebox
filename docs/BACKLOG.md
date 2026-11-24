@@ -6,7 +6,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
 | 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
-| 6 | P7, P9, P8 (all Done) | New sounds, effects, all 24 vibes |
+| 6 | P7, P9, P8 (Done) | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
 | 9 | G7 | Retouch from notes |
@@ -22,14 +22,11 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C7. Bundle 4 listen item** (23 Nov 2026): the drum lane is about 32 px high at 640 px screen height (recorded choice); say in the notes if it is hard to read.
 - **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
-- **C14. P7 listen items** (24 Nov 2026): the 20 s reverb decay is a 3.2 s impulse plus a feedback tail (a full 20 s impulse took load to about 93%); say in the notes if the tail sounds wrong, and that the default reverb tail is now measurably longer in every vibe (review S1, fixed to match the old tail by default). Drift pans the sound rather than widening it, because the voices are mono (review M3); the Drone mode and Swoop glide, the air layer and the lo-fi master need Pedro's ears. On short screens the mode icons hide under 400 px so "Drone" draws at full size (review M8).
-- **C15. P7 cost measure, for P9** (24 Nov 2026): everything on, base about 51 to 56% load and 12 to 14 ms worst stall, P7 about 54 to 71% and 10 to 20 ms; single runs vary by about 10%, so `tools/cost.py` (median of 5) is the measure. P9 reports against the P7 figures. A Tail-dial drag sits at 58 to 82% load. Pedro's choice (24 Nov 2026): if ten effect slots cost too much, cap how many slots are active at once (oldest turns off, no click), and keep all twelve effects and two slots per instrument to choose from.
-- **C16. P9 listen items and cap** (24 Nov 2026): all twelve effects, two slots per instrument; at most six slots are active at once (the oldest turns off when a seventh is switched on, no click), as Pedro decided. Measured load, `tools/cost.py` median of 5: all off 64.2%, the six in use 69.4%, the heaviest six 71.5%, all ten 71.9%; the heaviest six sit at the top of P7's 54 to 71% range, almost as heavy as all ten, so whether the cap is still the right figure is Pedro's call. Whether the effects are weird and fun is Pedro's ear. Air and reverb switches cannot be caught as clicks by the smoke test (they are counted, not judged).
-- **C17. Smoke notes, for P8** (24 Nov 2026): smoke takes about 19 minutes. The P7 "3.03" jump was a waveform's own edge, not a click (every figure is now judged against its own reference). The smoke's drum check reads the output's peak sample now (the old 5 ms RMS read missed claps; flaky, not a defect), and the record-timer check compares with the measured elapsed time (it failed on a slow box; flaky, not a defect). The G3 check "no sub-oscillator detunes read on the held chord" was real: see the P9 changelog line.
-- **C19. P8 listen items** (24 Nov 2026): from G5 to P9 a short note's ended oscillator could cut the next note to 0 Hz (the G5 leak patch disconnected an oscillator's frequency and detune signals from every oscillator; fixed in P8, `src/engine/oscPatch.ts`, unit test and smoke check that fail on the old patch), so short notes dropped pitch since G5: re-hear C1, C11 and C13 on this build, and re-run C13's 0.43 measurement on Drift. Whether each of the 24 vibes sounds like its name is Pedro's ear; sound changed in Trance (F# minor, offbeat bass, Saw lead arp, Gate), Drone (8 bars per chord, closed organ synth), Acid house (new beat) and Progressive (new hits) in the review fixes. Ambient into Drone is the only transition above 71% load (71.5%, fresh page); the phone itself is unmeasured. `tools/cost.py vibes` now measures each vibe on a fresh page.
 - **C11. P5 listen items** (23 Nov 2026): Drift is sparse after the review fix (4 notes in 8 bars at seed 1234, whole bars of silence), say in the notes if it is too sparse; an accent brightens every sounding note of the layer, a lead-is-monophonic approximation (review M3); Pulse slides do not hold the previous note over the next as the other styles do.
 - **C12. P6 review S1, not fixable at 360 x 640** (23 Nov 2026): the Advanced lane stays beside Back and New idea (171 px wide, up from about 135) on short screens; a full-width lane needs about 44 px more height than the dial rows free. Full width at 412 x 915. A fix needs a layout change (spec 8.6); T1 or G7 revisits it.
 - **C13. P6 listen item** (23 Nov 2026): the continuity check cannot reliably catch small clicks from knob turns or style switches; and a steady Drift sound (long notes, Busy 0.9) shows jumps of 0.43 of its peak on a sine in the worklet, cause unexplained (voice stealing is one candidate). Listen on Drift for clicks and say so in the notes.
+- **C14. P7 listen items** (24 Nov 2026): the 20 s reverb decay is a 3.2 s impulse plus a feedback tail (a full 20 s impulse took load to about 93%); say in the notes if the tail sounds wrong, and that the default reverb tail is now measurably longer in every vibe (review S1, fixed to match the old tail by default). Drift pans the sound rather than widening it, because the voices are mono (review M3); the Drone mode and Swoop glide, the air layer and the lo-fi master need Pedro's ears. On short screens the mode icons hide under 400 px so "Drone" draws at full size (review M8).
+- **C19. P8 listen items** (24 Nov 2026): from G5 to P9 a short note's ended oscillator could cut the next note to 0 Hz (the G5 leak patch disconnected an oscillator's frequency and detune signals from every oscillator; fixed in P8, `src/engine/oscPatch.ts`, unit test and smoke check that fail on the old patch), so short notes dropped pitch since G5: re-hear C1, C11 and C13 on this build, and re-run C13's 0.43 measurement on Drift. Whether each of the 24 vibes sounds like its name is Pedro's ear; sound changed in Trance (F# minor, offbeat bass, Saw lead arp, Gate), Drone (8 bars per chord, closed organ synth), Acid house (new beat) and Progressive (new hits) in the review fixes. Ambient into Drone is the only transition above 71% load (71.5%, fresh page); the phone itself is unmeasured. `tools/cost.py vibes` now measures each vibe on a fresh page.
 
 ## By hand (Pedro)
 
@@ -55,19 +52,7 @@ All rows of this bundle are Done. The player's check of the bundle is in `docs/r
 
 ## Bundle 6: phase 2, sounds, effects and all 24 vibes
 
-Read spec 8.7, 8.8 and 8.10 in full before any row of this bundle.
-
-### P7. Sound additions
-
-Done, see the Done list below and `docs/reviews/P7.md`.
-
-### P9. Effects
-
-Done, see the Done list below and `docs/reviews/P9.md`.
-
-### P8. Sixteen more vibes and the full lists
-
-Done, see the Done list below and `docs/reviews/P8.md`.
+All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-6.md`.
 
 ## Bundle 7: phase 2, the Drop and Morph, and the install
 
