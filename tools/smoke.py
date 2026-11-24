@@ -2138,6 +2138,22 @@ def walk_p4(page, failures: list) -> None:
         failures.append("the vibe button in the Chords title did not open the vibe picker")
     else:
         check_sizes(page, "borrow picker", failures)
+        # P8 review M3: the borrow picker's tiles too, every vibe at 48 px or more on one screen at 360 x 640.
+        page.set_viewport_size({"width": 360, "height": 640})
+        time.sleep(0.15)
+        tiles = page.evaluate("""() => [...document.querySelectorAll('[data-borrow]')].filter((t) => t.id !== 'borrow-own')
+          .map((t) => { const b = t.getBoundingClientRect(); return { id: t.dataset.borrow, hgt: b.height, bottom: b.bottom }; })""")
+        if sorted(t["id"] for t in tiles) != sorted(v["id"] for v in vibes):
+            failures.append(f"borrow picker at 360 x 640: tiles {[t['id'] for t in tiles]}, expected every vibe")
+        low = [f"{t['id']} {t['hgt']:.1f}" for t in tiles if t["hgt"] < 47.99]
+        if low:
+            failures.append(f"borrow picker at 360 x 640: tiles under 48 px tall: {low}")
+        if any(t["bottom"] > 640.5 for t in tiles):
+            failures.append("borrow picker at 360 x 640: a tile is off the screen")
+        check_sizes(page, "borrow picker at 360 x 640", failures)
+        print(f"borrow picker at 360 x 640: {len(tiles)} tiles, lowest {min(t['hgt'] for t in tiles):.1f} px")
+        page.set_viewport_size({"width": 390, "height": 844})
+        time.sleep(0.15)
         page.click(f'[data-borrow="{other["id"]}"]')
         if page.evaluate(f"{E}.pendingLoad()") or page.evaluate(f"{E}.getSong().style") != style:
             failures.append("borrowing a vibe's chords loaded the vibe")

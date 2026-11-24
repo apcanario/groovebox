@@ -308,6 +308,14 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
     page.click('[data-tab="play"]')
     page.set_viewport_size({"width": 390, "height": 844})
     time.sleep(0.2)
+    # P8 review M2: the paged pickers were really turned. Advanced shows the beat, bass rhythm and synth rhythm
+    # pickers at each size, each paged four names and More at a time (the beats alone 7 pages); if the More chip's
+    # mark changed, the walk would check first pages only and pass, so the pages turned must reach that sum.
+    data = page.evaluate("window.__data")
+    least = len(SIZES) * sum(-(-len(data[k]) // 4) for k in ("beats", "bass", "synth"))
+    if w.chips < least:
+        failures.append(f"the frame walk turned {w.chips} picker pages, expected at least {least} (beats, bass and synth rhythms at each size)")
+    print(f"frame walk: {w.chips} picker pages turned (at least {least})")
     return w.count
 
 
