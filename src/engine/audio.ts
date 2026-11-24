@@ -60,8 +60,12 @@ import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
     const end = node.onended;
     node.onended = (n: unknown): void => {
       try {
-        this.frequency.disconnect(node.frequency as Tone.InputNode);
-        this.detune.disconnect(node.detune as Tone.InputNode);
+        // The native AudioParams (P8): Tone's disconnect() resolves a ToneAudioNode or an AudioParam, but a Tone Param
+        // is neither, so it fell to a bare disconnect() that cut the signal from every oscillator, the one now
+        // playing too: when a short note's oscillator ended after the next note's had started, the voice sat at 0 Hz
+        // (silent) until a fresh start (the P8 smoke's silent bass in Acid house and Dubstep).
+        this.frequency.disconnect(nativeParam(node.frequency) as unknown as Tone.InputNode);
+        this.detune.disconnect(nativeParam(node.detune) as unknown as Tone.InputNode);
       } catch {
         // already disconnected (the oscillator was disposed first)
       } finally {

@@ -1919,7 +1919,7 @@ def walk_p3(page, failures: list) -> None:
                 quiet.append(f"{inst} {lvl:.1f} dB")
         if quiet:
             failures.append(f"{v['id']}: silent in its groove section: {', '.join(quiet)}")
-        print(f"vibe {v['name']}: landed on the bar at {v['bpm']} bpm, every instrument audible")
+        print(f"vibe {v['name']}: landed on the bar at {v['bpm']} bpm, " + (f"SILENT {', '.join(quiet)}" if quiet else "every instrument audible"))
     if timed < 3:
         failures.append(f"the synth cutoff was checked across only {timed} vibe landings, expected at least 3")
     print(f"vibe landings: synth cutoff old before the bar line, new after it, on {timed} landings; synced effect rates at the vibe's tempo checked: {fx_rates}")
