@@ -48,7 +48,7 @@ import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, 
 import { macroPosition } from "./macro.ts";
 import { PATCHES, PATCH_IDS, patchFor, resolvePatch } from "../music/styles.ts";
 import { EFFECTS, EFFECT_DEFS, MAX_ACTIVE_FX, activate, deactivate, fxKey, type EffectId, type FxKnobs, type FxSlot } from "../music/effects.ts";
-import { fxCounts, fxDebug } from "./fx.ts";
+import { fxCounts, fxDebug, fxWorklets, type FxSlotNode } from "./fx.ts";
 import { songFx } from "./song.ts";
 
 export * from "./song.ts";
@@ -498,7 +498,7 @@ export class Engine {
    * its knobs, or on and off. Acts at once, crossfaded, so it never clicks. Switching on a slot past the cap of
    * MAX_ACTIVE_FX active slots turns off the slot switched on longest ago. Returns false for a bad slot or value.
    */
-  setFx(inst: InstrumentId, slot: number, values: { effect?: EffectId; on?: boolean; knobs?: readonly number[] }): boolean {
+  setFx(inst: InstrumentId, slot: number, values: { effect?: EffectId; on?: boolean; knobs?: readonly number[] }, at?: number): boolean {
     if (!INSTRUMENTS.includes(inst) || (slot !== 0 && slot !== 1) || !values || typeof values !== "object") return false;
     if (values.effect !== undefined && !EFFECTS.includes(values.effect)) return false;
     if (values.on !== undefined && typeof values.on !== "boolean") return false;
@@ -519,11 +519,12 @@ export class Engine {
       for (const o of off) {
         const [oi, os] = o.split(":");
         fx[oi as InstrumentId][Number(os)] = { ...fx[oi as InstrumentId][Number(os)], on: false };
-        this.graph?.setFx(oi as InstrumentId, fx[oi as InstrumentId]);
+        this.graph?.setFx(oi as InstrumentId, fx[oi as InstrumentId], at);
       }
     } else if (!next.on && cur.on) this.fxOrder = deactivate(this.fxOrder, key);
     this.seq.song.fx = fx;
-    this.graph?.setFx(inst, fx[inst]);
+    // `at` (an audio time) is for the smoke test's timed switches only; the app acts at once.
+    this.graph?.setFx(inst, fx[inst], at);
     this.note("setFx", [inst, slot, values]);
     this.changed();
     return true;
@@ -983,20 +984,66 @@ export class Engine {
 
   /**
    * For the smoke test (P9): per instrument and slot, its effect, whether it is on and whether its effect is
-   * connected; the slots active now, in the order they were switched on; the cap; effects built so far.
+   * connected, and its LFO rate and Echo time (review S2); the slots active now, in the order they were switched on;
+   * the cap; effects built so far; worklet nodes alive (review E1: only running Crush and Shifter hold one).
    */
   fxState(): {
-    slots: Record<InstrumentId, { effect: EffectId; on: boolean; wired: boolean }[]>;
+    slots: Record<InstrumentId, ({ effect: EffectId; on: boolean; wired: boolean } & ReturnType<FxSlotNode["rates"]>)[]>;
     order: string[];
     cap: number;
     built: number;
+    worklets: number;
   } | null {
     const g = this.graph;
     if (!g) return null;
     const slots = Object.fromEntries(
-      INSTRUMENTS.map((id) => [id, g.instruments[id].channel.fx.slots.map((s) => ({ effect: s.effect, on: s.active, wired: s.wired }))]),
-    ) as Record<InstrumentId, { effect: EffectId; on: boolean; wired: boolean }[]>;
-    return { slots, order: [...this.fxOrder], cap: this.fxCap, built: fxCounts.built };
+      INSTRUMENTS.map((id) => [id, g.instruments[id].channel.fx.slots.map((s) => ({ effect: s.effect, on: s.active, wired: s.wired, ...s.rates() }))]),
+    ) as Record<InstrumentId, ({ effect: EffectId; on: boolean; wired: boolean } & ReturnType<FxSlotNode["rates"]>)[]>;
+    return { slots, order: [...this.fxOrder], cap: this.fxCap, built: fxCounts.built, worklets: fxWorklets.alive };
+  }
+
+  private probe: { osc: OscillatorNode; gain: GainNode } | null = null;
+
+  /**
+   * For the smoke test (P9 review E2, E3): a steady sine of `hz` (peak 0.25) fed into the effect slots of `into`, with
+   * every instrument's own sound cut from its slots, so a click check has a clean reference on any instrument;
+   * null ends it. Returns the audio time the sine starts (its phase is 0 there), the clock and the tempo.
+   */
+  fxProbe(hz: number | null, into: InstrumentId[] = []): { t0: number; now: number; beats: number; bpm: number } | null {
+    const g = this.graph;
+    if (!g) return null;
+    const raw = Tone.getContext().rawContext as unknown as AudioContext;
+    if (this.probe) {
+      const p = this.probe;
+      this.probe = null;
+      p.osc.stop();
+      p.gain.disconnect();
+      g.fxProbe(null, []);
+    }
+    const now = raw.currentTime;
+    const clock = { now, beats: this.fxBeats(now), bpm: Tone.getTransport().bpm.value };
+    if (hz === null) return { t0: 0, ...clock };
+    const osc = raw.createOscillator();
+    const gain = raw.createGain();
+    osc.frequency.value = hz;
+    gain.gain.value = 0.25;
+    osc.connect(gain);
+    const t0 = now + 0.05;
+    osc.start(t0);
+    this.probe = { osc, gain };
+    g.fxProbe(gain, into);
+    return { t0, ...clock };
+  }
+
+  /** For the smoke test: the audio clock now, the transport's beats then (0 while stopped) and the tempo. */
+  fxClock(): { now: number; beats: number; bpm: number } {
+    const now = (Tone.getContext().rawContext as unknown as AudioContext).currentTime;
+    return { now, beats: this.fxBeats(now), bpm: Tone.getTransport().bpm.value };
+  }
+
+  private fxBeats(t: number): number {
+    const tr = Tone.getTransport();
+    return tr.state === "started" ? tr.getTicksAtTime(t) / tr.PPQ : 0;
   }
 
   /** For the smoke test (P9): every slot switch steps instead of ramping, to prove the click check can fail. */
@@ -1176,7 +1223,8 @@ export class Engine {
           break;
         case "synth":
           g.instruments.synth.trigger(e.notes, e.len * sixteenth, t, e.vel);
-          g.fxNote("synth", midiHz(Math.min(...e.notes)), t);
+          // P9 review M5: an empty chord has no lowest note.
+          if (e.notes.length) g.fxNote("synth", midiHz(Math.min(...e.notes)), t);
           break;
         default: {
           // P9: Ring's Follow hears the layer's lowest note.

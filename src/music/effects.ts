@@ -111,8 +111,23 @@ export const GATE_PATTERNS: readonly { name: string; steps: string }[] = [
 export const gatePattern = (v: number): string => GATE_PATTERNS[stepIndex(v, GATE_PATTERNS.length)].steps;
 /** Whether a gate pattern is open on a sixteenth. */
 export const gateOpen = (pattern: string, step: number): boolean => pattern[((step % 16) + 16) % 16] === "x";
-/** Gate's Smooth: the time constant of each open or close, 1 to 30 ms. */
-export const gateTau = (v: number): number => 0.001 + clamp01(v) * 0.029;
+/**
+ * Gate's Smooth: the time constant of each open or close, 3 to 30 ms. P9 review M2: no shorter than 3 ms, so a
+ * close on a sustained pad is not a click.
+ */
+export const gateTau = (v: number): number => 0.003 + clamp01(v) * 0.027;
+
+/**
+ * Tremolo's and Pan's Shape at its square end: the sine LFO through tanh(SQUARE_STEEPNESS x). Its swing from 10% to
+ * 90% of the way takes `squareEdgeSeconds` of a cycle; P9 review M2 wants it no shorter than 3 ms at the fastest rate
+ * and tempo (unit-tested).
+ */
+export const SQUARE_STEEPNESS = 6;
+export function squareEdgeSeconds(hz: number, k = SQUARE_STEEPNESS): number {
+  // tanh(k sin(wt)) / tanh(k) from -0.8 to 0.8.
+  const x = Math.atanh(0.8 * Math.tanh(k)) / k;
+  return (2 * Math.asin(x)) / (2 * Math.PI * hz);
+}
 
 /** Chorus rate, 0.1 to 4 Hz, and depth, up to 5 ms of swing. */
 export const chorusHz = (v: number): number => 0.1 * Math.pow(40, clamp01(v));

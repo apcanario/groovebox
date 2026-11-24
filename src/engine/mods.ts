@@ -57,6 +57,8 @@ export class Lfo {
   readonly uni: GainNode;
   readonly neg: GainNode;
   private osc: OscillatorNode | null = null;
+  /** The running oscillator's own gain into `bi`, so a restart can crossfade (P9 review M1). */
+  private oscGain: GainNode | null = null;
   private readonly half: GainNode;
   /** The 0.5 offset of `uni` and `neg`: runs only while the oscillator does (P7 review M5: off costs nothing). */
   private lift: ConstantSourceNode | null = null;
@@ -82,33 +84,66 @@ export class Lfo {
     return this.osc !== null;
   }
 
-  /** Start (or restart) at audio time `at`, `hz` cycles a second, at phase `phase` of a cosine (0: the top). */
+  /**
+   * Start (or restart) at audio time `at`, `hz` cycles a second, at phase `phase` of a cosine (0: the top). A restart
+   * while it runs (Play pressed again, so a synced LFO lines up with the bar) crossfades from the old phase to the new
+   * over Lfo.XFADE: what it moves glides there instead of stepping (P9 review M1).
+   */
   start(at: number, hz: number, phase = 0): void {
     const ctx = raw();
-    this.stop(at);
+    const t = Math.max(at, ctx.currentTime);
     const osc = ctx.createOscillator();
     // cos(wt + phase) as a periodic wave: real is the cosine part, imag the sine part.
     const real = new Float32Array([0, Math.cos(phase)]);
     const imag = new Float32Array([0, -Math.sin(phase)]);
     osc.setPeriodicWave(ctx.createPeriodicWave(real, imag, { disableNormalization: true }));
     osc.frequency.value = hz;
-    osc.connect(this.bi);
-    osc.start(at);
-    const lift = ctx.createConstantSource();
-    lift.offset.value = 0.5;
-    lift.connect(this.uni);
-    lift.connect(this.drop);
-    lift.start(at);
+    const g = ctx.createGain();
+    osc.connect(g);
+    g.connect(this.bi);
+    osc.start(t);
+    const was = this.osc;
+    const wasGain = this.oscGain;
+    if (was && wasGain && this.lift) {
+      wasGain.gain.cancelScheduledValues(t);
+      wasGain.gain.setValueAtTime(1, t);
+      wasGain.gain.linearRampToValueAtTime(0, t + Lfo.XFADE);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(1, t + Lfo.XFADE);
+      was.stop(t + Lfo.XFADE);
+      was.onended = () => {
+        was.disconnect();
+        wasGain.disconnect();
+      };
+    } else {
+      this.stop(t);
+      const lift = ctx.createConstantSource();
+      lift.offset.value = 0.5;
+      lift.connect(this.uni);
+      lift.connect(this.drop);
+      lift.start(t);
+      this.lift = lift;
+      Lfo.sources += 2;
+    }
     this.osc = osc;
-    this.lift = lift;
-    Lfo.sources += 2;
+    this.oscGain = g;
     this.hz = hz;
   }
 
-  /** A new rate from `at`; the phase runs on, unbroken. */
+  /** A restart's crossfade, in seconds. */
+  static readonly XFADE = 0.015;
+
+  /**
+   * A new rate from `at`; the phase runs on, unbroken. The frequency moves over a few milliseconds, not in one
+   * sample (P9 review M10); a synced LFO is put back on the bar at the next Play.
+   */
   rate(hz: number, at?: number): void {
     this.hz = hz;
-    this.osc?.frequency.setValueAtTime(hz, Math.max(at ?? 0, raw().currentTime));
+    const f = this.osc?.frequency;
+    if (!f) return;
+    const t = Math.max(at ?? 0, raw().currentTime);
+    f.cancelScheduledValues(t);
+    f.setTargetAtTime(hz, t, 0.004);
   }
 
   get frequency(): number {
@@ -119,16 +154,22 @@ export class Lfo {
     const osc = this.osc;
     if (!osc) return;
     const lift = this.lift;
+    const g = this.oscGain;
     this.osc = null;
     this.lift = null;
+    this.oscGain = null;
     Lfo.sources -= 2;
     const t = Math.max(at ?? 0, raw().currentTime);
     for (const n of [osc, lift]) {
       if (!n) continue;
       n.stop(t);
-      n.onended = () => n.disconnect();
+      n.onended = () => {
+        n.disconnect();
+        if (n === osc) g?.disconnect();
+      };
     }
   }
+
 }
 
 /** A depth gain from an LFO output into a native parameter: connected while its depth is above 0. */

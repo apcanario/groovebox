@@ -17,6 +17,9 @@ import {
   FORMANTS,
   fxKey,
   gateOpen,
+  gateTau,
+  squareEdgeSeconds,
+  SYNC_RATES,
   mixGains,
   rateHz,
   ringCarrier,
@@ -108,6 +111,13 @@ describe("the twelve effects (spec 8.8)", () => {
     }
     expect(gateOpen("x...............", 0)).toBe(true);
     expect(gateOpen("x...............", 17)).toBe(false);
+  });
+
+  it("never open or close faster than 3 ms (P9 review M2: Gate's Smooth, the square Shape at the fastest rate and tempo)", () => {
+    expect(gateTau(0)).toBeCloseTo(0.003);
+    expect(gateTau(1)).toBeCloseTo(0.03);
+    const fastest = 180 / 60 / Math.min(...SYNC_RATES);
+    expect(squareEdgeSeconds(fastest)).toBeGreaterThanOrEqual(0.003);
   });
 });
 

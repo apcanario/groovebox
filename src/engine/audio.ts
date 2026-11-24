@@ -1425,6 +1425,24 @@ export class Graph {
     this.instruments[id].channel.fx.note(hz, time);
   }
 
+  /**
+   * For the smoke test (P9 review E2, E3): every instrument's own sound cut from its effect slots, and `source` fed
+   * into the slots of `into` instead; null puts every instrument back.
+   */
+  fxProbe(source: AudioNode | null, into: readonly InstrumentId[]): void {
+    for (const id of INSTRUMENT_LIST) {
+      const ch = this.instruments[id].channel;
+      if (source) {
+        try {
+          ch.gate.disconnect(ch.fx.input);
+        } catch {
+          // already cut
+        }
+        if (into.includes(id)) source.connect(ch.fx.input);
+      } else Tone.connect(ch.gate, ch.fx.input);
+    }
+  }
+
   setGate(id: InstrumentId, on: boolean): void {
     ramp(this.instruments[id].channel.gate.gain, on ? 1 : 0);
   }

@@ -17,6 +17,7 @@
 import * as Tone from "tone";
 import {
   FORMANT_GAINS,
+  SQUARE_STEEPNESS,
   SYNC_RATES,
   type EffectId,
   type FxKnobs,
@@ -91,8 +92,13 @@ class GbCrush extends AudioWorkletProcessor {
       { name: "rate", defaultValue: 8000, minValue: 100, maxValue: 96000, automationRate: "k-rate" },
     ];
   }
-  constructor() { super(); this.ph = 1; this.held = [0, 0]; }
+  constructor() {
+    super(); this.ph = 1; this.held = [0, 0]; this.done = false;
+    // P9 review E1: the effect is freed: stop processing, so the processor can be collected.
+    this.port.onmessage = () => { this.done = true; };
+  }
   process(inputs, outputs, p) {
+    if (this.done) return false;
     const inp = inputs[0], out = outputs[0];
     if (!inp || !inp.length) return true;
     const q = Math.pow(2, p.bits[0] - 1), step = p.rate[0] / sampleRate;
@@ -123,8 +129,10 @@ class GbShift extends AudioWorkletProcessor {
   }
   constructor() {
     super();
-    this.a = new Float64Array(16); this.b = new Float64Array(16);
-    this.bd = 0; this.prev = 0; this.c = 1; this.s = 0;
+    // One Hilbert state per channel (P9 review M6: stereo in, stereo out); the carrier is shared.
+    this.st = [0, 1].map(() => ({ a: new Float64Array(16), b: new Float64Array(16), bd: 0, prev: 0 }));
+    this.c = 1; this.s = 0; this.done = false;
+    this.port.onmessage = () => { this.done = true; };
   }
   chain(st, co, x) {
     for (let k = 0; k < 4; k++) {
@@ -136,20 +144,25 @@ class GbShift extends AudioWorkletProcessor {
     return x;
   }
   process(inputs, outputs, p) {
-    const inp = inputs[0], out = outputs[0][0];
+    if (this.done) return false;
+    const inp = inputs[0], out = outputs[0];
     if (!inp || !inp.length) return true;
-    const src = inp[0], w = 2 * Math.PI * p.shift[0] / sampleRate, fb = p.feedback[0];
+    const w = 2 * Math.PI * p.shift[0] / sampleRate, fb = p.feedback[0];
     const dc = Math.cos(w), ds = Math.sin(w);
     let c = this.c, s = this.s;
-    for (let i = 0; i < out.length; i++) {
-      const x = src[i] + fb * this.prev;
-      const a = this.chain(this.a, HA, x);
-      const b = this.chain(this.b, HB, x);
-      const bd = this.bd; this.bd = b;
-      const y = a * c - bd * s;
-      out[i] = y;
-      this.prev = Math.max(-2, Math.min(2, y));
-      const c2 = c * dc - s * ds; s = c * ds + s * dc; c = c2;
+    for (let ch = 0; ch < out.length; ch++) {
+      const src = inp[ch] || inp[0], o = out[ch], st = this.st[ch];
+      c = this.c; s = this.s;
+      for (let i = 0; i < o.length; i++) {
+        const x = src[i] + fb * st.prev;
+        const a = this.chain(st.a, HA, x);
+        const b = this.chain(st.b, HB, x);
+        const bd = st.bd; st.bd = b;
+        const y = a * c - bd * s;
+        o[i] = y;
+        st.prev = Math.max(-2, Math.min(2, y));
+        const c2 = c * dc - s * ds; s = c * ds + s * dc; c = c2;
+      }
     }
     const n = Math.hypot(c, s) || 1;
     this.c = c / n; this.s = s / n;
@@ -182,11 +195,31 @@ export function loadFxWorklet(): Promise<void> {
 /** Worklet nodes made here (Tone's context wraps the native one, so `instanceof AudioWorkletNode` does not hold). */
 const worklets = new WeakSet<AudioNode>();
 
-function worklet(name: string, params: Record<string, number>, mono = false): AudioNode {
+/** Worklet nodes alive now (for the smoke test, P9 review E1: an off or pre-built effect holds none). */
+export const fxWorklets = { alive: 0 };
+
+function worklet(name: string, params: Record<string, number>): AudioNode {
   if (!workletLoaded) return raw().createGain();
-  const n = Tone.getContext().createAudioWorkletNode(name, { parameterData: params, ...(mono ? { outputChannelCount: [1] } : {}) });
+  const n = Tone.getContext().createAudioWorkletNode(name, { parameterData: params, outputChannelCount: [2] });
   worklets.add(n);
+  fxWorklets.alive++;
   return n;
+}
+
+/** End a worklet node: cut it, and tell its processor to stop (it returns false), so it can be collected. */
+function endWorklet(n: AudioNode): void {
+  try {
+    n.disconnect();
+  } catch {
+    // already gone
+  }
+  if (!worklets.has(n)) return;
+  worklets.delete(n);
+  fxWorklets.alive--;
+  const port = (n as AudioWorkletNode).port;
+  port.postMessage("done");
+  // Closed once the message has had time to land; the processor already stops on it.
+  setTimeout(() => port.close(), 1000);
 }
 function wparam(n: AudioNode, name: string): AudioParam | null {
   return worklets.has(n) ? ((n as AudioWorkletNode).parameters.get(name) ?? null) : null;
@@ -210,7 +243,7 @@ class ShapedLfo {
     this.square.gain.value = 0;
     this.shaper = ctx.createWaveShaper();
     const c = new Float32Array(1025);
-    for (let i = 0; i < c.length; i++) c[i] = Math.tanh(6 * ((i / 1024) * 2 - 1)) / Math.tanh(6);
+    for (let i = 0; i < c.length; i++) c[i] = Math.tanh(SQUARE_STEEPNESS * ((i / 1024) * 2 - 1)) / Math.tanh(SQUARE_STEEPNESS);
     this.shaper.curve = c;
     this.lfo.bi.connect(this.sine);
     this.lfo.bi.connect(this.shaper);
@@ -274,6 +307,14 @@ abstract class Effect {
   tempo(_bpm: number, _at?: number): void {}
   note(_hz: number, _time: number): void {}
   step(_time: number, _step: number): void {}
+  /** Seconds its sound rings on once its input closes (P9 review M7: Echo's repeats); 0 for the rest. */
+  tail(): number {
+    return 0;
+  }
+  /** For the smoke test (P9 review S2): its LFO's rate in Hz and the beats of a synced one, and Echo's time. */
+  rates(): { lfoHz: number | null; beats: number | null; echoS: number | null; echoBeats: number | null } {
+    return { lfoHz: null, beats: null, echoS: null, echoBeats: null };
+  }
   dispose(): void {
     this.stop();
     for (const n of this.owned) {
@@ -282,7 +323,6 @@ abstract class Effect {
       } catch {
         // already gone
       }
-      if (worklets.has(n)) (n as AudioWorkletNode).port.close();
     }
   }
 }
@@ -352,6 +392,9 @@ class Chorus extends Blend {
     super.start(at);
     this.lfo.start(at, chorusHz(this.k[1]), 0);
   }
+  override rates(): ReturnType<Effect["rates"]> {
+    return { ...super.rates(), lfoHz: this.lfo.running ? this.lfo.frequency : null };
+  }
   override stop(): void {
     super.stop();
     this.lfo.stop();
@@ -385,6 +428,10 @@ abstract class Sweep extends Blend {
   override tempo(bpm: number, at?: number): void {
     const r = sweepRate(this.rateKnob);
     if (this.running && "beats" in r) this.lfo.rate(rateHz(r, bpm), at);
+  }
+  override rates(): ReturnType<Effect["rates"]> {
+    const r = sweepRate(this.rateKnob);
+    return { ...super.rates(), lfoHz: this.lfo.running ? this.lfo.frequency : null, beats: "beats" in r ? r.beats : null };
   }
   override stop(): void {
     super.stop();
@@ -483,21 +530,53 @@ class Fuzz extends Blend {
   }
 }
 
-class Crush extends Blend {
-  private readonly node: AudioNode;
-  constructor(clock: FxClock, k: FxKnobs) {
-    super("crush", clock, k, false);
-    this.node = this.own(worklet("gb-crush", { bits: crushBits(k[0]), rate: crushRate(k[1]) }));
+/**
+ * Crush and Shifter: a worklet between the input and the wet path. P9 review E1: the worklet node exists only while
+ * the effect runs (made in `start`, ended in `stop`), so an off slot and its pre-built copy hold no processor.
+ */
+abstract class WorkletBlend extends Blend {
+  private node: AudioNode | null = null;
+  constructor(id: EffectId, clock: FxClock, k: FxKnobs, private readonly processor: string) {
+    super(id, clock, k, false);
+  }
+  protected abstract params(): Record<string, number>;
+  protected param(name: string, value: number, at?: number): void {
+    const p = this.node ? wparam(this.node, name) : null;
+    if (p) glide(p, value, at);
+  }
+  override start(at: number): void {
+    super.start(at);
+    if (this.node) return;
+    this.node = worklet(this.processor, this.params());
     this.input.connect(this.node);
     this.node.connect(this.wet);
+  }
+  override stop(): void {
+    super.stop();
+    const n = this.node;
+    if (!n) return;
+    this.node = null;
+    try {
+      this.input.disconnect(n);
+    } catch {
+      // already gone
+    }
+    endWorklet(n);
+  }
+}
+
+class Crush extends WorkletBlend {
+  constructor(clock: FxClock, k: FxKnobs) {
+    super("crush", clock, k, "gb-crush");
     this.set(k);
+  }
+  protected params(): Record<string, number> {
+    return { bits: crushBits(this.k[0]), rate: crushRate(this.k[1]) };
   }
   set(k: FxKnobs, at?: number): void {
     this.k = [...k];
-    const b = wparam(this.node, "bits");
-    const r = wparam(this.node, "rate");
-    if (b) glide(b, crushBits(k[0]), at);
-    if (r) glide(r, crushRate(k[1]), at);
+    this.param("bits", crushBits(k[0]), at);
+    this.param("rate", crushRate(k[1]), at);
     this.mix(k[2], at);
   }
 }
@@ -529,6 +608,9 @@ abstract class Mover extends Effect {
   }
   override tempo(bpm: number, at?: number): void {
     if (this.running) this.lfo.lfo.rate(bpm / 60 / this.beats, at);
+  }
+  override rates(): ReturnType<Effect["rates"]> {
+    return { ...super.rates(), lfoHz: this.lfo.lfo.running ? this.lfo.lfo.frequency : null, beats: this.beats };
   }
   override stop(): void {
     super.stop();
@@ -591,7 +673,9 @@ class Gate extends Effect {
   }
   override start(at: number): void {
     super.start(at);
+    // On from the sixteenth it is switched on in (not open until the next one): the slot's crossfade covers it.
     this.last = -1;
+    this.step(at, Math.floor(this.clock.beatsAt(at) * 4 + 1e-6));
   }
   override step(time: number, step: number): void {
     if (!this.running) return;
@@ -709,6 +793,9 @@ class Vowel extends Blend {
   override tempo(bpm: number, at?: number): void {
     if (this.running && this.beats > 0) this.lfo.rate(bpm / 60 / this.beats, at);
   }
+  override rates(): ReturnType<Effect["rates"]> {
+    return { ...super.rates(), lfoHz: this.lfo.running ? this.lfo.frequency : null, beats: this.beats > 0 ? this.beats : null };
+  }
   override stop(): void {
     super.stop();
     this.lfo.stop();
@@ -716,22 +803,19 @@ class Vowel extends Blend {
   }
 }
 
-class Shifter extends Blend {
-  private readonly node: AudioNode;
+class Shifter extends WorkletBlend {
   constructor(clock: FxClock, k: FxKnobs) {
-    super("shifter", clock, k, false);
-    this.node = this.own(worklet("gb-shift", { shift: shiftHz(k[1]), feedback: shiftFeedback(k[2]) }, true));
-    this.input.connect(this.node);
-    this.node.connect(this.wet);
+    super("shifter", clock, k, "gb-shift");
     this.set(k);
+  }
+  protected params(): Record<string, number> {
+    return { shift: shiftHz(this.k[1]), feedback: shiftFeedback(this.k[2]) };
   }
   set(k: FxKnobs, at?: number): void {
     this.k = [...k];
     this.mix(k[0], at);
-    const s = wparam(this.node, "shift");
-    const f = wparam(this.node, "feedback");
-    if (s) glide(s, shiftHz(k[1]), at);
-    if (f) glide(f, shiftFeedback(k[2]), at);
+    this.param("shift", shiftHz(k[1]), at);
+    this.param("feedback", shiftFeedback(k[2]), at);
   }
 }
 
@@ -740,6 +824,10 @@ class Echo extends Effect {
   private readonly dr: DelayNode;
   private readonly fb: GainNode;
   private readonly wet: GainNode;
+  /** Each line's output, closed while its time changes (P9 review S4). */
+  private readonly hushL: GainNode;
+  private readonly hushR: GainNode;
+  private secs: number;
   constructor(clock: FxClock, k: FxKnobs) {
     super("echo", clock, k);
     const ctx = raw();
@@ -748,19 +836,23 @@ class Echo extends Effect {
     this.dr = this.own(ctx.createDelay(4.1));
     this.fb = this.own(ctx.createGain());
     this.wet = this.own(ctx.createGain());
+    this.hushL = this.own(ctx.createGain());
+    this.hushR = this.own(ctx.createGain());
     const merge = this.own(ctx.createChannelMerger(2));
     this.input.connect(this.output);
     this.input.connect(this.dl);
-    this.dl.connect(this.dr);
-    this.dr.connect(this.fb);
+    this.dl.connect(this.hushL);
+    this.hushL.connect(this.dr);
+    this.dr.connect(this.hushR);
+    this.hushR.connect(this.fb);
     this.fb.connect(this.dl);
-    this.dl.connect(merge, 0, 0);
-    this.dr.connect(merge, 0, 1);
+    this.hushL.connect(merge, 0, 0);
+    this.hushR.connect(merge, 0, 1);
     merge.connect(this.wet);
     this.wet.connect(this.output);
-    const s = this.seconds(clock.bpm());
-    this.dl.delayTime.value = s;
-    this.dr.delayTime.value = s;
+    this.secs = this.seconds(clock.bpm());
+    this.dl.delayTime.value = this.secs;
+    this.dr.delayTime.value = this.secs;
     this.set(k);
   }
   private seconds(bpm: number): number {
@@ -772,13 +864,37 @@ class Echo extends Effect {
     glide(this.fb.gain, feedback(k[2]), at);
     this.time(this.clock.bpm(), at);
   }
+  /**
+   * A new time. Gliding a delay line's time scrubs through it (a zip, and a step the feedback replays), so the lines'
+   * outputs close, the time moves while they are shut and they open again: a short gap in the repeats, no click.
+   */
   private time(bpm: number, at?: number): void {
     const s = this.seconds(bpm);
-    glide(this.dl.delayTime, s, at, 0.02);
-    glide(this.dr.delayTime, s, at, 0.02);
+    if (Math.abs(s - this.secs) < 1e-6) return;
+    this.secs = s;
+    const t = Math.max(at ?? 0, now());
+    const shut = t + 5 * RAMP / 4;
+    for (const h of [this.hushL, this.hushR]) {
+      h.gain.cancelScheduledValues(t);
+      h.gain.setTargetAtTime(0, t, RAMP / 4);
+      h.gain.setTargetAtTime(1, shut, RAMP / 4);
+    }
+    for (const d of [this.dl, this.dr]) {
+      d.delayTime.cancelScheduledValues(t);
+      d.delayTime.setValueAtTime(s, shut);
+    }
   }
   override tempo(bpm: number, at?: number): void {
     this.time(bpm, at);
+  }
+  /** Until the repeats are 40 dB down (at most 4 s): each round trip of both lines takes `feedback` of the level. */
+  override tail(): number {
+    const fb = feedback(this.k[2]);
+    const trips = fb > 0.01 ? Math.log(0.01) / Math.log(fb) : 0.5;
+    return Math.min(4, 2 * this.secs * Math.max(1, trips));
+  }
+  override rates(): ReturnType<Effect["rates"]> {
+    return { ...super.rates(), echoS: this.secs, echoBeats: echoBeats(this.k[1]) };
   }
 }
 
@@ -897,18 +1013,30 @@ export class FxSlotNode {
       fade(this.dry.gain, 0, at);
       return;
     }
-    fade(v.wet.gain, 0, at);
     fade(this.dry.gain, 1, at);
+    const tail = v.fx.tail();
+    const done = (): void => {
+      if (gen !== this.gen || this.on || this.cur !== v) return;
+      // Disconnected: the effect leaves the graph and a fresh one waits, unconnected, for the next switch on.
+      const { id } = v.fx;
+      const k = v.fx.knobs;
+      this.free(v);
+      this.cur = this.build(id, k);
+    };
+    if (tail <= 0) {
+      fade(v.wet.gain, 0, at);
+      afterFade(done, RAMP * 3, at);
+      return;
+    }
+    // P9 review M7: an effect that rings on (Echo) closes its input only; its repeats fade out after the tail.
+    fade(v.fx.input.gain, 0, at);
     afterFade(
       () => {
         if (gen !== this.gen || this.on || this.cur !== v) return;
-        // Disconnected: the effect leaves the graph and a fresh one waits, unconnected, for the next switch on.
-        const { id } = v.fx;
-        const k = v.fx.knobs;
-        this.free(v);
-        this.cur = this.build(id, k);
+        fade(v.wet.gain, 0);
+        afterFade(done, RAMP * 3);
       },
-      RAMP * 3,
+      tail,
       at,
     );
   }
@@ -918,7 +1046,21 @@ export class FxSlotNode {
     const old = this.cur;
     const next = this.build(effect, knobs);
     this.cur = next;
-    if (!this.on) return this.free(old);
+    if (!this.on && !old.wired) return this.free(old);
+    if (!this.on) {
+      // P9 review S3: still fading out (or ringing on) after a switch-off: it leaves with a fade, not at once.
+      fade(old.wet.gain, 0, at);
+      this.leaving++;
+      afterFade(
+        () => {
+          this.leaving--;
+          this.free(old);
+        },
+        RAMP * 3,
+        at,
+      );
+      return;
+    }
     // A crossfade from the old effect to the new one; the old one is freed once silent.
     const t = Math.max(at ?? 0, now());
     this.wire(next);
@@ -939,6 +1081,11 @@ export class FxSlotNode {
 
   setKnobs(k: FxKnobs, at?: number): void {
     this.cur.fx.set(k, at);
+  }
+
+  /** For the smoke test (P9 review S2): the running effect's LFO rate and Echo time. */
+  rates(): ReturnType<Effect["rates"]> {
+    return this.cur.fx.rates();
   }
 
   restart(at: number): void {
