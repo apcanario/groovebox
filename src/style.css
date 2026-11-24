@@ -1697,6 +1697,11 @@ button:disabled {
 .vibectl .vmain > span {
   flex: none;
 }
+/*
+ * C9 (P8, spec 8.6): 24 tiles in 12 rows of 48 px with "Continue last jam" first need 648 px with 2 px gaps, so the
+ * picker has no title row and no Close, no padding above or below and no note under 720 px of height; under 648 px
+ * its gaps go to 1 px (12 x 48 + 11 + 1 + 48 = 636 px), the one exception to the 2 px gap of spec 8.12.
+ */
 .vibes {
   position: fixed;
   inset: 0;
@@ -1704,24 +1709,23 @@ button:disabled {
   max-width: 480px;
   margin: 0 auto;
   background: var(--bg);
-  padding: 8px var(--pad) 10px;
+  padding: 0 var(--pad);
   display: flex;
   flex-direction: column;
-  gap: var(--group);
+  gap: var(--gap);
   overflow: hidden;
 }
-.vibehead {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--gap);
+@media (max-height: 647.98px) {
+  .vibes,
+  .vibes .vibegrid {
+    gap: 1px;
+  }
 }
-.vibehead h2 {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+@media (min-height: 720px) {
+  .vibes {
+    padding: 8px var(--pad) 10px;
+    gap: var(--group);
+  }
 }
 .btn.vcont {
   flex: none;
@@ -1769,6 +1773,11 @@ button:disabled {
   flex: none;
   text-align: center;
   margin-top: auto;
+}
+@media (max-height: 719.98px) {
+  .vnote {
+    display: none;
+  }
 }
 .chip.more {
   color: var(--text);

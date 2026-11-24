@@ -3,7 +3,7 @@
  * Simple Play tab. A vibe loads as a new song (the jam it replaces stays in Songs) and, while playing, lands on
  * the next bar line. The list is whatever is in `src/styles/`.
  */
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { STYLES, STYLE_IDS, stepVibe, vibeSong, vibeStart, vibeTiles, type VibeTile } from "../music/styles.ts";
 import type { StyleFamily } from "../music/data.ts";
 import type { Ctx } from "./App.tsx";
@@ -41,10 +41,26 @@ export async function loadVibe(ctx: Ctx, id: string, play: boolean): Promise<boo
   return ok;
 }
 
-function Tile({ tile, on, onPick }: { tile: VibeTile; on: boolean; onPick: () => void }) {
+/**
+ * C9 (P8, spec 8.6): the picker has no title row and no Close, so 24 tiles and "Continue last jam" fit at 360 x 640;
+ * "Continue last jam" (or "This jam's vibe") is the way back, and on a first launch a tile is the way in. A keyboard's
+ * Escape also closes it (a desktop browser, and the scripts that keep the first launch's song).
+ */
+function useEscape(onClose: () => void): void {
+  useEffect(() => {
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+}
+
+function Tile({ tile, on, onPick, off }: { tile: VibeTile; on: boolean; onPick: () => void; off?: boolean }) {
   return (
     <button
       class={`vibe${on ? " on" : ""}`}
+      disabled={off}
       style={{ "--c": FAMILY_COLOR[tile.family] }}
       data-vibe={tile.id}
       aria-pressed={on}
@@ -82,6 +98,7 @@ export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) 
   const rows = Math.ceil(tiles.length / 2);
   // As in groovebox-6 (P3 review M5): the jam's vibe, or its name for a song with none.
   const jam = vibeName(song.style) ?? song.name;
+  useEscape(onClose);
   const pick = async (id: string): Promise<void> => {
     setBusy(true);
     try {
@@ -92,23 +109,15 @@ export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) 
   };
   return (
     <div class="vibes" role="dialog" aria-label="Pick a vibe">
-      <div class="vibehead">
-        <h2>Pick a vibe</h2>
-        <button class="btn" id="vibe-close" onClick={onClose}>
-          Close
-        </button>
-      </div>
       {canContinue && (
         <button class="btn vcont" id="vibe-continue" aria-label={`Continue last jam: ${jam}`} onClick={onClose}>
           <span>Continue last jam</span>
-          <small>
-            {vibeName(song.style) ?? stripWord(song.name, CONTINUE_WORD_PX)} · {song.bpm}
-          </small>
+          <small>{recording ? "Recording" : `${vibeName(song.style) ?? stripWord(song.name, CONTINUE_WORD_PX)} · ${song.bpm}`}</small>
         </button>
       )}
       <div class="vibegrid" style={{ gridTemplateRows: `repeat(${rows}, minmax(48px, 64px))` }}>
         {tiles.map((t) => (
-          <Tile key={t.id} tile={t} on={t.id === current} onPick={() => !busy && !recording && void pick(t.id)} />
+          <Tile key={t.id} tile={t} on={t.id === current} off={recording} onPick={() => !busy && !recording && void pick(t.id)} />
         ))}
       </div>
       <p class="note vnote">{recording ? "Stop recording to load a vibe." : "One tap loads a full groove on the next bar."}</p>
@@ -121,18 +130,13 @@ export function BorrowPicker({ ctx, onClose, borrow }: { ctx: Ctx; onClose: () =
   const tiles = vibeTiles();
   const rows = Math.ceil(tiles.length / 2);
   const own = ctx.song.style;
+  useEscape(onClose);
   const pick = (id: string | undefined): void => {
     borrow.onPick(id);
     onClose();
   };
   return (
     <div class="vibes" role="dialog" aria-label="Borrow a vibe's chords">
-      <div class="vibehead">
-        <h2>Chords from</h2>
-        <button class="btn" id="vibe-close" onClick={onClose}>
-          Close
-        </button>
-      </div>
       <button class="btn vcont" id="borrow-own" aria-label={`This jam's vibe: ${vibeName(own) ?? "every vibe"}`} onClick={() => pick(undefined)}>
         <span>This jam's vibe</span>
         <small>{vibeName(own) ?? "Every vibe"}</small>

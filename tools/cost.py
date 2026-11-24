@@ -45,8 +45,8 @@ def main() -> int:
             for _ in range(runs):
                 page = browser.new_page(viewport={"width": 390, "height": 844})
                 page.goto(f"http://localhost:{PORT}/index.html")
-                wait_for(page, "!!window.__groovebox", 5.0)
-                page.click("#vibe-close")
+                wait_for(page, "!!window.__groovebox && !!document.querySelector('.vibes')", 5.0)
+                page.keyboard.press("Escape")
                 FIRST_SONG[:] = [page.evaluate(SONG)]
                 page.click("#play")
                 page.evaluate("window.__groovebox.switchSection(1)")

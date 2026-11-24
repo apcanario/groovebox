@@ -108,8 +108,8 @@ def main() -> int:
                 return m["JSHeapUsedSize"] / 2**20
 
             page.goto(f"http://localhost:{PORT}/index.html")
-            page.wait_for_function("!!window.__groovebox")
-            page.click("#vibe-close")  # the vibe picker opens the app (P3)
+            page.wait_for_function("!!window.__groovebox && !!document.querySelector('.vibes')")
+            page.keyboard.press("Escape")  # the vibe picker opens the app (P3)
             page.click("#play")
             page.wait_for_function("window.__groovebox.playing")
             if not baseline:

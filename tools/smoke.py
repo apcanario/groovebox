@@ -1752,7 +1752,7 @@ PICKER = """() => {
   const r = v.getBoundingClientRect();
   const tiles = [...v.querySelectorAll('[data-vibe]')].map((t) => {
     const b = t.getBoundingClientRect();
-    return { id: t.dataset.vibe, name: t.innerText.trim(), x: b.left, y: b.top, bottom: b.bottom, c: getComputedStyle(t).getPropertyValue('--c').trim() };
+    return { id: t.dataset.vibe, name: t.innerText.trim(), x: b.left, y: b.top, bottom: b.bottom, hgt: b.height, c: getComputedStyle(t).getPropertyValue('--c').trim() };
   });
   return { tiles, scrolls: v.scrollHeight > v.clientHeight + 1, bottom: r.bottom, h: window.innerHeight,
            cont: !!v.querySelector('#vibe-continue'), first: v.querySelector('button.vcont, [data-vibe]')?.id || '' };
@@ -1778,6 +1778,12 @@ def walk_picker_open(page, failures: list, first: bool) -> None:
             failures.append(f"{where}: tiles in {len(xs)} columns, expected two")
         if p["scrolls"] or any(t["bottom"] > p["h"] + 0.5 for t in p["tiles"]):
             failures.append(f"{where}: the picker scrolls or a tile is off the screen")
+        # C9 (P8): all 24 tiles, each at least 48 px tall, with Continue first, on one screen at 360 x 640.
+        if len(p["tiles"]) != 24:
+            failures.append(f"{where}: {len(p['tiles'])} tiles, expected the 24 vibes of spec 8.2")
+        low = [f"{t['id']} {t['hgt']:.1f}" for t in p["tiles"] if t["hgt"] < 47.99]
+        if low:
+            failures.append(f"{where}: tiles under 48 px tall: {low}")
         if len({t["c"] for t in p["tiles"]}) < 4:
             failures.append(f"{where}: tiles not coloured by family: {sorted({t['c'] for t in p['tiles']})}")
         if p["cont"] == first:
@@ -1890,7 +1896,7 @@ def walk_p3(page, failures: list) -> None:
         wait_for(page, "!document.querySelector('.vibes')", 2.0)
         if page.locator(".vibes").count():
             failures.append(f"{v['id']}: the picker stayed open after a tap")
-            page.click("#vibe-close")
+            page.keyboard.press("Escape")
         if not load_vibe_and_check(page, failures, v, "picker"):
             page.evaluate("window.__cutoffTrace = null")
             continue
@@ -1933,7 +1939,10 @@ def walk_p3(page, failures: list) -> None:
     if not page.locator(".vibes").count():
         failures.append("the vibe control's middle did not open the picker")
     else:
-        page.click("#vibe-close")
+        # C9: no Close; "Continue last jam" is the way back.
+        page.click("#vibe-continue")
+        if page.locator(".vibes").count():
+            failures.append("Continue last jam did not close the picker")
     check_sizes(page, "simple play with the vibe control", failures)
     print("vibe arrows: next and previous landed on the bar")
 
@@ -2963,7 +2972,9 @@ def main() -> int:
             wait_for(page, "!!window.__groovebox", 5.0)
             # P3: the vibe picker opens the app; on a first launch there is no jam to continue.
             walk_picker_open(page, failures, first=True)
-            page.click("#vibe-close")
+            page.keyboard.press("Escape")  # C9: no Close; Escape keeps the first launch's song
+            if not wait_for(page, "!document.querySelector('.vibes')", 2.0):
+                failures.append("Escape did not close the vibe picker")
             FIRST_SONG.append(page.evaluate(SONG))
             if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
                 failures.append("the app does not start in Simple")

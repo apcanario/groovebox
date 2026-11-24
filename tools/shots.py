@@ -208,8 +208,8 @@ class Walk:
 
 def close_picker(page) -> None:
     """The vibe picker opens the app (P3): close it, keeping the song that opened."""
-    page.wait_for_selector("#vibe-close", timeout=5000)
-    page.click("#vibe-close")
+    page.wait_for_selector(".vibes", timeout=5000)
+    page.keyboard.press("Escape")  # C9: the picker has no Close; Escape keeps the song that opened
 
 
 def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
@@ -254,7 +254,7 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                     # P4: the vibe picker borrowing chords, from the title's vibe button.
                     page.click("#chord-vibe")
                     w.screen(size, "simple-chords-borrow")
-                    page.click("#vibe-close")
+                    page.keyboard.press("Escape")
             if mode == "advanced":
                 # P9 review M8: the effect picker sheet, from the Drums FX page (closed by picking what was there).
                 page.click('[data-tab="drums"]')
@@ -285,7 +285,7 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
             # P3: the vibe picker, from New jam in the header (it opens the app too).
             page.click("#new-jam")
             w.screen(size, f"{mode}-vibe-picker")
-            page.click("#vibe-close")
+            page.keyboard.press("Escape")
     page.evaluate("""(n) => { const e = window.__groovebox; e.renameSong(n[0]);
       n.slice(1).forEach((s, i) => e.renameSection(i, s)); }""", names)
     page.click('[data-appmode="simple"]')

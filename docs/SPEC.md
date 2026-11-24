@@ -233,6 +233,8 @@ The images in `docs/design/look/` are the reference for how screens look (sectio
 - A tab with more controls than fit uses pages, switched by large page chips at the top of the tab. Advanced is where the fine control lives.
 - The saved-jams list is the one thing that scrolls. It contains only tappable rows.
 
+**The vibe picker fits 24 tiles at 360 x 640** (P8, from the P3 review's C9). It has no title row and no Close: "Continue last jam" is the way back, and on a first launch a tile is the way in. Under 720 px of screen height it has no padding above or below and no note line; under 648 px its gaps go to 1 px (12 rows of 48 px, 11 gaps of 1 px, then 1 px and the 48 px Continue: 636 px), the one exception to the 2 px gap of section 8.12. Every tile stays at least 48 px tall. The same holds for the picker that borrows chords (section 8.4), with "This jam's vibe" in Continue's place.
+
 **Text always fits its tile.** On a tile, chip, button, dial or pill, at 360 px wide and up, text never wraps, is never cut off and never overflows the edge. Text that is too wide is drawn smaller until it fits, down to 10 px. A label that still does not fit at 10 px is shortened in the source. Help text goes under a control or in a sheet, never inside a tile.
 
 **The controls used most sit at the bottom, in thumb reach.** Every screen is laid out in this order, top to bottom:
