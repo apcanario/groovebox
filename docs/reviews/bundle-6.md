@@ -22,3 +22,16 @@ Row text recovered from `git show a2c941f^:docs/BACKLOG.md`. Done when: "each ad
 - Row bullet "Measure the cost": reported in the P7 changelog line and C15. True.
 
 P7: every Done-when line true.
+
+## 3. P9 Done-when lines
+
+Row text recovered from `git show 2a91110^:docs/BACKLOG.md`. Done when: "every effect is audible on every instrument and can be switched mid-jam without a click (tested by level continuity); Simple needs no knob to use them; the cost is reported; `check` and `smoke` pass."
+
+- **Every effect is audible on every instrument: true.** Smoke: all 12 effects on all five instruments through slot 1, weakest Tremolo on Layer 1 at 0.112 of the input (wanted 0.1); slot 2 on Bass, all 12, weakest Crush 0.267; every off slot passes the sound unchanged and is disconnected. Slot 2 is tested on one instrument only; slot 1 and slot 2 are the same class (`src/engine/fx.ts`), so this is a limit, not a finding.
+- **Switched mid-jam without a click, tested by level continuity: true.** Smoke: stepped switches caught 40 of 40 for every effect (8 of 8 on every instrument), so the check can fail; shipped (ramped) switches clicked 0 of 480, largest 1.08 times its own reference; every knob of every effect low to high while playing 1.39; effect changed while on 1.02; the seventh switch (cap) 0.98; Lo-fi button 1.04. A click is above 2.5.
+- **Simple needs no knob to use them: true.** Smoke: Simple effect buttons and the Lo-fi switch work. Screens: Simple Bass has two on/off buttons named Fuzz and Chorus stacked beside the XY pad (`shots/360x640-simple-bass.png`); Simple Layer 1 has Echo and Phaser in the row of Back and New idea (`360x640-simple-layer1-generative-hook.png`); Simple Mix Space has Lo-fi as one on/off (`360x640-simple-mix-space.png`). No effect knob on any Simple screen. Advanced FX page: two slot chips, on/off, effect, three dials (`360x640-advanced-bass-fx.png`, `-layer1-generative-hook-fx.png`); the picker is a sheet of the twelve, 3 x 4 with Close, every tile 48 px or more (`360x640-advanced-fx-picker.png`). Matches spec 8.8's P9 notes; no text cut off or wrapped.
+- **The cost is reported: true.** P9 changelog line, C16 and spec 8.8: all off 64.2%, six in use 69.4%, heaviest six 71.5%, all ten 71.9% (median of 5). The six-slot cap is in spec 8.8 and `MAX_ACTIVE_FX = 6` (`src/music/effects.ts` 37). This box measured about 10 points higher today (chunk 1); same ordering.
+- **`check` and `smoke` pass: true.**
+- Row bullets: tempo sync true (smoke checks 45 synced rates across the 24 vibes at each vibe's tempo, and Tremolo 2.000 Hz at 120 bpm, 1.500 Hz at 90 bpm; Echo 0.250 s, 0.333 s); the eight P3 vibes set two effects per instrument (unit-tested, and smoke checks every vibe's slots play as its song sets them).
+
+P9: every Done-when line true.
