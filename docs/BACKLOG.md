@@ -6,7 +6,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
 | 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
-| 6 | P7 (Done), P9, P8 | New sounds, effects, all 24 vibes |
+| 6 | P7 (Done), P9 (Done), P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
 | 9 | G7 | Retouch from notes |
@@ -24,6 +24,9 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
 - **C14. P7 listen items** (24 Nov 2026): the 20 s reverb decay is a 3.2 s impulse plus a feedback tail (a full 20 s impulse took load to about 93%); say in the notes if the tail sounds wrong, and that the default reverb tail is now measurably longer in every vibe (review S1, fixed to match the old tail by default). Drift pans the sound rather than widening it, because the voices are mono (review M3); the Drone mode and Swoop glide, the air layer and the lo-fi master need Pedro's ears. On short screens the mode icons hide under 400 px so "Drone" draws at full size (review M8).
 - **C15. P7 cost measure, for P9** (24 Nov 2026): everything on, base about 51 to 56% load and 12 to 14 ms worst stall, P7 about 54 to 71% and 10 to 20 ms; single runs vary by about 10%, so `tools/cost.py` (median of 5) is the measure. P9 reports against the P7 figures. A Tail-dial drag sits at 58 to 82% load. Pedro's choice (24 Nov 2026): if ten effect slots cost too much, cap how many slots are active at once (oldest turns off, no click), and keep all twelve effects and two slots per instrument to choose from.
+- **C16. P9 listen items and cap** (24 Nov 2026): all twelve effects, two slots per instrument; at most six slots are active at once (the oldest turns off when a seventh is switched on, no click), as Pedro decided. Measured load, `tools/cost.py` median of 5: all off 64.2%, the six in use 69.4%, the heaviest six 71.5%, all ten 71.9%; the heaviest six sit at the top of P7's 54 to 71% range, almost as heavy as all ten, so whether the cap is still the right figure is Pedro's call. Whether the effects are weird and fun is Pedro's ear. Air and reverb switches cannot be caught as clicks by the smoke test (they are counted, not judged).
+- **C17. Smoke notes, for P8** (24 Nov 2026): smoke takes about 19 minutes. The P7 "3.03" jump was a waveform's own edge, not a click (every figure is now judged against its own reference). The smoke's drum check reads the output's peak sample now (the old 5 ms RMS read missed claps; flaky, not a defect), and the record-timer check compares with the measured elapsed time (it failed on a slow box; flaky, not a defect). The G3 check "no sub-oscillator detunes read on the held chord" was real: see the P9 changelog line.
+- **C18. AttackQueue page error, first fix of P8** (24 Nov 2026): one P9 smoke run threw "Start time must be strictly greater than previous start time" from `AttackQueue.at` into `triggerAttackRelease` (Tone raises it when a source gets a second start at the same time as its last; likely two late attacks both moved up to the current time). It belongs to `src/engine/attacks.ts` (commit 497d680) and did not recur in four later smoke runs. P8's builder first makes the queue guarantee strictly increasing start times per source (with a unit test that fails without it), then checks that no PAGE ERROR line appears in its smoke runs; P8's reviewer checks it again.
 - **C9. 24-tile picker does not fit at 360 x 640** (P3 review, 23 Nov 2026), for P8: 12 rows of 48 px with gaps plus Continue last jam needs at least 648 px, so the spec's no-scroll rule and 48 px rule conflict at 24 tiles. Reviewer's proposal: no title or Close row, 1 px gap only under 648 px screen height (636 px total). P8 edits spec 8.6 accordingly and adds a smoke check at 24 tiles.
 - **C10. P4 review M2, for P8** (23 Nov 2026): the library's vibe tags are six blanket groups; when P8 adds the sixteen vibes, retag each progression per vibe by choice, not by group.
 - **C11. P5 listen items** (23 Nov 2026): Drift is sparse after the review fix (4 notes in 8 bars at seed 1234, whole bars of silence), say in the notes if it is too sparse; an accent brightens every sounding note of the layer, a lead-is-monophonic approximation (review M3); Pulse slides do not hold the previous note over the next as the other styles do.
@@ -62,14 +65,7 @@ Done, see the Done list below and `docs/reviews/P7.md`.
 
 ### P9. Effects
 
-- Spec 8.8: the twelve effects, two slots per instrument, tempo-synced where the table says.
-- Simple: two on/off buttons per instrument tab, named after the effects in the slots; the lo-fi master as one on/off on the Mix tab.
-- Advanced: the FX page per instrument (picker, on/off and three knobs per slot).
-- An off slot is disconnected. Switching a slot on or off, or changing its effect, while playing makes no click.
-- Give the eight vibes of P3 their two effects per instrument.
-- Measure the cost with all ten slots on against all off, on the smoke test, and report it. If it is too much, apply the six-slot cap and write it into the spec.
-
-**Done when:** every effect is audible on every instrument and can be switched mid-jam without a click (tested by level continuity); Simple needs no knob to use them; the cost is reported; `check` and `smoke` pass. Whether they are weird and fun is Pedro's call.
+Done, see the Done list below and `docs/reviews/P9.md`.
 
 ### P8. The other sixteen vibes and the library
 
@@ -193,3 +189,4 @@ Kept here so no row disappears without a record.
 - **P5. Lead styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 3 should-fix, 5 minor, all applied), pushed. Report in `docs/reviews/P5.md`, printed patterns in `docs/reviews/P5-patterns.md`.
 - **P6. Lead screens** (23 Nov 2026). Built, reviewed (fix: 0 errors, 3 should-fix, 7 minor, all applied except S1, carried as C12, and S2 applied in part, see C13), pushed. Report in `docs/reviews/P6.md`.
 - **P7. Sound additions** (24 Nov 2026). Built, reviewed (fix: 2 errors, 5 should-fix, 9 minor, all applied; the errors were a drone or pad going silent after two wave or patch changes, and the Tail dial stacking a reverb per move). Report in `docs/reviews/P7.md`. C8 cleared. Cost with everything on: about 55% load before, about 59% after (median of 5), worst stall 13.6 ms before and 18.9 ms after.
+- **P9. Effects** (24 Nov 2026). Built, reviewed (fix: 3 errors, 4 should-fix, 10 minor, all applied; the errors were Crush and Shifter processors never stopping, and click checks too weak to prove no click). Report in `docs/reviews/P9.md`. Six-slot active cap applied on measured cost.
