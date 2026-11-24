@@ -6,8 +6,9 @@ over 7 runs or more, and only by differences larger than their min-max spread.
 
 Usage: python3 tools/cost.py dist [runs] [extras|none|vibes [id,id...]]
 
-P8: "vibes" plays each of the vibes in turn, as a tap on its tile loads it (its groove, its patches, its effect slots
-and mix), and reports each one's audio load and worst stall over six seconds, the median of `runs` (3 by default here).
+P8: "vibes" plays each of the vibes, each on a fresh page (P8 review S7: no tails of the vibe before), as a tap on its
+tile loads it (its groove, its patches, its effect slots and mix), and reports each one's audio load and worst stall
+over six seconds, the median of `runs` (3 by default here), and Ambient into Drone as its own row.
 
 To compare with the build before a row, build the base into its own dist first and run both:
     git worktree add /tmp/base <base-sha>
@@ -37,8 +38,30 @@ def load_of(renders: list) -> tuple:
     return 100.0 * sum(x["dur"] for x in renders) / (t1 - t0), max(x["dur"] for x in renders) / 1000.0
 
 
+def play_vibe(browser, page, v: dict) -> tuple:
+    """A tap on the vibe's tile, its landing, then its audio load and worst stall over six seconds."""
+    if not page.locator(".vibes").count():
+        page.click("#new-jam")
+        wait_for(page, "!!document.querySelector('.vibes')", 3.0)
+    page.click(f'[data-vibe="{v["id"]}"]')
+    wait_for(page, f"window.__groovebox.getSong().style === {v['id']!r} && window.__groovebox.playing", 10.0)
+    time.sleep(3.0)  # the landing, its patches and its reverb built
+    return load_of(trace_audio(browser, page, lambda: time.sleep(6.0)))
+
+
+def fresh_page(browser):
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    page.goto(f"http://localhost:{PORT}/index.html")
+    wait_for(page, "!!window.__groovebox && !!document.querySelector('.vibes')", 5.0)
+    return page
+
+
 def vibes(root: str, runs: int, only: list | None = None) -> int:
-    """P8: each vibe's own cost, loaded from the picker and playing its groove."""
+    """P8: each vibe's own cost, loaded from the picker on a fresh page and playing its groove. P8 review S7: one page
+    for all of them measured each vibe with the previous one's tails still ringing (Drone after Ambient's 8 to 20 s
+    releases: 73 to 78% against about 50% on its own), so each vibe now gets its own page. The one transition that
+    rings that long, Ambient into Drone (what the vibe arrow does), is measured as its own row: Drone loaded 10 s
+    after Ambient landed."""
     server = subprocess.Popen([sys.executable, "-m", "http.server", str(PORT), "--directory", root],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
@@ -49,26 +72,31 @@ def vibes(root: str, runs: int, only: list | None = None) -> int:
             kwargs = {"executable_path": chrome} if os.path.exists(chrome) else {}
             browser = p.chromium.launch(args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"], **kwargs)
             for _ in range(runs):
-                page = browser.new_page(viewport={"width": 390, "height": 844})
-                page.goto(f"http://localhost:{PORT}/index.html")
-                wait_for(page, "!!window.__groovebox && !!document.querySelector('.vibes')", 5.0)
-                for v in page.evaluate("window.__vibes"):
+                page = fresh_page(browser)
+                listed = page.evaluate("window.__vibes")
+                page.close()
+                for v in listed:
                     if only and v["id"] not in only:
                         continue
-                    if not page.locator(".vibes").count():
-                        page.click("#new-jam")
-                        wait_for(page, "!!document.querySelector('.vibes')", 3.0)
-                    page.click(f'[data-vibe="{v["id"]}"]')
-                    wait_for(page, f"window.__groovebox.getSong().style === {v['id']!r} && window.__groovebox.playing", 10.0)
-                    time.sleep(3.0)  # the landing, its patches and its reverb built
-                    load, worst = load_of(trace_audio(browser, page, lambda: time.sleep(6.0)))
+                    page = fresh_page(browser)
+                    load, worst = play_vibe(browser, page, v)
+                    page.close()
                     rows.setdefault(v["name"], []).append((load, worst))
                     print(f"cost {v['name']}: audio load {load:.1f}%, worst stall {worst:.2f} ms", flush=True)
-                page.close()
+                by_id = {v["id"]: v for v in listed}
+                if (not only or "drone" in only) and "ambient" in by_id and "drone" in by_id:
+                    page = fresh_page(browser)
+                    page.click('[data-vibe="ambient"]')
+                    wait_for(page, "window.__groovebox.getSong().style === 'ambient' && window.__groovebox.playing", 10.0)
+                    time.sleep(10.0)  # Ambient's pads at full swell
+                    load, worst = play_vibe(browser, page, by_id["drone"])
+                    page.close()
+                    rows.setdefault("Ambient > Drone", []).append((load, worst))
+                    print(f"cost Ambient > Drone: audio load {load:.1f}%, worst stall {worst:.2f} ms", flush=True)
             browser.close()
     finally:
         server.terminate()
-    print("vibe, median audio load %, worst stall ms (median), over", runs, "runs")
+    print("vibe, median audio load %, worst stall ms (median), over", runs, "runs, each vibe on a fresh page")
     for name, r in rows.items():
         loads = sorted(x[0] for x in r)
         worst = sorted(x[1] for x in r)
