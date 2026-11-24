@@ -536,20 +536,28 @@ export abstract class Instrument {
   private queue = new AttackQueue({
     now: () => Tone.getContext().now(),
     setTimeout: (fn, seconds) => Tone.getContext().setTimeout(fn, seconds),
+    currentTime: () => Tone.getContext().currentTime,
   });
 
   /**
    * Start an attack at audio time `time`. One in the future (a swung step, a roll's later hits) waits on the
    * context's clock, like Tone's own PolySynth, and is dropped if Stop comes first. An attack that starts now first
    * starts every waiting one due before it, so a source never gets a start earlier than one it already has.
+   * `fn` gets the time to start at (C18): `time`, moved up past the current time and the source's last start, so
+   * every start of one source is strictly later than the one before. `source`: a key for each separately started
+   * source of the instrument (a drum voice); by default one for the instrument.
    */
-  protected atTime(time: number, fn: () => void): void {
+  protected atTime(time: number, fn: (time: number) => void, source?: string): void {
     const epoch = this.epoch;
-    this.queue.at(time, () => {
-      if (epoch !== this.epoch) return;
-      this.attacks++;
-      fn();
-    });
+    this.queue.at(
+      time,
+      (t) => {
+        if (epoch !== this.epoch) return;
+        this.attacks++;
+        fn(t);
+      },
+      source,
+    );
   }
 
   /** Drop every attack not yet started. */
@@ -687,7 +695,7 @@ export class Drums extends Instrument {
    */
   trigger(voice: DrumVoice, time: number, vel: number, bpm: number, gap = Infinity): void {
     const d = drumDecay(voice, this.decays[voice], bpm, gap);
-    this.atTime(time, () => {
+    const hit = (time: number): void => {
       switch (voice) {
         case "kick":
           this.kick.envelope.decay = d;
@@ -709,7 +717,8 @@ export class Drums extends Instrument {
           this.shaker.envelope.decay = d;
           return void this.shaker.triggerAttackRelease(d, time, vel);
       }
-    });
+    };
+    this.atTime(time, hit, voice);
   }
 
   releaseAll(time: number): void {
@@ -816,7 +825,7 @@ export class Bass extends Instrument {
   }
 
   trigger(midi: number, dur: number, time: number, vel: number): void {
-    this.atTime(time, () => {
+    this.atTime(time, (time) => {
       const hz = midiToHz(midi);
       // A mono bass: the next note ends one still held by the previous voice set.
       this.monos.old?.synth.triggerRelease(time);
@@ -1084,8 +1093,7 @@ export class Poly extends Instrument {
   private rehold(at?: number): void {
     // From the lookahead on (Tone.now()), not the audio clock's now: building the new voice set can take longer than
     // a render quantum, and an attack scheduled in the past would start part-way up its ramp, a step.
-    const t = Math.max(at ?? 0, Tone.now());
-    this.atTime(t, () => {
+    this.atTime(Math.max(at ?? 0, Tone.now()), (t) => {
       const h = this.held;
       const live = this.polys.live?.synth;
       if (!h || !h.items.length || !live || h.poly === live) return;
@@ -1186,7 +1194,7 @@ export class Poly extends Instrument {
    * own over `glide` seconds (only this voice: the others keep their pitch); `accent` opens the filter for it.
    */
   trigger(notes: number[], dur: number, time: number, vel: number, lead?: { glideFrom?: number; glide?: number; accent?: boolean }): void {
-    this.atTime(time, () => {
+    this.atTime(time, (time) => {
       this.polys.retireIf((p) => p.activeVoices === 0);
       this.roomFor(notes.length, time);
       const poly = this.polys.live!.synth;
@@ -1239,7 +1247,7 @@ export class Poly extends Instrument {
 
   /** P7: start notes that are held until the layer lets go (a drone, a pad with Swoop). */
   hold(notes: number[], time: number, vel: number): void {
-    this.atTime(time, () => {
+    this.atTime(time, (time) => {
       this.attackHeld(notes, time, vel);
       this.breath?.hold(midiToHz(Math.max(...notes)), time, vel);
     });
@@ -1250,7 +1258,7 @@ export class Poly extends Instrument {
    * A chord with more notes starts the extra ones; with fewer, the spare voices let go. Nothing held: it starts them.
    */
   glideTo(notes: number[], time: number, seconds: number, vel: number): void {
-    this.atTime(time, () => {
+    this.atTime(time, (time) => {
       const h = this.held;
       if (!h || !h.items.length) {
         this.attackHeld(notes, time, vel);

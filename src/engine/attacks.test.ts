@@ -1,6 +1,6 @@
 /** Attacks start in audio-time order, however slow a tick's timeouts are (the P9 smoke's hat page error). */
 import { describe, expect, it } from "vitest";
-import { AttackQueue, freshSetNeeded } from "./attacks.ts";
+import { AttackQueue, MIN_GAP, freshSetNeeded } from "./attacks.ts";
 
 /**
  * Tone's context, as far as attacks see it: now() is the audio time plus a lookahead; on each tick the timeouts due
@@ -109,6 +109,56 @@ describe("attack queue", () => {
     const key = (x: { t: number; name: string }): string => `${x.t.toFixed(4)} ${x.name}`;
     expect(new Set(started.map(key)).size).toBe(asked.length);
     for (let i = 1; i < started.length; i++) expect(started[i].t).toBeGreaterThanOrEqual(started[i - 1].t);
+  });
+});
+
+describe("strictly increasing start times per source (C18)", () => {
+  /** A source as Tone's Source.start keeps it: a time in the past is clamped to the current time, and a restart at or before its last start throws. */
+  class Source {
+    starts: number[] = [];
+    constructor(private readonly tone: { current: number }) {}
+    start(time: number): void {
+      const t = Math.max(time, this.tone.current);
+      const last = this.starts[this.starts.length - 1];
+      if (last !== undefined && !(t > last + 1e-6)) throw new Error("Start time must be strictly greater than previous start time");
+      this.starts.push(t);
+    }
+  }
+
+  it("two late attacks on one source, both due in the past, start at strictly increasing times", () => {
+    const tone = new FakeTone([]);
+    const q = new AttackQueue({ now: () => tone.now(), setTimeout: (fn, s) => tone.setTimeout(fn, s), currentTime: () => tone.current });
+    const src = new Source(tone);
+    // Two hats asked for in the future; the tick that runs them comes late (a slow timeout), past both their times.
+    q.at(0.15, (t) => src.start(t), "hat");
+    q.at(0.16, (t) => src.start(t), "hat");
+    tone.tick(0.2, 0); // current 0.2: both hats are late and would both be clamped to 0.2
+    expect(src.starts.length).toBe(2);
+    expect(src.starts[1]).toBeGreaterThan(src.starts[0]);
+    expect(src.starts[0]).toBeGreaterThanOrEqual(0.2);
+    expect(src.starts[1] - src.starts[0]).toBeGreaterThanOrEqual(MIN_GAP - 1e-12);
+  });
+
+  it("an attack at a source's last start time moves just past it; another source keeps its own time", () => {
+    const tone = new FakeTone([]);
+    const q = new AttackQueue({ now: () => tone.now(), setTimeout: (fn, s) => tone.setTimeout(fn, s), currentTime: () => tone.current });
+    const hat = new Source(tone);
+    const kick = new Source(tone);
+    q.at(0.05, (t) => hat.start(t), "hat");
+    q.at(0.05, (t) => hat.start(t), "hat");
+    q.at(0.05, (t) => kick.start(t), "kick");
+    expect(hat.starts).toEqual([0.05, 0.05 + MIN_GAP]);
+    expect(kick.starts).toEqual([0.05]);
+  });
+
+  it("an attack on time keeps its own time (nothing moves without need)", () => {
+    const tone = new FakeTone([]);
+    const q = new AttackQueue({ now: () => tone.now(), setTimeout: (fn, s) => tone.setTimeout(fn, s), currentTime: () => tone.current });
+    const got: number[] = [];
+    q.at(0.3, (t) => got.push(t), "a");
+    q.at(0.4, (t) => got.push(t), "a");
+    for (let i = 0; i < 8; i++) tone.tick(0.05);
+    expect(got).toEqual([0.3, 0.4]);
   });
 });
 
