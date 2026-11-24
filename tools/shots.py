@@ -65,6 +65,9 @@ CHECK = r"""() => {
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
       if (p.closest('.songlist') && p.classList.contains('songlist')) break;
       const cs = getComputedStyle(p);
+      // A fixed layer (a sheet's shade, such as the effect picker's, made inside a page) is laid over the screen:
+      // the boxes it sits in do not clip it.
+      if (cs.position === 'fixed') break;
       if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
       const q = p.getBoundingClientRect();
       if (r.left < q.left - 0.5 || r.right > q.right + 0.5 || r.top < q.top - 0.5 || r.bottom > q.bottom + 0.5) {
@@ -252,6 +255,18 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                     page.click("#chord-vibe")
                     w.screen(size, "simple-chords-borrow")
                     page.click("#vibe-close")
+            if mode == "advanced":
+                # P9 review M8: the effect picker sheet, from the Drums FX page (closed by picking what was there).
+                page.click('[data-tab="drums"]')
+                page.click('[data-page="drums:fx"]')
+                page.click('[data-fxslot="drums:0"]')
+                cur = page.evaluate("window.__groovebox.getFx().drums[0].effect")
+                page.click('[data-fxpick="drums:0"]')
+                if page.locator("[data-fxeffect]").count():
+                    w.screen(size, "advanced-fx-picker")
+                    page.click(f'[data-fxeffect="{cur}"]')
+                else:
+                    failures.append(f"{size}: the effect picker did not open")
             # The sheets: a held section, and Songs from the header.
             page.click('[data-tab="play"]')
             box = page.locator('[data-strip="0"]').bounding_box()

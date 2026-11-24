@@ -134,10 +134,8 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
               onChange={(p) => engine.setMix("reverbDecay", knobValue(DECAY, p))}
             />
             <Dial id="air" label="Air" value={mixValue(mix, "air")} min={0} max={1} color="var(--blue)" onChange={set("air")} />
-          </div>
-          <GroupLabel thing="Master">Lo-fi</GroupLabel>
-          {/* P9 (spec 8.8): the lo-fi master as one on/off. */}
-          <div class="fxrow one">
+            {/* P9 (spec 8.8): the lo-fi master as one on/off, a tile beside the dials (review M8: no group label over a
+                button that names itself, and no empty band above it). */}
             <button
               class={`tog fxbtn${lofi ? " on" : " off"}`}
               style={{ "--c": "var(--coral)" }}

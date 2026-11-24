@@ -1866,7 +1866,8 @@ button:disabled {
 .dials.fxdials {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
-.dials.fxdials .tog.fxbtn,
+/* P9 review M8: the lo-fi on/off sits in Space's dial row as a tile, like a slot's on/off on the FX page. */
+.dials .tog.fxbtn,
 .btn.fxpick {
   height: auto;
   min-height: 64px;

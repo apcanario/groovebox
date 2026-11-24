@@ -2131,13 +2131,17 @@ def measure_cost(browser, page, label: str, extras, drag: bool = False) -> dict:
 
 def master_switches(page, failures: list, st) -> float:
     """P7's master switches (lo-fi, air, reverb 20 s), P9 review E3: judged on the master output with only a steady
-    sine in it (the probe through Layer 2; the pump off), so the reference is the sine's, not the groove's. Each is
-    switched as shipped (must not click) and stepped (fxHardSwitch: the lo-fi and reverb steps must be caught).
-    Returns the largest shipped jump against its own reference."""
+    sine in it (the probe through Layer 2, loud enough that the lo-fi's 8-bit staircase is small beside it; the pump
+    off), so the reference is the sine's, not the groove's. Each is switched as shipped (must not click) and stepped
+    (fxHardSwitch). The lo-fi's stepped switch must be caught: at 62.5 Hz its 8 ms delay puts its sound half a cycle
+    from the dry one, so a step is most of the peak. The air's and the reverb's stepped switches are counted, not
+    judged: the air steps the level of a quiet noise, whose onset is no larger a jump than the noise's own, and the
+    reverb swaps the input of two reverbs, whose output a step at the input cannot step. Returns the largest shipped
+    jump against its own reference."""
     E = "window.__groovebox"
     pump = page.evaluate(f"{E}.getMix().pump")
     page.evaluate(f"{E}.setMix('pump', 0)")
-    page.evaluate(f"{E}.fxProbe({PROBE_HZ}, ['layer2'])")
+    page.evaluate(f"{E}.fxProbe({MASTER_PROBE_HZ}, ['layer2'], 1)")
     time.sleep(1.5)
     base = steady_jumps(page, "master", 1.5)
     worst = 0.0
@@ -2174,11 +2178,11 @@ def master_switches(page, failures: list, st) -> float:
         page.evaluate(f"{E}.fxHardSwitch(false)")
         time.sleep(0.6)
         report.append(f"{name} {n} of 8")
-        if name != "air" and n < 6:
+        if name == "lo-fi" and n < 6:
             failures.append(f"P7: the master click check caught only {n} of 8 stepped {name} switches")
     page.evaluate(f"{E}.fxProbe(null)")
     page.evaluate(f"{E}.setMix('pump', {pump})")
-    print(f"P7 master switches on a {PROBE_HZ:.0f} Hz sine alone (reference {base:.4f}): largest shipped jump {worst:.2f} times "
+    print(f"P7 master switches on a {MASTER_PROBE_HZ} Hz sine alone (reference {base:.4f}): largest shipped jump {worst:.2f} times "
           f"its own reference; stepped switches caught: {', '.join(report)}")
     return worst
 
@@ -2374,6 +2378,7 @@ def all_fx_off(page) -> None:
 # clipped edge, no fast carrier or moving filter), so a step stands out of it, and where a hard switch makes a large
 # step: then a stepped switch must be caught and the shipped (ramped) one must not be.
 PROBE_HZ = 110.0
+MASTER_PROBE_HZ = 62.5
 FX_CHECK_KNOBS = {
     "chorus": [1, 0.35, 0],  # an even blend, no depth: two fixed delays
     "phaser": [1, 0, 0],  # an even blend, no depth: fixed allpasses
@@ -2683,6 +2688,42 @@ def walk_p9(page, failures: list) -> None:
 
 
 FIRST_SONG: list = []
+
+
+def audio_load(browser, page, seconds: float = 4.0) -> float:
+    """The audio thread's load (busy over wall time of its render callbacks) over `seconds`, as measure_cost reads it."""
+    renders = trace_audio(browser, page, lambda: time.sleep(seconds))
+    if len(renders) < 3:
+        return float("nan")
+    t0 = min(x["ts"] for x in renders)
+    t1 = max(x["ts"] + x["dur"] for x in renders)
+    return 100.0 * sum(x["dur"] for x in renders) / (t1 - t0)
+
+
+def walk_fx_load(browser, page, failures: list) -> None:
+    """P9 review E1: with the transport stopped, 150 rounds of picking Crush, switching it on and off, then the same
+    for Shifter (300 worklet effects built, run and freed) leave no worklet alive and do not raise the audio load
+    (within 3 points; it used to climb from 32% to 83%)."""
+    E = "window.__groovebox"
+    if page.evaluate(f"{E}.playing"):
+        page.click("#play")
+    all_fx_off(page)
+    time.sleep(1.5)
+    before = audio_load(browser, page)
+    for _ in range(15):
+        page.evaluate("""() => { const e = window.__groovebox;
+          for (let n = 0; n < 10; n++) for (const fx of ['crush', 'shifter']) {
+            e.setFx('drums', 0, { effect: fx }); e.setFx('drums', 0, { on: true }); e.setFx('drums', 0, { on: false }); } }""")
+        time.sleep(0.2)
+    time.sleep(2.0)
+    alive = page.evaluate(f"{E}.fxState().worklets")
+    after = audio_load(browser, page)
+    print(f"P9: 300 Crush and Shifter effects built, run and freed with the transport stopped: audio load {before:.1f}% -> "
+          f"{after:.1f}%, worklets alive {alive}")
+    if alive != 0:
+        failures.append(f"P9: {alive} worklet nodes alive with every slot off")
+    if not after <= before + 3:
+        failures.append(f"P9: building effects raised the stopped audio load from {before:.1f}% to {after:.1f}% (E1)")
 
 
 def walk_cost(browser, page, failures: list) -> None:

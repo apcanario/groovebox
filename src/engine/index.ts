@@ -1005,11 +1005,11 @@ export class Engine {
   private probe: { osc: OscillatorNode; gain: GainNode } | null = null;
 
   /**
-   * For the smoke test (P9 review E2, E3): a steady sine of `hz` (peak 0.25) fed into the effect slots of `into`, with
+   * For the smoke test (P9 review E2, E3): a steady sine of `hz` (peak `amp`) fed into the effect slots of `into`, with
    * every instrument's own sound cut from its slots, so a click check has a clean reference on any instrument;
    * null ends it. Returns the audio time the sine starts (its phase is 0 there), the clock and the tempo.
    */
-  fxProbe(hz: number | null, into: InstrumentId[] = []): { t0: number; now: number; beats: number; bpm: number } | null {
+  fxProbe(hz: number | null, into: InstrumentId[] = [], amp = 0.25): { t0: number; now: number; beats: number; bpm: number } | null {
     const g = this.graph;
     if (!g) return null;
     const raw = Tone.getContext().rawContext as unknown as AudioContext;
@@ -1026,7 +1026,7 @@ export class Engine {
     const osc = raw.createOscillator();
     const gain = raw.createGain();
     osc.frequency.value = hz;
-    gain.gain.value = 0.25;
+    gain.gain.value = Math.max(0, Math.min(1, amp));
     osc.connect(gain);
     const t0 = now + 0.05;
     osc.start(t0);
