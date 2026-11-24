@@ -1840,6 +1840,13 @@ def walk_p3(page, failures: list) -> None:
             continue
         if check_landing_cutoff(page, failures, v):
             timed += 1
+        # P9: the vibe's effect slots play as its song sets them.
+        fst = page.evaluate(f"{E}.fxState()")
+        song_fx = page.evaluate(f"{E}.getFx()")
+        playing = {i: [(x["effect"], x["on"]) for x in fst["slots"][i]] for i in LAYERS}
+        wanted = {i: [(x["effect"], x["on"]) for x in song_fx[i]] for i in LAYERS}
+        if playing != wanted:
+            failures.append(f"{v['id']}: the effect slots playing {playing} are not the vibe's {wanted}")
         bar_s = 4 * 60 / v["bpm"]
         quiet = []
         for inst in LAYERS:
@@ -2035,9 +2042,11 @@ COST_SCENE = """async (extras) => {
   e.setArp(sec, 'layer1', { rate: 1, octaves: 3 });
   for (const id of ['bass', 'synth', 'layer1', 'layer2']) { e.setParam(id, 'drive', 0.5); e.setParam(id, 'delay', 0.5); e.setParam(id, 'reverb', 0.5); }
   e.setMix('saturation', 0.5);
-  // P9: "fx" in the list switches on all ten effect slots (two per instrument, ten of the twelve effects; Pan and
-  // Gate, the cheapest, are left out), on top of whatever else is asked; "all" is every P7 addition.
-  if (extras && extras !== true && extras.includes('fx') && e.setFx) {
+  // P9: "fx" in the list switches on all ten effect slots in turn (two per instrument, ten of the twelve effects; Pan
+  // and Gate, the cheapest, are left out): under the app's cap the last six stay on. "all" is every P7 addition.
+  // "fx10" lifts the app's cap of six active slots first, so all ten play (the measure that set the cap).
+  if (extras && extras !== true && extras.includes('fx10') && e.fxCapForCost) e.fxCapForCost(10);
+  if (extras && extras !== true && (extras.includes('fx') || extras.includes('fx10')) && e.setFx) {
     const pick = { drums: ['crush', 'echo'], bass: ['fuzz', 'phaser'], synth: ['chorus', 'shifter'], layer1: ['flanger', 'vowel'], layer2: ['ring', 'tremolo'] };
     for (const [id, fx] of Object.entries(pick)) fx.forEach((f, i) => e.setFx(id, i, { effect: f, on: true }));
   }
@@ -2264,6 +2273,251 @@ def walk_p7(page, failures: list) -> None:
     page.evaluate(f"{E}.setParam('synth', 'wave', 'sawtooth')")
 
 
+# P9 (spec 8.8): the twelve effects, read from the app so the list is never copied.
+FX_NAMES = """() => Object.fromEntries(Object.entries(window.__fx.defs).map(([k, d]) => [k, d.name]))"""
+# An effect is audible when the instrument's sound after its slots differs from the sound going in by this much
+# (RMS of the difference over RMS of the input, -20 dB). With every slot off the two must be the same (-60 dB).
+FX_AUDIBLE = 0.1
+FX_BYPASS = 0.001
+
+
+def fx_diff(page, inst: str, seconds: float = 0.6) -> tuple:
+    """The difference ratio and input RMS of one instrument's slots over `seconds` (the first read starts it)."""
+    E = "window.__groovebox"
+    page.evaluate(f"{E}.fxDiff('{inst}')")
+    time.sleep(seconds)
+    d = page.evaluate(f"{E}.fxDiff('{inst}')")
+    return (d["diff"] / d["ref"] if d["ref"] > 1e-6 else 0.0), d["ref"]
+
+
+def all_fx_off(page) -> None:
+    page.evaluate("""() => { const e = window.__groovebox; for (const id of ['drums', 'bass', 'synth', 'layer1', 'layer2'])
+      for (const i of [0, 1]) e.setFx(id, i, { on: false }); }""")
+
+
+def walk_p9(page, failures: list) -> None:
+    """P9 (spec 8.8), on the first song's groove while playing. Every effect on every instrument is audible (its sound
+    after the slots differs from the sound going in) and an off slot is disconnected and passes the sound unchanged.
+    Switching each effect on and off, and changing a slot's effect, while a steady drone sounds makes no click (level
+    continuity), and the click check is shown to catch a stepped switch. The cap keeps six slots on, the newest, and
+    its switch-off makes no click. Simple: two on/off buttons per instrument tab named after its slots, and the lo-fi
+    master as one on/off on the Mix tab. Advanced: the FX page of every instrument picks the effect, switches it and
+    turns its three knobs."""
+    E = "window.__groovebox"
+    page.evaluate("(s) => window.__groovebox.loadSong(s)", FIRST_SONG[0])
+    if not page.evaluate(f"{E}.playing"):
+        page.click("#play")
+    page.evaluate(f"{E}.switchSection(1)")
+    wait_for(page, f"{E}.position().section === 1", 4.0)
+    sec = 1
+    page.evaluate(f"{E}.setLayerMode({sec}, 'layer1', 'arp')")
+    page.evaluate(f"{E}.setLayerMode({sec}, 'layer2', 'pad')")
+    all_fx_off(page)
+    time.sleep(1.0)
+    names = page.evaluate(FX_NAMES)
+    effects = list(names)
+    if len(effects) != 12:
+        failures.append(f"P9: {len(effects)} effects, not twelve")
+    fs = lambda: page.evaluate(f"{E}.fxState()")  # noqa: E731
+    # Every effect on every instrument: audible; off: the slot passes the sound unchanged and is disconnected.
+    weakest = (9.0, "")
+    built_on = 0
+    for inst in LAYERS:
+        r, ref = fx_diff(page, inst)
+        if ref < 1e-3:
+            failures.append(f"P9: {inst} is silent in the groove (input RMS {ref:.5f})")
+        if r > FX_BYPASS:
+            failures.append(f"P9: with both slots off, {inst}'s sound changes through them ({r:.4f})")
+        for fx in effects:
+            page.evaluate(f"{E}.setFx('{inst}', 0, {{effect: '{fx}'}})")
+            built = fs()["built"]
+            page.evaluate(f"{E}.setFx('{inst}', 0, {{on: true}})")
+            built_on += fs()["built"] - built
+            time.sleep(0.25)
+            r, ref = fx_diff(page, inst)
+            weakest = min(weakest, (r, f"{fx} on {inst}"))
+            if r < FX_AUDIBLE:
+                failures.append(f"P9: {fx} on {inst} is not audible (difference {r:.3f} of the input, wanted {FX_AUDIBLE})")
+            st = fs()["slots"][inst][0]
+            if not (st["on"] and st["wired"] and st["effect"] == fx):
+                failures.append(f"P9: {fx} on {inst}: the slot is {st}")
+            page.evaluate(f"{E}.setFx('{inst}', 0, {{on: false}})")
+        time.sleep(0.4)
+        st = fs()["slots"][inst]
+        if any(x["wired"] for x in st):
+            failures.append(f"P9: {inst}: a slot switched off is still connected: {st}")
+        r, _ = fx_diff(page, inst, 0.4)
+        if r > FX_BYPASS:
+            failures.append(f"P9: {inst}: after its effects went off its sound still changes through the slots ({r:.4f})")
+    if built_on:
+        failures.append(f"P9: switching a slot on built {built_on} effects (they are built in advance)")
+    print(f"P9: all {len(effects)} effects audible on all five instruments; weakest {weakest[1]} at {weakest[0]:.3f} of the input "
+          f"(wanted {FX_AUDIBLE}); every slot off passes the sound unchanged and is disconnected")
+
+    # Mid-jam switching without a click, on a steady sine drone on Layer 2 (the P6 and P7 continuity check).
+    page.evaluate(f"{E}.setLayerMode({sec}, 'layer2', 'drone')")
+    page.evaluate(f"{E}.setPad({sec}, 'layer2', {{attack: 0.3, release: 2, swoop: 0.3}})")
+    page.evaluate(f"{E}.setParam('layer2', 'wave', 'sine')")
+    page.evaluate(f"{E}.setChords({sec}, [{{degree: 0, bars: 2}}])")
+    time.sleep(3.0)
+    dry = steady_jumps(page, "layer2", 2.0)
+    worst = 0.0
+    prev = None
+    for fx in effects:
+        page.evaluate(f"{E}.setFx('layer2', 0, {{effect: '{fx}'}})")
+        # The steady sound just before the switch (the drone alone), so the reference is never a stale one.
+        dry = steady_jumps(page, "layer2", 0.75)
+        read_jumps(page, "layer2")
+        page.evaluate(f"{E}.setFx('layer2', 0, {{on: true}})")
+        time.sleep(1.0)
+        switched = read_jumps(page, "layer2")
+        wet = steady_jumps(page, "layer2", 1.0)
+        ref = max(dry, wet)
+        worst = max(worst, check_continuity(page, "layer2", ref, f"P9: {fx} switched on", failures, switched))
+        # A knob turned while it plays.
+        knobs = page.evaluate(f"{E}.getFx().layer2[0].knobs")
+        read_jumps(page, "layer2")
+        page.evaluate(f"(k) => window.__groovebox.setFx('layer2', 0, {{knobs: k}})", [1 - knobs[0] * 0.5, knobs[1], knobs[2]])
+        time.sleep(0.6)
+        worst = max(worst, check_continuity(page, "layer2", max(ref, steady_jumps(page, "layer2", 0.5)), f"P9: {fx} knob turned", failures))
+        page.evaluate(f"(k) => window.__groovebox.setFx('layer2', 0, {{knobs: k}})", knobs)
+        # The slot's effect changed while it is on: a crossfade from the one before.
+        if prev:
+            page.evaluate(f"{E}.setFx('layer2', 1, {{effect: '{prev}', on: true}})")
+            time.sleep(0.8)
+            before = steady_jumps(page, "layer2", 0.5)
+            read_jumps(page, "layer2")
+            page.evaluate(f"{E}.setFx('layer2', 1, {{effect: '{fx}'}})")
+            time.sleep(0.8)
+            changed = read_jumps(page, "layer2")
+            after = steady_jumps(page, "layer2", 0.5)
+            worst = max(worst, check_continuity(page, "layer2", max(before, after), f"P9: {prev} changed to {fx} while on", failures, changed))
+            page.evaluate(f"{E}.setFx('layer2', 1, {{on: false}})")
+            time.sleep(0.5)
+        read_jumps(page, "layer2")
+        page.evaluate(f"{E}.setFx('layer2', 0, {{on: false}})")
+        time.sleep(1.0)
+        worst = max(worst, check_continuity(page, "layer2", ref, f"P9: {fx} switched off", failures))
+        prev = fx
+    print(f"P9: every effect switched on and off, a knob turned and the effect changed while a drone sounds; largest jump "
+          f"{worst:.2f} times the steady sound's (a click above {CLICK_FACTOR:.1f})")
+    # The check can fail: the same switches stepped (no ramp) must be caught. Vowel at full mix on the drone's low sine
+    # passes little of it (its formants sit far above), so a stepped switch is a step of most of the sound.
+    page.evaluate(f"{E}.setFx('layer2', 0, {{effect: 'vowel', knobs: [1, 0, 0]}})")
+    dry = steady_jumps(page, "layer2", 1.0)
+    page.evaluate(f"{E}.setFx('layer2', 0, {{on: true}})")
+    time.sleep(0.5)
+    ref = max(dry, steady_jumps(page, "layer2", 1.0))
+    page.evaluate(f"{E}.setFx('layer2', 0, {{on: false}})")
+    time.sleep(0.5)
+    caught = {}
+    for hard in (True, False):
+        page.evaluate(f"{E}.fxHardSwitch({'true' if hard else 'false'})")
+        n = 0
+        for _ in range(4):
+            for on in ("true", "false"):
+                read_jumps(page, "layer2")
+                page.evaluate(f"{E}.setFx('layer2', 0, {{on: {on}}})")
+                time.sleep(0.4)
+                if check_continuity(page, "layer2", ref, "", []) > CLICK_FACTOR:
+                    n += 1
+                time.sleep(0.2)
+        caught[hard] = n
+    page.evaluate(f"{E}.fxHardSwitch(false)")
+    print(f"P9: the click check caught {caught[True]} of 8 stepped switches and {caught[False]} of 8 ramped ones")
+    if caught[True] < 5:
+        failures.append(f"P9: the click check caught only {caught[True]} of 8 stepped switches: it could not see a click")
+    if caught[False]:
+        failures.append(f"P9: {caught[False]} of 8 ramped switches clicked")
+
+    # The cap (spec 8.8): Layer 2's slot on first, then six more: Layer 2's goes off (the oldest), without a click.
+    all_fx_off(page)
+    time.sleep(0.5)
+    cap = fs()["cap"]
+    page.evaluate(f"{E}.setFx('layer2', 0, {{effect: 'chorus', on: true}})")
+    time.sleep(1.0)
+    ref = max(dry, steady_jumps(page, "layer2", 1.0))
+    others = [(i, s) for i in ["drums", "bass", "synth", "layer1"] for s in (0, 1)][:cap]
+    read_jumps(page, "layer2")
+    for i, s in others:
+        page.evaluate(f"{E}.setFx('{i}', {s}, {{on: true}})")
+    time.sleep(1.0)
+    worst = check_continuity(page, "layer2", ref, "P9: the cap switching Layer 2's slot off", failures)
+    st = fs()
+    on = [f"{i}:{s}" for i in LAYERS for s, x in enumerate(st["slots"][i]) if x["on"]]
+    song_on = page.evaluate("(() => { const f = window.__groovebox.getFx(); return Object.entries(f).flatMap(([i, r]) => r.flatMap((x, s) => x.on ? [i + ':' + s] : [])); })()")
+    want = [f"{i}:{s}" for i, s in others]
+    if sorted(on) != sorted(want) or sorted(song_on) != sorted(want) or len(on) != cap:
+        failures.append(f"P9: with the cap of {cap}, playing {on} and the song {song_on}, wanted {want}")
+    print(f"P9: cap of {cap}: the seventh switch turned the oldest off (Layer 2's), jump {worst:.2f} times the steady sound's")
+    all_fx_off(page)
+    time.sleep(0.4)
+
+    # Simple: two buttons per instrument tab, named after the slots; a tap switches the slot.
+    page.click('[data-appmode="simple"]')
+    for inst in LAYERS:
+        page.click(f'[data-tab="{inst}"]')
+        fx = page.evaluate(f"{E}.getFx().{inst}")
+        for s in (0, 1):
+            sel = f'[data-fx="{inst}:{s}"]'
+            if not page.locator(sel).count():
+                failures.append(f"P9: Simple {inst} has no button for slot {s + 1}")
+                continue
+            text = page.inner_text(sel).strip()
+            if text != names[fx[s]["effect"]]:
+                failures.append(f"P9: Simple {inst}'s slot {s + 1} button says {text!r}, its effect is {names[fx[s]['effect']]}")
+            page.click(sel)
+            if not page.evaluate(f"{E}.getFx().{inst}[{s}].on") or page.get_attribute(sel, "aria-checked") != "true":
+                failures.append(f"P9: Simple {inst}'s {text} button did not switch its slot on")
+            page.click(sel)
+            if page.evaluate(f"{E}.getFx().{inst}[{s}].on"):
+                failures.append(f"P9: Simple {inst}'s {text} button did not switch its slot off")
+        if page.locator(f'.body [data-dial^="{inst}:fx"]').count():
+            failures.append(f"P9: Simple {inst} shows effect knobs")
+        check_sizes(page, f"simple {inst} effect buttons", failures)
+    page.click('[data-tab="mix"]')
+    page.click('[data-page="mix:space"]')
+    was = page.evaluate(f"{E}.getMix().lofi ?? 0")
+    page.click("#lofi")
+    if (page.evaluate(f"{E}.getMix().lofi ?? 0") > 0) == (was > 0):
+        failures.append("P9: the Mix tab's Lo-fi button did not switch the lo-fi master")
+    page.click("#lofi")
+    if (page.evaluate(f"{E}.getMix().lofi ?? 0") > 0) != (was > 0):
+        failures.append("P9: the Mix tab's Lo-fi button did not switch the lo-fi master back")
+
+    # Advanced: the FX page of each instrument: pick the effect from the sheet, switch the slot, turn its three knobs.
+    page.click('[data-appmode="advanced"]')
+    for n, inst in enumerate(LAYERS):
+        page.click(f'[data-tab="{inst}"]')
+        if inst in ("layer1", "layer2"):
+            page.click(f'[data-mode="{inst}:arp"]')
+        page.click(f'[data-page="{inst}:fx"]')
+        for s in (0, 1):
+            page.click(f'[data-fxslot="{inst}:{s}"]')
+            pick = effects[(2 * n + s + 5) % len(effects)]
+            page.click(f'[data-fxpick="{inst}:{s}"]')
+            check_sizes(page, f"advanced {inst} effect picker", failures)
+            if page.locator("[data-fxeffect]").count() != len(effects):
+                failures.append(f"P9: the effect picker lists {page.locator('[data-fxeffect]').count()} effects")
+            page.click(f'[data-fxeffect="{pick}"]')
+            if page.evaluate(f"{E}.getFx().{inst}[{s}].effect") != pick or page.locator("[data-fxeffect]").count():
+                failures.append(f"P9: Advanced {inst} slot {s + 1}: picking {pick} did not set it (or the sheet stayed open)")
+            page.click(f'[data-fx="{inst}:{s}"]')
+            if not page.evaluate(f"{E}.getFx().{inst}[{s}].on"):
+                failures.append(f"P9: Advanced {inst} slot {s + 1}: the on/off did not switch it on")
+            for k in range(3):
+                d = f'[data-dial="{inst}:fx{s}:{k}"]'
+                before = page.evaluate(f"{E}.getFx().{inst}[{s}].knobs[{k}]")
+                if turn(page, d) < 0.02 or page.evaluate(f"{E}.getFx().{inst}[{s}].knobs[{k}]") == before:
+                    failures.append(f"P9: Advanced {inst} slot {s + 1}: knob {k + 1} ({pick}) did not move the slot")
+            check_sizes(page, f"advanced {inst} fx page", failures)
+            page.click(f'[data-fx="{inst}:{s}"]')
+    all_fx_off(page)
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    print("P9: Simple effect buttons and the Lo-fi switch, and every Advanced FX page (picker, on/off, three knobs), work")
+
+
 FIRST_SONG: list = []
 
 
@@ -2278,6 +2532,23 @@ def walk_cost(browser, page, failures: list) -> None:
     # Reported, not judged: the headless trace already shows callbacks longer than their period before P7.
     if out.get("worst_ms") is None:
         failures.append("cost: no audio render callbacks traced")
+    # P9 (spec 8.8): the effect slots, all ten on (the cap lifted for the measure) and under the app's cap of six,
+    # against all off above. tools/cost.py takes the median of several runs (all, all,fx10, all,fx).
+    E = "window.__groovebox"
+    cap = page.evaluate(f"{E}.fxState().cap")
+    ten = measure_cost(browser, page, "everything on, all ten effect slots on", ["all", "fx10"])
+    st = page.evaluate(f"{E}.fxState()")
+    n10 = sum(x["on"] for r in st["slots"].values() for x in r)
+    page.evaluate(f"{E}.fxCapForCost({cap})")
+    all_fx_off(page)
+    six = measure_cost(browser, page, f"everything on, effect slots on under the cap of {cap}", ["all", "fx"])
+    st = page.evaluate(f"{E}.fxState()")
+    n6 = sum(x["on"] for r in st["slots"].values() for x in r)
+    if n10 != 10 or n6 != cap:
+        failures.append(f"cost: the effect measure played {n10} slots (wanted 10) and {n6} under the cap (wanted {cap})")
+    print(f"cost P9: effect slots off {out.get('load', 0):.1f}% / {out.get('worst_ms', 0):.1f} ms; all ten on "
+          f"{ten.get('load', 0):.1f}% / {ten.get('worst_ms', 0):.1f} ms; {cap} on {six.get('load', 0):.1f}% / {six.get('worst_ms', 0):.1f} ms")
+    all_fx_off(page)
     # P7 review E2: a drag of the Tail dial keeps at most two reverbs alive (it used to pile one up per move).
     drag = measure_cost(browser, page, "everything on, Tail dial dragged", True, drag=True)
     st = page.evaluate("window.__groovebox.p7State()")
@@ -2461,6 +2732,7 @@ def main() -> int:
             walk_p3(page, failures)
             walk_p4(page, failures)
             walk_p7(page, failures)
+            walk_p9(page, failures)
             walk_cost(browser, page, failures)
             browser.close()
     finally:

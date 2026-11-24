@@ -1,6 +1,6 @@
 import "./style.css";
 import { render } from "preact";
-import { BASS_PRESETS, DRUM_PRESETS, Engine, MACROS, SYNTH_PRESETS, type LatencyHint } from "./engine/index.ts";
+import { BASS_PRESETS, DRUM_PRESETS, EFFECT_DEFS, Engine, MACROS, SYNTH_PRESETS, type LatencyHint } from "./engine/index.ts";
 import { STYLES, STYLE_IDS, vibeStart } from "./music/styles.ts";
 import { App } from "./ui/App.tsx";
 import { openIdb } from "./store/idb.ts";
@@ -48,10 +48,13 @@ async function boot(): Promise<void> {
     __macros: typeof MACROS;
     __vibes: { id: string; name: string; bpm: number; start: number }[];
     __data: { beats: readonly string[]; bass: readonly string[]; synth: readonly string[] };
+    __fx: { defs: typeof EFFECT_DEFS };
   };
   // P3: every vibe and every beat and rhythm that exists, so the smoke test loops whatever is there.
   w.__vibes = STYLE_IDS.map((id) => ({ id, name: STYLES[id].name, bpm: STYLES[id].bpm, start: vibeStart(id) }));
   w.__data = { beats: DRUM_PRESETS, bass: BASS_PRESETS, synth: SYNTH_PRESETS };
+  // P9: the effects that exist, so the smoke test walks whatever is there.
+  w.__fx = { defs: EFFECT_DEFS };
   // The macro mapping, for the smoke test's read-back of every Simple move in Advanced.
   w.__macros = MACROS;
   w.__groovebox = engine;

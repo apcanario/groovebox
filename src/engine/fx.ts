@@ -245,7 +245,10 @@ abstract class Effect {
     knobs: FxKnobs,
   ) {
     this.k = [...knobs];
+    // Closed until the slot fades it open: a delay line (Chorus, Flanger, Echo) then starts from a fade, not from a
+    // step into a silent line, which its output would replay a delay later as a click.
     this.input = this.own(raw().createGain());
+    this.input.gain.value = 0;
     this.output = this.own(raw().createGain());
   }
   get knobs(): FxKnobs {
@@ -889,6 +892,7 @@ export class FxSlotNode {
     if (on) {
       this.wire(v);
       if (!v.fx.isRunning) v.fx.start(t);
+      fade(v.fx.input.gain, 1, at);
       fade(v.wet.gain, 1, at);
       fade(this.dry.gain, 0, at);
       return;
@@ -919,6 +923,7 @@ export class FxSlotNode {
     const t = Math.max(at ?? 0, now());
     this.wire(next);
     next.fx.start(t);
+    fade(next.fx.input.gain, 1, at);
     fade(next.wet.gain, 1, at);
     fade(old.wet.gain, 0, at);
     this.leaving++;

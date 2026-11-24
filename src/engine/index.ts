@@ -480,6 +480,13 @@ export class Engine {
 
   /** Slots switched on, in the order they were switched on (the oldest first): the cap turns the oldest off. */
   private fxOrder: string[] = [];
+  /** The cap (spec 8.8); only `fxCapForCost` changes it, so tools/cost.py can measure all ten slots on. */
+  private fxCap = MAX_ACTIVE_FX;
+
+  /** For tools/cost.py (P9): lift or restore the cap on active slots, to measure the cost of all ten. Never used by the app. */
+  fxCapForCost(n: number): void {
+    this.fxCap = Math.max(1, Math.min(10, Math.round(n)));
+  }
 
   /** The effect slots as the song holds them (a copy; defaults, all off, for a song that sets none). */
   getFx(): Record<InstrumentId, [FxSlot, FxSlot]> {
@@ -507,7 +514,7 @@ export class Engine {
     fx[inst][slot] = next;
     const key = fxKey(inst, slot);
     if (next.on && !cur.on) {
-      const { order, off } = activate(this.fxOrder, key, MAX_ACTIVE_FX);
+      const { order, off } = activate(this.fxOrder, key, this.fxCap);
       this.fxOrder = order;
       for (const o of off) {
         const [oi, os] = o.split(":");
@@ -530,7 +537,7 @@ export class Engine {
     for (const id of INSTRUMENTS)
       fx[id].forEach((s, i) => {
         if (!s.on) return;
-        if (this.fxOrder.length >= MAX_ACTIVE_FX) {
+        if (this.fxOrder.length >= this.fxCap) {
           s.on = false;
           over = true;
         } else this.fxOrder.push(fxKey(id, i));
@@ -989,7 +996,7 @@ export class Engine {
     const slots = Object.fromEntries(
       INSTRUMENTS.map((id) => [id, g.instruments[id].channel.fx.slots.map((s) => ({ effect: s.effect, on: s.active, wired: s.wired }))]),
     ) as Record<InstrumentId, { effect: EffectId; on: boolean; wired: boolean }[]>;
-    return { slots, order: [...this.fxOrder], cap: MAX_ACTIVE_FX, built: fxCounts.built };
+    return { slots, order: [...this.fxOrder], cap: this.fxCap, built: fxCounts.built };
   }
 
   /** For the smoke test (P9): every slot switch steps instead of ramping, to prove the click check can fail. */
