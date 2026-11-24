@@ -15,7 +15,8 @@ export default {
   patches: {
     drums: "soft",
     bass: { patch: "sub", set: { attack: 2, release: 6, sustain: 0.9 } },
-    synth: { patch: "padSwell", set: { attack: 8, release: 14, cutoff: 0.25, drift: 0.5, driftRate: 0.1 } },
+    // P8 review M6: a low, closed organ (square) held long, darker than Ambient's sawtooth Pad swell.
+    synth: { patch: "organ", set: { attack: 8, decay: 1, sustain: 0.9, release: 14, cutoff: 0.2, envAmount: 0, reverb: 0.8, drift: 0.5, driftRate: 0.1 } },
     layer1: { patch: "darkPad", set: { attack: 6, release: 12, drift: 0.6, driftRate: 0.08, level: 0.55 } },
     layer2: { patch: "driftPad", set: { attack: 10, release: 16, cutoff: 0.45, drift: 0.7, driftRate: 0.05 } },
   },

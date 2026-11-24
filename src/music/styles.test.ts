@@ -245,6 +245,19 @@ describe("the full lists of spec 8.7 (P8)", () => {
       expect(forInst("layer"), id).toContain(id);
   });
 
+  it("gives Progressive and Acid their own hits, not another beat's with other velocities (P8 review S6, M1)", () => {
+    const hits = (id: string): Set<string> => {
+      const g = DRUM_PATTERNS[id].grid;
+      return new Set(Object.entries(g).flatMap(([v, row]) => row.flatMap((x, i) => (x > 0 ? [`${v}${i}`] : []))));
+    };
+    // The pairs the P8 review found one hit apart or less (house shuffle and tropical differ by their swing).
+    for (const [a, b] of [["progressive", "fourFloor"], ["acid", "techno"], ["acid", "fourFloor"], ["trance", "progressive"]]) {
+      const [x, y] = [hits(a), hits(b)];
+      const apart = [...x].filter((h) => !y.has(h)).length + [...y].filter((h) => !x.has(h)).length;
+      expect(apart, `${a} and ${b}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
   it("names are at most 14 characters, and unique within each picker in both Advanced and Simple words", () => {
     const lists: [string, { name: string; simple: string }[]][] = [
       ["beats", Object.values(BEAT_NAMES)],
@@ -289,6 +302,10 @@ describe("the full lists of spec 8.7 (P8)", () => {
     expect(drone.sections.every((s) => s.layer2.mode === "drone" && (s.layer2.pad.swoop ?? 0) > 0)).toBe(true);
     expect(drone.sections.every((s) => s.layer2.pad.attack >= 4 && s.layer2.pad.release >= 10)).toBe(true);
     expect(drone.sections.every((s) => s.chords.every((c) => c.bars >= 4))).toBe(true);
+    // P8 review S4: Drone stays on a chord longer than Ambient: eight bars in every section, the groove too.
+    expect(drone.sections.every((s) => s.chords.every((c) => c.bars >= 8))).toBe(true);
+    // P8 review M6: its own synth sound, not Ambient's.
+    expect(STYLES.drone.patches.synth).not.toEqual(STYLES.ambient.patches.synth);
     expect(drone.bpm).toBe(60);
   });
 });
