@@ -1,0 +1,67 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Breakbeat: a funky broken beat at 130, a bouncing octave bass, organ pushes, a saw hook and a dark pad. */
+export default {
+  order: 3,
+  name: "Breakbeat",
+  family: "breaks",
+  bpm: 130,
+  key: "E",
+  mood: "minor",
+  patches: { drums: "dusty", bass: "pluckBass", synth: "organ", layer1: "sawLead", layer2: "darkPad" },
+  mix: { sweep: 0, pump: 0.35, saturation: 0.3 },
+  leads: {
+    layer1: { style: "hook", phrase: 2, density: 0.6, shape: "fall", range: 0.45, register: 0.55, noteLength: 0.35, slide: 0.15, accent: 0.45 },
+    layer2: { style: "drift", register: 0.4, noteLength: 0.8, density: 0.4 },
+  },
+  // Fuzz on the breaks, the organ echoed, the saw lead flanged.
+  fx: {
+    drums: [{ effect: "fuzz", on: true, knobs: [0.25, 0.5, 0.35] }, { effect: "crush" }],
+    bass: [{ effect: "phaser" }, { effect: "chorus" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.3, 0.4, 0.4] }, { effect: "tremolo" }],
+    layer1: [{ effect: "flanger", on: true, knobs: [0.4, 0.75, 0.45] }, { effect: "echo" }],
+    layer2: [{ effect: "chorus" }, { effect: "phaser" }],
+  },
+  sections: [
+    {
+      name: "Intro",
+      on: ["drums", "synth"],
+      chords: [[0, 2], [3, 2]],
+      beat: "breakbeat",
+      bass: "octave",
+      synth: "push",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 1], [5, 1], [3, 1], [4, 1]],
+      beat: "breakbeat",
+      bass: "octave",
+      synth: "push",
+      layer1: { mode: "generative", gen: { density: 0.65 } },
+      layer2: { mode: "pad", pad: { brightness: 0.35 } },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1", "layer2"],
+      chords: [[0, 2], [5, 2]],
+      beat: "breakbeat",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "arp", arp: { direction: "down", rate: 2, octaves: 2 } },
+      layer2: { mode: "pad", pad: { attack: 1.5, release: 3 } },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer1"],
+      chords: [[0, 2], [3, 2]],
+      beat: "breakbeat",
+      bass: "octave",
+      synth: "push",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

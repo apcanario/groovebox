@@ -4,7 +4,7 @@ export default {
   order: 410,
   name: "Red zone",
   feels: ["tense"],
-  vibes: ["idm", "edm", "trance", "electro", "trap", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno"],
+  vibes: ["melodicTechno", "twoStep", "breakbeat", "synthwave", "trap"],
   mood: "minor",
   voicing: "triads",
   chords: [[0, 1], [2, 1], [6, 1], [4, 1]],

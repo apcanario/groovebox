@@ -4,7 +4,7 @@ export default {
   order: 117,
   name: "Blanket",
   feels: ["warm"],
-  vibes: ["loFi", "ambient", "drone", "downtempo", "synthwave", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage"],
+  vibes: ["progressive", "acidHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "breakbeat", "dubstep", "downtempo", "trap"],
   mood: "house",
   voicing: "extended",
   chords: [[3, 1], [4, 1], [0, 2]],

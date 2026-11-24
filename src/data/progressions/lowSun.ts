@@ -4,7 +4,7 @@ export default {
   order: 120,
   name: "Low sun",
   feels: ["warm"],
-  vibes: ["loFi", "ambient", "drone", "downtempo", "synthwave", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "idm", "edm", "trance", "electro", "trap"],
+  vibes: ["tropicalHouse", "ambient", "drone", "edm", "trance"],
   mood: "major",
   voicing: "triads",
   chords: [[3, 2], [0, 2]],

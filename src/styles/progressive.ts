@@ -1,0 +1,67 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Progressive: minor chords that build over two bars, a rolling bass, plucked eighths, an arp and slow strings. */
+export default {
+  order: 3,
+  name: "Progressive",
+  family: "house",
+  bpm: 124,
+  key: "A",
+  mood: "minor",
+  patches: { drums: "punchy", bass: "rubber", synth: "pluck", layer1: "pluckLead", layer2: "strings" },
+  mix: { sweep: 0, pump: 0.55, saturation: 0.1 },
+  leads: {
+    layer1: { style: "phrase", phrase: 4, density: 0.6, shape: "rise", range: 0.5, register: 0.65, noteLength: 0.5, slide: 0.05, accent: 0.3 },
+    layer2: { style: "drift", register: 0.5, noteLength: 0.85, density: 0.4 },
+  },
+  // The plucks and the arp echo, the strings sweep slowly through a phaser.
+  fx: {
+    drums: [{ effect: "pan" }, { effect: "crush" }],
+    bass: [{ effect: "chorus" }, { effect: "fuzz" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.35, 0.6, 0.45] }, { effect: "chorus" }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.4, 0.4] }, { effect: "flanger" }],
+    layer2: [{ effect: "phaser", on: true, knobs: [0.45, 0.2, 0.5] }, { effect: "chorus" }],
+  },
+  sections: [
+    {
+      name: "Intro",
+      on: ["drums", "layer2"],
+      chords: [[0, 2], [5, 2], [2, 2], [6, 2]],
+      beat: "progressive",
+      bass: "rolling",
+      synth: "pluck",
+      layer1: { mode: "arp", arp: { direction: "up", rate: 4, octaves: 2 } },
+      layer2: { mode: "pad", pad: { attack: 1.5, release: 3 } },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 1], [5, 1], [2, 1], [6, 1]],
+      beat: "progressive",
+      bass: "rolling",
+      synth: "pluck",
+      layer1: { mode: "arp", arp: { direction: "updown", rate: 4, octaves: 2, gate: 0.5 } },
+      layer2: { mode: "pad", pad: { brightness: 0.45, motion: 0.4 } },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1", "layer2"],
+      chords: [[5, 2], [6, 2], [0, 2], [2, 2]],
+      beat: "progressive",
+      bass: "long",
+      synth: "swell",
+      layer1: { mode: "generative", gen: { density: 0.45 } },
+      layer2: { mode: "pad", pad: { attack: 2.5, release: 5, motion: 0.6 } },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer1"],
+      chords: [[0, 2], [5, 2], [2, 2], [6, 2]],
+      beat: "progressive",
+      bass: "rolling",
+      synth: "pluck",
+      layer1: { mode: "arp", arp: { direction: "up", rate: 4, octaves: 2 } },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

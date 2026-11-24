@@ -4,7 +4,7 @@ export default {
   order: 507,
   name: "Anthem",
   feels: ["uplifting"],
-  vibes: ["idm", "edm", "trance", "electro", "trap", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno"],
+  vibes: ["progressive", "minimalTechno", "breakbeat", "synthwave", "edm", "trance", "electro"],
   mood: "minor",
   voicing: "triads",
   chords: [[5, 1], [6, 1], [0, 1], [2, 1]],

@@ -4,7 +4,7 @@ export default {
   order: 206,
   name: "Glass lake",
   feels: ["dreamy"],
-  vibes: ["loFi", "ambient", "drone", "downtempo", "synthwave", "idm", "edm", "trance", "electro", "trap", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse"],
+  vibes: ["progressive", "acidHouse", "melodicTechno", "twoStep", "dubstep", "trap"],
   mood: "house",
   voicing: "extended",
   chords: [[5, 1], [2, 1], [6, 1], [0, 1]],

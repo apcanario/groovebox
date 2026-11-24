@@ -30,10 +30,37 @@ import {
   vibeTiles,
 } from "./styles.ts";
 import { freeName } from "../store/library.ts";
-import { PROGRESSIONS, findProgression, progressionsFor } from "./progressions.ts";
+import { LAUNCH_VIBES, PROGRESSIONS, PROGRESSION_IDS, findProgression, progressionsFor } from "./progressions.ts";
 import type { Mood } from "./scales.ts";
 
-const LAUNCH = ["Deep house", "Tropical house", "Deep techno", "Melodic techno", "Drum and bass", "2-step", "Lo-fi", "Ambient"];
+/** Spec 8.2's launch set, in its table's order (family, then place in the family). */
+const LAUNCH = [
+  "Deep house",
+  "Tropical house",
+  "Progressive",
+  "Acid house",
+  "Afro house",
+  "Deep techno",
+  "Melodic techno",
+  "Minimal techno",
+  "Dub techno",
+  "Drum and bass",
+  "2-step",
+  "Breakbeat",
+  "Dubstep",
+  "Future garage",
+  "Lo-fi",
+  "Ambient",
+  "Drone",
+  "Downtempo",
+  "Synthwave",
+  "IDM",
+  "EDM",
+  "Trance",
+  "Electro",
+  "Trap",
+];
+const FAMILY_SIZES: [string, number][] = [["house", 5], ["techno", 4], ["breaks", 5], ["slow", 5], ["other", 5]];
 
 /** Which instruments play at least one note in `bars` bars of a section. */
 function heard(seq: Sequencer, bars: number): Set<InstrumentId> {
@@ -45,11 +72,13 @@ function heard(seq: Sequencer, bars: number): Set<InstrumentId> {
 const appStyles = import.meta.glob("../styles/*.ts", { eager: true }) as DataFiles;
 const fixtureStyles = import.meta.glob("./fixtures/styles/*.ts", { eager: true }) as DataFiles;
 
-describe("the eight launch styles (spec 8.2)", () => {
-  it("are the eight of P3, in family order, each named in at most 14 characters", () => {
+describe("the 24 launch styles (spec 8.2)", () => {
+  it("are the 24 of spec 8.2, in family order, each named in at most 14 characters", () => {
     expect(STYLE_IDS.map((id) => STYLES[id].name)).toEqual(LAUNCH);
     for (const id of STYLE_IDS) expect(STYLES[id].name.length).toBeLessThanOrEqual(14);
-    expect(vibeTiles().map((t) => t.family)).toEqual(["house", "house", "techno", "techno", "breaks", "breaks", "slow", "slow"]);
+    expect(vibeTiles().map((t) => t.family)).toEqual(FAMILY_SIZES.flatMap(([f, n]) => Array<string>(n).fill(f)));
+    // Every style id is the one the progression library has tagged since P4.
+    expect([...STYLE_IDS].sort()).toEqual([...LAUNCH_VIBES].sort());
   });
 
   it("each sets everything: a valid song with bpm, key, mood, five patches, mix and four arranged sections", () => {
@@ -104,20 +133,20 @@ describe("patch files (P3 review M2)", () => {
 describe("adding a style is one new file (spec 8.2)", () => {
   it("a style file dropped in the folder is listed, loads and plays, with no other change", () => {
     const withFixture = readStyles({ ...appStyles, ...fixtureStyles });
-    expect(withFixture.ids).toContain("progressive");
-    expect(STYLE_IDS).not.toContain("progressive");
+    expect(withFixture.ids).toContain("testVibe");
+    expect(STYLE_IDS).not.toContain("testVibe");
     const tiles = vibeTiles(withFixture.ids, withFixture.byId);
     expect(tiles.map((t) => t.name)).toEqual([...LAUNCH, "Test vibe"]);
-    const song = styleSong("progressive", withFixture.byId.progressive);
+    const song = styleSong("testVibe", withFixture.byId.testVibe);
     expect(validateSong(song)).toEqual([]);
     const seq = new Sequencer(song);
     seq.load(song, 1);
     seq.start();
     expect([...heard(seq, 1)].sort()).toEqual([...INSTRUMENTS].sort());
-    expect(stepVibe("ambient", 1, tiles)).toBe("progressive");
+    expect(stepVibe("trap", 1, tiles)).toBe("testVibe");
   });
 
-  it("the dropped-in style also passes the P4 library checks: four cards per feel, every section a progression tagged with it", () => {
+  it("the dropped-in style passes the P4 library checks: every feel has cards, every section is a library progression", () => {
     const withFixture = readStyles({ ...appStyles, ...fixtureStyles });
     const problems: string[] = [];
     for (const id of withFixture.ids) {
@@ -126,11 +155,13 @@ describe("adding a style is one new file (spec 8.2)", () => {
       style.sections.forEach((s, i) => {
         const found = findProgression(style.mood as Mood, s.chords.map(([degree, bars]) => ({ degree, bars })));
         if (!found) problems.push(`${id} section ${i}: not in the library`);
-        else if (!PROGRESSIONS[found].vibes.includes(id)) problems.push(`${id} section ${i}: ${found} is not tagged ${id}`);
+        // The 24 are tagged with their own sections' progressions; a 25th the library does not know shows every vibe's.
+        else if ((LAUNCH_VIBES as readonly string[]).includes(id) && !PROGRESSIONS[found].vibes.includes(id)) problems.push(`${id} section ${i}: ${found} is not tagged ${id}`);
       });
     }
     expect(withFixture.ids.length).toBe(STYLE_IDS.length + 1);
     expect(problems).toEqual([]);
+    for (const f of FEELS) expect(progressionsFor("testVibe", f)).toEqual(PROGRESSION_IDS.filter((p) => PROGRESSIONS[p].feels.includes(f)));
   });
 
   it("a broken style file is refused, naming the file and the problem", () => {
@@ -161,7 +192,7 @@ describe("presets as data (P3)", () => {
     for (const id of ["stabs", "offbeat", "sustained"]) expect(SYNTH_PRESETS).toContain(id);
     expect(MOODS).toEqual(["major", "minor", "house", "deep", "dark"]);
     expect(MOOD_TABLE.deep).toEqual({ scale: "dorian", voicing: "extended", label: "Deep", simple: "Deep", feel: "dreamy" });
-    expect(BEAT_NAMES.dnb).toEqual({ name: "DnB", simple: "Breakbeat" });
+    expect(BEAT_NAMES.dnb).toEqual({ name: "DnB", simple: "Fast break" });
     expect(BASS_NAMES.dnbSub).toEqual({ name: "DnB sub", simple: "Deep" });
     expect(SYNTH_NAMES.sustained.name).toBe("Held");
     expect([...SYNTH_HOLD]).toEqual(["sustained"]);
@@ -190,13 +221,86 @@ describe("presets as data (P3)", () => {
   });
 });
 
+describe("the full lists of spec 8.7 (P8)", () => {
+  const forInst = (i: PatchDef["instrument"]): string[] => PATCH_IDS.filter((id) => PATCHES[id].instrument === i);
+
+  it("at least 24 beats, 14 bass rhythms, 10 synth rhythms and 8 patches per instrument, every spec entry there", () => {
+    expect(DRUM_PRESETS.length).toBeGreaterThanOrEqual(24);
+    expect(BASS_PRESETS.length).toBeGreaterThanOrEqual(14);
+    expect(SYNTH_PRESETS.length).toBeGreaterThanOrEqual(10);
+    for (const i of ["drums", "bass", "synth", "layer"] as const) expect(forInst(i).length, i).toBeGreaterThanOrEqual(8);
+    // Spec 8.7's beats, by file id: Four on the floor, House shuffle, Techno, Minimal, Dub, Acid, Afro, Tropical,
+    // Progressive, 2-step, Garage shuffle, Breakbeat, DnB two-step, DnB roller, Halftime, Dubstep, Boom bap, Trap,
+    // Electro, Trance, EDM, Downtempo, Synthwave, Glitch and None.
+    const beats = ["fourFloor", "houseShuffle", "techno", "minimal", "dub", "acid", "afro", "tropical", "progressive", "twoStep", "garageShuffle", "breakbeat", "dnb", "dnbRoller", "halftime", "dubstep", "boomBap", "trap", "electro", "trance", "edm", "downtempo", "synthwave", "glitch", "none"];
+    for (const id of beats) expect(DRUM_PRESETS, id).toContain(id);
+    const bass = ["offbeat", "rolling", "long", "dnbSub", "octave", "acidLine", "dub", "reese", "wobbleRhythm", "glide808", "arpBass", "pedal", "garageSkip", "walking"];
+    for (const id of bass) expect(BASS_PRESETS, id).toContain(id);
+    const synth = ["stabs", "offbeat", "sustained", "dubChord", "pluck", "gate", "skank", "swell", "broken", "push"];
+    for (const id of synth) expect(SYNTH_PRESETS, id).toContain(id);
+    // The patches spec 8.7 names for bass, synth and the layers (leads and pads).
+    for (const id of ["sub", "round", "acidBass", "reese", "wobble", "bass808", "pluckBass", "rubber"]) expect(forInst("bass"), id).toContain(id);
+    for (const id of ["warmStab", "dubChord", "organ", "pluck", "supersaw", "softKeys", "glass", "brass"]) expect(forInst("synth"), id).toContain(id);
+    for (const id of ["softSine", "squareLead", "acidLead", "pluckLead", "bell", "sawLead", "whistle", "airyPad", "warmPad", "darkPad", "strings", "shimmer", "choir", "glassPad", "tapePad"])
+      expect(forInst("layer"), id).toContain(id);
+  });
+
+  it("names are at most 14 characters, and unique within each picker in both Advanced and Simple words", () => {
+    const lists: [string, { name: string; simple: string }[]][] = [
+      ["beats", Object.values(BEAT_NAMES)],
+      ["bass", Object.values(BASS_NAMES)],
+      ["synth", Object.values(SYNTH_NAMES)],
+      ...(["drums", "bass", "synth", "layer"] as const).map((i): [string, { name: string; simple: string }[]] => [
+        `${i} patches`,
+        forInst(i).map((id) => ({ name: PATCHES[id].name, simple: PATCHES[id].simple ?? PATCHES[id].name })),
+      ]),
+    ];
+    for (const [what, names] of lists) {
+      for (const n of names) {
+        expect(n.name.length, `${what} ${n.name}`).toBeLessThanOrEqual(14);
+        expect(n.simple.length, `${what} ${n.simple}`).toBeLessThanOrEqual(14);
+      }
+      expect(new Set(names.map((n) => n.name.toLowerCase())).size, what).toBe(names.length);
+      expect(new Set(names.map((n) => n.simple.toLowerCase())).size, what).toBe(names.length);
+    }
+  });
+
+  it("every one of the 24 styles sets its two effects per instrument, at most six on (P9's cap)", () => {
+    for (const id of STYLE_IDS) {
+      const song = vibeSong(id)!;
+      let on = 0;
+      for (const inst of INSTRUMENTS) {
+        expect(song.fx?.[inst].length, `${id} ${inst}`).toBe(2);
+        on += song.fx![inst].filter((f) => f.on).length;
+      }
+      expect(on, id).toBeGreaterThan(0);
+      expect(on, id).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("the first eight use the new sounds where they serve: Lo-fi the lo-fi master, Ambient an airy pad; Drone the Drone mode, air, long envelopes and Swoop", () => {
+    expect(vibeSong("loFi")!.mix?.lofi).toBe(1);
+    const amb = vibeSong("ambient")!;
+    expect([amb.patches.layer1, amb.patches.layer2].some((p) => p.reverb >= 0.75 && p.wave !== "sawtooth")).toBe(true);
+    expect(STYLES.ambient.patches.layer2).toMatchObject({ patch: "airyPad" });
+    const drone = vibeSong("drone")!;
+    expect(drone.mix?.air).toBeGreaterThan(0);
+    expect(drone.mix?.reverbDecay).toBeGreaterThanOrEqual(10);
+    expect(drone.sections.every((s) => s.layer2.mode === "drone" && (s.layer2.pad.swoop ?? 0) > 0)).toBe(true);
+    expect(drone.sections.every((s) => s.layer2.pad.attack >= 4 && s.layer2.pad.release >= 10)).toBe(true);
+    expect(drone.sections.every((s) => s.chords.every((c) => c.bars >= 4))).toBe(true);
+    expect(drone.bpm).toBe(60);
+  });
+});
+
 describe("the vibe arrows and names", () => {
   it("step to the next and previous vibe, wrapping; from no vibe to the first or last", () => {
     expect(stepVibe("deepHouse", 1)).toBe("tropicalHouse");
-    expect(stepVibe("deepHouse", -1)).toBe("ambient");
-    expect(stepVibe("ambient", 1)).toBe("deepHouse");
+    expect(stepVibe("deepHouse", -1)).toBe("trap");
+    expect(stepVibe("trap", 1)).toBe("deepHouse");
+    expect(stepVibe("afroHouse", 1)).toBe("deepTechno");
     expect(stepVibe(undefined, 1)).toBe("deepHouse");
-    expect(stepVibe(undefined, -1)).toBe("ambient");
+    expect(stepVibe(undefined, -1)).toBe("trap");
   });
 
   it("a vibe loaded again gets a free name, so the jam it replaces stays apart in Songs", () => {

@@ -1,0 +1,67 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Downtempo: a lazy swung head-nod, a walking bass, keys broken into single notes, a soft sine line and a tape pad. */
+export default {
+  order: 4,
+  name: "Downtempo",
+  family: "slow",
+  bpm: 92,
+  key: "A",
+  mood: "house",
+  patches: { drums: "dusty", bass: "warmBass", synth: "softKeys", layer1: "softSine", layer2: "tapePad" },
+  mix: { sweep: -0.05, pump: 0.25, saturation: 0.2 },
+  leads: {
+    layer1: { style: "phrase", phrase: 4, density: 0.5, shape: "arch", range: 0.4, register: 0.55, noteLength: 0.65, slide: 0.2, accent: 0.15 },
+    layer2: { style: "drift", register: 0.45, noteLength: 0.85, density: 0.35 },
+  },
+  // Crushed drums, chorused keys, an echo on the line.
+  fx: {
+    drums: [{ effect: "crush", on: true, knobs: [0.5, 0.55, 0.35] }, { effect: "echo" }],
+    bass: [{ effect: "chorus" }, { effect: "fuzz" }],
+    synth: [{ effect: "chorus", on: true, knobs: [0.5, 0.25, 0.55] }, { effect: "tremolo" }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.35, 0.6, 0.45] }, { effect: "vowel" }],
+    layer2: [{ effect: "phaser" }, { effect: "chorus" }],
+  },
+  sections: [
+    {
+      name: "Intro",
+      on: ["synth", "layer2"],
+      chords: [[0, 2], [5, 2]],
+      beat: "downtempo",
+      bass: "walking",
+      synth: "broken",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad", pad: { attack: 1.5, release: 3 } },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 1], [5, 1], [3, 1], [4, 1]],
+      beat: "downtempo",
+      bass: "walking",
+      synth: "broken",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad", pad: { brightness: 0.3 } },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1"],
+      chords: [[5, 2], [0, 2]],
+      beat: "downtempo",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative", gen: { style: "drift", density: 0.4 } },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer2"],
+      chords: [[0, 2], [5, 2]],
+      beat: "downtempo",
+      bass: "walking",
+      synth: "broken",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

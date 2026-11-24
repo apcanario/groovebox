@@ -4,7 +4,7 @@ export default {
   order: 505,
   name: "Sunrise",
   feels: ["uplifting"],
-  vibes: ["deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage"],
+  vibes: ["deepHouse", "acidHouse", "afroHouse", "minimalTechno", "dubTechno", "twoStep", "futureGarage", "loFi", "downtempo", "idm"],
   mood: "house",
   voicing: "extended",
   chords: [[0, 1], [5, 1], [6, 1], [2, 1]],

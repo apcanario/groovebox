@@ -4,7 +4,7 @@ export default {
   order: 209,
   name: "Mirage",
   feels: ["dreamy"],
-  vibes: ["drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "idm", "edm", "trance", "electro", "trap"],
+  vibes: ["progressive", "acidHouse", "afroHouse", "melodicTechno", "minimalTechno", "twoStep", "breakbeat", "dubstep", "downtempo", "idm", "electro", "trap"],
   mood: "house",
   voicing: "extended",
   chords: [[0, 1], [2, 1], [3, 1], [0, 1]],

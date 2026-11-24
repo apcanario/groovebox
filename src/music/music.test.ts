@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { arpSequence, arpNote } from "./arp.ts";
-import { buildChord, degreeChords } from "./chords.ts";
+import { buildChord, degreeChords, hitBass, hitNotes } from "./chords.ts";
+import { Sequencer } from "../engine/sequencer.ts";
+import { defaultSong } from "../engine/song.ts";
 import { GenerativeLead, mutationChance, type LeadParams } from "./lead.ts";
 import { BASS_PRESETS, BASS_RHYTHMS, DRUM_PATTERNS, DRUM_PRESETS, DRUM_VOICES, SYNTH_RHYTHMS } from "./presets.ts";
 import { createRng, deriveSeed } from "./random.ts";
@@ -225,5 +227,56 @@ describe("generative lead", () => {
     // 5 bars of 16 steps = 80 steps = 16 loops of 5: it realigns at bar 6.
     const sixth = Array.from({ length: 16 }, (_, s) => lead.step(s, p, ctx)?.midi ?? null);
     expect(sixth).toEqual(bars[0]);
+  });
+});
+
+describe("rhythm hits on chord tones (P8: Octave bounce, Acid line, 808 glide, Arp bass, Walking, Broken chord)", () => {
+  it("a bass hit plays the root, a chord tone folded into the octave above it, or an octave up", () => {
+    const c = buildChord("C", "major", 0); // C E G
+    expect(hitBass(c, {})).toBe(c.bass);
+    expect(hitBass(c, { tone: 1 })).toBe(c.bass + 4);
+    expect(hitBass(c, { tone: 2 })).toBe(c.bass + 7);
+    expect(hitBass(c, { tone: 3 })).toBe(c.bass); // wraps to the root
+    expect(hitBass(c, { oct: 1 })).toBe(c.bass + 12);
+    expect(hitBass(c, { tone: 2, oct: 1 })).toBe(c.bass + 19);
+    const d = buildChord("A", "deep", 1); // an extended voicing: the ninth folds into the octave
+    for (let t = 0; t < 8; t++) {
+      const n = hitBass(d, { tone: t });
+      expect(n - d.bass).toBeGreaterThanOrEqual(0);
+      expect(n - d.bass).toBeLessThan(12);
+      expect(d.tones).toContain(n % 12);
+    }
+  });
+
+  it("a synth hit plays the whole chord, or one note of its voicing", () => {
+    const c = buildChord("D", "minor", 3);
+    expect(hitNotes(c, {})).toEqual(c.notes);
+    expect(hitNotes(c, { tone: 1 })).toEqual([c.notes[1]]);
+    expect(hitNotes(c, { tone: 4 })).toEqual([c.notes[1]]);
+    expect(hitNotes(c, { tone: 0, oct: 1 })).toEqual([c.notes[0] + 12]);
+  });
+
+  it("the sequencer plays them: Walking steps root, third, fifth, third; Broken chord one note at a time", () => {
+    const song = defaultSong();
+    const sec = song.sections[1];
+    sec.on = { drums: false, bass: true, synth: true, layer1: false, layer2: false };
+    sec.chords = [{ degree: 0, bars: 1 }];
+    sec.bass.rhythm = "walking";
+    sec.synth.rhythm = "broken";
+    const seq = new Sequencer(song);
+    seq.load(song, 1);
+    seq.start();
+    const bass: number[] = [];
+    const synth: number[][] = [];
+    for (let i = 0; i < 16; i++)
+      for (const e of seq.next().events) {
+        if (e.inst === "bass") bass.push(e.midi);
+        if (e.inst === "synth") synth.push(e.notes);
+      }
+    const c = buildChord(song.key, song.mood, 0);
+    expect(bass).toEqual([0, 1, 2, 1].map((tone) => hitBass(c, { tone })));
+    expect(synth.length).toBe(8);
+    expect(synth.every((n) => n.length === 1)).toBe(true);
+    expect(new Set(synth.map((n) => n[0] % 12)).size).toBeGreaterThanOrEqual(3);
   });
 });

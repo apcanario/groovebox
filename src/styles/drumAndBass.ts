@@ -38,7 +38,7 @@ export default {
       name: "Groove",
       on: ["drums", "bass", "synth", "layer1", "layer2"],
       chords: [[0, 2], [5, 2], [2, 2], [6, 2]],
-      beat: "dnb",
+      beat: "dnbRoller",
       bass: "dnbSub",
       synth: "stabs",
       layer1: { mode: "pad", pad: { brightness: 0.5, motion: 0.4 } },

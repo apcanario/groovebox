@@ -4,7 +4,7 @@ export default {
   order: 309,
   name: "Coal",
   feels: ["dark"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "idm", "edm", "trance", "electro", "trap", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage"],
+  vibes: ["deepTechno", "minimalTechno", "idm", "electro"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 1], [1, 1], [3, 1], [1, 1]],

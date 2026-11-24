@@ -4,7 +4,7 @@ export default {
   order: 123,
   name: "Coffee steam",
   feels: ["warm"],
-  vibes: ["loFi", "downtempo", "deepHouse"],
+  vibes: ["deepHouse", "minimalTechno", "drumAndBass", "futureGarage", "loFi", "downtempo"],
   mood: "deep",
   voicing: "extended",
   chords: [[3, 1], [4, 1], [0, 2]],

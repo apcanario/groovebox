@@ -4,7 +4,7 @@ export default {
   order: 118,
   name: "Cocoa",
   feels: ["warm"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "loFi", "ambient", "drone", "downtempo", "synthwave", "idm", "edm", "trance", "electro", "trap"],
+  vibes: ["afroHouse", "loFi", "synthwave", "idm", "trance", "electro"],
   mood: "deep",
   voicing: "extended",
   chords: [[0, 1], [1, 1], [2, 1], [1, 1]],

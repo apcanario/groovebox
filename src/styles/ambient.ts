@@ -3,7 +3,8 @@ import type { StyleDef } from "../music/data.ts";
 /**
  * Ambient (P7 rework, spec 8.10): slow and major, chords of four and eight bars, a drone on Layer 2 that glides
  * from chord to chord, a pad on Layer 1 that swoops between them, long attacks and releases, slow drift on the
- * pads, a 12-second reverb and the air layer. A sparse halftime pulse only in the groove.
+ * pads, a 12-second reverb and the air layer. A sparse halftime pulse only in the groove. P8: Layer 1 is the new
+ * Shimmer pad (FM, long and wet) beside the airy pad on Layer 2.
  */
 export default {
   order: 2,
@@ -16,7 +17,7 @@ export default {
     drums: "soft",
     bass: "sub",
     synth: { patch: "padSwell", set: { attack: 3, release: 8, drift: 0.35, driftRate: 0.2 } },
-    layer1: { patch: "driftPad", set: { level: 0.5 } },
+    layer1: { patch: "shimmer", set: { level: 0.5 } },
     layer2: { patch: "airyPad", set: { reverb: 0.85, drift: 0.5, driftRate: 0.1 } },
   },
   mix: { sweep: 0, pump: 0.1, saturation: 0, air: 0.5, reverbDecay: 12 },

@@ -4,7 +4,7 @@ export default {
   order: 517,
   name: "Climb",
   feels: ["uplifting"],
-  vibes: ["drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "idm", "edm", "trance", "electro", "trap", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno"],
+  vibes: ["progressive", "melodicTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "downtempo", "synthwave", "edm", "trance", "electro", "trap"],
   mood: "minor",
   voicing: "triads",
   chords: [[2, 1], [6, 1], [0, 1], [0, 1]],

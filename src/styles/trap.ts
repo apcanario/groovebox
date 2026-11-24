@@ -1,0 +1,67 @@
+import type { StyleDef } from "../music/data.ts";
+
+/** Trap: rolling hats over a halftime kick and clap, a gliding 808, dark held chords, a plucked hook and a dark pad. */
+export default {
+  order: 5,
+  name: "Trap",
+  family: "other",
+  bpm: 140,
+  key: "C",
+  mood: "minor",
+  patches: { drums: "boom", bass: "bass808", synth: "softKeys", layer1: "pluckLead", layer2: "darkPad" },
+  mix: { sweep: 0, pump: 0.2, saturation: 0.25 },
+  leads: {
+    layer1: { style: "hook", phrase: 2, density: 0.5, shape: "fall", range: 0.4, register: 0.6, noteLength: 0.35, slide: 0.05, accent: 0.4 },
+    layer2: { style: "drift", register: 0.4, noteLength: 0.9, density: 0.3 },
+  },
+  // A distorted 808, an echoed hook, the keys through a slow tremolo.
+  fx: {
+    drums: [{ effect: "crush" }, { effect: "pan" }],
+    bass: [{ effect: "fuzz", on: true, knobs: [0.25, 0.4, 0.35] }, { effect: "chorus" }],
+    synth: [{ effect: "tremolo", on: true, knobs: [0.3, 0.43, 0] }, { effect: "echo" }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.6, 0.4] }, { effect: "shifter" }],
+    layer2: [{ effect: "chorus" }, { effect: "phaser" }],
+  },
+  sections: [
+    {
+      name: "Intro",
+      on: ["synth", "layer1"],
+      chords: [[0, 2], [3, 2]],
+      beat: "trap",
+      bass: "glide808",
+      synth: "sustained",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Groove",
+      on: ["drums", "bass", "synth", "layer1", "layer2"],
+      chords: [[0, 1], [4, 1], [5, 1], [4, 1]],
+      beat: "trap",
+      bass: "glide808",
+      synth: "sustained",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad", pad: { brightness: 0.25 } },
+    },
+    {
+      name: "Break",
+      on: ["synth", "layer1", "layer2"],
+      chords: [[0, 1], [6, 1], [5, 1], [6, 1]],
+      beat: "trap",
+      bass: "long",
+      synth: "sustained",
+      layer1: { mode: "generative", gen: { density: 0.35 } },
+      layer2: { mode: "pad" },
+    },
+    {
+      name: "Outro",
+      on: ["drums", "bass", "layer2"],
+      chords: [[0, 2], [3, 2]],
+      beat: "trap",
+      bass: "glide808",
+      synth: "sustained",
+      layer1: { mode: "generative" },
+      layer2: { mode: "pad" },
+    },
+  ],
+} satisfies StyleDef;

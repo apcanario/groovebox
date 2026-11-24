@@ -26,11 +26,26 @@ describe("the progression library", () => {
     expect(PROGRESSION_IDS.length).toBeGreaterThanOrEqual(120);
   });
 
-  it("gives every one of the 24 vibes at least four progressions for every feel", () => {
+  it("gives every one of the 24 vibes at least seven progressions for every feel (P8, C10: two pages of cards less one)", () => {
     expect(LAUNCH_VIBES.length).toBe(24);
     const short: string[] = [];
-    for (const v of LAUNCH_VIBES) for (const f of FEELS) if (progressionsFor(v, f).length < 4) short.push(`${v}/${f}: ${progressionsFor(v, f).length}`);
+    for (const v of LAUNCH_VIBES) for (const f of FEELS) if (progressionsFor(v, f).length < 7) short.push(`${v}/${f}: ${progressionsFor(v, f).length}`);
     expect(short).toEqual([]);
+  });
+
+  it("tags each vibe by choice, not by blanket group (C10): no two vibes share a set of cards, none shares most of another's", () => {
+    const sets = LAUNCH_VIBES.map((v) => new Set(PROGRESSION_IDS.filter((id) => PROGRESSIONS[id].vibes.includes(v))));
+    const close: string[] = [];
+    for (let a = 0; a < sets.length; a++)
+      for (let b = a + 1; b < sets.length; b++) {
+        const both = [...sets[a]].filter((id) => sets[b].has(id)).length;
+        const either = new Set([...sets[a], ...sets[b]]).size;
+        // The P4 library's six blanket groups gave whole groups of vibes the same list (overlap 1).
+        if (both / either > 0.8) close.push(`${LAUNCH_VIBES[a]} and ${LAUNCH_VIBES[b]}: ${both} of ${either}`);
+      }
+    expect(close).toEqual([]);
+    // No progression suits nearly every vibe.
+    for (const id of PROGRESSION_IDS) expect(PROGRESSIONS[id].vibes.length, id).toBeLessThanOrEqual(20);
   });
 
   it("tags only vibes of the launch set, and every style that exists is in it", () => {

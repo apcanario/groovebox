@@ -3,9 +3,9 @@ import type { StyleDef } from "../../data.ts";
 /**
  * A test fixture (P3): a style file like any in `src/styles/`, kept out of that folder so the app does not list
  * it. The test reads it with the app's own folder and shows it in the picker, loaded and playing, with no other
- * change: adding a style is one new file. Its id is one of the 24 the progression library already tags
- * (`LAUNCH_VIBES`), and every section's chords are a library progression tagged with it (spec 8.2): Chase,
- * Grey city and Northern sky.
+ * change: adding a style is one new file. P8: all 24 vibes of spec 8.2 exist, so its id is a 25th that the library
+ * does not tag; Simple Chords then shows it every vibe's cards, and every section's chords are still a library
+ * progression (Chase, Grey city and Northern sky), so Simple shows each as Playing.
  */
 export default {
   order: 9,

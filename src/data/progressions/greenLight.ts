@@ -4,7 +4,7 @@ export default {
   order: 18,
   name: "Green light",
   feels: ["bright"],
-  vibes: ["deepHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "loFi", "ambient", "drone", "downtempo", "synthwave"],
+  vibes: ["deepHouse", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi", "ambient", "drone", "downtempo", "idm", "trap"],
   mood: "deep",
   voicing: "extended",
   chords: [[0, 2], [3, 2]],

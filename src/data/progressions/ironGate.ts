@@ -4,7 +4,7 @@ export default {
   order: 306,
   name: "Iron gate",
   feels: ["dark"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "idm", "edm", "trance", "electro", "trap"],
+  vibes: ["deepHouse", "tropicalHouse", "progressive", "afroHouse", "melodicTechno", "drumAndBass", "breakbeat", "loFi", "downtempo", "synthwave", "edm", "trance", "trap"],
   mood: "minor",
   voicing: "triads",
   chords: [[0, 1], [6, 1], [5, 1], [6, 1]],

@@ -4,7 +4,7 @@ export default {
   order: 122,
   name: "Late lounge",
   feels: ["warm"],
-  vibes: ["deepHouse", "loFi", "downtempo", "futureGarage"],
+  vibes: ["deepHouse", "deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi", "ambient", "drone", "downtempo"],
   mood: "deep",
   voicing: "extended",
   chords: [[5, 2], [3, 2]],

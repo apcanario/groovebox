@@ -4,7 +4,7 @@ export default {
   order: 514,
   name: "New dawn",
   feels: ["uplifting"],
-  vibes: ["deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "loFi", "ambient", "drone", "downtempo", "synthwave"],
+  vibes: ["deepHouse", "afroHouse", "dubTechno", "twoStep", "futureGarage", "loFi", "downtempo", "idm"],
   mood: "deep",
   voicing: "extended",
   chords: [[0, 1], [6, 1], [3, 1], [3, 1]],

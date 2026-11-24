@@ -4,7 +4,7 @@ export default {
   order: 407,
   name: "Fault line",
   feels: ["tense"],
-  vibes: ["drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "idm", "edm", "trance", "electro", "trap"],
+  vibes: ["tropicalHouse", "progressive", "melodicTechno", "drumAndBass", "twoStep", "breakbeat", "loFi", "downtempo", "synthwave", "edm", "trap"],
   mood: "minor",
   voicing: "triads",
   chords: [[0, 1], [1, 1], [4, 1], [0, 1]],

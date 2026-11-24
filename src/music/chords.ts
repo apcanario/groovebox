@@ -62,3 +62,23 @@ export function buildChord(key: KeyName, mood: Mood, degree: number): Chord {
 export function degreeChords(key: KeyName, mood: Mood): Chord[] {
   return [0, 1, 2, 3, 4, 5, 6].map((d) => buildChord(key, mood, d));
 }
+
+/**
+ * P8 (spec 8.7): the bass note of a rhythm hit. The root, or with `tone` the chord tone that many steps up from it
+ * (wrapping), folded into the octave above the root; `oct` octaves up or down. Kept inside MIDI 24..60.
+ */
+export function hitBass(chord: Chord, hit: { tone?: number; oct?: number }): number {
+  let midi = chord.bass;
+  if (hit.tone !== undefined && chord.notes.length) midi += (chord.notes[hit.tone % chord.notes.length] - chord.notes[0]) % 12;
+  midi += 12 * (hit.oct ?? 0);
+  while (midi < 24) midi += 12;
+  while (midi > 60) midi -= 12;
+  return midi;
+}
+
+/** P8 (spec 8.7, Broken chord): a synth rhythm hit's notes. The whole chord, or with `tone` that one note of the voicing; `oct` octaves up or down. */
+export function hitNotes(chord: Chord, hit: { tone?: number; oct?: number }): number[] {
+  const shift = 12 * (hit.oct ?? 0);
+  if (hit.tone === undefined || !chord.notes.length) return shift ? chord.notes.map((n) => n + shift) : chord.notes;
+  return [chord.notes[hit.tone % chord.notes.length] + shift];
+}

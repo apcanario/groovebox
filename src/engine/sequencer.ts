@@ -4,7 +4,7 @@
  * renders what this returns, at audio-clock times computed ahead.
  */
 import { ARP_DIRECTIONS, arpNote, type ArpParams } from "../music/arp.ts";
-import { buildChord, type Chord } from "../music/chords.ts";
+import { buildChord, hitBass, hitNotes, type Chord } from "../music/chords.ts";
 import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, nextSeed, type LeadParams } from "../music/lead.ts";
 import { Lead, phraseBar } from "../music/leadStyles.ts";
 import {
@@ -749,7 +749,7 @@ export class Sequencer {
 
     if (now.has("bass")) {
       for (const hit of BASS_RHYTHMS[section.bass.rhythm]) {
-        if (hit.step === step) events.push({ inst: "bass", midi: pos.chord.bass, len: Math.min(hit.len, pos.remaining), vel: hit.vel, shift });
+        if (hit.step === step) events.push({ inst: "bass", midi: hitBass(pos.chord, hit), len: Math.min(hit.len, pos.remaining), vel: hit.vel, shift });
       }
       // A key, mood or chord edit cuts the held bass note (the engine releases it): a note that
       // started earlier in this chord and is still sounding goes on at the new root for the rest of its hit.
@@ -759,7 +759,7 @@ export class Sequencer {
         );
         if (held) {
           const len = Math.min(held.step + held.len - step, pos.remaining);
-          events.push({ inst: "bass", midi: pos.chord.bass, len, vel: held.vel, shift });
+          events.push({ inst: "bass", midi: hitBass(pos.chord, held), len, vel: held.vel, shift });
         }
       }
     }
@@ -770,7 +770,7 @@ export class Sequencer {
         if (chordStart || entered.has("synth") || restart.has("synth")) events.push({ inst: "synth", notes: pos.chord.notes, len: pos.remaining, vel: 0.7, shift });
       } else {
         for (const hit of SYNTH_RHYTHMS[rhythm]) {
-          if (hit.step === step) events.push({ inst: "synth", notes: pos.chord.notes, len: hit.len, vel: hit.vel, shift });
+          if (hit.step === step) events.push({ inst: "synth", notes: hitNotes(pos.chord, hit), len: hit.len, vel: hit.vel, shift });
         }
       }
     }

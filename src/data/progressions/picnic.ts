@@ -4,7 +4,7 @@ export default {
   order: 15,
   name: "Picnic",
   feels: ["bright"],
-  vibes: ["deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "loFi", "ambient", "drone", "downtempo", "synthwave"],
+  vibes: ["tropicalHouse", "afroHouse", "melodicTechno", "dubTechno", "twoStep", "dubstep", "ambient", "downtempo", "synthwave", "edm", "electro", "trap"],
   mood: "major",
   voicing: "triads",
   chords: [[3, 1], [4, 1], [2, 1], [5, 1]],

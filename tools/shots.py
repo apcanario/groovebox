@@ -156,6 +156,7 @@ class Walk:
         self.failures = failures
         self.out = out_dir
         self.count = 0
+        self.chips = 0
         self.frame_y: dict = {}
 
     def screen(self, size: tuple, label: str) -> None:
@@ -171,6 +172,21 @@ class Walk:
         if self.out:
             self.page.screenshot(path=os.path.join(self.out, f"{size[0]}x{size[1]}-{label}.png"))
         self.count += 1
+        self.chip_pages(size, label)
+
+    def chip_pages(self, size: tuple, label: str) -> None:
+        """P8 (spec 8.7: every name fits its tile): a picker that pages its chips behind More is turned through every
+        page, back to the first, and each page's text checked, so every beat, rhythm and patch name is drawn once."""
+        names = self.page.eval_on_selector_all("[data-more]", "els => els.filter(e => e.getClientRects().length).map(e => e.dataset.more)")
+        for name in names:
+            sel = f'[data-more="{name}"]'
+            pages = int((self.page.get_attribute(sel, "data-page-of") or "1/1").split("/")[1])
+            for _ in range(pages):
+                self.page.click(sel)
+                _settle(self.page)
+                for b in self.page.evaluate(CHECK):
+                    self.failures.append(f"{size[0]}x{size[1]} {label} {name} page {self.page.get_attribute(sel, 'data-page-of')}: {b}")
+                self.chips += 1
 
     def frame_check(self, size: tuple, label: str) -> None:
         y = tuple(self.page.evaluate(FRAME_Y))

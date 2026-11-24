@@ -4,7 +4,7 @@ export default {
   order: 221,
   name: "Blue hour",
   feels: ["dreamy"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse"],
+  vibes: ["acidHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "twoStep", "dubstep", "downtempo", "synthwave", "idm", "electro", "trap"],
   mood: "house",
   voicing: "extended",
   chords: [[0, 1], [2, 1], [5, 1], [6, 1]],

@@ -1,6 +1,10 @@
 import type { StyleDef } from "../music/data.ts";
 
-/** Lo-fi: slow and swung, jazzy sevenths, a crunchy boom bap, long bass notes, soft keys and a quiet sine lead. */
+/**
+ * Lo-fi: slow and swung, jazzy sevenths, a crunchy boom bap, long bass notes, soft keys and a quiet sine lead.
+ * P8: through the lo-fi master (bit-crush, slow pitch wobble, noise; spec 8.7), the pad a wobbling tape pad, and the
+ * bass walking in the break.
+ */
 export default {
   order: 1,
   name: "Lo-fi",
@@ -13,9 +17,9 @@ export default {
     bass: "warmBass",
     synth: "softKeys",
     layer1: "softSine",
-    layer2: { patch: "warmPad", set: { cutoff: 0.35 } },
+    layer2: { patch: "tapePad", set: { cutoff: 0.35 } },
   },
-  mix: { sweep: -0.2, pump: 0.2, saturation: 0.35 },
+  mix: { sweep: -0.2, pump: 0.2, saturation: 0.35, lofi: 1 },
   // P6: a lazy, sliding line over four bars that rests between phrases; Drift in the break; the pad layer drifts.
   leads: {
     layer1: { style: "phrase", phrase: 4, density: 0.45, shape: "valley", range: 0.4, register: 0.5, noteLength: 0.6, slide: 0.3, accent: 0.1 },
@@ -55,7 +59,7 @@ export default {
       on: ["synth", "layer1"],
       chords: [[5, 2], [4, 2]],
       beat: "boomBap",
-      bass: "long",
+      bass: "walking",
       synth: "sustained",
       layer1: { mode: "generative", gen: { style: "drift", density: 0.4 } },
       layer2: { mode: "pad" },

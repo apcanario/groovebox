@@ -4,7 +4,7 @@ export default {
   order: 416,
   name: "Heartbeat",
   feels: ["tense"],
-  vibes: ["idm", "edm", "trance", "electro", "trap", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage"],
+  vibes: ["deepHouse", "tropicalHouse", "acidHouse", "drumAndBass", "breakbeat", "loFi", "synthwave", "edm", "trance", "trap"],
   mood: "minor",
   voicing: "triads",
   chords: [[0, 1], [4, 1], [3, 1], [4, 1]],

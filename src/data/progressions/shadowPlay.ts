@@ -4,7 +4,7 @@ export default {
   order: 312,
   name: "Shadow play",
   feels: ["dark"],
-  vibes: ["drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "idm", "edm", "trance", "electro", "trap", "loFi", "ambient", "drone", "downtempo", "synthwave"],
+  vibes: ["deepHouse", "tropicalHouse", "progressive", "afroHouse", "melodicTechno", "drumAndBass", "twoStep", "breakbeat", "downtempo", "edm", "electro"],
   mood: "minor",
   voicing: "triads",
   chords: [[5, 1], [4, 1], [0, 1], [0, 1]],

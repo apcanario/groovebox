@@ -3,7 +3,7 @@ import { row, type BeatDef } from "../../music/data.ts";
 export default {
   order: 9,
   name: "DnB",
-  simple: "Breakbeat",
+  simple: "Fast break",
   swing: 0,
   grid: {
     kick: row({ 0: 1, 10: 0.95 }),

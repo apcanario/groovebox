@@ -4,7 +4,7 @@ export default {
   order: 316,
   name: "Basement",
   feels: ["dark"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse"],
+  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "futureGarage", "drone"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 2], [3, 2]],

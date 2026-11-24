@@ -4,7 +4,7 @@ export default {
   order: 4,
   name: "Clear sky",
   feels: ["bright"],
-  vibes: ["deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "loFi", "ambient", "drone", "downtempo", "synthwave", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno"],
+  vibes: ["deepHouse", "progressive", "acidHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "dubstep", "futureGarage", "loFi", "ambient", "drone", "downtempo", "trance", "trap"],
   mood: "major",
   voicing: "triads",
   chords: [[3, 1], [4, 1], [0, 2]],

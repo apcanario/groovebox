@@ -4,7 +4,7 @@ export default {
   order: 311,
   name: "Tunnel",
   feels: ["dark", "tense"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse"],
+  vibes: ["minimalTechno", "dubTechno", "dubstep", "idm", "electro"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 1], [0, 1], [1, 1], [0, 1]],

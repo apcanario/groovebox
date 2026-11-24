@@ -4,7 +4,7 @@ export default {
   order: 224,
   name: "Rainy desk",
   feels: ["dreamy"],
-  vibes: ["loFi", "downtempo", "ambient"],
+  vibes: ["deepHouse", "deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi", "ambient", "downtempo"],
   mood: "deep",
   voicing: "extended",
   chords: [[5, 2], [4, 2]],

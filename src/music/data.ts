@@ -10,11 +10,18 @@ import type { LeadParams, LeadStyle } from "./lead.ts";
 import type { KeyName, ScaleName, Voicing } from "./scales.ts";
 import type { EffectId, FxKnobs } from "./effects.ts";
 
-/** One hit of a bass or synth rhythm. */
+/**
+ * One hit of a bass or synth rhythm. P8 (spec 8.7: Octave bounce, Acid line, 808 glide, Arp bass, Walking, Broken
+ * chord): `tone` plays one tone of the chord (0 the root, 1 the next chord tone up, and so on, wrapping), the bass
+ * inside an octave above its root and the synth a single note of its voicing; `oct` moves the hit up or down octaves.
+ * Without either, the bass plays the root and the synth the whole chord, as before.
+ */
 export interface RhythmHit {
   step: number; // 0..15
   len: number; // in steps
   vel: number; // 0..1
+  tone?: number; // 0..7
+  oct?: number; // -1..2
 }
 
 /** The four drum voices of G1; every beat file has a row for each. */
@@ -153,7 +160,12 @@ export function checkNamed(e: Named): string[] {
 export function checkHits(list: unknown, out: string[]): void {
   if (!Array.isArray(list)) return void out.push("hits: must be a list");
   for (const h of list as RhythmHit[])
-    if (!(h.step >= 0 && h.step < 16 && Number.isInteger(h.step) && h.len > 0 && h.vel > 0 && h.vel <= 1)) out.push(`hits: bad hit ${JSON.stringify(h)}`);
+    if (
+      !(h.step >= 0 && h.step < 16 && Number.isInteger(h.step) && h.len > 0 && h.vel > 0 && h.vel <= 1) ||
+      (h.tone !== undefined && !(Number.isInteger(h.tone) && h.tone >= 0 && h.tone <= 7)) ||
+      (h.oct !== undefined && !(Number.isInteger(h.oct) && h.oct >= -1 && h.oct <= 2))
+    )
+      out.push(`hits: bad hit ${JSON.stringify(h)}`);
 }
 
 export function checkGrid(grid: unknown, out: string[]): void {

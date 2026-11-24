@@ -4,7 +4,7 @@ export default {
   order: 219,
   name: "Undertow",
   feels: ["dreamy"],
-  vibes: ["drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "loFi", "ambient", "drone", "downtempo", "synthwave"],
+  vibes: ["deepHouse", "afroHouse", "drumAndBass", "futureGarage", "loFi", "idm", "electro"],
   mood: "deep",
   voicing: "extended",
   chords: [[2, 1], [3, 1], [0, 1], [0, 1]],

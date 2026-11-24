@@ -4,7 +4,7 @@ export default {
   order: 17,
   name: "Lift off",
   feels: ["bright"],
-  vibes: ["idm", "edm", "trance", "electro", "trap", "deepHouse", "tropicalHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno"],
+  vibes: ["tropicalHouse"],
   mood: "major",
   voicing: "triads",
   chords: [[3, 0.5], [4, 0.5], [0, 1]],

@@ -4,7 +4,7 @@ export default {
   order: 404,
   name: "Cold sweat",
   feels: ["tense"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "idm", "edm", "trance", "electro", "trap", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage"],
+  vibes: ["afroHouse", "deepTechno", "minimalTechno", "dubstep", "drone", "idm", "electro"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 1], [4, 1], [0, 1], [1, 1]],

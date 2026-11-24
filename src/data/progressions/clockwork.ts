@@ -4,7 +4,7 @@ export default {
   order: 411,
   name: "Clockwork",
   feels: ["tense"],
-  vibes: ["deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "idm", "edm", "trance", "electro", "trap"],
+  vibes: ["afroHouse", "deepTechno", "minimalTechno", "dubTechno", "dubstep", "idm", "electro"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 1], [3, 1], [4, 1], [3, 1]],
