@@ -102,6 +102,9 @@ export interface DropMark extends DropBar {
   at: number;
 }
 
+/** A typical groove's energy on the master output (-19 dB), against which the drop's extra layers are sized. */
+const DROP_TYPICAL = Math.pow(10, -1.9);
+
 const DROP_OFF: DropBar = { phase: "off", index: 0, length: 0, impact: false, cliff: false, end: false, cancelled: false };
 export { MP3_KBPS, type Take } from "./recorder.ts";
 export {
@@ -1085,8 +1088,14 @@ export class Engine {
     return this.stereoWatch.read();
   }
 
+  /**
+   * The extra layers' levels: the recipe's amounts, a little more with the width, and sized to the section's own level
+   * (its energy before the build against a typical groove's, -19 dB), so a loud drone gets layers as large, relative to
+   * it, as a quiet groove does. The follower then brings the whole to the section's loudness.
+   */
   private dropLevels(r: DropRecipe): Record<OverlayGroup, number> {
-    const w = 0.5 + 0.5 * r.width;
+    const size = this.dropRef > 0 ? Math.max(0.5, Math.min(3, Math.sqrt(this.dropRef / DROP_TYPICAL))) : 1;
+    const w = (0.5 + 0.5 * r.width) * size;
     return { synth: r.layers.synth * w, bass: r.layers.bass * w, drums: r.layers.drums * w, leads: r.layers.leads * w };
   }
 
