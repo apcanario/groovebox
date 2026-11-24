@@ -47,3 +47,24 @@ Row text recovered from `git show e6338bd^:docs/BACKLOG.md`. Done when: "all 24 
 - Row bullets: every style sets two effects per instrument (player count: 10 slots in each of the 24 files, 3 or 4 on, so the cap of six holds on arrival); Lo-fi has `lofi: 1` (`src/styles/loFi.ts` 22) with Crush and Chorus on the keys; Ambient has the Shimmer and Airy pads (`src/styles/ambient.ts` 20-21); Drone uses the Drone layer, Swoop, long envelopes, air and a 16 s reverb (unit-tested). C9 and C10 met (smoke 24-tile checks; library retagged, at most 0.6 overlap, unit-tested).
 
 P8: every Done-when line true. Whether each vibe sounds like its name stays Pedro's ear (C19).
+
+## 5. README and docs consistency
+
+README "What it does today" has the P7, P9 and P8 bullets (lines 31-33), and Status (line 86) and "Where it is going" (line 64) are right. Older bullets further down were not updated by the bundle and now say less than, or the opposite of, what the app does:
+
+- **D1 (should-fix). `README.md` 49-52, Layer tabs: "three modes each" (Arp, Pad, Lead).** There are four: Drone is on the mode row in both modes (`shots/360x640-simple-layer2-drone.png`). Fix: "four modes each", and add "*Drone:* root, or root and fifth, held and gliding between chords (Swoop); attack, release, brightness, motion."
+- **D2 (should-fix). `README.md` 47, Drums tab: "an 8-step sequencer per drum voice".** The sequencer has six voices (Kick, Clap, Hat, Open, Perc, Shaker), an 8 / 16 step switch with 1-8 and 9-16 pages, and a Kit page (`shots/360x640-advanced-drums-steps.png`, `-drums-kit.png`). Fix: "an 8- or 16-step sequencer for six voices (Perc and Shaker on the Kit page), level and decay per voice, kick pitch and drive, and an FX page."
+- **D3 (should-fix). `README.md` 46, Chords tab: "lengths of half a bar, one bar or two".** The editor cycles 1, 2, 4, 8 and half a bar (`src/ui/logic.ts` 11). Fix: "lengths of half a bar to eight bars".
+- **D4 (minor). `README.md` 38: "A library of 143 progressions".** `src/data/progressions/` holds 172 files now (P8 added 29 four- and eight-bar cards). Fix: "172".
+- **D5 (minor). `README.md` 40: "(patches get their picker in P7)".** P7 built it. Fix: delete the parenthesis.
+- **D6 (minor). `README.md` 48, Bass and Synth tabs: "rhythm and wave pickers".** Each also has a Sound picker of patch files and an FX page. Fix: "rhythm, sound and wave pickers, ... and an FX page".
+- Source comment, not a README line (minor): `src/ui/logic.ts` 181 says "Cycle a chord's length: 1 bar, 2 bars, half a bar" while `LENGTHS` (line 11) is 1, 2, 4, 8, 0.5. Fix: "1, 2, 4 and 8 bars, then half a bar." Left unchanged here (no source edits).
+
+`docs/CHANGELOG.md` and `docs/BACKLOG.md` against the code:
+
+- Counts true: 24 style files; 26 beats, 14 bass, 10 synth rhythms; patches 9 / 9 / 9 / 17 ("9 to 17" in the P8 line and README); 784 tests; 279 screens and 234 picker pages (this run).
+- Cap of six: spec 8.8, `MAX_ACTIVE_FX = 6` (`src/music/effects.ts` 37), README 32, P9 line, C16, all agree; every vibe arrives with 3 or 4 on.
+- C14 true (`src/engine/mods.ts` 315: 3.2 s impulse plus feedback; `src/style.css` 1520: icons hide under 400 px). C16 true (figures match spec 8.8). C17 true (smoke took about 19 minutes; drum check reads the output's peak, `tools/smoke.py` 365). C19 true (`src/engine/oscPatch.ts`, probe and patch checks in smoke; 0 throws this run). C15 true as history.
+- **D7 (minor). `docs/BACKLOG.md` 26 (C15, "for P9") and 28 (C17, "for P8") are addressed to rows now Done.** C15's decision is in spec 8.8 and its figures in the P7 changelog line; C17 is smoke notes with no open fix or listen item. Fix: clear both at the bundle close (or fold C17's "smoke takes about 19 minutes" into RUN.md if it is wanted).
+- **D8 (minor). `docs/BACKLOG.md` 56-70, the Bundle 6 section** keeps three "Done, see the Done list" stubs; bundles 4 and 5 read "All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-N.md`." Fix at the close: the same two sentences with `bundle-6.md`. Also C11 to C13 (lines 30-32) sit after C19; move them above C14 to keep the list in order.
+- Cleared items really cleared: **C8** (Simple Synth lists patches: Warm stab, Dub chord, Pluck, Soft keys, More, `shots/360x640-simple-synth.png`; every Advanced Sound page lists `patchIds`, `src/ui/tabs/SimpleTab.tsx` 104); **C9** (spec 8.6 edited, 24 tiles at 360 x 640, smoke 48.3 px lowest in the borrow picker); **C10** (per-vibe profiles, unit-tested, Ambient and Drone cards of 4 and 8 bars); **C18** (`src/engine/attacks.ts` 27 and 76, `MIN_GAP` 0.1 ms, test in `attacks.test.ts` 115; no PAGE ERROR in this smoke run).
