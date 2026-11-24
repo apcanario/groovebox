@@ -39,6 +39,8 @@ import {
 } from "../music/sound.ts";
 import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
+import { FxRackNode, loadFxWorklet } from "./fx.ts";
+import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
 
 // Tone 15.1.22 leak (G5 review E1): Oscillator._start connects its frequency and detune signals to each new
 // native oscillator and never disconnects them, so every ended oscillator stays reachable from the
@@ -203,6 +205,9 @@ class Channel {
   private driftRate = 0.5;
   private driftGen = 0;
 
+  /** P9 (spec 8.8): the instrument's two effect slots, between the mute point and the level dial. */
+  readonly fx: FxRackNode;
+
   constructor(
     out: Tone.Gain,
     buses: Buses,
@@ -210,6 +215,7 @@ class Channel {
     withDrive: boolean,
     private readonly trim: number,
     pan = false,
+    inst: keyof typeof DEFAULT_FX = "drums",
   ) {
     this.filter = new Tone.Filter({ frequency: hz[1], type: "lowpass", rolloff: -24, Q: 0.7 });
     this.drive = withDrive ? new Tone.Distortion({ distortion: 0.4, oversample: "2x", wet: 1 }) : null;
@@ -219,8 +225,12 @@ class Channel {
     this.panner = pan ? new Tone.Panner(0) : null;
     this.input.chain(this.filter, this.dry, this.gate);
     if (this.drive) this.drive.chain(this.wet, this.gate);
-    if (this.panner) this.gate.chain(this.level, this.panner, out);
-    else this.gate.chain(this.level, out);
+    const [a, b] = DEFAULT_FX[inst];
+    this.fx = new FxRackNode(clock, [a, b], [EFFECT_DEFS[a].defaults, EFFECT_DEFS[b].defaults]);
+    Tone.connect(this.gate, this.fx.input);
+    Tone.connect(this.fx.output, this.level);
+    if (this.panner) this.level.chain(this.panner, out);
+    else this.level.connect(out);
     this.level.connect(this.delaySend);
     this.level.connect(this.reverbSend);
   }
@@ -275,11 +285,13 @@ class Channel {
   /** Play starts at audio time `at` (bar 1, beat 1): the synced LFO restarts there, at the top of its cycle. */
   startClock(at: number): void {
     if (this.sync && this.lfoDepth > 0) this.syncStart(at);
+    this.fx.restart(at);
   }
 
   /** A new tempo from `at`: the synced LFO keeps its length in beats. */
   setTempo(bpm: number, at?: number): void {
     if (this.sync?.lfo.running) this.sync.lfo.rate(bpm / 60 / this.sync.beats, at);
+    this.fx.tempo(bpm, at);
   }
 
   // ---- P7: the free-running drift (spec 8.10) -------------------------------------------------
@@ -584,7 +596,7 @@ export class Drums extends Instrument {
   private percPitch = 0.5;
 
   constructor(buses: Buses) {
-    super(new Channel(buses.drums, buses, [200, 10000], false, 1)); // C2: 10 kHz top like every other filter
+    super(new Channel(buses.drums, buses, [200, 10000], false, 1, false, "drums")); // C2: 10 kHz top like every other filter
     const into = (voice: DrumVoice, node: Tone.ToneAudioNode): void => {
       const g = new Tone.Gain(this.trims[voice]).connect(this.channel.input);
       node.connect(g);
@@ -735,7 +747,7 @@ export class Bass extends Instrument {
   private playing = false;
 
   constructor(buses: Buses) {
-    super(new Channel(buses.duck, buses, [80, 6000], true, 0.75));
+    super(new Channel(buses.duck, buses, [80, 6000], true, 0.75, false, "bass"));
     this.channel.enableEnv();
     this.monos = new VoiceSets(this.channel.input);
     this.subGain = new Tone.Gain(subGain(0.75)).connect(this.channel.input);
@@ -873,8 +885,9 @@ export class Poly extends Instrument {
     private readonly maxPolyphony: number,
     trim: number,
     private readonly opts: { filterEnv?: boolean; fatAll?: boolean; padTone?: boolean } = {},
+    inst: "synth" | "layer1" | "layer2" = "synth",
   ) {
-    super(new Channel(buses.duck, buses, [100, 10000], true, trim, true));
+    super(new Channel(buses.duck, buses, [100, 10000], true, trim, true, inst));
     if (opts.filterEnv) this.channel.enableEnv();
     let dest = this.channel.input;
     if (opts.padTone) {
@@ -1281,14 +1294,16 @@ export class Graph {
     this.instruments = {
       drums: new Drums(buses),
       bass: new Bass(buses),
-      synth: new Poly(buses, 2, 16, 0.5, { filterEnv: true, fatAll: true }),
+      synth: new Poly(buses, 2, 16, 0.5, { filterEnv: true, fatAll: true }, "synth"),
       // Either layer can be a pad: 4 notes times 2 overlapping chords, plus headroom.
-      layer1: new Poly(buses, 2, 10, 0.5, { padTone: true }),
-      layer2: new Poly(buses, 2, 10, 0.5, { padTone: true }),
+      layer1: new Poly(buses, 2, 10, 0.5, { padTone: true }, "layer1"),
+      layer2: new Poly(buses, 2, 10, 0.5, { padTone: true }, "layer2"),
     };
   }
 
   static async build(): Promise<Graph> {
+    // P9: the effects' worklet (Crush, Shifter) loads before any slot is built.
+    await loadFxWorklet();
     // Limiter: Tone.Limiter has a 10 ms release, fast enough to ride the gain within one cycle of
     // the bass and kick (audible as fuzz and crackle). A compressor at limiter ratio with a 120 ms
     // release holds the gain steady instead. Its attack lets kick transients overshoot: with the
@@ -1393,6 +1408,21 @@ export class Graph {
   /** P7: a new tempo from `at`, for the synced LFOs. */
   setTempo(bpm: number, at?: number): void {
     for (const id of INSTRUMENT_LIST) this.instruments[id].channel.setTempo(bpm, at);
+  }
+
+  /** P9: an instrument's two effect slots to `rack`, from `at` (else now). */
+  setFx(id: InstrumentId, rack: readonly FxSlot[], at?: number): void {
+    this.instruments[id].channel.fx.configure(rack, at);
+  }
+
+  /** P9: a sixteenth of the bar at audio time `time` (Gate's pattern). */
+  fxStep(time: number, step: number): void {
+    for (const id of INSTRUMENT_LIST) this.instruments[id].channel.fx.step(time, step);
+  }
+
+  /** P9: a note an instrument plays (Ring's Follow). */
+  fxNote(id: InstrumentId, hz: number, time: number): void {
+    this.instruments[id].channel.fx.note(hz, time);
   }
 
   setGate(id: InstrumentId, on: boolean): void {

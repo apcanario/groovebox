@@ -8,6 +8,7 @@ import type { DroneParams, InstrumentId, LayerMode, MixState, PadParams, Patch }
 import type { ArpParams } from "./arp.ts";
 import type { LeadParams, LeadStyle } from "./lead.ts";
 import type { KeyName, ScaleName, Voicing } from "./scales.ts";
+import type { EffectId, FxKnobs } from "./effects.ts";
 
 /** One hit of a bass or synth rhythm. */
 export interface RhythmHit {
@@ -213,6 +214,13 @@ export interface StyleLayer {
  */
 export type StyleLead = Partial<Omit<LeadParams, "seed">> & { style: LeadStyle };
 
+/** A style's effect slot (P9, spec 8.8): the effect, whether it arrives on, and knobs that differ from the effect's start. */
+export interface StyleFx {
+  effect: EffectId;
+  on?: boolean;
+  knobs?: FxKnobs;
+}
+
 /** One section of a style. `chords`: [degree, bars] pairs; `on`: the instruments playing in it. */
 export interface StyleSection {
   name: string;
@@ -242,6 +250,8 @@ export interface StyleDef {
   mix: MixState;
   /** Each layer's lead style and settings (P6). */
   leads: Record<"layer1" | "layer2", StyleLead>;
+  /** P9 (spec 8.8): the two effects of every instrument, and which arrive on. */
+  fx: Record<InstrumentId, [StyleFx, StyleFx]>;
   sections: [StyleSection, StyleSection, StyleSection, StyleSection];
   start?: number;
 }

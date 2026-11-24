@@ -15,6 +15,14 @@ export default {
     layer1: { style: "hook", phrase: 2, density: 0.65, shape: "arch", range: 0.4, register: 0.7, noteLength: 0.45, slide: 0.25, accent: 0.2 },
     layer2: { style: "drift", register: 0.6, noteLength: 0.75, density: 0.45 },
   },
+  // P9: dotted echo on the plucks, a wide chorus on the pad, the lead echoed.
+  fx: {
+    drums: [{ effect: "pan" }, { effect: "echo" }],
+    bass: [{ effect: "chorus" }, { effect: "fuzz" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.35, 0.4, 0.35] }, { effect: "chorus" }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.4, 0.3] }, { effect: "ring" }],
+    layer2: [{ effect: "chorus", on: true }, { effect: "pan" }],
+  },
   sections: [
     {
       name: "Intro",

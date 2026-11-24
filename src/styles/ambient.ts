@@ -25,6 +25,14 @@ export default {
     layer1: { style: "drift", register: 0.7, range: 0.6, noteLength: 0.9, density: 0.4, slide: 0.25 },
     layer2: { style: "drift", register: 0.45, range: 0.4, noteLength: 1, density: 0.3 },
   },
+  // P9: long echoes on the keys and the lead, the pad chorused and slowly talking.
+  fx: {
+    drums: [{ effect: "echo" }, { effect: "gate" }],
+    bass: [{ effect: "chorus" }, { effect: "ring" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.45, 1, 0.6] }, { effect: "shifter" }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.4, 0.8, 0.55] }, { effect: "phaser" }],
+    layer2: [{ effect: "chorus", on: true }, { effect: "vowel", on: true, knobs: [0.4, 0.75, 0.17] }],
+  },
   sections: [
     {
       name: "Intro",

@@ -15,6 +15,14 @@ export default {
     layer1: { style: "hook", phrase: 1, density: 0.6, shape: "zigzag", range: 0.35, register: 0.6, noteLength: 0.35, repeats: 0.15, accent: 0.3 },
     layer2: { style: "drift", register: 0.45, noteLength: 0.8, density: 0.45 },
   },
+  // P9: the bass chorused, the stabs echoed, the lead in dotted eighths, the pad chorused.
+  fx: {
+    drums: [{ effect: "echo" }, { effect: "crush" }],
+    bass: [{ effect: "chorus", on: true, knobs: [0.5, 0.3, 0.4] }, { effect: "fuzz" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.3, 0.4, 0.35] }, { effect: "tremolo" }],
+    layer1: [{ effect: "ring" }, { effect: "echo", on: true, knobs: [0.3, 0.4, 0.35] }],
+    layer2: [{ effect: "vowel" }, { effect: "chorus", on: true }],
+  },
   sections: [
     {
       name: "Intro",

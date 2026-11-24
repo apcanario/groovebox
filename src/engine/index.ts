@@ -8,7 +8,7 @@ import { Graph } from "./audio.ts";
 import { Lfo } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
-import { JumpWatch, type Jumps } from "./continuity.ts";
+import { DiffWatch, JumpWatch, type Jumps } from "./continuity.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
 import { Sequencer, STEPS_PER_BAR, type GenValues, type LaneBar, type StepResult } from "./sequencer.ts";
@@ -47,6 +47,9 @@ import type { ArpParams } from "../music/arp.ts";
 import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
 import { PATCHES, PATCH_IDS, patchFor, resolvePatch } from "../music/styles.ts";
+import { EFFECTS, EFFECT_DEFS, MAX_ACTIVE_FX, activate, deactivate, fxKey, type EffectId, type FxKnobs, type FxSlot } from "../music/effects.ts";
+import { fxCounts, fxDebug } from "./fx.ts";
+import { songFx } from "./song.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
@@ -74,6 +77,18 @@ export type { Pending, PendingChords, PendingToggle } from "./queue.ts";
 export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { MP3_KBPS, type Take } from "./recorder.ts";
+export {
+  EFFECTS,
+  EFFECT_DEFS,
+  FX_SLOTS,
+  MAX_ACTIVE_FX,
+  type EffectDef,
+  type EffectId,
+  type FxKnobDef,
+  type FxKnobs,
+  type FxRack,
+  type FxSlot,
+} from "../music/effects.ts";
 
 /** off; armed (starts with Play); recording; finishing (the tail after Stop, then the encoder's last frames). */
 export type RecordState = "off" | "armed" | "recording" | "finishing";
@@ -90,6 +105,8 @@ export interface RecordInfo {
 
 /** Seconds of tail recorded after Stop, so releases and the reverb are not cut off. */
 export const RECORD_TAIL = 1.5;
+
+const midiHz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 
 /** A copy of a song document without its mix and log: what the sequencer holds. */
 function bareSong(song: Song): Song {
@@ -161,6 +178,7 @@ export class Engine {
     const song = migrateSong(given);
     this.seq = new Sequencer(bareSong(song));
     this.takeDocument(song);
+    this.takeFx();
   }
 
   /** Must be called from a tap: browsers only start audio after a user gesture. */
@@ -219,6 +237,7 @@ export class Engine {
     this.queued = null;
     this.takeDocument(song);
     this.seq.load(bareSong(song), section);
+    this.takeFx();
     if (this.graph) {
       this.applyAll();
       Tone.getTransport().bpm.rampTo(song.bpm, 0.1);
@@ -455,6 +474,68 @@ export class Engine {
   /** The patch files an instrument can load, in picker order (C8). */
   patchIds(inst: InstrumentId): string[] {
     return PATCH_IDS.filter((id) => PATCHES[id].instrument === patchFor(inst));
+  }
+
+  // ---- Effects (P9, spec 8.8) ----------------------------------------------------------------
+
+  /** Slots switched on, in the order they were switched on (the oldest first): the cap turns the oldest off. */
+  private fxOrder: string[] = [];
+
+  /** The effect slots as the song holds them (a copy; defaults, all off, for a song that sets none). */
+  getFx(): Record<InstrumentId, [FxSlot, FxSlot]> {
+    return songFx(this.seq.song);
+  }
+
+  /**
+   * Change one effect slot: its effect (the knobs go to the new effect's starting values unless `knobs` is given),
+   * its knobs, or on and off. Acts at once, crossfaded, so it never clicks. Switching on a slot past the cap of
+   * MAX_ACTIVE_FX active slots turns off the slot switched on longest ago. Returns false for a bad slot or value.
+   */
+  setFx(inst: InstrumentId, slot: number, values: { effect?: EffectId; on?: boolean; knobs?: readonly number[] }): boolean {
+    if (!INSTRUMENTS.includes(inst) || (slot !== 0 && slot !== 1) || !values || typeof values !== "object") return false;
+    if (values.effect !== undefined && !EFFECTS.includes(values.effect)) return false;
+    if (values.on !== undefined && typeof values.on !== "boolean") return false;
+    const k = values.knobs;
+    if (k !== undefined && !(Array.isArray(k) && k.length === 3 && k.every((x) => typeof x === "number" && Number.isFinite(x)))) return false;
+    const fx = songFx(this.seq.song);
+    const cur = fx[inst][slot];
+    const next: FxSlot = {
+      effect: values.effect ?? cur.effect,
+      on: values.on ?? cur.on,
+      knobs: (k ? k.map((x) => Math.max(0, Math.min(1, x))) : values.effect && values.effect !== cur.effect ? [...EFFECT_DEFS[values.effect].defaults] : cur.knobs) as FxKnobs,
+    };
+    fx[inst][slot] = next;
+    const key = fxKey(inst, slot);
+    if (next.on && !cur.on) {
+      const { order, off } = activate(this.fxOrder, key, MAX_ACTIVE_FX);
+      this.fxOrder = order;
+      for (const o of off) {
+        const [oi, os] = o.split(":");
+        fx[oi as InstrumentId][Number(os)] = { ...fx[oi as InstrumentId][Number(os)], on: false };
+        this.graph?.setFx(oi as InstrumentId, fx[oi as InstrumentId]);
+      }
+    } else if (!next.on && cur.on) this.fxOrder = deactivate(this.fxOrder, key);
+    this.seq.song.fx = fx;
+    this.graph?.setFx(inst, fx[inst]);
+    this.note("setFx", [inst, slot, values]);
+    this.changed();
+    return true;
+  }
+
+  /** The activation order from a loaded song: its slots that are on, in instrument order, at most the cap. */
+  private takeFx(): void {
+    const fx = songFx(this.seq.song);
+    this.fxOrder = [];
+    let over = false;
+    for (const id of INSTRUMENTS)
+      fx[id].forEach((s, i) => {
+        if (!s.on) return;
+        if (this.fxOrder.length >= MAX_ACTIVE_FX) {
+          s.on = false;
+          over = true;
+        } else this.fxOrder.push(fxKey(id, i));
+      });
+    if (over) this.seq.song.fx = fx;
   }
 
   /** Lands on the next bar line while playing; tapping it again before then cancels it. */
@@ -893,6 +974,49 @@ export class Engine {
     };
   }
 
+  /**
+   * For the smoke test (P9): per instrument and slot, its effect, whether it is on and whether its effect is
+   * connected; the slots active now, in the order they were switched on; the cap; effects built so far.
+   */
+  fxState(): {
+    slots: Record<InstrumentId, { effect: EffectId; on: boolean; wired: boolean }[]>;
+    order: string[];
+    cap: number;
+    built: number;
+  } | null {
+    const g = this.graph;
+    if (!g) return null;
+    const slots = Object.fromEntries(
+      INSTRUMENTS.map((id) => [id, g.instruments[id].channel.fx.slots.map((s) => ({ effect: s.effect, on: s.active, wired: s.wired }))]),
+    ) as Record<InstrumentId, { effect: EffectId; on: boolean; wired: boolean }[]>;
+    return { slots, order: [...this.fxOrder], cap: MAX_ACTIVE_FX, built: fxCounts.built };
+  }
+
+  /** For the smoke test (P9): every slot switch steps instead of ramping, to prove the click check can fail. */
+  fxHardSwitch(on: boolean): void {
+    fxDebug.hard = on;
+  }
+
+  private diffWatches = new Map<InstrumentId, DiffWatch>();
+
+  /**
+   * For the smoke test (P9): how far an instrument's sound after its two effect slots differs from the sound going
+   * in, since the last call (the first call starts the watch): the RMS of the difference and of the input, on the
+   * left channel. An effect is audible when the difference is large; every slot off gives none.
+   */
+  async fxDiff(id: InstrumentId): Promise<{ diff: number; ref: number } | null> {
+    if (!this.graph) return null;
+    let w = this.diffWatches.get(id);
+    if (!w) {
+      w = await DiffWatch.make(Tone.getContext());
+      const fx = this.graph.instruments[id].channel.fx;
+      fx.input.connect(w.node, 0, 0);
+      fx.output.connect(w.node, 0, 1);
+      this.diffWatches.set(id, w);
+    }
+    return w.read();
+  }
+
   /** Native value of a drum voice's level gain (its trim times its dial). */
   drumGain(voice: DrumVoice): number | null {
     return this.graph ? this.graph.instruments.drums.levelGain(voice) : null;
@@ -982,6 +1106,9 @@ export class Engine {
       if (at === undefined) g.setMix(k, mixValue(this.mix, k));
       else g.setMixAt(k, mixValue(this.mix, k), at);
     }
+    // P9: every instrument's effect slots, from the same moment.
+    const fx = songFx(this.seq.song);
+    for (const id of INSTRUMENTS) g.setFx(id, fx[id], at);
   }
 
   private tick(time: number): void {
@@ -999,6 +1126,7 @@ export class Engine {
       const doc = this.queued;
       this.queued = null;
       this.takeDocument(doc);
+      this.takeFx();
       for (const id of INSTRUMENTS) g.instruments[id].releaseAll(time);
       this.applyAll(time);
       Tone.getTransport().bpm.setValueAtTime(doc.bpm, time);
@@ -1022,6 +1150,8 @@ export class Engine {
     if (r.retrigger) g.instruments.bass.releaseAll(time);
     // Pad mode's envelope and filter follow the playing section's pad dials, from this step's time.
     for (const id of LAYER_IDS) g.instruments[id].useMode(r.pads[id], time);
+    // P9: Gate's pattern moves on the straight sixteenths.
+    g.fxStep(time, r.step);
     for (const e of r.events) {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
       switch (e.inst) {
@@ -1035,11 +1165,15 @@ export class Engine {
         }
         case "bass":
           g.instruments.bass.trigger(e.midi, e.len * sixteenth, t, e.vel);
+          g.fxNote("bass", midiHz(e.midi), t);
           break;
         case "synth":
           g.instruments.synth.trigger(e.notes, e.len * sixteenth, t, e.vel);
+          g.fxNote("synth", midiHz(Math.min(...e.notes)), t);
           break;
         default: {
+          // P9: Ring's Follow hears the layer's lowest note.
+          if (e.notes.length) g.fxNote(e.inst, midiHz(Math.min(...e.notes)), t);
           // P7: a drone or a swooping pad starts its held notes, or glides them to the new chord's.
           if (e.hold) {
             g.instruments[e.inst].hold(e.notes, t, e.vel);

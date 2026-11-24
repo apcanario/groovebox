@@ -15,6 +15,14 @@ export default {
     layer1: { style: "drift", register: 0.5, noteLength: 0.8, density: 0.45 },
     layer2: { style: "phrase", phrase: 4, density: 0.55, shape: "arch", range: 0.45, register: 0.65, noteLength: 0.65, slide: 0.1 },
   },
+  // P9: a growl of fuzz on the bass, echo on the chords, the lead flanged, the pad chorused.
+  fx: {
+    drums: [{ effect: "crush" }, { effect: "echo" }],
+    bass: [{ effect: "fuzz", on: true, knobs: [0.3, 0.45, 0.45] }, { effect: "phaser" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.35, 0.6, 0.4] }, { effect: "ring" }],
+    layer1: [{ effect: "flanger", on: true, knobs: [0.5, 0.75, 0.5] }, { effect: "echo" }],
+    layer2: [{ effect: "chorus", on: true }, { effect: "tremolo" }],
+  },
   sections: [
     {
       name: "Intro",

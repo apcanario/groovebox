@@ -18,6 +18,7 @@ import {
 import { MOODS, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
 import { checkEvents, type LogEvent } from "./eventlog.ts";
 import { MACRO_KEYS } from "../music/macros.ts";
+import { FX_SLOTS, checkFxSlot, defaultRack, type FxRack } from "../music/effects.ts";
 
 export const INSTRUMENTS = ["drums", "bass", "synth", "layer1", "layer2"] as const;
 export type InstrumentId = (typeof INSTRUMENTS)[number];
@@ -302,6 +303,15 @@ export interface Song {
   macros?: Record<string, number>;
   /** Optional (P3): the vibe (style id, a file in `src/styles/`) the song was started from. */
   style?: string;
+  /** Optional (P9, spec 8.8): each instrument's two effect slots. Missing means every slot at its default, off. */
+  fx?: Record<InstrumentId, FxRack>;
+}
+
+/** The effect slots a song plays: its own, else each instrument's defaults (all off). A copy. */
+export function songFx(song: Pick<Song, "fx">): Record<InstrumentId, FxRack> {
+  return Object.fromEntries(
+    INSTRUMENTS.map((id) => [id, (song.fx?.[id] ?? defaultRack(id)).map((s) => ({ ...s, knobs: [...s.knobs] })) as FxRack]),
+  ) as Record<InstrumentId, FxRack>;
 }
 
 export const LIMITS = { bpm: [60, 180], sections: [1, 4], chords: [1, 8] } as const;
@@ -548,6 +558,15 @@ function checkMix(m: unknown, at: string, errors: string[]): void {
   }
 }
 
+function checkFx(fx: unknown, at: string, errors: string[]): void {
+  if (!isObj(fx)) return void errors.push(`${at}: not an object`);
+  for (const id of INSTRUMENTS) {
+    const r = fx[id];
+    if (!Array.isArray(r) || r.length !== FX_SLOTS) errors.push(`${at}.${id}: must be ${FX_SLOTS} slots`);
+    else r.forEach((s, i) => checkFxSlot(s, `${at}.${id}[${i}]`, errors));
+  }
+}
+
 function checkLog(l: unknown, at: string, errors: string[]): void {
   if (!isObj(l)) return void errors.push(`${at}: not an object`);
   if (typeof l.recorded !== "string") errors.push(`${at}.recorded: must be a time`);
@@ -566,6 +585,7 @@ export function validateSong(doc: unknown): string[] {
   if (doc.log !== undefined) checkLog(doc.log, "log", errors);
   if (doc.macros !== undefined) checkMacros(doc.macros, "macros", errors);
   if (doc.style !== undefined && (typeof doc.style !== "string" || !doc.style)) errors.push("style: must be a style id");
+  if (doc.fx !== undefined) checkFx(doc.fx, "fx", errors);
   if (doc.version !== 1) errors.push("version: must be 1");
   if (typeof doc.name !== "string") errors.push("name: must be a string");
   if (!oneOf(doc.key, NOTE_NAMES)) errors.push("key: unknown key");

@@ -15,6 +15,14 @@ export default {
     layer1: { style: "hook", phrase: 2, density: 0.65, shape: "arch", range: 0.35, register: 0.6, noteLength: 0.45, slide: 0.1, accent: 0.25 },
     layer2: { style: "drift", register: 0.4, noteLength: 0.8, density: 0.5 },
   },
+  // P9: a dub echo on the stabs and the lead, the pad chorused.
+  fx: {
+    drums: [{ effect: "crush" }, { effect: "echo" }],
+    bass: [{ effect: "chorus" }, { effect: "fuzz" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.35, 0.4, 0.45] }, { effect: "chorus" }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.6, 0.35] }, { effect: "phaser" }],
+    layer2: [{ effect: "chorus", on: true }, { effect: "tremolo" }],
+  },
   sections: [
     {
       name: "Intro",

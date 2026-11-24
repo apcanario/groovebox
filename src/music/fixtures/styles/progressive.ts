@@ -17,6 +17,13 @@ export default {
   patches: { drums: "punchy", bass: "round", synth: "warmStab", layer1: "bell", layer2: "warmPad" },
   mix: { sweep: 0, pump: 0.4, saturation: 0 },
   leads: { layer1: { style: "hook" }, layer2: { style: "drift" } },
+  fx: {
+    drums: [{ effect: "crush" }, { effect: "echo" }],
+    bass: [{ effect: "fuzz" }, { effect: "chorus" }],
+    synth: [{ effect: "chorus", on: true }, { effect: "echo" }],
+    layer1: [{ effect: "echo" }, { effect: "phaser" }],
+    layer2: [{ effect: "chorus" }, { effect: "tremolo" }],
+  },
   sections: [
     { name: "Intro", on: ["drums"], chords: [[0, 1], [6, 1], [5, 1], [4, 1]], beat: "fourFloor", bass: "offbeat", synth: "stabs", layer1: { mode: "generative" }, layer2: { mode: "pad" } },
     {

@@ -15,6 +15,14 @@ export default {
     layer1: { style: "pulse", lock: 0.85, register: 0.45, range: 0.35, noteLength: 0.3, accent: 0.2 },
     layer2: { style: "drift", register: 0.3, range: 0.3, noteLength: 0.75, density: 0.4 },
   },
+  // P9: Dub techno's echo on the chords, a little grit on the bass, the lead phased, the hats echoed.
+  fx: {
+    drums: [{ effect: "echo", on: true, knobs: [0.25, 0.4, 0.4] }, { effect: "crush" }],
+    bass: [{ effect: "fuzz", on: true, knobs: [0.25, 0.4, 0.4] }, { effect: "phaser" }],
+    synth: [{ effect: "echo", on: true, knobs: [0.5, 0.4, 0.6] }, { effect: "flanger" }],
+    layer1: [{ effect: "phaser", on: true }, { effect: "shifter" }],
+    layer2: [{ effect: "vowel" }, { effect: "tremolo" }],
+  },
   sections: [
     {
       name: "Intro",

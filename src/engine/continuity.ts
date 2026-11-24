@@ -30,6 +30,27 @@ class GrooveJump extends AudioWorkletProcessor {
   }
 }
 registerProcessor("groove-jump", GrooveJump);
+
+// P9: how far a sound after the effects (input 1) differs from the sound going in (input 0), left channel.
+class GrooveDiff extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.d = 0; this.r = 0; this.n = 0;
+    this.port.onmessage = () => {
+      const n = Math.max(1, this.n);
+      this.port.postMessage({ diff: Math.sqrt(this.d / n), ref: Math.sqrt(this.r / n) });
+      this.d = 0; this.r = 0; this.n = 0;
+    };
+  }
+  process(inputs) {
+    const a = inputs[0] && inputs[0][0], b = inputs[1] && inputs[1][0];
+    if (!a || !b) return true;
+    for (let i = 0; i < a.length; i++) { const e = b[i] - a[i]; this.d += e * e; this.r += a[i] * a[i]; }
+    this.n += a.length;
+    return true;
+  }
+}
+registerProcessor("groove-diff", GrooveDiff);
 `;
 
 /**
@@ -49,19 +70,24 @@ export interface Jumps {
   peak: number;
 }
 
+/** Load the watches' worklet module once per context. */
+async function loadModule(ctx: JumpContext): Promise<void> {
+  if (!loaded.has(ctx)) {
+    const url = URL.createObjectURL(new Blob([JUMP_SOURCE], { type: "text/javascript" }));
+    try {
+      await (ctx.rawContext as { audioWorklet: { addModule(url: string): Promise<void> } }).audioWorklet.addModule(url);
+      loaded.add(ctx);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+}
+
 export class JumpWatch {
   private constructor(readonly node: AudioWorkletNode) {}
 
   static async make(ctx: JumpContext): Promise<JumpWatch> {
-    if (!loaded.has(ctx)) {
-      const url = URL.createObjectURL(new Blob([JUMP_SOURCE], { type: "text/javascript" }));
-      try {
-        await (ctx.rawContext as { audioWorklet: { addModule(url: string): Promise<void> } }).audioWorklet.addModule(url);
-        loaded.add(ctx);
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    }
+    await loadModule(ctx);
     return new JumpWatch(
       ctx.createAudioWorkletNode("groove-jump", { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers" }),
     );
@@ -71,6 +97,25 @@ export class JumpWatch {
   read(): Promise<Jumps> {
     return new Promise((resolve) => {
       this.node.port.onmessage = (e: MessageEvent) => resolve(e.data as Jumps);
+      this.node.port.postMessage("read");
+    });
+  }
+}
+
+/** P9: the RMS of the difference between two signals (after and before the effects) and of the first. */
+export class DiffWatch {
+  private constructor(readonly node: AudioWorkletNode) {}
+
+  static async make(ctx: JumpContext): Promise<DiffWatch> {
+    await loadModule(ctx);
+    return new DiffWatch(
+      ctx.createAudioWorkletNode("groove-diff", { numberOfInputs: 2, numberOfOutputs: 0, channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers" }),
+    );
+  }
+
+  read(): Promise<{ diff: number; ref: number }> {
+    return new Promise((resolve) => {
+      this.node.port.onmessage = (e: MessageEvent) => resolve(e.data as { diff: number; ref: number });
       this.node.port.postMessage("read");
     });
   }

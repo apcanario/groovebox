@@ -21,6 +21,14 @@ export default {
     layer1: { style: "phrase", phrase: 4, density: 0.45, shape: "valley", range: 0.4, register: 0.5, noteLength: 0.6, slide: 0.3, accent: 0.1 },
     layer2: { style: "drift", register: 0.4, noteLength: 0.85, density: 0.4 },
   },
+  // P9 (spec 8.8): Crush and Chorus on the keys; the pad wobbles with a slow tremolo.
+  fx: {
+    drums: [{ effect: "crush" }, { effect: "echo" }],
+    bass: [{ effect: "chorus" }, { effect: "fuzz" }],
+    synth: [{ effect: "crush", on: true, knobs: [0.4, 0.35, 0.5] }, { effect: "chorus", on: true, knobs: [0.6, 0.25, 0.6] }],
+    layer1: [{ effect: "echo" }, { effect: "vowel" }],
+    layer2: [{ effect: "tremolo", on: true, knobs: [0.35, 0.43, 0] }, { effect: "chorus" }],
+  },
   sections: [
     {
       name: "Intro",

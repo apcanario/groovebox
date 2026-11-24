@@ -28,8 +28,10 @@ import {
   type StyleLayer,
   type StyleLead,
   type StylePatch,
+  type StyleFx,
 } from "./data.ts";
 import { LEAD_STYLES } from "./lead.ts";
+import { EFFECTS, MAX_ACTIVE_FX, fxSlot, type FxRack } from "./effects.ts";
 import { BASS_PRESETS, DRUM_PRESETS, SYNTH_PRESETS } from "./presets.ts";
 import { deriveSeed } from "./random.ts";
 import { MOODS, NOTE_NAMES } from "./scales.ts";
@@ -104,6 +106,8 @@ export function styleSong(id: string, def: StyleDef, patches: Readonly<Record<st
     return sec;
   });
   const patchesOut = Object.fromEntries(INSTRUMENTS.map((inst) => [inst, resolvePatch(inst, def.patches[inst], patches)])) as Record<InstrumentId, Patch>;
+  const slot = (f: StyleFx) => fxSlot(f.effect, f.on ?? false, f.knobs);
+  const fx = Object.fromEntries(INSTRUMENTS.map((inst) => [inst, def.fx[inst].map(slot) as FxRack])) as Record<InstrumentId, FxRack>;
   return {
     version: 1,
     name: def.name,
@@ -114,6 +118,7 @@ export function styleSong(id: string, def: StyleDef, patches: Readonly<Record<st
     sections,
     mix: { ...def.mix },
     style: id,
+    fx,
   };
 }
 
@@ -129,6 +134,20 @@ export function checkStyle(def: StyleDef, id: string, patches: Readonly<Record<s
   for (const id of ["layer1", "layer2"] as const)
     if (!def.leads?.[id] || !(LEAD_STYLES as readonly string[]).includes(def.leads[id].style)) out.push(`leads.${id}: needs a lead style`);
   if (def.start !== undefined && !(Number.isInteger(def.start) && def.start >= 0 && def.start < 4)) out.push("start: must be 0..3");
+  // P9: two effects per instrument, and no more on at once than the cap allows.
+  let fxOn = 0;
+  for (const inst of INSTRUMENTS) {
+    const r = def.fx?.[inst];
+    if (!Array.isArray(r) || r.length !== 2) {
+      out.push(`fx.${inst}: needs two effects`);
+      continue;
+    }
+    for (const [i, f] of r.entries()) {
+      if (!(EFFECTS as readonly string[]).includes(f?.effect)) out.push(`fx.${inst}[${i}]: unknown effect`);
+      if (f?.on) fxOn++;
+    }
+  }
+  if (fxOn > MAX_ACTIVE_FX) out.push(`fx: ${fxOn} slots on, more than the ${MAX_ACTIVE_FX} the app plays at once`);
   for (const [i, s] of (def.sections ?? []).entries()) {
     if (!DRUM_PRESETS.includes(s.beat)) out.push(`sections[${i}].beat: unknown ${s.beat}`);
     if (!BASS_PRESETS.includes(s.bass)) out.push(`sections[${i}].bass: unknown ${s.bass}`);

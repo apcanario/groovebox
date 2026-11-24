@@ -15,6 +15,14 @@ export default {
     layer1: { style: "hook", phrase: 2, register: 0.7, range: 0.3, noteLength: 0.35 },
     layer2: { style: "roll", phrase: 2, density: 0.7, shape: "zigzag", range: 0.35, register: 0.5, noteLength: 0.4, slide: 0.2, accent: 0.35, repeats: 0.08 },
   },
+  // P9: the chords phased and echoed, the lead in dotted eighths, the pad chorused.
+  fx: {
+    drums: [{ effect: "gate" }, { effect: "echo" }],
+    bass: [{ effect: "fuzz" }, { effect: "chorus" }],
+    synth: [{ effect: "phaser", on: true, knobs: [0.6, 0.85, 0.6] }, { effect: "echo", on: true, knobs: [0.35, 0.4, 0.45] }],
+    layer1: [{ effect: "echo", on: true, knobs: [0.35, 0.4, 0.5] }, { effect: "flanger" }],
+    layer2: [{ effect: "chorus", on: true }, { effect: "pan" }],
+  },
   sections: [
     {
       name: "Intro",
