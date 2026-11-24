@@ -29,11 +29,11 @@ export type FxRack = [FxSlot, FxSlot];
 export const FX_SLOTS = 2;
 
 /**
- * Most slots active at once across the app (spec 8.8). Ten is every slot: the P9 measure decided whether a cap is
- * needed (Pedro, 24 Nov 2026: if it is, keep every effect and slot to choose from and cap the active ones; switching
- * on one past the cap turns off the slot switched on longest ago).
+ * Most slots active at once across the app (spec 8.8). P9 measured all ten on at 77.5% audio load against 64.2% with
+ * all off (median of 5), too much for a phone, so the cap is six (Pedro, 24 Nov 2026: every effect and slot stays to
+ * choose from; switching on one past the cap turns off the slot switched on longest ago).
  */
-export const MAX_ACTIVE_FX = 10;
+export const MAX_ACTIVE_FX = 6;
 
 /** Rates in beats per cycle that move with the tempo (spec 8.8: Tremolo, Pan, Gate; Phaser and Flanger at a note value). */
 export const SYNC_RATES = LFO_RATES;

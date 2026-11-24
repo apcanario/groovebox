@@ -302,7 +302,7 @@ Things that make a sound weird and fun. All synthesized, all switchable while pl
 - **Advanced:** an FX page on each instrument tab: per slot, a picker for the effect, an on/off, and its three knobs.
 - **Rates are tempo-synced** where the effect moves in time (Tremolo, Pan, Gate, and Phaser and Flanger when set to a note value).
 - **Master effects** stay on the Mix tab: the filter sweep, pump, saturation, and the lo-fi master of 8.7. Simple shows the lo-fi master as one on/off.
-- **Cost:** a slot that is off is disconnected and costs nothing. At most two effects per instrument. The row that builds this measures the phone load with all ten slots on and reports it; if that is too much, the cap drops to six active slots across the app and the spec says so.
+- **Cost:** a slot that is off is disconnected and costs nothing. At most two effects per instrument. P9 measured all ten slots on against all off with everything else on (24 Nov 2026, `tools/cost.py`, median of 5): audio load 77.5% against 64.2%, worst stall about the same (20.6 against 22.5 ms). That is too much for a phone, so **at most six slots are active at once across the app** (Pedro's decision, 24 Nov 2026). Every effect and both slots of every instrument stay to choose from; switching on a seventh slot turns off the slot switched on longest ago, with the same crossfade as any switch (no click) and no menu. A vibe arrives with six slots on at most.
 - **Each vibe sets its slots,** so Lo-fi can arrive with Crush and Chorus on the keys and Dub techno with Echo on the chords.
 
 ### 8.9 The Drop
@@ -429,6 +429,8 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 | Wave, Sequencer, Motion, Direction, Rate, Octaves | waves, view_week, motion_blur, swap_vert, speed, height |
 | Pulse | timeline |
 | Kit, Steps, Mod, Space | adjust, view_week, speed, water |
+| Phaser, Flanger, Fuzz, Crush, Tremolo, Pan | cyclone, flight, local_fire_department, texture, earthquake, swap_horiz |
+| Gate, Ring, Vowel, Shifter | fence, notifications, record_voice_over, moving |
 
 - The set has no drum icon; `adjust` (a pad seen from above) stands in. The row that builds each remaining effect and feature picks its icon from the same set and adds it to this table.
 - An icon may be drawn by hand only where the set has nothing usable, at the same line weight.
