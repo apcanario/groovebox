@@ -1047,10 +1047,12 @@ def read_jumps(page, inst: str) -> tuple:
     return r["jump"], r["peak"], (r["jump"] / r["peak"] if r["peak"] > 1e-3 else 0.0)
 
 
-def steady_jumps(page, inst: str, seconds: float) -> float:
+def steady_jumps(page, inst: str, seconds: float, stat: str = "median") -> float:
     """The steady sound's own jump over peak: the median of its quarter-second reads over `seconds` (P9 review E3:
-    the median, so one stray read cannot raise the reference and blind the check)."""
-    return steady_many(page, [inst], seconds)[inst]
+    the median, so one stray read cannot raise the reference and blind the check). `stat="max"` takes the largest
+    instead, for a sound that is not steady but moves by itself (a lead's notes, Ring following an arp): there every
+    read is its own sound."""
+    return steady_many(page, [inst], seconds, stat)[inst]
 
 
 def read_many(page, insts: list) -> dict:
@@ -1063,14 +1065,16 @@ def read_many(page, insts: list) -> dict:
     return out
 
 
-def steady_many(page, insts: list, seconds: float) -> dict:
-    """steady_jumps for several watches over the same stretch: the median of each one's quarter-second reads."""
+def steady_many(page, insts: list, seconds: float, stat: str = "median") -> dict:
+    """steady_jumps for several watches over the same stretch: the median (or largest) of each one's quarter-second reads."""
     read_many(page, insts)
     reads: dict = {i: [] for i in insts}
     for _ in range(max(1, int(seconds / 0.25))):
         time.sleep(0.25)
         for i, r in read_many(page, insts).items():
             reads[i].append(r[2])
+    if stat == "max":
+        return {i: max(v) for i, v in reads.items()}
     return {i: sorted(v)[len(v) // 2] for i, v in reads.items()}
 
 
@@ -1107,7 +1111,8 @@ def walk_p6(page, failures: list) -> None:
     wave = page.evaluate(f"{SONG}.patches.layer1.wave")
     page.evaluate("window.__groovebox.setParam('layer1', 'wave', 'sine')")
     page.evaluate(f"()=>window.__groovebox.setGen({sec}, 'layer1', {{style: 'drift', noteLength: 1, density: 0.9}})")
-    steady = steady_jumps(page, "layer1", 3.0)
+    # A lead's notes start all the time: every read is its own sound, so the reference is the largest (not the median).
+    steady = steady_jumps(page, "layer1", 3.0, "max")
     worst = 0.0
     for style in LEAD_STYLES:
         read_jumps(page, "layer1")
@@ -1117,7 +1122,7 @@ def walk_p6(page, failures: list) -> None:
         time.sleep(0.3)
         switched = read_jumps(page, "layer1")
         # The steady sound grows by this style's own (a style can sit higher than the one before).
-        steady = max(steady, steady_jumps(page, "layer1", 1.5))
+        steady = max(steady, steady_jumps(page, "layer1", 1.5, "max"))
         worst = max(worst, check_continuity(page, "layer1", steady, f"P6: picking {style}", failures, switched))
         pages = page.eval_on_selector_all(".body [data-page]", "els => els.map(e => e.dataset.page.split(':')[1])")
         want = ["notes", "feel"] + (["pulse"] if style == "pulse" else [])
@@ -2511,14 +2516,16 @@ def fx_click_checks(page, failures: list, effects: list) -> None:
             lo[k] = 0.0
             page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 0, { knobs: a.k }); }", {"ids": LAYERS, "k": lo})
             time.sleep(0.4)
-            before = steady_many(page, LAYERS, 0.5)
+            # The largest read, not the median: some settings move by themselves (an LFO's sweep, Ring following the
+            # notes played).
+            before = steady_many(page, LAYERS, 0.5, "max")
             hi = list(lo)
             hi[k] = 1.0
             read_many(page, LAYERS)
             page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 0, { knobs: a.k }); }", {"ids": LAYERS, "k": hi})
             time.sleep(0.6)
             turned = read_many(page, LAYERS)
-            after = steady_many(page, LAYERS, 0.5)
+            after = steady_many(page, LAYERS, 0.5, "max")
             label = page.evaluate(f"window.__fx.defs[{fx!r}].knobs[{k}].label")
             for i in LAYERS:
                 knob_worst = max(knob_worst, check_continuity(page, i, max(dry[i], before[i], after[i]), f"P9: {fx} {label} turned low to high", failures, turned[i]))
@@ -2528,13 +2535,13 @@ def fx_click_checks(page, failures: list, effects: list) -> None:
             page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 1, { effect: a.fx, knobs: a.k, on: true }); }",
                           {"ids": LAYERS, "fx": prev, "k": FX_CHECK_KNOBS[prev]})
             time.sleep(0.6)
-            before = steady_many(page, LAYERS, 0.5)
+            before = steady_many(page, LAYERS, 0.5, "max")
             read_many(page, LAYERS)
             page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 1, { effect: a.fx, knobs: a.k }); }",
                           {"ids": LAYERS, "fx": fx, "k": knobs})
             time.sleep(0.6)
             changed = read_many(page, LAYERS)
-            after = steady_many(page, LAYERS, 0.5)
+            after = steady_many(page, LAYERS, 0.5, "max")
             for i in LAYERS:
                 change_worst = max(change_worst, check_continuity(page, i, max(dry[i], before[i], after[i]), f"P9: {prev} changed to {fx} while on", failures, changed[i]))
             page.evaluate("(ids) => { for (const i of ids) window.__groovebox.setFx(i, 1, { on: false }); }", LAYERS)

@@ -503,6 +503,9 @@ export class LoFi {
   /** The transport runs: the hiss plays only then. */
   private playing = false;
 
+  /** Seconds a reconnected delay line takes to play out what it held (its 8 ms, the wobble's 2 ms and a margin). */
+  static readonly REFILL = 0.02;
+
   /** A staircase curve: `bits` of resolution over -1..1. */
   static stairs(bits: number): Float32Array {
     const n = 4096;
@@ -530,6 +533,10 @@ export class LoFi {
       this.input.connect(this.delay);
       this.wobble.start(Tone.getContext().currentTime, 0.4);
       this.on = true;
+      // P9 review E3 (found by the master click check on a sine): a delay line reconnected still holds the last
+      // milliseconds it heard before it was cut, and plays them out first; its join with the new sound is a step.
+      // The crossfade waits until the line has been refilled.
+      at = Math.max(at ?? 0, Tone.getContext().currentTime) + LoFi.REFILL;
     }
     glideParam(this.dry.gain, Math.cos((a * Math.PI) / 2), at);
     glideParam(this.wet.gain, Math.sin((a * Math.PI) / 2), at);
