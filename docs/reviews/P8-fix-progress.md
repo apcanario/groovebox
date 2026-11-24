@@ -2,3 +2,4 @@
 - Chunk 2: S1, S2 done, f86264a (walk_p3 on a build with the G5 patch restored: probe 0 Hz on all three waves, Acid house, Breakbeat, Dubstep, Synthwave and Trance bass fail; on the fix: probe 215 to 226 Hz, no tone failure)
 - Chunk 3: S7 tool fix done, 5834c87; the 24-vibe re-measure runs on the final build after chunks 4 and 5
 - Chunk 4: S4, S5, S6 (and M5's 0.2 s supersaw release in Trance) done, 077520f
+- Chunk 5a: M1, M6 (M5 in chunk 4) done, f6fbb3a
