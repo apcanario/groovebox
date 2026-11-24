@@ -40,6 +40,7 @@ import {
 import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
+import { AttackQueue } from "./attacks.ts";
 import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
 
 // Tone 15.1.22 leak (G5 review E1): Oscillator._start connects its frequency and detune signals to each new
@@ -531,26 +532,30 @@ export abstract class Instrument {
     this.channel = channel;
   }
 
+  /** Attacks waiting for their time, started in time order (see attacks.ts). */
+  private queue = new AttackQueue({
+    now: () => Tone.getContext().now(),
+    setTimeout: (fn, seconds) => Tone.getContext().setTimeout(fn, seconds),
+  });
+
   /**
-   * Start an attack at audio time `time`. One in the future (a swung step) waits on the context's
-   * clock, like Tone's own PolySynth, and is dropped if Stop comes first.
+   * Start an attack at audio time `time`. One in the future (a swung step, a roll's later hits) waits on the
+   * context's clock, like Tone's own PolySynth, and is dropped if Stop comes first. An attack that starts now first
+   * starts every waiting one due before it, so a source never gets a start earlier than one it already has.
    */
   protected atTime(time: number, fn: () => void): void {
-    const ctx = Tone.getContext();
     const epoch = this.epoch;
-    const run = (): void => {
+    this.queue.at(time, () => {
       if (epoch !== this.epoch) return;
       this.attacks++;
       fn();
-    };
-    const wait = time - ctx.now();
-    if (wait <= 0) run();
-    else ctx.setTimeout(run, wait);
+    });
   }
 
   /** Drop every attack not yet started. */
   cancel(): void {
     this.epoch++;
+    this.queue.clear();
   }
   /** Apply a whole patch: from now, or from audio time `at` (P3 review E1: a vibe lands on its bar line). */
   apply(p: Patch, at?: number): void {
