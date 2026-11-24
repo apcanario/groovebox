@@ -2157,4 +2157,7 @@ button:disabled {
   .shell.now .sec {
     height: 52px;
   }
+  .shell.now .sec b {
+    font-size: 24px;
+  }
 }
