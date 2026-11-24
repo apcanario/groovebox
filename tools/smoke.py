@@ -1578,6 +1578,20 @@ def save_take(page, failures: list, want: float, where: str) -> dict | None:
     return info
 
 
+def rec_timer_ok(shown: str, elapsed: float, tol: float = 1.5) -> bool:
+    """The record timer (m:ss) agrees with the measured time since the take began, within tol seconds.
+
+    The sleep before the reading is at least 2 s, so a frozen timer (0:00) or one counting at twice
+    the rate is off by at least 2 s and fails; a slow machine only makes both numbers larger together.
+    """
+    try:
+        m, sec = shown.strip().split(":")
+        value = int(m) * 60 + int(sec)
+    except ValueError:
+        return False
+    return abs(value - elapsed) <= tol
+
+
 def walk_g5_record(page, failures: list) -> None:
     """G5 while playing: a take with the indicator and timer, knob moves in its log, saved as MP3."""
     page.click('[data-tab="mix"]')
@@ -1594,8 +1608,9 @@ def walk_g5_record(page, failures: list) -> None:
     page.click('[data-cell="1:layer2"]')
     time.sleep(2.0)
     shown = page.inner_text("#rec-time")
-    if shown not in ("0:02", "0:03"):
-        failures.append(f"record timer shows {shown!r} after about 2 s")
+    elapsed = time.time() - t0
+    if not rec_timer_ok(shown, elapsed):
+        failures.append(f"record timer shows {shown!r} after {elapsed:.1f} s")
     narrow_pass(page, failures)  # the wider record button must still fit at 360 px
     page.click('[data-cell="1:layer2"]')
     while time.time() - t0 < 6.0:
