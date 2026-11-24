@@ -6,7 +6,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 |---|---|---|
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
 | 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
-| 6 | P7, P9, P8 | New sounds, effects, all 24 vibes |
+| 6 | P7 (Done), P9, P8 | New sounds, effects, all 24 vibes |
 | 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
 | 9 | G7 | Retouch from notes |
@@ -22,7 +22,8 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **C7. Bundle 4 listen item** (23 Nov 2026): the drum lane is about 32 px high at 640 px screen height (recorded choice); say in the notes if it is hard to read.
 - **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
 - **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
-- **C8. P3 review M1, for P7 (sounds)** (23 Nov 2026): patches are data files (`src/data/patches/`, 22 of them) but no picker lists them; Simple Synth's Sound picker still lists waves. P7 adds a Sound picker per instrument listing `PATCH_IDS` for that instrument (spec 8.2: pickers list whatever exists).
+- **C14. P7 listen items** (24 Nov 2026): the 20 s reverb decay is a 3.2 s impulse plus a feedback tail (a full 20 s impulse took load to about 93%); say in the notes if the tail sounds wrong, and that the default reverb tail is now measurably longer in every vibe (review S1, fixed to match the old tail by default). Drift pans the sound rather than widening it, because the voices are mono (review M3); the Drone mode and Swoop glide, the air layer and the lo-fi master need Pedro's ears. On short screens the mode icons hide under 400 px so "Drone" draws at full size (review M8).
+- **C15. P7 cost measure, for P9** (24 Nov 2026): everything on, base about 51 to 56% load and 12 to 14 ms worst stall, P7 about 54 to 71% and 10 to 20 ms; single runs vary by about 10%, so `tools/cost.py` (median of 5) is the measure. P9 reports against the P7 figures. A Tail-dial drag sits at 58 to 82% load. Pedro's choice (24 Nov 2026): if ten effect slots cost too much, cap how many slots are active at once (oldest turns off, no click), and keep all twelve effects and two slots per instrument to choose from.
 - **C9. 24-tile picker does not fit at 360 x 640** (P3 review, 23 Nov 2026), for P8: 12 rows of 48 px with gaps plus Continue last jam needs at least 648 px, so the spec's no-scroll rule and 48 px rule conflict at 24 tiles. Reviewer's proposal: no title or Close row, 1 px gap only under 648 px screen height (636 px total). P8 edits spec 8.6 accordingly and adds a smoke check at 24 tiles.
 - **C10. P4 review M2, for P8** (23 Nov 2026): the library's vibe tags are six blanket groups; when P8 adds the sixteen vibes, retag each progression per vibe by choice, not by group.
 - **C11. P5 listen items** (23 Nov 2026): Drift is sparse after the review fix (4 notes in 8 bars at seed 1234, whole bars of silence), say in the notes if it is too sparse; an accent brightens every sounding note of the layer, a lead-is-monophonic approximation (review M3); Pulse slides do not hold the previous note over the next as the other styles do.
@@ -57,11 +58,7 @@ Read spec 8.7, 8.8 and 8.10 in full before any row of this bundle.
 
 ### P7. Sound additions
 
-- Spec 8.7, engine additions: Perc and Shaker drum voices; 16-step drum presets with repeats and the 16-step switch on the Advanced sequencer; noise oscillator and two-operator FM wave; tempo-synced filter LFO; the lo-fi master option. Each switchable off. (Chorus and the other effects are P9.)
-- Spec 8.10, what Ambient and Drone need: attack, release and reverb decay up to 20 seconds; chord lengths of 4 and 8 bars; the Drone layer mode, added to the mode switch in both modes; pitch glide between chords on pads and drones; the free-running slow LFO; the air layer. Rework the Ambient vibe of P3 to use them.
-- Measure the cost: report the smoke test's worst stall and audio load with everything on, against the same measure before the row.
-
-**Done when:** each addition is audible and can be turned off; nothing clicks when one is switched while playing; the voice cap holds; `check` and `smoke` pass.
+Done, see the Done list below and `docs/reviews/P7.md`.
 
 ### P9. Effects
 
@@ -195,3 +192,4 @@ Kept here so no row disappears without a record.
 - **P4. Simple chords** (23 Nov 2026). Built, reviewed (fix: 0 errors, 5 should-fix, 6 minor, all applied except M2, carried as C10 for P8), pushed. Report in `docs/reviews/P4.md`.
 - **P5. Lead styles** (23 Nov 2026). Built, reviewed (fix: 1 error, 3 should-fix, 5 minor, all applied), pushed. Report in `docs/reviews/P5.md`, printed patterns in `docs/reviews/P5-patterns.md`.
 - **P6. Lead screens** (23 Nov 2026). Built, reviewed (fix: 0 errors, 3 should-fix, 7 minor, all applied except S1, carried as C12, and S2 applied in part, see C13), pushed. Report in `docs/reviews/P6.md`.
+- **P7. Sound additions** (24 Nov 2026). Built, reviewed (fix: 2 errors, 5 should-fix, 9 minor, all applied; the errors were a drone or pad going silent after two wave or patch changes, and the Tail dial stacking a reverb per move). Report in `docs/reviews/P7.md`. C8 cleared. Cost with everything on: about 55% load before, about 59% after (median of 5), worst stall 13.6 ms before and 18.9 ms after.

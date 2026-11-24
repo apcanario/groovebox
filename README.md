@@ -26,8 +26,9 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5 and P6, 22 and 23 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6 and P7, 22 to 24 Nov 2026):
 
+- **New sounds (P7):** Perc and Shaker drum voices, Afro and Trap beats (Trap has hat rolls) and 16-step beats with a 16-step view on the Advanced Steps page; noise and two-operator FM waves, a tempo-synced filter LFO and a slow drift on filter, pitch, pan and sends; a lo-fi master (wobble, crush, hiss); a Sound picker on every instrument that lists its patch files (four new: Glass, Wobble, Breath, Drift pad). For ambient and drone work: attack, release and reverb decay up to 20 seconds, chords of 4 and 8 bars, a Drone layer mode in both modes, Swoop glide between chords on pads and drones, and an air layer. Ambient is reworked to use them. Each can be switched off. The other vibes do not use them yet (P8).
 - **Lead screens (P6):** the Advanced Layer tab has a style row (Hook, Phrase, Roll, Drift, Pulse), the Notes and Feel pages of six knobs each, a Pulse page with its own three knobs (shown only for Pulse), and the lane with a phrase bar showing which bar of the phrase is playing. Simple Layer has a style picker beside Busy, Evolve, Bright and Space. Every vibe sets a fitting lead style on both layers (Hook in Deep house, Tropical house and 2-step; Roll in Melodic techno; Phrase in Drum and bass and Lo-fi; Pulse in Deep techno; Drift in Ambient and on the pads). The Shape dial reads Dip and Zig for Valley and Zigzag, which do not fit a dial at 360 px.
 
 - **Lead styles (P5):** Hook, Phrase, Roll and Drift beside Pulse, seeded and always in key, shaped by twelve shared knobs, with varied velocity and per-note glide, accent and quick repeats in the layer voice. Screens for them are P6, above.
@@ -58,13 +59,13 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5 and P6,
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
-**Phase 2** (rows P7 to P11)
+**Phase 2** (rows P8 to P11, P7 is built)
 - **Sixteen more vibes** (P8), to make 24: Drone, Trance, Acid house, Dubstep and more.
 - **Effects:** two slots per instrument from twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo). On or off in Simple, three knobs each in Advanced.
 - **DROP:** one large button that builds for a few bars, hangs, then brings the section back wider, with extra layers on everything, and stays there until you switch it off. Bigger by width, not volume. Each vibe has its own version.
-- **Drone, and Ambient reworked with drones** (P7, P8): for coasting, with drones, swooping pads and very slow movement.
+- **Drone vibe** (P8): for coasting, using the drone tools of P7.
 - **Morph:** a switch that lets the jam change by itself, slowly, so it can be left playing.
-- **More beats, bass rhythms, synth rhythms and sounds,** with the engine additions they need: two more drum voices, 16-step beats, noise and FM oscillators, a tempo-synced filter wobble and a lo-fi master.
+- **The full lists of beats, bass rhythms, synth rhythms and patches** (P8), and the lo-fi master and airy pads in the first eight vibes.
 
 **Install** (row G6): an Android APK built by GitHub Actions. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
 
@@ -84,8 +85,8 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b, P2, P3, P4, P5, P6 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens | Done |
-| P7 to P11 | Phase 2: sounds, effects, sixteen more vibes, the Drop, Morph | Planned |
+| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds | Done |
+| P9, P8, P10, P11 | Phase 2: effects, sixteen more vibes, the Drop, Morph | Planned |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
