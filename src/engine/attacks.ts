@@ -50,3 +50,13 @@ export class AttackQueue {
     while (this.waiting.length && this.waiting[0].time <= time) this.waiting.shift()!.run();
   }
 }
+
+/**
+ * Whether `n` new notes need a new voice set: PolySynth drops a note when its free voices (available, plus the room
+ * left under the cap) run out, and counts a voice until its release has rung out. A new set is needed only when the
+ * notes would fit but for voices already let go (`ringing`); a cap full of notes still held drops notes as before.
+ */
+export function freshSetNeeded(pool: { cap: number; voices: number; available: number }, active: number, ringing: number, n: number): boolean {
+  const free = pool.available + Math.max(0, pool.cap - pool.voices);
+  return free < n && active - ringing + n <= pool.cap;
+}

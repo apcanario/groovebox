@@ -1,6 +1,6 @@
 /** Attacks start in audio-time order, however slow a tick's timeouts are (the P9 smoke's hat page error). */
 import { describe, expect, it } from "vitest";
-import { AttackQueue } from "./attacks.ts";
+import { AttackQueue, freshSetNeeded } from "./attacks.ts";
 
 /**
  * Tone's context, as far as attacks see it: now() is the audio time plus a lookahead; on each tick the timeouts due
@@ -109,5 +109,21 @@ describe("attack queue", () => {
     const key = (x: { t: number; name: string }): string => `${x.t.toFixed(4)} ${x.name}`;
     expect(new Set(started.map(key)).size).toBe(asked.length);
     for (let i = 1; i < started.length; i++) expect(started[i].t).toBeGreaterThanOrEqual(started[i - 1].t);
+  });
+});
+
+describe("a new voice set when the cap is full of voices ringing out", () => {
+  const cap = 16;
+  it("a Held chord after a busy rhythm's releaseAll: all 16 voices let go, five notes get a new set", () => {
+    expect(freshSetNeeded({ cap, voices: 16, available: 0 }, 16, 16, 5)).toBe(true);
+  });
+  it("room left under the cap or available voices: no new set", () => {
+    expect(freshSetNeeded({ cap, voices: 11, available: 0 }, 11, 11, 5)).toBe(false);
+    expect(freshSetNeeded({ cap, voices: 16, available: 5 }, 11, 11, 5)).toBe(false);
+  });
+  it("a cap full of notes still held drops notes as before", () => {
+    expect(freshSetNeeded({ cap, voices: 16, available: 0 }, 16, 0, 5)).toBe(false);
+    expect(freshSetNeeded({ cap, voices: 16, available: 0 }, 16, 4, 5)).toBe(false);
+    expect(freshSetNeeded({ cap, voices: 16, available: 0 }, 16, 5, 5)).toBe(true);
   });
 });

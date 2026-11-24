@@ -40,7 +40,7 @@ import {
 import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, type NumericPatchKey, type Patch, type Wave } from "./song.ts";
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
-import { AttackQueue } from "./attacks.ts";
+import { AttackQueue, freshSetNeeded } from "./attacks.ts";
 import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
 
 // Tone 15.1.22 leak (G5 review E1): Oscillator._start connects its frequency and detune signals to each new
@@ -846,6 +846,9 @@ export class Bass extends Instrument {
   }
 }
 
+/** PolySynth's voice bookkeeping, as Poly.roomFor reads it. */
+type VoicePool = { _voices: unknown[]; _availableVoices: unknown[]; _activeVoices: { released: boolean }[] };
+
 /** A polyphonic voice: the Synth instrument and both layers. */
 export class Poly extends Instrument {
   private polys: VoiceSets<Tone.PolySynth>;
@@ -871,6 +874,10 @@ export class Poly extends Instrument {
   private wrapped = new WeakSet<object>();
   /** Held notes moved to a new voice set by a wave change (P7 review E1), for the smoke test. */
   reholds = 0;
+  /** PolySynth's entries let go by releaseAll (see roomFor). */
+  private letGo = new WeakSet<object>();
+  /** New voice sets made because the cap was full of voices ringing out (see roomFor), for the smoke test. */
+  freshSets = 0;
   /**
    * Layers only (G4): the pad filter after the voices. Open (10 kHz, the C1 top) outside Pad mode;
    * in Pad mode Brightness sets its top and Motion sweeps it down and back by up to two octaves,
@@ -1020,33 +1027,53 @@ export class Poly extends Instrument {
   protected setWave(w: Wave, at?: number): void {
     if (w === this.wave) return;
     this.wave = w;
-    this.polys.swap(() => {
-      let p: Tone.PolySynth;
-      if (w === "fm") {
-        p = new Tone.PolySynth(Tone.FMSynth, {
-          harmonicity: fmRatio(this.fm.ratio),
-          modulationIndex: fmIndex(this.fm.index),
-          oscillator: { type: "sine" },
-          modulation: { type: "sine" },
-          envelope: this.env,
-          modulationEnvelope: modEnv(this.env),
-        } as unknown as Partial<Tone.FMSynthOptions>) as unknown as Tone.PolySynth;
-        this.fmSets.add(p);
-      } else {
-        p = new Tone.PolySynth(Tone.Synth, {
-          oscillator: w === "noise" ? { type: "sine" } : oscFor(w, this.fat, this.spreadFor(w), this.opts.fatAll),
-          envelope: this.env,
-        } as unknown as Partial<Tone.SynthOptions>);
-        // The noise wave's sine body sits under its breath.
-        if (w === "noise") p.volume.value = -8;
-      }
-      p.maxPolyphony = this.maxPolyphony;
-      return p;
-    }, at);
+    this.polys.swap(() => this.makeSet(w), at);
     if (w === "noise") (this.breath ??= new Breath(this.polysDest(), this.playing)).setOn(true);
     else this.breath?.setOn(false, this.env.release);
     this.breath?.shape(this.env);
     if (this.held?.items.length) this.rehold(at);
+  }
+
+  /** A new voice set of wave `w`, at the voice cap. */
+  private makeSet(w: Wave): Tone.PolySynth {
+    let p: Tone.PolySynth;
+    if (w === "fm") {
+      p = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: fmRatio(this.fm.ratio),
+        modulationIndex: fmIndex(this.fm.index),
+        oscillator: { type: "sine" },
+        modulation: { type: "sine" },
+        envelope: this.env,
+        modulationEnvelope: modEnv(this.env),
+      } as unknown as Partial<Tone.FMSynthOptions>) as unknown as Tone.PolySynth;
+      this.fmSets.add(p);
+    } else {
+      p = new Tone.PolySynth(Tone.Synth, {
+        oscillator: w === "noise" ? { type: "sine" } : oscFor(w, this.fat, this.spreadFor(w), this.opts.fatAll),
+        envelope: this.env,
+      } as unknown as Partial<Tone.SynthOptions>);
+      // The noise wave's sine body sits under its breath.
+      if (w === "noise") p.volume.value = -8;
+    }
+    p.maxPolyphony = this.maxPolyphony;
+    return p;
+  }
+
+  /**
+   * Make room for `n` new voices at `time`. PolySynth counts a voice against its cap until its release has rung
+   * out, and drops a note when the cap is full: so after a busy rhythm with a long release, a rhythm switch's
+   * releaseAll left every voice ringing, and the Held chord started on that step was dropped whole (silence until
+   * the next chord; the smoke's "no sub-oscillator detunes read on the held chord"). When the notes would fit but
+   * for voices already let go, the next notes go to a new set of the same wave and those tails ring out on the old.
+   */
+  private roomFor(n: number, time: number): void {
+    const poly = this.polys.live?.synth as unknown as VoicePool | undefined;
+    if (!poly || !this.wave || this.held?.items.length) return;
+    const ringing = poly._activeVoices.filter((e) => e.released || this.letGo.has(e)).length;
+    const free = { cap: this.maxPolyphony, voices: poly._voices.length, available: poly._availableVoices.length };
+    if (!freshSetNeeded(free, poly._activeVoices.length, ringing, n)) return;
+    this.polys.swap(() => this.makeSet(this.wave!), time);
+    this.freshSets++;
   }
 
   /**
@@ -1161,6 +1188,7 @@ export class Poly extends Instrument {
   trigger(notes: number[], dur: number, time: number, vel: number, lead?: { glideFrom?: number; glide?: number; accent?: boolean }): void {
     this.atTime(time, () => {
       this.polys.retireIf((p) => p.activeVoices === 0);
+      this.roomFor(notes.length, time);
       const poly = this.polys.live!.synth;
       type Active = { _activeVoices: { midi: number; voice: Tone.Synth }[] };
       const was = (poly as unknown as Active)._activeVoices.length;
@@ -1195,6 +1223,7 @@ export class Poly extends Instrument {
   /** Start `notes` at `time` and hold them (P7: a drone, a swooping pad) until releaseAll; adds to what is held. */
   private attackHeld(notes: number[], time: number, vel: number): void {
     this.polys.retireIf((p) => p.activeVoices === 0);
+    this.roomFor(notes.length, time);
     const poly = this.polys.live!.synth;
     type Active = { _activeVoices: { midi: number; voice: Tone.Synth; released: boolean }[] };
     const before = new Set((poly as unknown as Active)._activeVoices.map((e) => e.voice));
@@ -1248,7 +1277,12 @@ export class Poly extends Instrument {
   }
 
   releaseAll(time: number): void {
-    this.polys.each((p) => p.releaseAll(time));
+    this.polys.each((p) => {
+      p.releaseAll(time);
+      // PolySynth.releaseAll does not mark its voices released (a pending release of the same note must still find
+      // them, not a newer voice): note them here, so roomFor knows they are only ringing out.
+      for (const e of (p as unknown as VoicePool)._activeVoices) this.letGo.add(e);
+    });
     this.breath?.release(time);
     this.held = null;
   }
