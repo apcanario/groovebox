@@ -1,6 +1,10 @@
 import type { StyleDef } from "../music/data.ts";
 
-/** Future garage: a swung shuffle, a skipping sub, rainy chords in a long reverb, a talking choir and a shimmer pad. */
+/**
+ * Future garage: a swung shuffle, a skipping sub, rainy chords in a long reverb, a talking choir and an airy pad. P8
+ * cost: with the Shimmer pad and the swelling chord in the groove it measured 99 to 100% audio load (tools/cost.py
+ * vibes), so the groove holds its chord and the pad is the lighter Airy pad.
+ */
 export default {
   order: 5,
   name: "Future garage",
@@ -12,15 +16,15 @@ export default {
     drums: "soft",
     bass: "sub",
     synth: { patch: "padSwell", set: { attack: 0.4, release: 2 } },
-    layer1: "choir",
-    layer2: "shimmer",
+    layer1: "softSine",
+    layer2: { patch: "airyPad", set: { drift: 0.4, driftRate: 0.2 } },
   },
   mix: { sweep: 0, pump: 0.3, saturation: 0.1, reverbDecay: 5 },
   leads: {
     layer1: { style: "drift", register: 0.65, range: 0.5, noteLength: 0.8, density: 0.45, slide: 0.3 },
     layer2: { style: "drift", register: 0.55, noteLength: 0.95, density: 0.3 },
   },
-  // Crushed drums, echoed chords, the choir through a moving vowel, the shimmer chorused.
+  // Crushed drums, echoed chords, the choir through a moving vowel, the pad chorused.
   fx: {
     drums: [{ effect: "crush", on: true, knobs: [0.55, 0.6, 0.4] }, { effect: "echo" }],
     bass: [{ effect: "chorus" }, { effect: "phaser" }],
@@ -45,7 +49,7 @@ export default {
       chords: [[0, 1], [2, 1], [6, 1], [3, 1]],
       beat: "garageShuffle",
       bass: "garageSkip",
-      synth: "swell",
+      synth: "sustained",
       layer1: { mode: "generative" },
       layer2: { mode: "pad", pad: { motion: 0.5 } },
     },
