@@ -612,10 +612,14 @@ class Crush extends WorkletBlend {
       const t = soon(at);
       const shut = t + (5 * RAMP) / 4;
       this.param("bits", bits, shut, true);
+      // Bits is a k-rate parameter: its step takes effect at the first render quantum (128 frames) that starts at or
+      // after `shut`, up to 2.9 ms later. The path opens one quantum after `shut`, so it never opens on the old bits
+      // (it did whenever `shut` fell early in a quantum: a click as the bits stepped into a path a quarter open).
+      const open = shut + 128 / raw().sampleRate;
       const [, w] = mixGains(k[2]);
       this.wet.gain.cancelScheduledValues(t);
       this.wet.gain.setTargetAtTime(0, t, RAMP / 4);
-      this.wet.gain.setTargetAtTime(w, shut, RAMP / 4);
+      this.wet.gain.setTargetAtTime(w, open, RAMP / 4);
       glide(this.dry.gain, mixGains(k[2])[0], at);
     } else {
       this.param("bits", bits, at);
@@ -1148,7 +1152,9 @@ export class FxSlotNode {
     if (this.on) this.cur.fx.note(hz, time);
   }
   step(time: number, step: number): void {
-    if (this.on) this.cur.fx.step(time, step);
+    // Also while it fades out after a switch-off: a Gate keeps its pattern until it is silent, instead of holding
+    // whatever state the last step before the switch left it in (open or shut, by chance, through the fade).
+    if (this.cur.wired) this.cur.fx.step(time, step);
   }
 }
 
