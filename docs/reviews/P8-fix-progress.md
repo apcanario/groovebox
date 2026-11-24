@@ -4,3 +4,4 @@
 - Chunk 4: S4, S5, S6 (and M5's 0.2 s supersaw release in Trance) done, 077520f
 - Chunk 5a: M1, M6 (M5 in chunk 4) done, f6fbb3a
 - Chunk 5b: M2, M3 done, 7305027; shots.py passed (279 screens). M4 (commit message counts) and S3 (Carried) are BACKLOG/CHANGELOG lines for the main chat
+- Re-measure (tools/cost.py dist 3 vibes, fresh page each, on cdec33f): median load %: Deep house 61.7, Tropical house 40.9, Progressive 52.6, Acid house 62.9, Afro house 55.1, Deep techno 44.4, Melodic techno 52.8, Minimal techno 48.5, Dub techno 55.9, Drum and bass 59.1, 2-step 59.2, Breakbeat 51.2, Dubstep 53.4, Future garage 68.7, Lo-fi 56.1, Ambient 55.2, Drone 51.5, Downtempo 47.0, Synthwave 51.7, IDM 68.2, EDM 55.2, Trance 61.8, Electro 51.1, Trap 57.8; Ambient > Drone 71.5 (the only one above 71%); worst stalls 9.9 to 30.3 ms
