@@ -18,6 +18,7 @@ Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
 It checks that sound is produced and nothing throws. It cannot judge how it sounds.
 """
+import json
 import math
 import os
 import re
@@ -2071,6 +2072,15 @@ COST_SCENE = """async (extras) => {
     const pick = { drums: ['crush', 'echo'], bass: ['fuzz', 'phaser'], synth: ['chorus', 'shifter'], layer1: ['flanger', 'vowel'], layer2: ['ring', 'tremolo'] };
     for (const [id, fx] of Object.entries(pick)) fx.forEach((f, i) => e.setFx(id, i, { effect: f, on: true }));
   }
+  // P9 review S1: "fx1:<effect>" switches one effect on (Synth's slot 1), to rank the effects by cost; "fx6max" the
+  // six heaviest by that ranking (FX_HEAVIEST in tools/smoke.py), two per instrument at most.
+  const one = extras && extras !== true ? extras.find((x) => x.startsWith('fx1:')) : null;
+  if (one && e.setFx) e.setFx('synth', 0, { effect: one.slice(4), on: true });
+  if (extras && extras !== true && extras.includes('fx6max') && e.setFx) {
+    const heavy = %s;
+    const ids = ['drums', 'bass', 'synth', 'layer1', 'layer2'];
+    heavy.forEach((f, n) => e.setFx(ids[Math.floor(n / 2)], n %% 2, { effect: f, on: true }));
+  }
   if (!extras || !e.p7) return false;
   const all = extras === true || extras.includes('all');
   const want = (k) => all || extras.includes(k);
@@ -2087,6 +2097,10 @@ COST_SCENE = """async (extras) => {
   if (want('lofi')) e.setMix('lofi', 1);
   return true;
 }"""
+# P9 review S1: the six heaviest effects, by a one-at-a-time measure (tools/cost.py dist 3 all,fx1:<effect>).
+FX_HEAVIEST = ["crush", "shifter", "echo", "flanger", "vowel", "phaser"]
+COST_SCENE = COST_SCENE % json.dumps(FX_HEAVIEST)
+
 
 
 def trace_audio(browser, page, during) -> list:
@@ -2831,8 +2845,11 @@ def walk_cost(browser, page, failures: list) -> None:
     n6 = sum(x["on"] for r in st["slots"].values() for x in r)
     if n10 != 10 or n6 != cap:
         failures.append(f"cost: the effect measure played {n10} slots (wanted 10) and {n6} under the cap (wanted {cap})")
+    all_fx_off(page)
+    heavy = measure_cost(browser, page, f"everything on, the six heaviest effects on ({', '.join(FX_HEAVIEST)})", ["all", "fx6max"])
     print(f"cost P9: effect slots off {out.get('load', 0):.1f}% / {out.get('worst_ms', 0):.1f} ms; all ten on "
-          f"{ten.get('load', 0):.1f}% / {ten.get('worst_ms', 0):.1f} ms; {cap} on {six.get('load', 0):.1f}% / {six.get('worst_ms', 0):.1f} ms")
+          f"{ten.get('load', 0):.1f}% / {ten.get('worst_ms', 0):.1f} ms; {cap} on {six.get('load', 0):.1f}% / {six.get('worst_ms', 0):.1f} ms; "
+          f"the heaviest six {heavy.get('load', 0):.1f}% / {heavy.get('worst_ms', 0):.1f} ms")
     all_fx_off(page)
     # P7 review E2: a drag of the Tail dial keeps at most two reverbs alive (it used to pile one up per move).
     drag = measure_cost(browser, page, "everything on, Tail dial dragged", True, drag=True)
