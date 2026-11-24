@@ -4,7 +4,8 @@
  * Notes are scheduled ahead on the audio clock by the transport; the UI's timers never schedule.
  */
 import * as Tone from "tone";
-import { Graph } from "./audio.ts";
+import { Graph, oscProbe } from "./audio.ts";
+import { oscPatchStats } from "./oscPatch.ts";
 import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
@@ -1114,6 +1115,21 @@ export class Engine {
   /** One instrument's own level in dB, without the shared sends (P3 review S2); -Infinity before audio starts. */
   instrumentLevel(id: InstrumentId): number {
     return this.graph ? this.graph.instrumentLevel(id) : -Infinity;
+  }
+
+  /** P8 review S2: a native analyser on one instrument's sound before its effects, for the smoke test's tone check. */
+  instrumentScope(id: InstrumentId): AnalyserNode | null {
+    return this.graph ? this.graph.instrumentScope(id) : null;
+  }
+
+  /** P8 review S1: the second note's pitch after a short note (the oscillator-leak probe), for the smoke test. */
+  oscProbe(hz: number, wave: "sine" | "sawtooth" | "square"): Promise<number> {
+    return oscProbe(hz, wave);
+  }
+
+  /** P8 review S1: the oscillator patch's disconnects and the throws it counted, for the smoke test. */
+  oscPatchStats(): { throws: number; disconnects: number } {
+    return { ...oscPatchStats };
   }
 
   /** The lead's shapes and styles in their order, so the test tools read them instead of copying them (P6 review M6). */

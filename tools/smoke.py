@@ -1811,6 +1811,71 @@ def solo_bar(page, layer: str, bar_s: float) -> float:
     return top
 
 
+# P8 review S2: whether each instrument plays tones, judged by what a frozen 0 Hz oscillator cannot do. Every ~60 ms
+# it reads 8192 samples (about 0.17 s) of each instrument's own sound before its effects, takes the mean out (a held
+# DC level is the mean), and counts the windows with AC energy above -60 dB ("sounding") and those of them that also
+# cross zero at least TONE_CROSSINGS times with hysteresis ("tonal": a tone of 24 Hz or more; a gated DC level crosses
+# about twice per note edge). A peak or level meter reads a held DC level as sound; this does not.
+TONE_CROSSINGS = 8
+# The share of sounding windows that must hold a tone. On the fixed build the lowest was 0.68 (a bass's windows that
+# catch only a note's edge); with the G5 patch restored Acid house, Breakbeat and Dubstep read 0, Synthwave 0.05,
+# Trance 0.07 and Future garage 0.35 (24 Nov 2026).
+TONAL_SHARE = 0.5
+TONAL = """async ([ids, seconds, need]) => {
+  const e = window.__groovebox, out = {};
+  const taps = ids.map((id) => [id, e.instrumentScope(id)]);
+  const n = taps[0][1].fftSize, buf = new Float32Array(n);
+  for (const [id] of taps) out[id] = { sounding: 0, tonal: 0, top: -999 };
+  const end = performance.now() + seconds * 1000;
+  while (performance.now() < end) {
+    for (const [id, an] of taps) {
+      an.getFloatTimeDomainData(buf);
+      let mean = 0;
+      for (let i = 0; i < n; i++) mean += buf[i];
+      mean /= n;
+      let ss = 0;
+      for (let i = 0; i < n; i++) ss += (buf[i] - mean) ** 2;
+      const rms = Math.sqrt(ss / n), db = rms > 0 ? 20 * Math.log10(rms) : -999, o = out[id];
+      o.top = Math.max(o.top, db);
+      if (db < -60) continue;
+      o.sounding++;
+      const th = 0.05 * rms;
+      let side = 0, c = 0;
+      for (let i = 0; i < n; i++) {
+        const x = buf[i] - mean;
+        if (x > th) { if (side < 0) c++; side = 1; } else if (x < -th) { if (side > 0) c++; side = -1; }
+      }
+      if (c >= need) o.tonal++;
+    }
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  return out;
+}"""
+
+
+def check_osc_probe(page, failures: list) -> None:
+    """P8 review S1: a short note, then the next one 5 ms after its release ends, must keep its pitch (220 Hz). The
+    G5 patch left the second at 0 Hz in every run; a check of every wave, every time, not a chance in a vibe."""
+    for wave in ("sine", "sawtooth", "square"):
+        hz = page.evaluate(f"window.__groovebox.oscProbe(220, {wave!r})")
+        if not 200 <= hz <= 240:
+            failures.append(f"oscillator probe ({wave}): the note after a short note plays {hz:.1f} Hz, not 220 (a frozen oscillator)")
+        print(f"oscillator probe {wave}: the note after a short note at {hz:.1f} Hz")
+
+
+def check_osc_patch(page, failures: list) -> None:
+    """P8 review S1: the oscillator patch disconnected ended oscillators all through the walk and never threw."""
+    st = page.evaluate("window.__groovebox.oscPatchStats()")
+    if st["throws"] or not st["disconnects"]:
+        failures.append(f"the oscillator patch: {st['disconnects']} disconnects, {st['throws']} threw (expected some and none)")
+    print(f"oscillator patch: {st['disconnects']} ended oscillators disconnected, {st['throws']} threw")
+
+
+def tone_check(page, bar_s: float) -> dict:
+    """P8 review S2: two bars of every instrument's tone count at once (see TONAL)."""
+    return page.evaluate(TONAL, [LAYERS, 2 * bar_s + 0.3, TONE_CROSSINGS])
+
+
 CUTOFF_TRACE = """(id) => {
   const e = window.__groovebox, trace = [], end = performance.now() + 12000;
   window.__cutoffTrace = trace;
@@ -1883,6 +1948,7 @@ def walk_p3(page, failures: list) -> None:
     if not page.evaluate(f"{E}.playing"):
         page.click("#play")
         wait_for(page, f"{E}.playing", 3.0)
+    check_osc_probe(page, failures)
     before = page.evaluate("window.__keeper.list().then(l => l.length)")
     vibes = page.evaluate("window.__vibes")
     timed = 0
@@ -1912,14 +1978,23 @@ def walk_p3(page, failures: list) -> None:
         # P9 review S2: its synced effects run at its tempo.
         fx_rates += check_fx_tempo(page, failures, f"{v['id']} at {v['bpm']} bpm")
         bar_s = 4 * 60 / v["bpm"]
-        quiet = []
+        # P8 review S2: each instrument's own sound over two bars, its mean (a held DC level) taken out: it must
+        # sound above -60 dB and most of the windows that sound must hold a tone (a frozen oscillator does not).
+        quiet, frozen = [], []
+        tones = tone_check(page, bar_s)
         for inst in LAYERS:
-            lvl = solo_bar(page, inst, bar_s)
-            if lvl < -60:
-                quiet.append(f"{inst} {lvl:.1f} dB")
+            t = tones[inst]
+            if t["top"] < -60:
+                quiet.append(f"{inst} {t['top']:.1f} dB")
+            elif t["tonal"] < TONAL_SHARE * t["sounding"]:
+                frozen.append(f"{inst} {t['tonal']} of {t['sounding']}")
         if quiet:
             failures.append(f"{v['id']}: silent in its groove section: {', '.join(quiet)}")
-        print(f"vibe {v['name']}: landed on the bar at {v['bpm']} bpm, " + (f"SILENT {', '.join(quiet)}" if quiet else "every instrument audible"))
+        if frozen:
+            failures.append(f"{v['id']}: sound without a tone (a frozen oscillator's DC level) in its groove section, windows with a tone: {', '.join(frozen)}")
+        bad = (f"SILENT {', '.join(quiet)} " if quiet else "") + (f"NO TONE {', '.join(frozen)}" if frozen else "")
+        print(f"vibe {v['name']}: landed on the bar at {v['bpm']} bpm, " + (bad or "every instrument audible with a tone ("
+              + ", ".join(f"{i} {tones[i]['tonal']}/{tones[i]['sounding']}" for i in LAYERS) + ")"))
     if timed < 3:
         failures.append(f"the synth cutoff was checked across only {timed} vibe landings, expected at least 3")
     print(f"vibe landings: synth cutoff old before the bar line, new after it, on {timed} landings; synced effect rates at the vibe's tempo checked: {fx_rates}")
@@ -3110,6 +3185,7 @@ def main() -> int:
             walk_p9(page, failures)
             walk_fx_load(browser, page, failures)
             walk_cost(browser, page, failures)
+            check_osc_patch(page, failures)
             browser.close()
     finally:
         server.terminate()

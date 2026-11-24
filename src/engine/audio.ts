@@ -41,39 +41,11 @@ import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, t
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
 import { AttackQueue, freshSetNeeded } from "./attacks.ts";
+import { nativeParam, patchOscillatorEnd, type OscillatorProto } from "./oscPatch.ts";
 import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
 
-// Tone 15.1.22 leak (G5 review E1): Oscillator._start connects its frequency and detune signals to each new
-// native oscillator and never disconnects them, so every ended oscillator stays reachable from the
-// instrument's signals. Disconnect them when the oscillator ends. Drop this patch once Tone fixes it.
-{
-  const proto = Tone.Oscillator.prototype as unknown as {
-    _start(t: unknown): void;
-    _oscillator: { onended: (n: unknown) => void; frequency: unknown; detune: unknown };
-    frequency: Tone.Signal<"frequency">;
-    detune: Tone.Signal<"cents">;
-  };
-  const start = proto._start;
-  proto._start = function (this: typeof proto, t: unknown): void {
-    start.call(this, t);
-    const node = this._oscillator;
-    const end = node.onended;
-    node.onended = (n: unknown): void => {
-      try {
-        // The native AudioParams (P8): Tone's disconnect() resolves a ToneAudioNode or an AudioParam, but a Tone Param
-        // is neither, so it fell to a bare disconnect() that cut the signal from every oscillator, the one now
-        // playing too: when a short note's oscillator ended after the next note's had started, the voice sat at 0 Hz
-        // (silent) until a fresh start (the P8 smoke's silent bass in Acid house and Dubstep).
-        this.frequency.disconnect(nativeParam(node.frequency) as unknown as Tone.InputNode);
-        this.detune.disconnect(nativeParam(node.detune) as unknown as Tone.InputNode);
-      } catch {
-        // already disconnected (the oscillator was disposed first)
-      } finally {
-        end(n);
-      }
-    };
-  };
-}
+// Tone 15.1.22 leak (G5 review E1, P8): see oscPatch.ts.
+patchOscillatorEnd(Tone.Oscillator.prototype as unknown as OscillatorProto);
 
 const RAMP = 0.03; // seconds; every continuous parameter change is ramped this long
 const MAX_Q = 6; // resonance cap (the spike went to 14, G1 shipped 8)
@@ -83,12 +55,6 @@ const qComp = (q: number): number => 1 / (1 + 0.15 * (q - 0.7));
 const dryWet = (v: number): [number, number] => [Math.cos((v * Math.PI) / 2), Math.sin((v * Math.PI) / 2)];
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 
-/** The native AudioParam under a Tone Param or Signal (a Signal wraps a Param, a Param an AudioParam). */
-function nativeParam(p: unknown): AudioParam {
-  let q = p as { _param?: unknown };
-  while (q._param) q = q._param as { _param?: unknown };
-  return q as unknown as AudioParam;
-}
 
 /**
  * Move a parameter to `value` over about RAMP, from wherever it is now (G3 review E1). Tone's
@@ -1309,6 +1275,7 @@ export class Graph {
   readonly instruments: { drums: Drums; bass: Bass; synth: Poly; layer1: Poly; layer2: Poly };
   private meter: Tone.Meter;
   private meters = new Map<InstrumentId, Tone.Meter>();
+  private scopes = new Map<InstrumentId, AnalyserNode>();
   /** Raw samples after the limiter, for the peak reading (the last 16384, about 0.37 s at 44.1 kHz). */
   private scope: Tone.Analyser;
   private lp: Tone.Filter;
@@ -1444,6 +1411,21 @@ export class Graph {
     return typeof v === "number" ? v : v[0];
   }
 
+  /**
+   * P8 review S2: a native analyser on one instrument's own sound, before its effect slots (so a Shifter or Ring
+   * cannot turn a held DC level into a tone), for the smoke test's tone check. Made on first use.
+   */
+  instrumentScope(id: InstrumentId): AnalyserNode {
+    let a = this.scopes.get(id);
+    if (!a) {
+      a = Tone.getContext().rawContext.createAnalyser() as AnalyserNode;
+      a.fftSize = 8192;
+      Tone.connect(this.instruments[id].channel.gate, a as unknown as Tone.InputNode);
+      this.scopes.set(id, a);
+    }
+    return a;
+  }
+
   /** P7: Play starts at `at`: the synced LFOs restart there, on the bar; the hiss and the air play while it runs. */
   startClock(at: number): void {
     for (const id of INSTRUMENT_LIST) this.instruments[id].channel.startClock(at);
@@ -1515,4 +1497,43 @@ export class Graph {
   attacks(): number {
     return Object.values(this.instruments).reduce((n, i) => n + i.attacks, 0);
   }
+}
+
+/**
+ * P8 review S1: the oscillator-leak probe for the smoke test. A Synth plays a 0.1 s note, then a second one 5 ms after
+ * the first one's release ends (its oscillator starts before the first one's ended event), and the second note's
+ * pitch is read from its zero crossings. The G5 patch left it at 0 Hz (a held DC level) in 12 of 12 runs.
+ */
+export async function oscProbe(hz: number, wave: "sine" | "sawtooth" | "square"): Promise<number> {
+  const ctx = Tone.getContext();
+  const an = ctx.rawContext.createAnalyser() as AnalyserNode;
+  an.fftSize = 4096;
+  const synth = new Tone.Synth({ oscillator: { type: wave }, envelope: { attack: 0.005, decay: 0.01, sustain: 1, release: 0.05 } });
+  Tone.connect(synth, an as unknown as Tone.InputNode);
+  const t = ctx.currentTime + 0.1;
+  synth.triggerAttackRelease(hz, 0.1, t);
+  synth.triggerAttack(hz, t + 0.155);
+  synth.triggerRelease(t + 0.8);
+  const until = t + 0.6;
+  while (ctx.currentTime < until) await new Promise((r) => setTimeout(r, 20));
+  const buf = new Float32Array(an.fftSize);
+  an.getFloatTimeDomainData(buf);
+  synth.dispose();
+  an.disconnect();
+  let mean = 0;
+  for (const x of buf) mean += x;
+  mean /= buf.length;
+  let peak = 0;
+  for (const x of buf) peak = Math.max(peak, Math.abs(x - mean));
+  const th = 0.2 * peak;
+  let side = 0;
+  let rising = 0;
+  for (const x of buf) {
+    const y = x - mean;
+    if (y > th) {
+      if (side < 0) rising++;
+      side = 1;
+    } else if (y < -th) side = -1;
+  }
+  return peak < 1e-4 ? 0 : (rising * ctx.sampleRate) / buf.length;
 }
