@@ -5,7 +5,7 @@
  */
 import * as Tone from "tone";
 import { Graph } from "./audio.ts";
-import { Lfo } from "./mods.ts";
+import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { DiffWatch, JumpWatch, type Jumps } from "./continuity.ts";
@@ -1046,9 +1046,13 @@ export class Engine {
     return tr.state === "started" ? tr.getTicksAtTime(t) / tr.PPQ : 0;
   }
 
-  /** For the smoke test (P9): every slot switch steps instead of ramping, to prove the click check can fail. */
+  /**
+   * For the smoke test (P9): every slot switch steps instead of ramping, and so does every master switch (lo-fi,
+   * air, reverb; review E3), to prove the click checks can fail.
+   */
   fxHardSwitch(on: boolean): void {
     fxDebug.hard = on;
+    modsDebug.hard = on;
   }
 
   private diffWatches = new Map<InstrumentId, DiffWatch>();

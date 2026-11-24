@@ -1047,18 +1047,36 @@ def read_jumps(page, inst: str) -> tuple:
 
 
 def steady_jumps(page, inst: str, seconds: float) -> float:
-    """The steady sound's own jump over peak: the largest of its quarter-second reads over `seconds`."""
-    read_jumps(page, inst)
-    best = 0.0
-    for _ in range(int(seconds / 0.25)):
+    """The steady sound's own jump over peak: the median of its quarter-second reads over `seconds` (P9 review E3:
+    the median, so one stray read cannot raise the reference and blind the check)."""
+    return steady_many(page, [inst], seconds)[inst]
+
+
+def read_many(page, insts: list) -> dict:
+    """read_jumps for several watches at once (one read each, at the same moment)."""
+    rs = page.evaluate("(ids) => Promise.all(ids.map((i) => window.__groovebox.jumps(i)))", insts)
+    out = {}
+    for i, r in zip(insts, rs):
+        r = r or {"jump": 0.0, "peak": 0.0}
+        out[i] = (r["jump"], r["peak"], (r["jump"] / r["peak"] if r["peak"] > 1e-3 else 0.0))
+    return out
+
+
+def steady_many(page, insts: list, seconds: float) -> dict:
+    """steady_jumps for several watches over the same stretch: the median of each one's quarter-second reads."""
+    read_many(page, insts)
+    reads: dict = {i: [] for i in insts}
+    for _ in range(max(1, int(seconds / 0.25))):
         time.sleep(0.25)
-        best = max(best, read_jumps(page, inst)[2])
-    return best
+        for i, r in read_many(page, insts).items():
+            reads[i].append(r[2])
+    return {i: sorted(v)[len(v) // 2] for i, v in reads.items()}
 
 
 def check_continuity(page, inst: str, steady: float, where: str, failures: list, read: tuple | None = None) -> float:
     """Level continuity (P6 review S2; P9 reuses it): since the last read (or in `read`), no jump well above the
-    steady sound's own. Returns the jump over peak as a multiple of the steady one."""
+    steady sound's own. Returns the jump over peak as a multiple of `steady`, the reference it was judged against
+    (P9 review E3: every printed figure is against its own check's reference)."""
     jump, pk, ratio = read or read_jumps(page, inst)
     if steady > 0 and ratio > CLICK_FACTOR * steady:
         failures.append(f"{where}: a click on {inst} (jump {jump:.4f} at peak {pk:.3f}: {ratio / steady:.1f} times the steady sound's)")
@@ -2111,6 +2129,60 @@ def measure_cost(browser, page, label: str, extras, drag: bool = False) -> dict:
 
 
 
+def master_switches(page, failures: list, st) -> float:
+    """P7's master switches (lo-fi, air, reverb 20 s), P9 review E3: judged on the master output with only a steady
+    sine in it (the probe through Layer 2; the pump off), so the reference is the sine's, not the groove's. Each is
+    switched as shipped (must not click) and stepped (fxHardSwitch: the lo-fi and reverb steps must be caught).
+    Returns the largest shipped jump against its own reference."""
+    E = "window.__groovebox"
+    pump = page.evaluate(f"{E}.getMix().pump")
+    page.evaluate(f"{E}.setMix('pump', 0)")
+    page.evaluate(f"{E}.fxProbe({PROBE_HZ}, ['layer2'])")
+    time.sleep(1.5)
+    base = steady_jumps(page, "master", 1.5)
+    worst = 0.0
+    report = []
+    for name, on, off, running in [
+        ("lo-fi", f"{E}.setMix('lofi', 1)", f"{E}.setMix('lofi', 0)", lambda s: s["lofi"]),
+        ("air", f"{E}.setMix('air', 1)", f"{E}.setMix('air', 0)", lambda s: s["air"]),
+        ("reverb 20 s", f"{E}.setMix('reverbDecay', 20)", f"{E}.setMix('reverbDecay', 1.9)", lambda s: s["reverbDecay"] > 19),
+    ]:
+        read_jumps(page, "master")
+        page.evaluate(on)
+        time.sleep(1.2)
+        r_on = read_jumps(page, "master")
+        wet = steady_jumps(page, "master", 1.0)
+        ref = max(base, wet)
+        worst = max(worst, check_continuity(page, "master", ref, f"P7: {name} on", failures, r_on))
+        if not running(st()):
+            failures.append(f"P7: {name} is not running when switched on")
+        read_jumps(page, "master")
+        page.evaluate(off)
+        time.sleep(1.2)
+        worst = max(worst, check_continuity(page, "master", ref, f"P7: {name} off", failures))
+        if running(st()):
+            failures.append(f"P7: {name} still runs when switched off")
+        time.sleep(0.5)
+        page.evaluate(f"{E}.fxHardSwitch(true)")
+        n = 0
+        for i in range(8):
+            read_jumps(page, "master")
+            page.evaluate(on if i % 2 == 0 else off)
+            time.sleep(0.6)
+            if check_continuity(page, "master", ref, "", []) > CLICK_FACTOR:
+                n += 1
+        page.evaluate(f"{E}.fxHardSwitch(false)")
+        time.sleep(0.6)
+        report.append(f"{name} {n} of 8")
+        if name != "air" and n < 6:
+            failures.append(f"P7: the master click check caught only {n} of 8 stepped {name} switches")
+    page.evaluate(f"{E}.fxProbe(null)")
+    page.evaluate(f"{E}.setMix('pump', {pump})")
+    print(f"P7 master switches on a {PROBE_HZ:.0f} Hz sine alone (reference {base:.4f}): largest shipped jump {worst:.2f} times "
+          f"its own reference; stepped switches caught: {', '.join(report)}")
+    return worst
+
+
 def walk_p7(page, failures: list) -> None:
     """P7 (spec 8.7, 8.10), on the first song's groove while playing: each addition is audible or running when on and
     stops when off; switching each while a steady drone sounds makes no click (level continuity, on the layer and on
@@ -2169,30 +2241,28 @@ def walk_p7(page, failures: list) -> None:
     if lvl < -60:
         failures.append(f"P7: the drone is silent ({lvl:.1f} dB)")
     steady = steady_jumps(page, "layer2", 2.0)
-    msteady = steady_jumps(page, "master", 2.0)
     worst = 0.0
     switches = [
         ("drift", "layer2", f"{E}.setParam('layer2', 'drift', 1)", f"{E}.setParam('layer2', 'drift', 0)", lambda s: s["drift"]["layer2"]),
         ("synced LFO", "layer2", f"{E}.setParam('layer2', 'lfoDepth', 1)", f"{E}.setParam('layer2', 'lfoDepth', 0)", lambda s: s["lfo"]["layer2"]),
-        ("lo-fi", "master", f"{E}.setMix('lofi', 1)", f"{E}.setMix('lofi', 0)", lambda s: s["lofi"]),
-        ("air", "master", f"{E}.setMix('air', 1)", f"{E}.setMix('air', 0)", lambda s: s["air"]),
-        ("reverb 20 s", "master", f"{E}.setMix('reverbDecay', 20)", f"{E}.setMix('reverbDecay', 1.9)", lambda s: s["reverbDecay"] > 19),
         ("swoop", "layer2", f"{E}.setPad({sec}, 'layer2', {{swoop: 1}})", f"{E}.setPad({sec}, 'layer2', {{swoop: 0.3}})", None),
         ("fifth", "layer2", f"{E}.setDrone({sec}, 'layer2', {{fifth: false}})", f"{E}.setDrone({sec}, 'layer2', {{fifth: true}})", None),
     ]
     for name, where, on, off, running in switches:
-        ref = steady if where == "layer2" else msteady
         read_jumps(page, where)
         page.evaluate(on)
         time.sleep(1.2)
-        worst = max(worst, check_continuity(page, where, ref, f"P7: {name} on", failures))
+        worst = max(worst, check_continuity(page, where, steady, f"P7: {name} on", failures))
         if running and not running(st()):
             failures.append(f"P7: {name} is not running when switched on")
         page.evaluate(off)
         time.sleep(1.2)
-        worst = max(worst, check_continuity(page, where, ref, f"P7: {name} off", failures))
+        worst = max(worst, check_continuity(page, where, steady, f"P7: {name} off", failures))
         if running and running(st()):
             failures.append(f"P7: {name} still runs when switched off")
+    # The master switches (lo-fi, air, reverb), P9 review E3: judged on the master with nothing in it but a steady
+    # sine (the probe, through Layer 2's channel), not over the whole groove, whose own jumps hid a click.
+    worst = max(worst, master_switches(page, failures, st))
     # P7 review S4: rate changes while the LFO and the drift move, and a mode change away from the drone and back.
     for name, on, change, off in [
         ("LFO rate", f"{E}.setParam('layer2', 'lfoDepth', 1)", [f"{E}.setParam('layer2', 'lfoRate', 0.9)", f"{E}.setParam('layer2', 'lfoRate', 0.3)"], f"{E}.setParam('layer2', 'lfoDepth', 0)"),
@@ -2233,7 +2303,9 @@ def walk_p7(page, failures: list) -> None:
         failures.append(f"P7: after two wave changes the drone holds {s4['held']['layer2']} notes, moved {s4['reholds']['layer2'] - s3['reholds']['layer2']} times (want 2, 2)")
     if s4["swoops"]["layer2"] <= s3["swoops"]["layer2"]:
         failures.append("P7: no chord change reached the drone after two wave changes")
-    # Wave changes while it holds, through FM and noise: no click over either wave's own sound.
+    # Wave changes while it holds, through FM and noise: no click over either wave's own sound. P9 review E3: each
+    # is judged, and reported, against its own reference (the larger of the two waves' own jumps); a saw's or a
+    # noise's edge is its sound, not a click, so it is never scaled back to the sine's.
     prev = steady_jumps(page, "layer2", 1.0)
     for wave in ["sawtooth", "fm", "noise", "sawtooth"]:
         read_jumps(page, "layer2")
@@ -2241,7 +2313,7 @@ def walk_p7(page, failures: list) -> None:
         time.sleep(1.2)
         r = read_jumps(page, "layer2")
         new = steady_jumps(page, "layer2", 1.0)
-        worst = max(worst, check_continuity(page, "layer2", max(prev, new), f"P7: wave to {wave} while the drone holds", failures, r) * max(prev, new) / steady)
+        worst = max(worst, check_continuity(page, "layer2", max(prev, new), f"P7: wave to {wave} while the drone holds", failures, r))
         prev = new
         if wave == "noise" and not st()["breath"]["layer2"]:
             failures.append("P7: the noise wave's breath is not running")
@@ -2260,7 +2332,8 @@ def walk_p7(page, failures: list) -> None:
     act = page.evaluate(f"{E}.activeVoices('layer2')")
     if act > s2["cap"]["layer2"]:
         failures.append(f"P7: layer2 sounds {act} voices, over its cap {s2['cap']['layer2']}")
-    print(f"P7: switches made while a drone sounds; largest jump {worst:.2f} times the steady sound's; voices {s2['voices']}, caps {s2['cap']}")
+    print(f"P7: switches made while a drone sounds; largest jump {worst:.2f} times its own check's reference "
+          f"(a click above {CLICK_FACTOR:.1f}); voices {s2['voices']}, caps {s2['cap']}")
     # The breath runs only while the transport plays (P7 review M6).
     page.evaluate(f"{E}.setParam('synth', 'wave', 'noise')")
     time.sleep(0.3)
@@ -2293,6 +2366,164 @@ def fx_diff(page, inst: str, seconds: float = 0.6) -> tuple:
 def all_fx_off(page) -> None:
     page.evaluate("""() => { const e = window.__groovebox; for (const id of ['drums', 'bass', 'synth', 'layer1', 'layer2'])
       for (const i of [0, 1]) e.setFx(id, i, { on: false }); }""")
+
+
+# P9 review E2: the click checks feed every instrument's slots a steady sine (the probe; the instruments' own sound
+# is cut from their slots meanwhile), so every instrument has the same clean reference, its own jump 2 pi f / rate of
+# its peak. Each effect is checked at knobs that keep its own sound about as smooth as the sine (no staircase, no
+# clipped edge, no fast carrier or moving filter), so a step stands out of it, and where a hard switch makes a large
+# step: then a stepped switch must be caught and the shipped (ramped) one must not be.
+PROBE_HZ = 110.0
+FX_CHECK_KNOBS = {
+    "chorus": [1, 0.35, 0],  # an even blend, no depth: two fixed delays
+    "phaser": [1, 0, 0],  # an even blend, no depth: fixed allpasses
+    "flanger": [1, 0, 0],  # an even blend, the slowest sweep, no feedback
+    "fuzz": [0, 0, 1],  # the least drive, the darkest tone, all wet
+    "crush": [1, 1, 0.5],  # 12 bits at the top rate (no staircase), half mix (3 dB up)
+    "tremolo": [1, 4 / 7, 0],  # full depth, a beat, a sine
+    "pan": [1, 4 / 7, 0],  # full depth, a beat, a sine
+    "gate": [5 / 7, 1, 0],  # Stab (open one sixteenth in four), full depth, the quickest smooth
+    "ring": [1, 0, 0],  # all wet, a 30 Hz carrier, no follow
+    "vowel": [1, 0, 0],  # all wet, A, still
+    "shifter": [1, 0.5, 0],  # all wet, no shift
+    "echo": [1, 0, 0],  # all wet, a sixteenth, no feedback
+}
+# When a timed switch lands: on a peak of the probe, and where the effect's sound differs from the dry one (Gate on
+# a closed sixteenth of Stab, Tremolo low in its cycle, Pan to a side, Ring's carrier away from 1).
+FX_SWITCH_AT = """(a) => {
+  const e = window.__groovebox, c = e.fxClock(), spb = 60 / c.bpm;
+  const beats = (t) => c.beats + (t - c.now) / spb;
+  const x = (t) => Math.sin(2 * Math.PI * a.hz * (t - a.t0));
+  // Crush and Shifter open their path 30 ms after a switch on (Effect.startDelay: their worklet starts first).
+  const d = a.on && (a.fx === 'crush' || a.fx === 'shifter') ? 0.03 : 0;
+  const ok = (t) => {
+    if (Math.abs(x(t + d)) < 0.95) return false;
+    const b = beats(t);
+    if (a.fx === 'gate') { const q = b * 4, s = Math.floor(q) % 4, f = q - Math.floor(q); return s >= 2 && f > 0.2 && f < 0.8; }
+    if (a.fx === 'tremolo') return Math.cos(2 * Math.PI * b) < -0.8;
+    if (a.fx === 'pan') return Math.abs(Math.cos(2 * Math.PI * b)) > 0.8;
+    if (a.fx === 'ring' && !a.on) return Math.sin(2 * Math.PI * 30 * (t - a.tOn)) < -0.6;
+    return true;
+  };
+  let t = c.now + 0.15;
+  while (!ok(t) && t < c.now + 4) t += 1 / (64 * a.hz);
+  for (const i of a.insts) e.setFx(i, a.slot, { on: a.on }, t);
+  return { t, now: c.now };
+}"""
+
+
+def fx_switch_at(page, insts: list, fx: str, on: bool, t0: float, t_on: float, slot: int = 0) -> float:
+    """A timed switch of every instrument's slot; waits until it has sounded (an Echo step comes two delays later)
+    and returns the audio time it landed."""
+    r = page.evaluate(FX_SWITCH_AT, {"insts": insts, "fx": fx, "on": on, "hz": PROBE_HZ, "t0": t0, "tOn": t_on, "slot": slot})
+    time.sleep(r["t"] - r["now"] + 0.35)
+    return r["t"]
+
+
+def fx_click_checks(page, failures: list, effects: list) -> None:
+    """P9 review E2, S4: every effect, on every instrument at once. Stepped switches (fxHardSwitch) must be caught,
+    at least 6 of 8 on every instrument, and the shipped ramped ones never; each knob turned low to high, and the slot's
+    effect changed while on, make no click either. Each check is judged against its own reference: the larger of the
+    sine alone and the effect's steady sound."""
+    E = "window.__groovebox"
+    cap = page.evaluate(f"{E}.fxState().cap")
+    page.evaluate(f"{E}.fxCapForCost(10)")
+    all_fx_off(page)
+    time.sleep(0.5)
+    t0 = page.evaluate(f"(ids) => {E}.fxProbe({PROBE_HZ}, ids)", LAYERS)["t0"]
+    time.sleep(1.0)
+    dry = steady_many(page, LAYERS, 1.5)
+    stepped: dict = {}
+    ramped_clicks = 0
+    ramped_worst = 0.0
+    knob_worst = 0.0
+    change_worst = 0.0
+    prev = None
+    for fx in effects:
+        knobs = FX_CHECK_KNOBS.get(fx)
+        if knobs is None:
+            failures.append(f"P9: no click-check knobs for {fx}")
+            continue
+        page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 0, { effect: a.fx, knobs: a.k, on: false }); }",
+                      {"ids": LAYERS, "fx": fx, "k": knobs})
+        page.evaluate(f"{E}.fxHardSwitch(false)")
+        t_on = fx_switch_at(page, LAYERS, fx, True, t0, 0.0)
+        time.sleep(0.3)
+        wet = steady_many(page, LAYERS, 1.0)
+        ref = {i: max(dry[i], wet[i]) for i in LAYERS}
+        counts = {}
+        for hard in (False, True):
+            page.evaluate(f"{E}.fxHardSwitch({'true' if hard else 'false'})")
+            n = {i: 0 for i in LAYERS}
+            on = True
+            for _ in range(8):
+                on = not on
+                read_many(page, LAYERS)
+                t = fx_switch_at(page, LAYERS, fx, on, t0, t_on)
+                if on:
+                    t_on = t
+                for i, r in read_many(page, LAYERS).items():
+                    k = r[2] / ref[i] if ref[i] > 0 else 0.0
+                    if k > CLICK_FACTOR:
+                        n[i] += 1
+                    if not hard:
+                        ramped_worst = max(ramped_worst, k)
+            counts[hard] = n
+        page.evaluate(f"{E}.fxHardSwitch(false)")
+        stepped[fx] = counts[True]
+        for i in LAYERS:
+            if counts[True][i] < 6:
+                failures.append(f"P9: the click check caught only {counts[True][i]} of 8 stepped {fx} switches on {i}: it could not see a click")
+            if counts[False][i]:
+                failures.append(f"P9: {counts[False][i]} of 8 ramped {fx} switches clicked on {i}")
+                ramped_clicks += counts[False][i]
+        # The slot ends on (8 switches from on). Each knob turned low to high while it plays (S4).
+        for k in range(3):
+            lo = list(knobs)
+            lo[k] = 0.0
+            page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 0, { knobs: a.k }); }", {"ids": LAYERS, "k": lo})
+            time.sleep(0.4)
+            before = steady_many(page, LAYERS, 0.5)
+            hi = list(lo)
+            hi[k] = 1.0
+            read_many(page, LAYERS)
+            page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 0, { knobs: a.k }); }", {"ids": LAYERS, "k": hi})
+            time.sleep(0.6)
+            turned = read_many(page, LAYERS)
+            after = steady_many(page, LAYERS, 0.5)
+            label = page.evaluate(f"window.__fx.defs[{fx!r}].knobs[{k}].label")
+            for i in LAYERS:
+                knob_worst = max(knob_worst, check_continuity(page, i, max(dry[i], before[i], after[i]), f"P9: {fx} {label} turned low to high", failures, turned[i]))
+        page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 0, { knobs: a.k }); }", {"ids": LAYERS, "k": knobs})
+        # The slot's effect changed while it is on: a crossfade from the one before (slot 2).
+        if prev:
+            page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 1, { effect: a.fx, knobs: a.k, on: true }); }",
+                          {"ids": LAYERS, "fx": prev, "k": FX_CHECK_KNOBS[prev]})
+            time.sleep(0.6)
+            before = steady_many(page, LAYERS, 0.5)
+            read_many(page, LAYERS)
+            page.evaluate("(a) => { for (const i of a.ids) window.__groovebox.setFx(i, 1, { effect: a.fx, knobs: a.k }); }",
+                          {"ids": LAYERS, "fx": fx, "k": knobs})
+            time.sleep(0.6)
+            changed = read_many(page, LAYERS)
+            after = steady_many(page, LAYERS, 0.5)
+            for i in LAYERS:
+                change_worst = max(change_worst, check_continuity(page, i, max(dry[i], before[i], after[i]), f"P9: {prev} changed to {fx} while on", failures, changed[i]))
+            page.evaluate("(ids) => { for (const i of ids) window.__groovebox.setFx(i, 1, { on: false }); }", LAYERS)
+        page.evaluate("(ids) => { for (const i of ids) window.__groovebox.setFx(i, 0, { on: false }); }", LAYERS)
+        time.sleep(0.4)
+        prev = fx
+    page.evaluate(f"{E}.fxProbe(null)")
+    page.evaluate(f"{E}.fxCapForCost({cap})")
+    all_fx_off(page)
+    caught = ", ".join(f"{fx} {sum(n.values())}" for fx, n in stepped.items())
+    least = min((min(n.values()) for n in stepped.values()), default=0)
+    print(f"P9: click check on a {PROBE_HZ:.0f} Hz sine through slot 1 of all five instruments: stepped switches caught of 40 "
+          f"per effect: {caught} (least on one instrument: {least} of 8); ramped switches clicked: {ramped_clicks} of "
+          f"{8 * len(stepped) * len(LAYERS)}, largest jump {ramped_worst:.2f} times its own reference (a click above {CLICK_FACTOR:.1f})")
+    print(f"P9: every knob of every effect turned low to high while playing: largest jump {knob_worst:.2f}; the slot's effect "
+          f"changed while on: {change_worst:.2f} (times its own reference)")
+
 
 
 def walk_p9(page, failures: list) -> None:
@@ -2354,81 +2585,14 @@ def walk_p9(page, failures: list) -> None:
     print(f"P9: all {len(effects)} effects audible on all five instruments; weakest {weakest[1]} at {weakest[0]:.3f} of the input "
           f"(wanted {FX_AUDIBLE}); every slot off passes the sound unchanged and is disconnected")
 
-    # Mid-jam switching without a click, on a steady sine drone on Layer 2 (the P6 and P7 continuity check).
+    # Mid-jam switching without a click (P9 review E2, S4): on every instrument at once, each fed a steady sine.
+    fx_click_checks(page, failures, effects)
+    page.evaluate(f"{E}.setChords({sec}, [{{degree: 0, bars: 2}}])")
     page.evaluate(f"{E}.setLayerMode({sec}, 'layer2', 'drone')")
     page.evaluate(f"{E}.setPad({sec}, 'layer2', {{attack: 0.3, release: 2, swoop: 0.3}})")
     page.evaluate(f"{E}.setParam('layer2', 'wave', 'sine')")
-    page.evaluate(f"{E}.setChords({sec}, [{{degree: 0, bars: 2}}])")
-    time.sleep(3.0)
-    dry = steady_jumps(page, "layer2", 2.0)
-    worst = 0.0
-    prev = None
-    for fx in effects:
-        page.evaluate(f"{E}.setFx('layer2', 0, {{effect: '{fx}'}})")
-        # The steady sound just before the switch (the drone alone), so the reference is never a stale one.
-        dry = steady_jumps(page, "layer2", 0.75)
-        read_jumps(page, "layer2")
-        page.evaluate(f"{E}.setFx('layer2', 0, {{on: true}})")
-        time.sleep(1.0)
-        switched = read_jumps(page, "layer2")
-        wet = steady_jumps(page, "layer2", 1.0)
-        ref = max(dry, wet)
-        worst = max(worst, check_continuity(page, "layer2", ref, f"P9: {fx} switched on", failures, switched))
-        # A knob turned while it plays.
-        knobs = page.evaluate(f"{E}.getFx().layer2[0].knobs")
-        read_jumps(page, "layer2")
-        page.evaluate(f"(k) => window.__groovebox.setFx('layer2', 0, {{knobs: k}})", [1 - knobs[0] * 0.5, knobs[1], knobs[2]])
-        time.sleep(0.6)
-        worst = max(worst, check_continuity(page, "layer2", max(ref, steady_jumps(page, "layer2", 0.5)), f"P9: {fx} knob turned", failures))
-        page.evaluate(f"(k) => window.__groovebox.setFx('layer2', 0, {{knobs: k}})", knobs)
-        # The slot's effect changed while it is on: a crossfade from the one before.
-        if prev:
-            page.evaluate(f"{E}.setFx('layer2', 1, {{effect: '{prev}', on: true}})")
-            time.sleep(0.8)
-            before = steady_jumps(page, "layer2", 0.5)
-            read_jumps(page, "layer2")
-            page.evaluate(f"{E}.setFx('layer2', 1, {{effect: '{fx}'}})")
-            time.sleep(0.8)
-            changed = read_jumps(page, "layer2")
-            after = steady_jumps(page, "layer2", 0.5)
-            worst = max(worst, check_continuity(page, "layer2", max(before, after), f"P9: {prev} changed to {fx} while on", failures, changed))
-            page.evaluate(f"{E}.setFx('layer2', 1, {{on: false}})")
-            time.sleep(0.5)
-        read_jumps(page, "layer2")
-        page.evaluate(f"{E}.setFx('layer2', 0, {{on: false}})")
-        time.sleep(1.0)
-        worst = max(worst, check_continuity(page, "layer2", ref, f"P9: {fx} switched off", failures))
-        prev = fx
-    print(f"P9: every effect switched on and off, a knob turned and the effect changed while a drone sounds; largest jump "
-          f"{worst:.2f} times the steady sound's (a click above {CLICK_FACTOR:.1f})")
-    # The check can fail: the same switches stepped (no ramp) must be caught. Vowel at full mix on the drone's low sine
-    # passes little of it (its formants sit far above), so a stepped switch is a step of most of the sound.
-    page.evaluate(f"{E}.setFx('layer2', 0, {{effect: 'vowel', knobs: [1, 0, 0]}})")
+    time.sleep(2.0)
     dry = steady_jumps(page, "layer2", 1.0)
-    page.evaluate(f"{E}.setFx('layer2', 0, {{on: true}})")
-    time.sleep(0.5)
-    ref = max(dry, steady_jumps(page, "layer2", 1.0))
-    page.evaluate(f"{E}.setFx('layer2', 0, {{on: false}})")
-    time.sleep(0.5)
-    caught = {}
-    for hard in (True, False):
-        page.evaluate(f"{E}.fxHardSwitch({'true' if hard else 'false'})")
-        n = 0
-        for _ in range(4):
-            for on in ("true", "false"):
-                read_jumps(page, "layer2")
-                page.evaluate(f"{E}.setFx('layer2', 0, {{on: {on}}})")
-                time.sleep(0.4)
-                if check_continuity(page, "layer2", ref, "", []) > CLICK_FACTOR:
-                    n += 1
-                time.sleep(0.2)
-        caught[hard] = n
-    page.evaluate(f"{E}.fxHardSwitch(false)")
-    print(f"P9: the click check caught {caught[True]} of 8 stepped switches and {caught[False]} of 8 ramped ones")
-    if caught[True] < 5:
-        failures.append(f"P9: the click check caught only {caught[True]} of 8 stepped switches: it could not see a click")
-    if caught[False]:
-        failures.append(f"P9: {caught[False]} of 8 ramped switches clicked")
 
     # The cap (spec 8.8): Layer 2's slot on first, then six more: Layer 2's goes off (the oldest), without a click.
     all_fx_off(page)

@@ -19,12 +19,19 @@ export function nativeParam(p: unknown): AudioParam {
   return q as unknown as AudioParam;
 }
 
+/**
+ * For the smoke test's proof that its click checks can fail (P9 review E3: the lo-fi, air and reverb switches): with
+ * `hard` set, glideParam steps instead of gliding. Never set by the app.
+ */
+export const modsDebug = { hard: false };
+
 /** Move a parameter to `value` from `at` (else now), from wherever it is: no step. */
 export function glideParam(param: unknown, value: number, at?: number, tau = RAMP / 4): void {
   const p = typeof AudioParam !== "undefined" && param instanceof AudioParam ? param : nativeParam(param);
   const t = Math.max(at ?? 0, Tone.getContext().currentTime);
   p.cancelScheduledValues(t);
-  p.setTargetAtTime(value, t, tau);
+  if (modsDebug.hard) p.setValueAtTime(value, t);
+  else p.setTargetAtTime(value, t, tau);
 }
 
 /**

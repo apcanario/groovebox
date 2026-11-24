@@ -73,7 +73,8 @@ export interface JumpContext {
   createAudioWorkletNode(name: string, options?: Partial<AudioWorkletNodeOptions>): AudioWorkletNode;
 }
 
-const loaded = new WeakSet<JumpContext>();
+/** One load per context, shared by watches made at the same moment (a second load of the module would throw). */
+const loaded = new WeakMap<JumpContext, Promise<void>>();
 
 /** Largest sample-to-sample jump and largest sample over a stretch of audio. */
 export interface Jumps {
@@ -82,16 +83,17 @@ export interface Jumps {
 }
 
 /** Load the watches' worklet module once per context. */
-async function loadModule(ctx: JumpContext): Promise<void> {
-  if (!loaded.has(ctx)) {
+function loadModule(ctx: JumpContext): Promise<void> {
+  let p = loaded.get(ctx);
+  if (!p) {
     const url = URL.createObjectURL(new Blob([JUMP_SOURCE], { type: "text/javascript" }));
-    try {
-      await (ctx.rawContext as { audioWorklet: { addModule(url: string): Promise<void> } }).audioWorklet.addModule(url);
-      loaded.add(ctx);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    p = (ctx.rawContext as { audioWorklet: { addModule(url: string): Promise<void> } }).audioWorklet
+      .addModule(url)
+      .finally(() => URL.revokeObjectURL(url));
+    p.catch(() => loaded.delete(ctx));
+    loaded.set(ctx, p);
   }
+  return p;
 }
 
 export class JumpWatch {

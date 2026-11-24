@@ -131,7 +131,7 @@ class GbShift extends AudioWorkletProcessor {
     super();
     // One Hilbert state per channel (P9 review M6: stereo in, stereo out); the carrier is shared.
     this.st = [0, 1].map(() => ({ a: new Float64Array(16), b: new Float64Array(16), bd: 0, prev: 0 }));
-    this.c = 1; this.s = 0; this.done = false;
+    this.c = 1; this.s = 0; this.done = false; this.fb = -1;
     this.port.onmessage = () => { this.done = true; };
   }
   chain(st, co, x) {
@@ -147,13 +147,18 @@ class GbShift extends AudioWorkletProcessor {
     if (this.done) return false;
     const inp = inputs[0], out = outputs[0];
     if (!inp || !inp.length) return true;
-    const w = 2 * Math.PI * p.shift[0] / sampleRate, fb = p.feedback[0];
+    const w = 2 * Math.PI * p.shift[0] / sampleRate, fb1 = p.feedback[0];
+    // The feedback is a k-rate value: moved sample by sample across the block, not stepped at its start (a step
+    // inside the loop is a click).
+    const fb0 = this.fb < 0 ? fb1 : this.fb;
+    this.fb = fb1;
     const dc = Math.cos(w), ds = Math.sin(w);
     let c = this.c, s = this.s;
     for (let ch = 0; ch < out.length; ch++) {
-      const src = inp[ch] || inp[0], o = out[ch], st = this.st[ch];
+      const src = inp[ch] || inp[0], o = out[ch], st = this.st[ch], n = o.length;
       c = this.c; s = this.s;
-      for (let i = 0; i < o.length; i++) {
+      for (let i = 0; i < n; i++) {
+        const fb = fb0 + ((fb1 - fb0) * (i + 1)) / n;
         const x = src[i] + fb * st.prev;
         const a = this.chain(st.a, HA, x);
         const b = this.chain(st.b, HB, x);
@@ -307,6 +312,13 @@ abstract class Effect {
   tempo(_bpm: number, _at?: number): void {}
   note(_hz: number, _time: number): void {}
   step(_time: number, _step: number): void {}
+  /**
+   * Seconds between building its sources at a switch on and opening its path: a worklet's processor starts on the
+   * audio thread a few render quanta after its node is made, and a path opened before then would step when it starts.
+   */
+  get startDelay(): number {
+    return 0;
+  }
   /** Seconds its sound rings on once its input closes (P9 review M7: Echo's repeats); 0 for the rest. */
   tail(): number {
     return 0;
@@ -540,9 +552,17 @@ abstract class WorkletBlend extends Blend {
     super(id, clock, k, false);
   }
   protected abstract params(): Record<string, number>;
-  protected param(name: string, value: number, at?: number): void {
+  /** A worklet parameter, glided from `at`, or (`step`) set at `at`. */
+  protected param(name: string, value: number, at?: number, step = false): void {
     const p = this.node ? wparam(this.node, name) : null;
-    if (p) glide(p, value, at);
+    if (!p) return;
+    if (!step) return glide(p, value, at);
+    const t = Math.max(at ?? 0, now());
+    p.cancelScheduledValues(t);
+    p.setValueAtTime(value, t);
+  }
+  override get startDelay(): number {
+    return 0.03;
   }
   override start(at: number): void {
     super.start(at);
@@ -574,10 +594,25 @@ class Crush extends WorkletBlend {
     return { bits: crushBits(this.k[0]), rate: crushRate(this.k[1]) };
   }
   set(k: FxKnobs, at?: number): void {
+    const was = crushBits(this.k[0]);
     this.k = [...k];
-    this.param("bits", crushBits(k[0]), at);
+    const bits = crushBits(k[0]);
+    if (this.isRunning && Math.abs(bits - was) > 1) {
+      // A jump of more than a bit (a dial's drag moves less): gliding there would sweep through every coarser
+      // staircase on the way, a burst. The wet path closes, the bits change while it is shut, and it opens again.
+      const t = Math.max(at ?? 0, now());
+      const shut = t + (5 * RAMP) / 4;
+      this.param("bits", bits, shut, true);
+      const [, w] = mixGains(k[2]);
+      this.wet.gain.cancelScheduledValues(t);
+      this.wet.gain.setTargetAtTime(0, t, RAMP / 4);
+      this.wet.gain.setTargetAtTime(w, shut, RAMP / 4);
+      glide(this.dry.gain, mixGains(k[2])[0], at);
+    } else {
+      this.param("bits", bits, at);
+      this.mix(k[2], at);
+    }
     this.param("rate", crushRate(k[1]), at);
-    this.mix(k[2], at);
   }
 }
 
@@ -673,9 +708,13 @@ class Gate extends Effect {
   }
   override start(at: number): void {
     super.start(at);
-    // On from the sixteenth it is switched on in (not open until the next one): the slot's crossfade covers it.
-    this.last = -1;
-    this.step(at, Math.floor(this.clock.beatsAt(at) * 4 + 1e-6));
+    // At once in the state of the sixteenth it is switched on in, not open until the next one: the slot's crossfade
+    // (its wet path still closed at `at`) is what smooths the switch.
+    const t = Math.max(at, now());
+    const v = gateOpen(gatePattern(this.k[0]), Math.floor(this.clock.beatsAt(t) * 4 + 1e-6)) ? 1 : 1 - this.k[1];
+    this.vca.gain.cancelScheduledValues(t);
+    this.vca.gain.setValueAtTime(v, t);
+    this.last = v;
   }
   override step(time: number, step: number): void {
     if (!this.running) return;
@@ -1007,10 +1046,11 @@ export class FxSlotNode {
     const t = Math.max(at ?? 0, now());
     if (on) {
       this.wire(v);
+      const open = v.fx.isRunning ? t : t + v.fx.startDelay;
       if (!v.fx.isRunning) v.fx.start(t);
-      fade(v.fx.input.gain, 1, at);
-      fade(v.wet.gain, 1, at);
-      fade(this.dry.gain, 0, at);
+      fade(v.fx.input.gain, 1, open);
+      fade(v.wet.gain, 1, open);
+      fade(this.dry.gain, 0, open);
       return;
     }
     fade(this.dry.gain, 1, at);
@@ -1063,11 +1103,12 @@ export class FxSlotNode {
     }
     // A crossfade from the old effect to the new one; the old one is freed once silent.
     const t = Math.max(at ?? 0, now());
+    const open = t + next.fx.startDelay;
     this.wire(next);
     next.fx.start(t);
-    fade(next.fx.input.gain, 1, at);
-    fade(next.wet.gain, 1, at);
-    fade(old.wet.gain, 0, at);
+    fade(next.fx.input.gain, 1, open);
+    fade(next.wet.gain, 1, open);
+    fade(old.wet.gain, 0, open);
     this.leaving++;
     afterFade(
       () => {
@@ -1075,7 +1116,7 @@ export class FxSlotNode {
         this.free(old);
       },
       RAMP * 3,
-      at,
+      open,
     );
   }
 
