@@ -35,3 +35,15 @@ Row text recovered from `git show 2a91110^:docs/BACKLOG.md`. Done when: "every e
 - Row bullets: tempo sync true (smoke checks 45 synced rates across the 24 vibes at each vibe's tempo, and Tremolo 2.000 Hz at 120 bpm, 1.500 Hz at 90 bpm; Echo 0.250 s, 0.333 s); the eight P3 vibes set two effects per instrument (unit-tested, and smoke checks every vibe's slots play as its song sets them).
 
 P9: every Done-when line true.
+
+## 4. P8 Done-when lines
+
+Row text recovered from `git show e6338bd^:docs/BACKLOG.md`. Done when: "all 24 styles load and play (smoke test loops them); every list meets its count; every name fits its tile (tested); `check` and `smoke` pass."
+
+- **All 24 styles load and play, smoke loops them: true.** This run: all 24 tapped from the picker mid-jam, each landed on the bar, every instrument audible with a tone over two bars (the AC-level and zero-crossing check of P8 review S2), each kept as a new song in Songs, each vibe's effect slots playing as its song sets them; arrows next and previous land on the bar. Oscillator probe 215 to 226 Hz on three waves.
+- **Every list meets its count: true.** Files: 26 beats (spec: at least 24), 14 bass rhythms (14), 10 synth rhythms (10); patches 9 drums, 9 bass, 9 synth, 17 layer (at least 8 each). Every spec name present (unit test in `src/music/styles.test.ts`).
+- **Every name fits its tile, tested: true.** No beat, rhythm, patch or style name over 14 characters (player grep: 214 names, 0 long; progression names too). `shots.py` turned 234 picker pages at both sizes and ran the text-fit check on each; pass. Screens: the vibe picker at 360 x 640 shows all 24 tiles, two columns, family colours, Continue first, nothing cut or wrapped, no title or Close (`shots/360x640-advanced-vibe-picker.png`); the borrow picker the same with "This jam's vibe" (`360x640-simple-chords-borrow.png`), smoke: lowest tile 48.3 px. Spec 8.6's 636 px layout holds (12 rows, 1 px gaps).
+- **`check` and `smoke` pass: true.**
+- Row bullets: every style sets two effects per instrument (player count: 10 slots in each of the 24 files, 3 or 4 on, so the cap of six holds on arrival); Lo-fi has `lofi: 1` (`src/styles/loFi.ts` 22) with Crush and Chorus on the keys; Ambient has the Shimmer and Airy pads (`src/styles/ambient.ts` 20-21); Drone uses the Drone layer, Swoop, long envelopes, air and a 16 s reverb (unit-tested). C9 and C10 met (smoke 24-tile checks; library retagged, at most 0.6 overlap, unit-tested).
+
+P8: every Done-when line true. Whether each vibe sounds like its name stays Pedro's ear (C19).
