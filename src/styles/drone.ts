@@ -40,7 +40,7 @@ export default {
     cliff: "none",
     cliffLength: "beat",
     impact: { sweep: false, sub: false, burst: false },
-    layers: { synth: 0.8, bass: 0.0, drums: 0.0, leads: 1.0 },
+    layers: { synth: 1.0, bass: 0.0, drums: 0.0, leads: 1.0 },
     width: 1.0,
     pump: 0,
     wind: 4,

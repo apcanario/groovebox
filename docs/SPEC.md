@@ -256,6 +256,7 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 
 **Play tab.**
 - **Simple, "Now":** the vibe control at the top, then the five instrument lanes for the playing section (section 8.12), then the DROP button (section 8.9) with the Morph switch (section 8.11) beside it, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
+- P10: under 700 px of screen height the vibe control and DROP are 48 px tall and sit 2 px from the lanes, and the strip is not taller, so the five lanes keep 48 px at 360 x 640 (a second exception to the 10 px between groups of section 8.12).
 - **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam is kept in Songs.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
 

@@ -412,8 +412,8 @@ export class DropOverlay {
     // The pad: an octave up, a detuned voice on each side (they beat against each other, so the two sides differ).
     if (pad)
       for (const m of notes.slice(0, 4)) {
-        this.osc("sawtooth", m + 12, -9, t, dur, 0.045 * vel, 0.35, 0.9, this.groups.leads.l);
-        this.osc("sawtooth", m + 12, 9, t, dur, 0.045 * vel, 0.35, 0.9, this.groups.leads.r);
+        this.osc("sawtooth", m + 12, -9, t, dur, 0.06 * vel, 0.35, 0.9, this.groups.leads.l);
+        this.osc("sawtooth", m + 12, 9, t, dur, 0.06 * vel, 0.35, 0.9, this.groups.leads.r);
       }
     else for (const m of notes.slice(0, 3)) this.osc("triangle", m + 12, 0, t, dur, 0.065 * vel, 0.005, 0.12, this.leadIn);
   }

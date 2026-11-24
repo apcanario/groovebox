@@ -92,6 +92,10 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     if d["phase"] != "off" or d["lit"] != 0:
         failures.append(f"P10: DROP at rest is not off with dim segments: {d}")
 
+    # At 360 x 640 the five lanes keep their 48 px with DROP added (nothing overflows the lanes).
+    fit = page.evaluate("(() => { const n = document.querySelector('.nowlist'); return [n.scrollHeight, n.clientHeight, Math.min(...[...n.querySelectorAll('.now-tile')].map(t => t.getBoundingClientRect().height))]; })()")
+    if fit[0] > fit[1] + 1 or fit[2] < 48:
+        failures.append(f"P10: with DROP the Simple lanes do not fit at 360 x 640 (need {fit[0]} px, have {fit[1]}, lowest tile {fit[2]:.0f} px)")
     before = doc(page)
     # First press, mid-bar: nothing immediate; armed (queued for the next bar: hatched) with its build length.
     wait_for(page, f"{E}.position().step === 5", 3.0)
@@ -251,6 +255,9 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
 
 def drop_vibes(page, failures: list) -> None:
     vibes = page.evaluate("window.__vibes")
+    # Ambient and Drone last: their tails ring for up to 20 s and would sit in the next vibe's bars before its drop.
+    slow = ["ambient", "drone"]
+    vibes = [v for v in vibes if v["id"] not in slow] + [v for s in slow for v in vibes if v["id"] == s]
     if not page.evaluate(f"{E}.playing"):
         page.click("#play")
     rows = []
