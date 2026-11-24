@@ -7,9 +7,10 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | 4 | P1, P1b, P2 (Done) | The new screens, the look, Simple and Advanced |
 | 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 (Done) | New sounds, effects, all 24 vibes |
-| 7 | P10, P11, G6 | The Drop, Morph, the APK (G6 was parked on 23 Nov; see its row) |
+| 7 | P10, P11 | The Drop, Morph |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
-| 9 | G7 | Retouch from notes |
+| 9 | G6 | The APK (parked by Pedro until after the tablet bundle, 24 Nov 2026) |
+| 10 | G7 | Retouch from notes |
 
 ## Carried
 
@@ -54,7 +55,7 @@ All rows of this bundle are Done. The player's check of the bundle is in `docs/r
 
 All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-6.md`.
 
-## Bundle 7: phase 2, the Drop and Morph, and the install
+## Bundle 7: phase 2, the Drop and Morph
 
 Read spec 8.9 and 8.11 in full before any row of this bundle.
 
@@ -77,17 +78,6 @@ Read spec 8.9 and 8.11 in full before any row of this bundle.
 - On by default in Ambient and Drone.
 
 **Done when:** with Morph on, ten minutes of Ambient in the smoke test never repeats a 16-bar stretch exactly and never leaves the key (tested); the same seed gives the same ten minutes twice (tested); a hand-moved control is not touched for 16 bars (tested); Morph off changes nothing; `check` and `smoke` pass. Whether it is good to coast on is Pedro's call.
-
-### G6. APK
-
-History, kept from the G5 chat: "G5 is Done. G6 is parked by Pedro (23 Nov 2026): do not work it until he asks." The phase 2 and 3 plan, which Pedro went through the same night, schedules it here, after P11. The bundle 7 chat works it unless the starter's `Notes:` line says to leave G6 parked.
-
-- Capacitor Android project wrapping the built app. Portrait only, screen kept awake while playing, app icon, works offline (fonts bundled, no network needed).
-- No foreground service and no background audio: spec section 2.
-- A GitHub Actions workflow that builds a debug APK on each push to `main` and attaches it to a release named `latest`.
-- A short `docs/INSTALL.md`: where to download the APK and how to install it.
-
-**Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
 
 ## Bundle 8: phase 3, tablet
 
@@ -121,7 +111,20 @@ Spec section 9 is the brief. Read it in full, with section 8.12, before any row 
 
 **Done when:** each punch pad starts and ends on the beat or bar the spec names (tested on the audio clock); two controls can be moved at once (tested); animation can be turned off; `check` and `smoke` pass. Whether it makes you want to jam for hours is Pedro's call.
 
-## Bundle 9: retouch
+## Bundle 9: the install
+
+### G6. APK
+
+History, kept from the G5 chat: "G5 is Done. G6 is parked by Pedro (23 Nov 2026): do not work it until he asks." Pedro moved it on 24 Nov 2026: G6 waits until after the tablet bundle (bundle 8) and is bundle 9; the chat that works bundle 9 starts it, and a `Notes:` line can park it again.
+
+- Capacitor Android project wrapping the built app. Portrait only, screen kept awake while playing, app icon, works offline (fonts bundled, no network needed).
+- No foreground service and no background audio: spec section 2.
+- A GitHub Actions workflow that builds a debug APK on each push to `main` and attaches it to a release named `latest`.
+- A short `docs/INSTALL.md`: where to download the APK and how to install it.
+
+**Done when:** the workflow produces an APK; the web build still deploys to Pages; `check` and `smoke` pass. Installing on the phone is Pedro's test.
+
+## Bundle 10: retouch
 
 ### G7. Retouch
 
