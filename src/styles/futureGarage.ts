@@ -32,6 +32,19 @@ export default {
     layer1: [{ effect: "vowel", on: true, knobs: [0.5, 0.5, 0.33] }, { effect: "echo" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "shifter" }],
   },
+  // P10 (spec 8.9): a riser under a closing filter and a held chord, a falling sweep.
+  drop: {
+    build: 4,
+    parts: { sweep: "low", roll: false, riser: true, reverb: true, climb: false, hatsOut: false, kickOut: true },
+    cliff: "hold",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: false, burst: false },
+    layers: { synth: 0.8, bass: 0.4, drums: 0.5, leads: 0.8 },
+    width: 0.9,
+    pump: 0.05,
+    wind: 4,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

@@ -1961,3 +1961,146 @@ button:disabled {
 .fxrow.one {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* ---- P10: the DROP button (spec 8.9, 8.12) ---- */
+/*
+ * A full-width yellow tile with its icon and four bar segments. Build: a dark tile filling from the left with marching
+ * stripes, segments and number counting down. On: lit, with a slow wide band (once over four bars). Wind-down: the
+ * fill drains. Queued for the next bar (armed, cancel, wind-down called): the hatched frame and the beat ring. Only
+ * transforms, opacity and background position move.
+ */
+.droprow {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--gap);
+  margin-top: calc(var(--group) - var(--gap));
+}
+.drop {
+  --c: var(--yellow);
+  --hc: var(--yellow);
+  --p: 0;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  height: 56px;
+  min-height: var(--hit);
+  min-width: 0;
+  border-radius: var(--r);
+  background: var(--yellow);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  touch-action: manipulation;
+}
+.drop .ic {
+  width: 26px;
+  height: 26px;
+}
+.drop b {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  line-height: 1;
+}
+.drop .dleft {
+  font-style: normal;
+  margin-left: auto;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.3em;
+  text-align: right;
+}
+.drop .segs {
+  margin-left: auto;
+  display: flex;
+  gap: 3px;
+  height: 28px;
+}
+.drop .dleft + .segs {
+  margin-left: 0;
+}
+.drop .segs i {
+  width: 9px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.25;
+}
+.drop .segs i.lit {
+  opacity: 1;
+}
+.drop .dfill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+.drop .dring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r);
+  border: 2px solid var(--hc);
+  opacity: 0;
+  pointer-events: none;
+}
+.drop.build,
+.drop.wind,
+.drop.off.pending {
+  background: var(--card);
+  color: var(--text);
+}
+.drop.build .dfill {
+  background: repeating-linear-gradient(-45deg, var(--yellow) 0 8px, color-mix(in srgb, var(--yellow), #000 40%) 8px 16px);
+  background-size: 22.627px 22.627px;
+  background-position: calc(var(--p) * 4 * 22.627px) 0;
+  transform: translateX(calc(((var(--di) + var(--p)) / var(--dl) - 1) * 100%));
+}
+.drop.wind .dfill {
+  background: color-mix(in srgb, var(--yellow), #000 25%);
+  transform: translateX(calc(-1 * (var(--di) + var(--p)) / var(--dl) * 100%));
+}
+.running .drop.on::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 10%, color-mix(in srgb, var(--yellow), #fff 45%) 50%, transparent 90%) no-repeat;
+  background-size: 60% 100%;
+  background-position: calc((var(--db) + var(--p)) / 4 * 400% - 150%) 0;
+}
+.drop.on.pending {
+  --hc: var(--bg);
+}
+.drop.pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r);
+  padding: 5px;
+  background: repeating-linear-gradient(-45deg, var(--hc) 0 5px, transparent 5px 10px);
+  background-size: 14.142px 14.142px;
+  background-position: calc(var(--p) * 8 * 14.142px) 0;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.running .drop.pending .dring {
+  opacity: calc(0.75 * (1 - var(--beat, 0)));
+}
+.still .drop.on::before {
+  display: none;
+}
+.still .drop.build .dfill,
+.still .drop.pending::after {
+  background-position: 0 0;
+}
+.still .drop .dring {
+  opacity: 0;
+}

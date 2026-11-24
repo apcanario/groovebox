@@ -72,6 +72,11 @@ export const ICON_FOR = {
   Direction: "swap_vert",
   Rate: "speed",
   Octaves: "height",
+  // P10: the Mix tab's Drop page (its chip carries DROP's icon) and its group headings.
+  Drop: "keyboard_double_arrow_down",
+  Build: "trending_up",
+  Cliffhanger: "content_cut",
+  "Wind-down": "undo",
 } as const satisfies Record<string, IconName>;
 
 export type IconThing = keyof typeof ICON_FOR;

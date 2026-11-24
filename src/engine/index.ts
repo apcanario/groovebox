@@ -9,7 +9,9 @@ import { oscPatchStats } from "./oscPatch.ts";
 import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
-import { DiffWatch, JumpWatch, type Jumps } from "./continuity.ts";
+import { DiffWatch, EnergyWatch, JumpWatch, type Energy, type Jumps } from "./continuity.ts";
+import { DropConductor, checkDropSettings, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
+import { COMP_TOP, type OverlayGroup } from "./drop.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
 import { Sequencer, STEPS_PER_BAR, type GenValues, type LaneBar, type StepResult } from "./sequencer.ts";
@@ -47,7 +49,7 @@ import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/pr
 import type { ArpParams } from "../music/arp.ts";
 import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
-import { PATCHES, PATCH_IDS, patchFor, resolvePatch } from "../music/styles.ts";
+import { PATCHES, PATCH_IDS, STYLES as VIBES, patchFor, resolvePatch } from "../music/styles.ts";
 import { EFFECTS, EFFECT_DEFS, MAX_ACTIVE_FX, activate, deactivate, fxKey, type EffectId, type FxKnobs, type FxSlot } from "../music/effects.ts";
 import { fxCounts, fxDebug, fxWorklets, type FxSlotNode } from "./fx.ts";
 import { songFx } from "./song.ts";
@@ -77,6 +79,30 @@ export { LEAD_SHAPES, LEAD_STYLES, LOCK_FROZEN, PHRASE_BARS, type LeadParams, ty
 export type { Pending, PendingChords, PendingToggle } from "./queue.ts";
 export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
+export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, type DropBuild, type DropCliff, type DropIntent, type DropPhase, type DropRecipe, type DropSettings, type DropWind } from "../music/drop.ts";
+export type { Energy } from "./continuity.ts";
+
+/** What the DROP button shows (spec 8.9), as heard: the phase, the bar in it, its length, what a press waits for and the section queued behind the drop. */
+export interface DropShown {
+  phase: DropPhase;
+  /** Bar within the build or wind-down (0 otherwise). */
+  index: number;
+  /** Bars in the build or wind-down; the build's length while armed; 0 otherwise. */
+  length: number;
+  /** Bars left in the build or wind-down, counting the one playing. */
+  barsLeft: number;
+  intent: DropIntent;
+  /** A section tapped during the drop, waiting for the wind-down (spec 8.9), or null. */
+  queued: number | null;
+}
+
+/** One bar line of the Drop, for the smoke test: the bar, its audio time and what it is. */
+export interface DropMark extends DropBar {
+  bar: number;
+  at: number;
+}
+
+const DROP_OFF: DropBar = { phase: "off", index: 0, length: 0, impact: false, cliff: false, end: false, cancelled: false };
 export { MP3_KBPS, type Take } from "./recorder.ts";
 export {
   EFFECTS,
@@ -174,6 +200,44 @@ export class Engine {
   /** Every bar line at which queued switches landed, newest last (kept short). */
   readonly landed: LandedSwitch[] = [];
 
+  // ---- The Drop (P10, spec 8.9) ----
+  private dropper = new DropConductor();
+  /** The bar the scheduler is in, as the conductor gave it at its bar line. */
+  private dropPlan: DropBar = DROP_OFF;
+  /** The recipe of the drop running now (fixed when its build starts); null when none runs. */
+  private dropRec: DropRecipe | null = null;
+  /** A section tapped during the drop: it lands on the bar line the drop ends (spec 8.9). */
+  private dropSection: number | null = null;
+  /** What the button shows, as heard (set on the audio clock), and what a press waits for. */
+  private dropHeard: { phase: DropPhase; index: number; length: number; barsLeft: number } = { phase: "off", index: 0, length: 0, barsLeft: 0 };
+  private dropIntent: DropIntent = "none";
+  /** The level follower: the master output's energy, read every beat. */
+  private dropWatch: EnergyWatch | null = null;
+  /** Energy of the last beats at normal size (the reference the drop matches), and of the drop's last beats. */
+  private beatEnergy = new Map<number, number>();
+  /** The section's beats as the build began (by place in the four-bar phrase), and their mean. */
+  private dropRefs = new Map<number, number>();
+  /** The drop's last beats: each one's energy and the overlay's gain while it played. */
+  private dropWindow: { e: number; c: number; ref: number }[] = [];
+  private dropRef = 0;
+  private dropSkip = 0;
+  /** The follower's gain in the last drop (the first beat of the next one starts there). */
+  private compSteady = 0.8;
+  /** The follower's last reading of the drop (mean energy of its last beats, as heard). */
+  private dropMeasured = 0;
+  /** The drop's mix (deeper pump, filter fully open) is on the master: the knobs' own values wait in `mix`. */
+  private dropMixOn = false;
+  /** The last chord heard (the Hold cliffhanger hangs it) and each layer's held notes (the pad doubled while held). */
+  private lastChord: number[] = [];
+  /**
+   * What each instrument holds past the bar it started in (a long bass note, a sustained chord, a pad, a drone), until
+   * when (audio time; Infinity while a drone holds) and whether it is a pad: the extra layers double it bar by bar,
+   * so a drop that starts in the middle of an eight-bar chord still has it.
+   */
+  private sustain: Partial<Record<Exclude<InstrumentId, "drums">, { notes: number[]; vel: number; until: number; pad: boolean }>> = {};
+  /** Every bar line of the Drop's phases (kept short), for the smoke test. */
+  readonly dropMarks: DropMark[] = [];
+
   constructor(given: Song = defaultSong()) {
     // A song saved before P2 plays at P2's balance (P2 review S1).
     const song = migrateSong(given);
@@ -188,6 +252,14 @@ export class Engine {
     Tone.setContext(new Tone.Context({ latencyHint: hint }));
     await Tone.start();
     this.graph = await Graph.build();
+    // P10: the Drop's level follower listens to the master output (what is heard, after the limiter). Without it the
+    // drop keeps a fixed gain.
+    try {
+      this.dropWatch = await EnergyWatch.make(Tone.getContext());
+      this.graph.tap(this.dropWatch.node);
+    } catch {
+      this.dropWatch = null;
+    }
     await prepareTap(Tone.getContext()).catch((err: unknown) => {
       this.recError = `Recording unavailable: ${err instanceof Error ? err.message : String(err)}`;
     });
@@ -236,6 +308,7 @@ export class Engine {
     // A song saved before P2 plays at P2's balance (P2 review S1).
     const song = migrateSong(given);
     this.queued = null;
+    this.dropReset();
     this.takeDocument(song);
     this.seq.load(bareSong(song), section);
     this.takeFx();
@@ -298,6 +371,10 @@ export class Engine {
     }
     this.graph.resetPump();
     this.graph.setPlaying(false);
+    // P10: a drop ends with Stop; a section waiting behind it is chosen now.
+    const held = this.dropSection;
+    this.dropReset();
+    if (held !== null) this.seq.switchSection(held);
     this.inFlight.clear();
     // A song still waiting for its bar line loads now.
     const queued = this.queued;
@@ -455,7 +532,11 @@ export class Engine {
     this.note("setMix", [key, value]);
     const v = Math.max(lo, Math.min(hi, value));
     this.mix[key] = v;
-    this.graph?.setMix(key, v);
+    // P10: while the drop is on, the filter stays fully open and the pump goes deeper (spec 8.9); the knob's value
+    // is kept and comes back on the bar line the drop ends.
+    if (this.dropMixOn && key === "sweep") return this.changed();
+    if (this.dropMixOn && key === "pump" && this.dropRec) this.graph?.setMix("pump", v + this.dropRec.pump);
+    else this.graph?.setMix(key, v);
     this.changed();
   }
 
@@ -550,6 +631,14 @@ export class Engine {
   /** Lands on the next bar line while playing; tapping it again before then cancels it. */
   switchSection(index: number): void {
     this.note("switchSection", [index]);
+    // P10: during a drop a tapped section waits for the wind-down (the one exception to the next-bar rule); tapping it
+    // again, or the playing one, takes it back.
+    if (this.dropper.active && this.seq.isRunning) {
+      if (index < 0 || index >= this.seq.song.sections.length) return;
+      this.dropSection = this.dropSection === index || index === this.seq.section ? null : index;
+      this.changed();
+      return;
+    }
     this.seq.switchSection(index);
     if (!this.seq.isRunning) this.emit({ ...this.pos, section: this.seq.section });
     this.changed();
@@ -856,7 +945,8 @@ export class Engine {
 
   /** Switches waiting in the queue for the next bar line the scheduler reaches. */
   pending(): Pending {
-    return this.seq.pending();
+    const p = this.seq.pending();
+    return this.dropSection === null ? p : { ...p, section: this.dropSection };
   }
 
   /**
@@ -865,7 +955,8 @@ export class Engine {
    * until the bar it lands on is heard.
    */
   pendingShown(): Pending {
-    return this.inFlight.shown(this.seq.pending());
+    const p = this.inFlight.shown(this.seq.pending());
+    return this.dropSection === null ? p : { ...p, section: this.dropSection };
   }
 
   /**
@@ -900,6 +991,258 @@ export class Engine {
       this.graph.setTempo(bpm);
     }
     this.changed();
+  }
+
+  // ---- The Drop (P10, spec 8.9) ---------------------------------------------------
+
+  /**
+   * The DROP button. Nothing is immediate: off, it arms the build for the next bar line (a second press before then
+   * disarms it); during the build it cancels it, back to normal on the next bar line; while on, it starts the
+   * wind-down on the next bar line. During the wind-down it does nothing. Stopped, it does nothing. Recorded.
+   */
+  drop(): void {
+    if (!this.seq.isRunning) return;
+    const did = this.dropper.press();
+    if (did === "ignored") return;
+    this.note("drop", []);
+    // Disarmed before the build began: a section held behind it takes the ordinary next-bar queue.
+    if (did === "disarmed" && this.dropSection !== null) {
+      const s = this.dropSection;
+      this.dropSection = null;
+      this.seq.switchSection(s);
+    }
+    this.dropIntent = this.dropper.intent;
+    this.changed();
+  }
+
+  /** What the DROP button shows, as heard. */
+  dropShown(): DropShown {
+    const h = this.dropHeard;
+    const armed = h.phase === "off" && this.dropIntent === "on";
+    const build = this.dropRecipe().build;
+    return { ...h, length: armed ? build : h.length, barsLeft: armed ? build : h.barsLeft, intent: this.dropIntent, queued: this.dropSection };
+  }
+
+  /** The playing song's drop: its vibe's recipe (spec 8.9) with the Drop page's settings over it. */
+  dropRecipe(): DropRecipe {
+    const song = this.seq.song;
+    return resolveDrop(song.style ? VIBES[song.style]?.drop : undefined, song.drop);
+  }
+
+  /** The Drop page's settings as the song holds them (a copy). */
+  getDropSettings(): DropSettings {
+    return { ...this.seq.song.drop };
+  }
+
+  /**
+   * The Drop page (Advanced): build length, cliffhanger, wind-down length and Width. Stored in the song; a build or
+   * wind-down already running keeps its length; Width acts at once on a drop that is on. Returns false when refused.
+   */
+  setDrop(values: DropSettings): boolean {
+    const errors: string[] = [];
+    checkDropSettings(values, "drop", errors);
+    if (errors.length) return false;
+    const next = { ...this.seq.song.drop, ...values };
+    for (const k of Object.keys(next) as (keyof DropSettings)[]) if (next[k] === undefined) delete next[k];
+    if (Object.keys(next).length) this.seq.song.drop = next;
+    else delete this.seq.song.drop;
+    if (values.width !== undefined && this.dropRec && this.graph) {
+      this.dropRec = { ...this.dropRec, width: values.width };
+      const t = Tone.getContext().currentTime;
+      this.graph.drop.width(values.width, t);
+      if (this.dropRec.bloom || this.dropPlan.phase === "on") {
+        const lv = this.dropLevels(this.dropRec);
+        for (const k of Object.keys(lv) as OverlayGroup[]) this.graph.drop.level(k, lv[k], t);
+      }
+    }
+    this.note("setDrop", [values]);
+    this.changed();
+    return true;
+  }
+
+  /** For the smoke test: the follower's gain, its reference, voices sounding, the most at once, notes over the cap. */
+  dropInfo(): { comp: number; ref: number; measured: number; steady: number; live: number; most: number; dropped: number; follower: boolean } | null {
+    const g = this.graph;
+    if (!g) return null;
+    const d = g.drop;
+    const out = { comp: d.compValue, ref: this.dropRef, measured: this.dropMeasured, steady: this.compSteady, live: d.live, most: d.most, dropped: d.dropped, follower: !!this.dropWatch };
+    d.most = d.live;
+    return out;
+  }
+
+  private stereoWatch: EnergyWatch | null = null;
+
+  /**
+   * For the smoke test (P10): the master output's energy, stereo width (side over mid) and peak since the last call
+   * (the first call starts the watch).
+   */
+  async stereo(): Promise<Energy | null> {
+    if (!this.graph) return null;
+    if (!this.stereoWatch) {
+      this.stereoWatch = await EnergyWatch.make(Tone.getContext());
+      this.graph.tap(this.stereoWatch.node);
+    }
+    return this.stereoWatch.read();
+  }
+
+  private dropLevels(r: DropRecipe): Record<OverlayGroup, number> {
+    const w = 0.5 + 0.5 * r.width;
+    return { synth: r.layers.synth * w, bass: r.layers.bass * w, drums: r.layers.drums * w, leads: r.layers.leads * w };
+  }
+
+  /** Back to normal at once: Stop, a song loaded, a vibe landing. */
+  private dropReset(time?: number): void {
+    const was = this.dropper.active || this.dropRec !== null;
+    this.dropper.reset();
+    this.dropPlan = DROP_OFF;
+    this.dropRec = null;
+    this.dropSection = null;
+    this.dropIntent = "none";
+    this.dropHeard = { phase: "off", index: 0, length: 0, barsLeft: 0 };
+    this.sustain = {};
+    this.dropWindow = [];
+    if (!this.graph || !was) return;
+    if (time === undefined) this.graph.drop.reset();
+    else this.graph.drop.end(time);
+    if (this.dropMixOn) {
+      this.dropMixOn = false;
+      this.graph.setMix("sweep", mixValue(this.mix, "sweep"), time);
+      this.graph.setMix("pump", mixValue(this.mix, "pump"), time);
+    }
+  }
+
+  /** The conductor's bar line at audio time `time`, before the sequencer plays the bar (spec 8.9). */
+  private dropBarLine(time: number, bar: number): void {
+    const g = this.graph!;
+    if (this.seq.songQueued) {
+      // A vibe lands on this bar line: the drop ends with the song it was on.
+      if (this.dropper.active || this.dropRec) {
+        this.dropReset(time);
+        this.showDrop(time);
+      }
+      return;
+    }
+    if (!this.dropper.active && this.dropPlan.phase === "off") return;
+    const rec = this.dropRec ?? this.dropRecipe();
+    const plan = this.dropper.bar(rec.build, rec.wind);
+    this.dropPlan = plan;
+    const barSec = 240 / Tone.getTransport().bpm.value;
+    const six = barSec / 16;
+    if (plan.phase === "build" && plan.index === 0) {
+      this.dropRec = rec;
+      const e = [...this.beatEnergy.values()];
+      this.dropRefs = new Map(this.beatEnergy);
+      this.dropRef = e.length ? e.reduce((a, b) => a + b, 0) / e.length : 0;
+      g.drop.begin(time, rec, barSec * plan.length, this.dropLevels(rec));
+    }
+    if (plan.phase === "build") {
+      const cliff = plan.cliff && rec.cliff !== "none";
+      const cut = cliff ? (rec.cliffLength === "beat" ? 12 : 8) : 16;
+      if (rec.parts.roll) g.drop.roll(time, six, rollHits(plan.index, plan.length, cut));
+      if (cliff) g.drop.cliff(time + cut * six, time + barSec, rec.cliff as "gap" | "hold", this.lastChord);
+    }
+    if (plan.impact) {
+      g.drop.impact(time, rec, barSec, this.dropLevels(rec), this.compSteady);
+      // The impact bar is an event, not the drop: the follower starts on the bar after it.
+      this.dropSkip = 4;
+      this.dropWindow = [];
+      this.dropMixOn = true;
+      g.setMix("sweep", 0, time);
+      g.setMix("pump", mixValue(this.mix, "pump") + rec.pump);
+    }
+    if (plan.phase === "wind" && plan.index === 0) g.drop.wind(time, barSec * plan.length);
+    if (plan.end) {
+      g.drop.end(time);
+      if (this.dropMixOn) {
+        this.dropMixOn = false;
+        g.setMix("sweep", mixValue(this.mix, "sweep"), time);
+        g.setMix("pump", mixValue(this.mix, "pump"));
+      }
+      this.dropRec = null;
+      this.sustain = {};
+      // A section tapped during the drop lands on this bar line, with the music back at its normal size.
+      if (this.dropSection !== null) {
+        const s = this.dropSection;
+        this.dropSection = null;
+        this.seq.switchSection(s);
+      }
+    }
+    // What the instruments hold over this bar line is doubled bar by bar while the extra layers sound.
+    if (this.dropRec && this.doubling()) for (const [id, h] of Object.entries(this.sustain)) if (h.until > time + 0.01) this.doubleNotes(id as Exclude<InstrumentId, "drums">, h.notes, time, Math.min(barSec, h.until - time), h.vel, true, h.pad);
+    this.dropMarks.push({ ...plan, bar, at: time });
+    if (this.dropMarks.length > 48) this.dropMarks.shift();
+    this.showDrop(time);
+  }
+
+  /** One instrument's notes into its extra layer (`soft`: a slow attack and release, for notes carried over a bar line). */
+  private doubleNotes(id: Exclude<InstrumentId, "drums">, notes: number[], t: number, dur: number, vel: number, soft: boolean, pad: boolean): void {
+    const ov = this.graph!.drop;
+    if (id === "bass") ov.bass(notes[0], t, dur, vel, soft);
+    else if (id === "synth") ov.synth(notes, t, dur, vel, soft);
+    else ov.lead(notes, t, dur, vel, pad);
+  }
+
+  /** The extra layers sound: the drop is on or winding down, or a bloom is building. */
+  private doubling(): boolean {
+    const p = this.dropPlan.phase;
+    return !!this.dropRec && (p === "on" || p === "wind" || (p === "build" && this.dropRec.bloom));
+  }
+
+  /** The button follows what is heard: its phase changes on the bar line, on the audio clock. */
+  private showDrop(time: number): void {
+    const v = this.dropper.view();
+    const heard = { phase: v.phase, index: v.length - v.barsLeft, length: v.length, barsLeft: v.barsLeft };
+    Tone.getDraw().schedule(() => {
+      this.dropHeard = heard;
+      this.dropIntent = this.dropper.intent;
+      this.changed();
+    }, time);
+  }
+
+  /** The build's changes to the bar's notes (hats out, the kick out for the last bar, the lead climbing). */
+  private dropEvents(events: StepResult["events"]): StepResult["events"] {
+    const rec = this.dropRec;
+    const p = this.dropPlan;
+    if (!rec || p.phase !== "build") return events;
+    const last = p.index === p.length - 1;
+    const climb = rec.parts.climb && p.index >= p.length / 2;
+    return events
+      .filter((e) => !(e.inst === "drums" && ((rec.parts.hatsOut && (e.voice === "hat" || e.voice === "open")) || (rec.parts.kickOut && last && e.voice === "kick"))))
+      .map((e) =>
+        climb && (e.inst === "layer1" || e.inst === "layer2") && e.mode === "generative" && !e.hold && e.glide === undefined
+          ? { ...e, notes: e.notes.map((n) => n + 12), glideFrom: e.glideFrom === undefined ? undefined : e.glideFrom + 12 }
+          : e,
+      );
+  }
+
+  /**
+   * The level follower, every beat. At normal size it keeps the energy of each beat of the last four bars, by its
+   * place in the four-bar phrase (`key`, 0..15): the section's own level, beat by beat. While the drop sounds it
+   * compares each beat with the same beat of the phrase before the build (so a phrase that is louder on some chords
+   * than others does not throw it), as it would be at a gain of 1, and sets the overlay's gain to bring the last four
+   * beats to the section's level. Read after the limiter, so it settles where what is heard matches the section.
+   */
+  private dropFollow(e: Energy, phase: DropPhase, ready: boolean, key: number): void {
+    if (phase === "off" && !this.dropper.active) {
+      if (ready) this.beatEnergy.set(key, e.energy);
+      return;
+    }
+    if (phase !== "on" && phase !== "wind") return;
+    if (this.dropSkip > 0) return void this.dropSkip--;
+    if (!this.graph || !(this.dropRef > 0)) return;
+    const c = Math.max(0.05, this.graph.drop.compValue);
+    const ref = this.dropRefs.get(key) ?? this.dropRef;
+    this.dropWindow.push({ e: e.energy, c, ref });
+    if (this.dropWindow.length > 4) this.dropWindow.shift();
+    const w = this.dropWindow;
+    this.dropMeasured = w.reduce((a, b) => a + b.e, 0) / w.length;
+    const ratio = w.reduce((a, b) => a + b.e / (b.c * b.c * b.ref), 0) / w.length;
+    if (!(ratio > 0)) return;
+    // Aimed at the section's own level: down when the extra layers add, up (at most COMP_TOP) when the deeper pump takes.
+    // At most 3 dB a beat, so one odd beat cannot throw it.
+    const target = Math.min(COMP_TOP, c * 1.41, Math.max(c / 1.41, 1 / Math.sqrt(ratio)));
+    this.graph.drop.setComp(target);
+    if (phase === "on") this.compSteady = Math.max(0.2, target);
   }
 
   // ---- Diagnostics and test hooks ------------------------------------------------
@@ -1189,6 +1532,10 @@ export class Engine {
     // transport.stop() takes effect a lookahead later; the clock keeps calling until then.
     if (!this.seq.isRunning) return;
     const g = this.graph!;
+    // P10: the Drop's conductor decides each bar at its bar line, before the sequencer plays it (a section held
+    // behind the drop is queued here, so it lands on this very bar line).
+    const up = this.seq.upcoming;
+    if (up.step === 0) this.dropBarLine(time, up.bar);
     const r: StepResult = this.seq.next();
     const bpm = Tone.getTransport().bpm.value;
     let sixteenth = 60 / bpm / 4;
@@ -1226,8 +1573,38 @@ export class Engine {
     for (const id of LAYER_IDS) g.instruments[id].useMode(r.pads[id], time);
     // P9: Gate's pattern moves on the straight sixteenths.
     g.fxStep(time, r.step);
-    for (const e of r.events) {
+    // P10: the level follower reads every beat; a new section or song starts its reference afresh.
+    if (r.applied?.section != null || r.loaded) this.beatEnergy.clear();
+    if (this.dropWatch && r.step % 4 === 0) {
+      const phase = this.dropPlan.phase;
+      const ready = r.step === 0 ? r.applied?.section == null && !r.loaded : true;
+      // The reading holds the beat that just ended: its place in the four-bar phrase.
+      const key = (((r.bar * 4 + r.step / 4 - 1) % 16) + 16) % 16;
+      void this.dropWatch.read().then((e) => this.dropFollow(e, phase, ready, key));
+    }
+    const doubling = this.doubling();
+    const ov = g.drop;
+    if (doubling && this.seq.song.sections[r.section]?.on.drums) ov.drumStep(time, r.step);
+    // What the instruments hold lets go where the engine releases it (below): stopped, let go, a new section or chord.
+    for (const id of [...r.letGo, ...r.stopped, ...r.restarted]) if (id !== "drums") delete this.sustain[id];
+    if (r.retrigger || (r.applied && r.applied.section !== null))
+      for (const id of ["synth", "layer1", "layer2"] as const) if (!(r.kept as string[]).includes(id)) delete this.sustain[id];
+    if (r.retrigger) delete this.sustain.bass;
+    const barEnd = time + (STEPS_PER_BAR - r.step) * sixteenth;
+    for (const e of this.dropEvents(r.events)) {
       const t = time + e.shift * sixteenth; // swing: every instrument on an odd step moves together
+      if (e.inst === "synth" && e.notes.length) this.lastChord = e.notes;
+      if (e.inst !== "drums") {
+        const notes = e.inst === "bass" ? [e.midi] : e.notes;
+        const held = e.inst !== "bass" && e.inst !== "synth" && (e.hold || e.glide !== undefined);
+        const pad = e.inst !== "bass" && e.inst !== "synth" && (e.mode === "pad" || e.mode === "drone");
+        const until = held ? Infinity : t + e.len * sixteenth;
+        // A note that outlasts its bar is kept, to be doubled again on each bar line it sounds over.
+        if (until > barEnd + 0.01 && notes.length) this.sustain[e.inst] = { notes, vel: e.vel, until, pad };
+        else if (notes.length) delete this.sustain[e.inst];
+        if (held && !this.lastChord.length) this.lastChord = notes;
+        if (doubling && notes.length) this.doubleNotes(e.inst, notes, t, Math.min(until, barEnd + 0.02) - t, e.vel, until > barEnd + 0.01, pad);
+      }
       switch (e.inst) {
         case "drums": {
           // P7: a roll splits the sixteenth into 2..4 quick hits, each softer than the last and short enough to end before the next.

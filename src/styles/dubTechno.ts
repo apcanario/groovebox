@@ -22,6 +22,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.35, 0.6, 0.5] }, { effect: "vowel" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "tremolo" }],
   },
+  // P10 (spec 8.9): the filter closes into a held dub chord, then wider chords.
+  drop: {
+    build: 4,
+    parts: { sweep: "low", roll: false, riser: false, reverb: true, climb: false, hatsOut: true, kickOut: true },
+    cliff: "hold",
+    cliffLength: "half",
+    impact: { sweep: false, sub: true, burst: false },
+    layers: { synth: 1.0, bass: 0.2, drums: 0.4, leads: 0.4 },
+    width: 0.85,
+    pump: 0.05,
+    wind: 4,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

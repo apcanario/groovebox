@@ -4,6 +4,7 @@
  * only the formats and the reader that turns a folder of files into a list; it imports nothing that reads a
  * folder, so a data file can import its types from here without a cycle. No audio dependency.
  */
+import type { DropRecipe } from "./drop.ts";
 import type { DroneParams, InstrumentId, LayerMode, MixState, PadParams, Patch } from "../engine/song.ts";
 import type { ArpParams } from "./arp.ts";
 import type { LeadParams, LeadStyle } from "./lead.ts";
@@ -266,4 +267,6 @@ export interface StyleDef {
   fx: Record<InstrumentId, [StyleFx, StyleFx]>;
   sections: [StyleSection, StyleSection, StyleSection, StyleSection];
   start?: number;
+  /** P10 (spec 8.9): the vibe's drop. */
+  drop: DropRecipe;
 }

@@ -23,6 +23,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.6, 0.35] }, { effect: "phaser" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "tremolo" }],
   },
+  // P10 (spec 8.9): a four-bar build with a clap roll and a riser, a beat of silence, a sweep and a sub hit.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: true, burst: false },
+    layers: { synth: 0.8, bass: 0.5, drums: 0.6, leads: 0.6 },
+    width: 0.75,
+    pump: 0.12,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

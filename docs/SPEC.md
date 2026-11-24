@@ -434,6 +434,7 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 | Kit, Steps, Mod, Space | adjust, view_week, speed, water |
 | Phaser, Flanger, Fuzz, Crush, Tremolo, Pan | cyclone, flight, local_fire_department, texture, earthquake, swap_horiz |
 | Gate, Ring, Vowel, Shifter | fence, notifications, record_voice_over, moving |
+| Drop, Build, Cliffhanger, Wind-down | keyboard_double_arrow_down, trending_up, content_cut, undo |
 
 - The set has no drum icon; `adjust` (a pad seen from above) stands in. The row that builds each remaining effect and feature picks its icon from the same set and adds it to this table.
 - An icon may be drawn by hand only where the set has nothing usable, at the same line weight.

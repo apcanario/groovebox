@@ -1,4 +1,5 @@
 /** Song document (spec section 6): types, default song, validation. No audio dependency. */
+import { checkDropSettings, type DropSettings } from "../music/drop.ts";
 import { ARP_DIRECTIONS, type ArpParams } from "../music/arp.ts";
 import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, type LeadParams } from "../music/lead.ts";
 import {
@@ -305,6 +306,8 @@ export interface Song {
   style?: string;
   /** Optional (P9, spec 8.8): each instrument's two effect slots. Missing means every slot at its default, off. */
   fx?: Record<InstrumentId, FxRack>;
+  /** Optional (P10, spec 8.9): the Drop page's settings over the vibe's recipe. Missing means the recipe as it is. */
+  drop?: DropSettings;
 }
 
 /** The effect slots a song plays: its own, else each instrument's defaults (all off). A copy. */
@@ -586,6 +589,7 @@ export function validateSong(doc: unknown): string[] {
   if (doc.macros !== undefined) checkMacros(doc.macros, "macros", errors);
   if (doc.style !== undefined && (typeof doc.style !== "string" || !doc.style)) errors.push("style: must be a style id");
   if (doc.fx !== undefined) checkFx(doc.fx, "fx", errors);
+  if (doc.drop !== undefined) checkDropSettings(doc.drop, "drop", errors);
   if (doc.version !== 1) errors.push("version: must be 1");
   if (typeof doc.name !== "string") errors.push("name: must be a string");
   if (!oneOf(doc.key, NOTE_NAMES)) errors.push("key: unknown key");

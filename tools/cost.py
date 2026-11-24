@@ -17,6 +17,11 @@ To compare with the build before a row, build the base into its own dist first a
     python3 tools/cost.py dist 7
     git worktree remove /tmp/base
 A base from before P7 has no P7 additions: the scene then plays the base scene alone ("P7 additions absent").
+
+P10: "drop" plays each vibe named (EDM, Trance, Deep house and Ambient by default) on a fresh page, measures its groove
+for six seconds, then its drop (a two-bar build, measured from the bar after the impact), and reports both loads, the
+worst stalls, and the most overlay voices sounding at once against the overlay's cap (VOICE_CAP in src/engine/drop.ts):
+    python3 tools/cost.py dist 3 drop [edm,trance,...]
 """
 import os
 import subprocess
@@ -104,8 +109,51 @@ def vibes(root: str, runs: int, only: list | None = None) -> int:
     return 0
 
 
+def drops(root: str, runs: int, only: list | None = None) -> int:
+    """P10: each vibe's groove, then its drop, on a fresh page: audio load, worst stall and the overlay's voices."""
+    ids = only or ["edm", "trance", "deepHouse", "ambient"]
+    server = subprocess.Popen([sys.executable, "-m", "http.server", str(PORT), "--directory", root],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1)
+    rows = {}
+    E = "window.__groovebox"
+    try:
+        with sync_playwright() as p:
+            chrome = "/usr/bin/google-chrome"
+            kwargs = {"executable_path": chrome} if os.path.exists(chrome) else {}
+            browser = p.chromium.launch(args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"], **kwargs)
+            for _ in range(runs):
+                for vid in ids:
+                    page = fresh_page(browser)
+                    v = {"id": vid}
+                    base = play_vibe(browser, page, v)
+                    page.evaluate(f"{E}.setDrop({{build: 2}})")
+                    page.evaluate(f"{E}.drop()")
+                    wait_for(page, f"{E}.dropShown().phase === 'on'", 15.0)
+                    b0 = page.evaluate(f"{E}.position().bar")
+                    wait_for(page, f"{E}.position().bar > {b0}", 6.0)
+                    page.evaluate(f"{E}.dropInfo()")  # starts the count of voices at once
+                    on = load_of(trace_audio(browser, page, lambda: time.sleep(6.0)))
+                    info = page.evaluate(f"{E}.dropInfo()")
+                    page.close()
+                    rows.setdefault(vid, []).append((base, on, info["most"], info["dropped"]))
+                    print(f"cost drop {vid}: groove {base[0]:.1f}% / {base[1]:.2f} ms, drop {on[0]:.1f}% / {on[1]:.2f} ms, "
+                          f"overlay voices at most {info['most']} of the cap, {info['dropped']} notes over it", flush=True)
+            browser.close()
+    finally:
+        server.terminate()
+    print("vibe, median audio load % groove -> drop, worst stall ms groove -> drop, most overlay voices, over", runs, "runs")
+    for vid, r in rows.items():
+        med = lambda xs: sorted(xs)[len(xs) // 2]  # noqa: E731
+        print(f"{vid:14} {med([x[0][0] for x in r]):5.1f} -> {med([x[1][0] for x in r]):5.1f}   "
+              f"{med([x[0][1] for x in r]):6.2f} -> {med([x[1][1] for x in r]):6.2f}   {max(x[2] for x in r)}")
+    return 0
+
+
 def main() -> int:
     root = sys.argv[1] if len(sys.argv) > 1 else "dist"
+    if len(sys.argv) > 3 and sys.argv[3] == "drop":
+        return drops(root, int(sys.argv[2]), sys.argv[4].split(",") if len(sys.argv) > 4 else None)
     if len(sys.argv) > 3 and sys.argv[3] == "vibes":
         return vibes(root, int(sys.argv[2]), sys.argv[4].split(",") if len(sys.argv) > 4 else None)
     runs = int(sys.argv[2]) if len(sys.argv) > 2 else 7

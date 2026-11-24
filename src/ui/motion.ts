@@ -64,9 +64,9 @@ export function showLanes(l: LaneBar): void {
 /**
  * Every element that reads the motion properties, by its outermost container: the Now view (tiles, lanes,
  * playhead, flashes), the Song grid's cells, the section strip, the switches on the instrument and layer
- * tabs, a lane outside the Now view, and the record button's dot.
+ * tabs, a lane outside the Now view, the record button's dot, and the DROP button (P10).
  */
-export const MOVERS = ".nowlist, .grid, .secs, .tog, .rec, .lane:not(.nowlist .lane)";
+export const MOVERS = ".nowlist, .grid, .secs, .tog, .rec, .lane:not(.nowlist .lane), .drop";
 
 /** Start the loop. Returns a function that stops it. */
 export function startMotion(engine: Engine, root: HTMLElement = document.documentElement): () => void {

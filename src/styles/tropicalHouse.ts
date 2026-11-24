@@ -23,6 +23,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.4, 0.3] }, { effect: "ring" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "pan" }],
   },
+  // P10 (spec 8.9): a riser under a held chord, the flute-like lead doubled wide.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: false, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "hold",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: false, burst: true },
+    layers: { synth: 0.7, bass: 0.4, drums: 0.6, leads: 0.8 },
+    width: 0.8,
+    pump: 0.1,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

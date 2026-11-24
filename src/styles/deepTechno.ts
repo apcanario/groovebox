@@ -23,6 +23,19 @@ export default {
     layer1: [{ effect: "phaser", on: true }, { effect: "shifter" }],
     layer2: [{ effect: "vowel" }, { effect: "tremolo" }],
   },
+  // P10 (spec 8.9): restrained: hats out, filter down, kick back in, wider chords.
+  drop: {
+    build: 4,
+    parts: { sweep: "low", roll: false, riser: false, reverb: true, climb: false, hatsOut: true, kickOut: true },
+    cliff: "hold",
+    cliffLength: "beat",
+    impact: { sweep: false, sub: false, burst: false },
+    layers: { synth: 1.0, bass: 0.0, drums: 0.4, leads: 0.4 },
+    width: 0.9,
+    pump: 0.05,
+    wind: 4,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

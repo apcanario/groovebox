@@ -62,6 +62,33 @@ class GrooveDiff extends AudioWorkletProcessor {
   }
 }
 registerProcessor("groove-diff", GrooveDiff);
+
+// P10: energy of the left and right channels, of their mid and side, and the largest sample since the last read. A
+// stretch with no input counts as silence (the Drop's loudness and width, measured over whole bars).
+class GrooveEnergy extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.l = 0; this.r = 0; this.m = 0; this.s = 0; this.n = 0; this.pk = 0;
+    this.port.onmessage = () => {
+      this.port.postMessage({ l: this.l, r: this.r, m: this.m, s: this.s, n: this.n, peak: this.pk });
+      this.l = 0; this.r = 0; this.m = 0; this.s = 0; this.n = 0; this.pk = 0;
+    };
+  }
+  process(inputs) {
+    const inp = inputs[0];
+    if (!inp || !inp.length) { this.n += 128; return true; }
+    const a = inp[0], b = inp[1] || inp[0];
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i], y = b[i], m = 0.5 * (x + y), d = 0.5 * (x - y);
+      this.l += x * x; this.r += y * y; this.m += m * m; this.s += d * d;
+      const p = Math.max(Math.abs(x), Math.abs(y));
+      if (p > this.pk) this.pk = p;
+    }
+    this.n += a.length;
+    return true;
+  }
+}
+registerProcessor("groove-energy", GrooveEnergy);
 `;
 
 /**
@@ -129,6 +156,41 @@ export class DiffWatch {
   read(): Promise<{ diff: number; ref: number }> {
     return new Promise((resolve) => {
       this.node.port.onmessage = (e: MessageEvent) => resolve(e.data as { diff: number; ref: number });
+      this.node.port.postMessage("read");
+    });
+  }
+}
+
+/** P10: what an energy watch read: the mean energy of the two channels, their side over mid, and the largest sample. */
+export interface Energy {
+  /** Mean square of left and right together (0 for silence). */
+  energy: number;
+  /** RMS of the side over RMS of the mid (0: mono). */
+  width: number;
+  /** Largest sample of either channel. */
+  peak: number;
+  /** Samples read. */
+  n: number;
+}
+
+/** P10: energy, stereo width and peak of a signal since the last read (the Drop's level follower and the smoke test). */
+export class EnergyWatch {
+  private constructor(readonly node: AudioWorkletNode) {}
+
+  static async make(ctx: JumpContext): Promise<EnergyWatch> {
+    await loadModule(ctx);
+    return new EnergyWatch(
+      ctx.createAudioWorkletNode("groove-energy", { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers" }),
+    );
+  }
+
+  read(): Promise<Energy> {
+    return new Promise((resolve) => {
+      this.node.port.onmessage = (e: MessageEvent) => {
+        const d = e.data as { l: number; r: number; m: number; s: number; n: number; peak: number };
+        const n = Math.max(1, d.n);
+        resolve({ energy: (d.l + d.r) / (2 * n), width: d.m > 0 ? Math.sqrt(d.s / d.m) : 0, peak: d.peak, n: d.n });
+      };
       this.node.port.postMessage("read");
     });
   }

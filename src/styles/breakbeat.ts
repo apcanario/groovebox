@@ -22,6 +22,19 @@ export default {
     layer1: [{ effect: "flanger", on: true, knobs: [0.4, 0.75, 0.45] }, { effect: "echo" }],
     layer2: [{ effect: "chorus" }, { effect: "phaser" }],
   },
+  // P10 (spec 8.9): a snare roll, half a bar of silence, the full impact.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "half",
+    impact: { sweep: true, sub: true, burst: true },
+    layers: { synth: 0.6, bass: 0.6, drums: 0.9, leads: 0.5 },
+    width: 0.8,
+    pump: 0.12,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

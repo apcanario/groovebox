@@ -22,6 +22,19 @@ export default {
     layer1: [{ effect: "ring", on: true, knobs: [0.4, 0.6, 0.5] }, { effect: "echo" }],
     layer2: [{ effect: "vowel", on: true, knobs: [0.4, 0.5, 0.5] }, { effect: "chorus" }],
   },
+  // P10 (spec 8.9): a roll under a closing filter and a held chord, a bright burst.
+  drop: {
+    build: 4,
+    parts: { sweep: "low", roll: true, riser: false, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "hold",
+    cliffLength: "half",
+    impact: { sweep: false, sub: false, burst: true },
+    layers: { synth: 0.6, bass: 0.4, drums: 0.8, leads: 0.7 },
+    width: 0.9,
+    pump: 0.05,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

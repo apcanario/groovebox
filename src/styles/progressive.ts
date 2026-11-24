@@ -22,6 +22,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.4, 0.4] }, { effect: "flanger" }],
     layer2: [{ effect: "phaser", on: true, knobs: [0.45, 0.2, 0.5] }, { effect: "chorus" }],
   },
+  // P10 (spec 8.9): an eight-bar build, the full impact, wide supersaw layers.
+  drop: {
+    build: 8,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: true, burst: true },
+    layers: { synth: 0.9, bass: 0.6, drums: 0.7, leads: 0.8 },
+    width: 0.9,
+    pump: 0.18,
+    wind: 4,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

@@ -33,6 +33,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.35, 1, 0.6] }, { effect: "vowel", on: true, knobs: [0.35, 0.25, 0.17] }],
     layer2: [{ effect: "shifter", on: true, knobs: [0.3, 0.52, 0.4] }, { effect: "vowel" }],
   },
+  // P10 (spec 8.9): a bloom: no roll, no impact, the drone opens and widens over eight bars.
+  drop: {
+    build: 8,
+    parts: { sweep: "none", roll: false, riser: false, reverb: true, climb: false, hatsOut: false, kickOut: false },
+    cliff: "none",
+    cliffLength: "beat",
+    impact: { sweep: false, sub: false, burst: false },
+    layers: { synth: 0.8, bass: 0.0, drums: 0.0, leads: 1.0 },
+    width: 1.0,
+    pump: 0,
+    wind: 4,
+    bloom: true,
+  },
   sections: [
     {
       name: "Intro",

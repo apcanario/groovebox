@@ -33,6 +33,19 @@ export default {
     layer1: [{ effect: "echo" }, { effect: "vowel" }],
     layer2: [{ effect: "tremolo", on: true, knobs: [0.35, 0.43, 0] }, { effect: "chorus" }],
   },
+  // P10 (spec 8.9): a filter-down and the beat falling back in.
+  drop: {
+    build: 2,
+    parts: { sweep: "low", roll: false, riser: false, reverb: false, climb: false, hatsOut: true, kickOut: true },
+    cliff: "none",
+    cliffLength: "beat",
+    impact: { sweep: false, sub: false, burst: false },
+    layers: { synth: 0.5, bass: 0.3, drums: 0.4, leads: 0.6 },
+    width: 0.6,
+    pump: 0.0,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

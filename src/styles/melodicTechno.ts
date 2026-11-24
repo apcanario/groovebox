@@ -23,6 +23,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.35, 0.4, 0.5] }, { effect: "flanger" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "pan" }],
   },
+  // P10 (spec 8.9): a long build, the lead climbing, the arp doubled wide.
+  drop: {
+    build: 8,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: true, burst: false },
+    layers: { synth: 0.8, bass: 0.5, drums: 0.6, leads: 0.9 },
+    width: 0.9,
+    pump: 0.15,
+    wind: 4,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

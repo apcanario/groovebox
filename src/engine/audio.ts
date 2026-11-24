@@ -41,6 +41,7 @@ import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, t
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
 import { AttackQueue, freshSetNeeded } from "./attacks.ts";
+import { DropOverlay } from "./drop.ts";
 import { nativeParam, patchOscillatorEnd, type OscillatorProto } from "./oscPatch.ts";
 import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
 
@@ -1288,6 +1289,8 @@ export class Graph {
   readonly lofi: LoFi;
   readonly air: Air;
   readonly reverb: ReverbBank;
+  /** P10 (spec 8.9): the Drop's overlay, on the master path between the sweep filters and the lo-fi master. */
+  readonly drop: DropOverlay;
 
   private constructor(
     buses: Buses,
@@ -1298,7 +1301,9 @@ export class Graph {
     sat: Tone.Distortion,
     out: Tone.Compressor,
     p7: { lofi: LoFi; air: Air; reverb: ReverbBank },
+    drop: DropOverlay,
   ) {
+    this.drop = drop;
     this.lofi = p7.lofi;
     this.air = p7.air;
     this.reverb = p7.reverb;
@@ -1317,6 +1322,7 @@ export class Graph {
       layer1: new Poly(buses, 2, 10, 0.5, { padTone: true }, "layer1"),
       layer2: new Poly(buses, 2, 10, 0.5, { padTone: true }, "layer2"),
     };
+    drop.feedReverb(INSTRUMENT_LIST.map((id) => this.instruments[id].channel.level));
   }
 
   static async build(): Promise<Graph> {
@@ -1334,7 +1340,8 @@ export class Graph {
     const master = new Tone.Gain(0.5); // was 0.7 in the spike: more headroom into the limiter
     // P7: the lo-fi master sits after the sweep filters and before the saturation; off, it is a dry gain.
     const lofi = new LoFi();
-    master.chain(lp, hp, lofi.input);
+    // P10: the Drop's overlay sits between the sweep filters and the lo-fi master (see below).
+    master.chain(lp, hp);
     lofi.output.chain(sat, limiter);
     sat.connect(meter);
     const scope = new Tone.Analyser({ type: "waveform", size: 16384 });
@@ -1347,7 +1354,11 @@ export class Graph {
     delay.connect(duck);
     // The air layer goes to the drum bus (not ducked by the kick) and into the reverb.
     const air = new Air(drums, bank.input);
-    return new Graph({ duck, drums, delay, reverb: bank.input }, meter, scope, lp, hp, sat, limiter, { lofi, air, reverb: bank });
+    // P10: the Drop's overlay sits after the sweep filters, so its level follower hears what the filter lets through.
+    const drop = new DropOverlay({ duck, drums, reverb: bank.input });
+    Tone.connect(hp, drop.input);
+    Tone.connect(drop.output, lofi.input);
+    return new Graph({ duck, drums, delay, reverb: bank.input }, meter, scope, lp, hp, sat, limiter, { lofi, air, reverb: bank }, drop);
   }
 
   /** Feed the master output (after the limiter, what the headphones hear) into a native node. */

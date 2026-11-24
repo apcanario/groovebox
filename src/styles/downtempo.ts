@@ -22,6 +22,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.35, 0.6, 0.45] }, { effect: "vowel" }],
     layer2: [{ effect: "phaser" }, { effect: "chorus" }],
   },
+  // P10 (spec 8.9): a short riser under a held chord, a soft sub hit.
+  drop: {
+    build: 2,
+    parts: { sweep: "low", roll: false, riser: true, reverb: true, climb: false, hatsOut: false, kickOut: true },
+    cliff: "hold",
+    cliffLength: "beat",
+    impact: { sweep: false, sub: true, burst: false },
+    layers: { synth: 0.7, bass: 0.4, drums: 0.5, leads: 0.6 },
+    width: 0.7,
+    pump: 0.05,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

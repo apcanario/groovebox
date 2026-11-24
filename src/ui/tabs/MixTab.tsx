@@ -3,10 +3,10 @@
  * level per instrument (Levels), and the audio buffer choice (Audio).
  */
 import { useEffect, useState } from "preact/hooks";
-import { INSTRUMENTS, MIX_RANGES, mixValue, type Engine, type LatencyHint, type MixKey } from "../../engine/index.ts";
+import { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, INSTRUMENTS, MIX_RANGES, mixValue, type Engine, type LatencyHint, type MixKey } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Dial, GroupLabel, Meter, Pager } from "../components.tsx";
-import { knobPos, knobValue, meterFraction, secondsText, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
+import { knobPos, knobValue, meterFraction, secondsText, shownPage, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Icon } from "../icons.tsx";
@@ -67,13 +67,58 @@ const BUFFERS = [
   ["playback", "Safe"],
 ] as const;
 
-type MixPage = "master" | "levels" | "space" | "audio";
+type MixPage = "master" | "levels" | "space" | "audio" | "drop";
 const MIX_PAGES: PageDef<MixPage>[] = [
   ["master", "Master"],
   ["levels", "Levels"],
   ["space", "Space"],
   ["audio", "Audio"],
 ];
+/** P10 (spec 8.9): Advanced adds the Drop page. */
+const ADVANCED_PAGES: PageDef<MixPage>[] = [...MIX_PAGES, ["drop", "Drop"]];
+
+const CLIFF_NAME = { gap: "Gap", hold: "Hold", none: "None" } as const;
+
+/**
+ * The Drop page (spec 8.9, Advanced): build length, cliffhanger, wind-down length and one Width knob, over the vibe's
+ * recipe; stored in the song. A build or wind-down already running keeps its length.
+ */
+function DropPage({ engine }: { engine: Engine }) {
+  const r = engine.dropRecipe();
+  return (
+    <div class="droppage">
+      <GroupLabel thing="Build" split="bars" />
+      <div class="seg">
+        {DROP_BUILDS.map((n) => (
+          <button key={n} class={r.build === n ? "on" : ""} data-dropbuild={n} aria-pressed={r.build === n} onClick={() => engine.setDrop({ build: n })}>
+            {n}
+          </button>
+        ))}
+      </div>
+      <GroupLabel thing="Cliffhanger" />
+      <div class="seg">
+        {DROP_CLIFFS.map((c) => (
+          <button key={c} class={r.cliff === c ? "on" : ""} data-dropcliff={c} aria-pressed={r.cliff === c} onClick={() => engine.setDrop({ cliff: c })}>
+            {CLIFF_NAME[c]}
+          </button>
+        ))}
+      </div>
+      <div class="droplow">
+        <div class="dropwind">
+          <GroupLabel thing="Wind-down" split="bars" />
+          <div class="seg two">
+            {DROP_WINDS.map((n) => (
+              <button key={n} class={r.wind === n ? "on" : ""} data-dropwind={n} aria-pressed={r.wind === n} onClick={() => engine.setDrop({ wind: n })}>
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Dial id="dropWidth" label="Width" value={r.width} min={0} max={1} color="var(--yellow)" onChange={(v) => engine.setDrop({ width: Math.round(v * 100) / 100 })} />
+      </div>
+    </div>
+  );
+}
 
 /** The reverb decay dial (P7, spec 8.10): 1 to 20 seconds on an exponential curve. */
 const DECAY = { label: "Tail", seconds: MIX_RANGES.reverbDecay };
@@ -88,14 +133,16 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
     if (armed === h) void ctx.keeper.flush().then(() => (location.href = `?hint=${h}`));
     else setArmed(h);
   };
-  const [page, setPage] = useState<MixPage>("master");
+  const [chosenPage, setPage] = useState<MixPage>("master");
+  const pages = ctx.advanced ? ADVANCED_PAGES : MIX_PAGES;
+  const page = shownPage(pages, chosenPage);
   const mix = engine.getMix();
   const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
   const lofi = mixValue(mix, "lofi") > 0;
   return (
     <section class="mixtab">
       <MasterMeter engine={engine} />
-      <Pager id="mix" pages={MIX_PAGES} page={page} onPage={setPage} />
+      <Pager id="mix" pages={pages} page={page} onPage={setPage} />
       {page === "master" && (
         <div class="dials n3">
           <Dial id="sweep" label={ctx.advanced ? "Filter" : "Tone"} value={mix.sweep} min={-1} max={1} bipolar display={ctx.advanced ? sweepLabel(mix.sweep) : simpleSweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
@@ -153,6 +200,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
           <p class="note">Tail is how long the reverb rings. Air is a soft breath of noise. Lo-fi wobbles, crunches and hisses.</p>
         </>
       )}
+      {page === "drop" && <DropPage engine={engine} />}
       {page === "audio" && (
         <>
           <div class="seg">

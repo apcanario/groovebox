@@ -23,6 +23,19 @@ export default {
     layer1: [{ effect: "ring" }, { effect: "echo", on: true, knobs: [0.3, 0.4, 0.35] }],
     layer2: [{ effect: "vowel" }, { effect: "chorus", on: true }],
   },
+  // P10 (spec 8.9): a clap roll, a beat of silence, a sweep and a sub hit.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: true, burst: false },
+    layers: { synth: 0.8, bass: 0.6, drums: 0.9, leads: 0.7 },
+    width: 1.0,
+    pump: 0.12,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

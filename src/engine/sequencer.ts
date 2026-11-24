@@ -692,6 +692,11 @@ export class Sequencer {
     return this.queue.pending();
   }
 
+  /** P10: the bar and step the next call to `next` produces (the Drop's conductor runs on its bar lines). */
+  get upcoming(): { bar: number; step: number } {
+    return { bar: Math.floor(this.globalStep / STEPS_PER_BAR), step: this.globalStep % STEPS_PER_BAR };
+  }
+
   /** Produce the events of the next sixteenth. */
   next(): StepResult {
     const step = this.globalStep % STEPS_PER_BAR;

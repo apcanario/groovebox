@@ -11,6 +11,7 @@ import { nowTile, sectionLetter } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane, Playhead } from "../lanes.tsx";
 import { VibeControl } from "../vibes.tsx";
+import { DropButton } from "../drop.tsx";
 
 function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   const { engine, song, pending, pos } = ctx;
@@ -90,6 +91,10 @@ export function PlayTab({ ctx }: { ctx: Ctx }) {
           <NowView ctx={ctx} />
         </>
       )}
+      {/* P10 (spec 8.9): between the instruments and the section strip, full width, in both modes. */}
+      <div class="droprow">
+        <DropButton ctx={ctx} />
+      </div>
     </section>
   );
 }

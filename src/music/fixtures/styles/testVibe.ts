@@ -1,4 +1,5 @@
 import type { StyleDef } from "../../data.ts";
+import { DEFAULT_DROP } from "../../drop.ts";
 
 /**
  * A test fixture (P3): a style file like any in `src/styles/`, kept out of that folder so the app does not list
@@ -24,6 +25,7 @@ export default {
     layer1: [{ effect: "echo" }, { effect: "phaser" }],
     layer2: [{ effect: "chorus" }, { effect: "tremolo" }],
   },
+  drop: DEFAULT_DROP,
   sections: [
     { name: "Intro", on: ["drums"], chords: [[0, 1], [6, 1], [5, 1], [4, 1]], beat: "fourFloor", bass: "offbeat", synth: "stabs", layer1: { mode: "generative" }, layer2: { mode: "pad" } },
     {

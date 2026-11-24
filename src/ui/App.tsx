@@ -319,6 +319,8 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
     openVibes: () => setVibes(true),
   };
   const taking = rec.state === "recording" || rec.state === "finishing";
+  // P10: a section tapped during the drop waits for its wind-down.
+  const dropHeld = engine.dropShown().queued;
   const lights = beatLights(pos.playing, pos.step);
   // On the Advanced Play tab the strip is the grid's column labels: indented under its four columns.
   const gridStrip = tab === "play" && advanced;
@@ -382,7 +384,7 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
             key={i}
             i={i}
             name={s.name}
-            view={stripState(i, { chosen, playing, running: pos.playing, queued: pending.section, name: s.name })}
+            view={stripState(i, { chosen, playing, running: pos.playing, queued: pending.section, name: s.name, afterDrop: dropHeld === i })}
             onTap={() => engine.switchSection(i)}
             onHold={() => setHeld(i)}
           />

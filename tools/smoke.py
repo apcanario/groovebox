@@ -13,6 +13,9 @@ as a new song and plays every instrument audibly in its groove section, and the 
 P5: Layer 1 sounds in each of the five lead styles, and its voice glides and accents notes.
 P6: every lead dial of every style turned while playing reaches the section, the output never clips, the lane
 counts the phrase's bars, and the layer switched off lets every voice go (no stuck note); Simple picks the style.
+P10: the Drop (tools/dropcheck.py): its button and motion, a drop that stays on, the wind-down landing on a bar line in
+the same section and in a tapped one, the song document unchanged, a cancel, the Drop page; and in all 24 vibes the
+drop within 1 dB of its section, measurably wider, the master never clipping.
 
 Usage: python3 tools/smoke.py dist [screenshot.png]
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
@@ -31,6 +34,7 @@ from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
 from shots import SMALL, simple_words, walk_frame  # noqa: E402
+from dropcheck import drop_vibes, walk_drop  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -3199,6 +3203,9 @@ def main() -> int:
             walk_p4(page, failures)
             walk_p7(page, failures)
             walk_p9(page, failures)
+            # P10 (spec 8.9): the Drop, its button and Drop page, then its loudness and width in all 24 vibes.
+            walk_drop(page, failures)
+            drop_vibes(page, failures)
             walk_fx_load(browser, page, failures)
             walk_cost(browser, page, failures)
             check_osc_patch(page, failures)

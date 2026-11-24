@@ -28,6 +28,19 @@ export default {
     layer1: [{ effect: "shifter", on: true, knobs: [0.3, 0.55, 0.3] }, { effect: "echo" }],
     layer2: [{ effect: "chorus" }, { effect: "phaser" }],
   },
+  // P10 (spec 8.9): hats out under a closing filter, a sub hit, percussion spread out.
+  drop: {
+    build: 4,
+    parts: { sweep: "low", roll: false, riser: true, reverb: true, climb: false, hatsOut: true, kickOut: true },
+    cliff: "gap",
+    cliffLength: "beat",
+    impact: { sweep: false, sub: true, burst: false },
+    layers: { synth: 0.7, bass: 0.4, drums: 1.0, leads: 0.6 },
+    width: 0.9,
+    pump: 0.08,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

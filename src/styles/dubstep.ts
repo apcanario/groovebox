@@ -28,6 +28,19 @@ export default {
     layer1: [{ effect: "ring", on: true, knobs: [0.35, 0.5, 0.5] }, { effect: "echo" }],
     layer2: [{ effect: "phaser" }, { effect: "chorus" }],
   },
+  // P10 (spec 8.9): the full build, half a bar of silence, a wide wobble layer.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "half",
+    impact: { sweep: true, sub: true, burst: true },
+    layers: { synth: 0.6, bass: 1.0, drums: 0.6, leads: 0.5 },
+    width: 0.85,
+    pump: 0.1,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

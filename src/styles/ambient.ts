@@ -34,6 +34,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.4, 0.8, 0.55] }, { effect: "phaser" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "vowel", on: true, knobs: [0.4, 0.75, 0.17] }],
   },
+  // P10 (spec 8.9): a bloom: no roll, no impact, the pads open and widen over eight bars.
+  drop: {
+    build: 8,
+    parts: { sweep: "none", roll: false, riser: false, reverb: true, climb: false, hatsOut: false, kickOut: false },
+    cliff: "none",
+    cliffLength: "beat",
+    impact: { sweep: false, sub: false, burst: false },
+    layers: { synth: 0.6, bass: 0.0, drums: 0.0, leads: 1.0 },
+    width: 1.0,
+    pump: 0,
+    wind: 4,
+    bloom: true,
+  },
   sections: [
     {
       name: "Intro",

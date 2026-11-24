@@ -22,6 +22,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.6, 0.4] }, { effect: "shifter" }],
     layer2: [{ effect: "chorus" }, { effect: "phaser" }],
   },
+  // P10 (spec 8.9): a hat-and-snare roll, half a bar of silence, an 808 sub hit.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: false, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "half",
+    impact: { sweep: true, sub: true, burst: false },
+    layers: { synth: 0.5, bass: 0.8, drums: 0.8, leads: 0.6 },
+    width: 0.8,
+    pump: 0.05,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

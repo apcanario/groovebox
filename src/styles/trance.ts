@@ -26,6 +26,19 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.35, 0.4, 0.45] }, { effect: "pan" }],
     layer2: [{ effect: "gate", on: true, knobs: [3 / 7, 0.9, 0.3] }, { effect: "phaser" }],
   },
+  // P10 (spec 8.9): the full thing: eight bars of build, silence, the full impact.
+  drop: {
+    build: 8,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "beat",
+    impact: { sweep: true, sub: true, burst: true },
+    layers: { synth: 1.0, bass: 0.6, drums: 0.7, leads: 1.0 },
+    width: 1.0,
+    pump: 0.2,
+    wind: 4,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

@@ -23,6 +23,19 @@ export default {
     layer1: [{ effect: "flanger", on: true, knobs: [0.5, 0.75, 0.5] }, { effect: "echo" }],
     layer2: [{ effect: "chorus", on: true }, { effect: "tremolo" }],
   },
+  // P10 (spec 8.9): a roll and a riser, half a bar of silence, a wide upper bass around the sub.
+  drop: {
+    build: 4,
+    parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: true, hatsOut: false, kickOut: true },
+    cliff: "gap",
+    cliffLength: "half",
+    impact: { sweep: true, sub: true, burst: true },
+    layers: { synth: 0.6, bass: 0.9, drums: 0.7, leads: 0.6 },
+    width: 0.8,
+    pump: 0.1,
+    wind: 2,
+    bloom: false,
+  },
   sections: [
     {
       name: "Intro",

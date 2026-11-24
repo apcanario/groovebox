@@ -38,6 +38,9 @@ export const LOG_OPS = [
   "addSection",
   "copySection",
   "deleteSection",
+  // P10 (spec 8.9): the DROP button and the Drop page.
+  "drop",
+  "setDrop",
 ] as const;
 export type LogOp = (typeof LOG_OPS)[number];
 
@@ -79,6 +82,8 @@ export function coalesceKey(op: LogOp, a: readonly unknown[]): string | null {
     case "setGen":
     case "setFx":
       return `${op}:${String(a[0])}:${String(a[1])}:${keys(a[2])}`;
+    case "setDrop":
+      return `${op}:${keys(a[0])}`;
     default:
       return null;
   }

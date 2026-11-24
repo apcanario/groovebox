@@ -68,6 +68,8 @@ export interface StripInput {
   queued: number | null;
   /** The section's name. */
   name: string;
+  /** P10: the queued section waits for the drop's wind-down, not the next bar line. */
+  afterDrop?: boolean;
 }
 
 export interface StripView {
@@ -86,7 +88,7 @@ export function stripState(i: number, s: StripInput): StripView {
   const isPlaying = i === s.playing;
   const isNext = s.running && s.queued === i && !isPlaying;
   const isEdit = s.chosen === i && !isPlaying;
-  const sub = isNext ? "Next bar" : isPlaying && s.running ? "Playing" : isEdit ? "Editing" : stripWord(s.name);
+  const sub = isNext ? (s.afterDrop ? "After drop" : "Next bar") : isPlaying && s.running ? "Playing" : isEdit ? "Editing" : stripWord(s.name);
   return { isPlaying, isNext, isEdit, sub };
 }
 
@@ -723,4 +725,37 @@ export function chipPage<T>(
   const p = page === null ? (at < 0 ? 0 : Math.floor(at / per)) : ((page % pages) + pages) % pages;
   const shown = options.slice(p * per, p * per + per);
   return { pages, page: p, shown, pad: per - shown.length };
+}
+
+// ---- The DROP button (P10, spec 8.9 and 8.12) ----
+
+/** What the DROP button needs of the engine's heard state. */
+export interface DropLook {
+  phase: "off" | "build" | "on" | "wind";
+  intent: "none" | "on" | "cancel" | "off";
+  barsLeft: number;
+  length: number;
+}
+
+/** How many of the four bar segments are lit: all while armed or on, counting down through the build and wind-down. */
+export function dropSegments(v: DropLook): number {
+  if (v.phase === "on" || (v.phase === "off" && v.intent === "on")) return 4;
+  if (v.phase === "build" || v.phase === "wind") return Math.max(0, Math.min(4, Math.ceil((4 * v.barsLeft) / Math.max(1, v.length))));
+  return 0;
+}
+
+/** The button's spoken label. */
+export function dropLabel(v: DropLook, playing: boolean): string {
+  const bars = (n: number): string => `${n} bar${n === 1 ? "" : "s"}`;
+  if (!playing) return "Drop: press Play first";
+  switch (v.phase) {
+    case "off":
+      return v.intent === "on" ? `Drop: building from the next bar, ${bars(v.barsLeft)}. Tap to call it off` : "Drop: tap to build to the drop from the next bar";
+    case "build":
+      return v.intent === "cancel" ? "Drop: cancelled, back to normal on the next bar" : `Drop: building, ${bars(v.barsLeft)} left. Tap to cancel`;
+    case "on":
+      return v.intent === "off" ? "Drop: on, winding down from the next bar" : "Drop: on. Tap to wind down";
+    case "wind":
+      return `Drop: winding down, ${bars(v.barsLeft)} left`;
+  }
 }
