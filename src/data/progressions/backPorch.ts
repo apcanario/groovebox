@@ -4,7 +4,7 @@ export default {
   order: 121,
   name: "Back porch",
   feels: ["warm"],
-  vibes: ["deepHouse", "afroHouse", "futureGarage", "synthwave", "idm"],
+  vibes: ["deepHouse", "afroHouse", "futureGarage", "synthwave", "idm", "minimalTechno"],
   mood: "deep",
   voicing: "extended",
   chords: [[6, 1], [3, 1], [0, 1], [0, 1]],

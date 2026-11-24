@@ -4,7 +4,7 @@ export default {
   order: 13,
   name: "Sun on tiles",
   feels: ["bright", "uplifting"],
-  vibes: ["deepHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "loFi", "downtempo", "idm", "electro", "trap"],
+  vibes: ["deepHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "breakbeat", "dubstep", "futureGarage", "loFi", "downtempo", "idm", "electro"],
   mood: "deep",
   voicing: "extended",
   chords: [[3, 1], [0, 1], [3, 1], [6, 1]],

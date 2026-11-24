@@ -4,7 +4,7 @@ export default {
   order: 124,
   name: "Corner shop",
   feels: ["warm"],
-  vibes: ["deepHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "futureGarage", "downtempo", "trap"],
+  vibes: ["deepHouse", "progressive", "acidHouse", "afroHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "twoStep", "futureGarage", "downtempo"],
   mood: "house",
   voicing: "extended",
   chords: [[3, 2], [4, 2]],

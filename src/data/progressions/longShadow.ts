@@ -5,7 +5,7 @@ export default {
   order: 904,
   name: "Long shadow",
   feels: ["dark", "dreamy"],
-  vibes: ["deepTechno", "dubstep", "drone"],
+  vibes: ["drone"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 8], [6, 8]],

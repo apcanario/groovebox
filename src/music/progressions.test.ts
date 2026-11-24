@@ -43,6 +43,9 @@ describe("the progression library", () => {
       for (const f of FEELS) expect(progressionsFor(v, f).length, `${v}/${f}`).toBeGreaterThanOrEqual(7);
     }
     expect(short).toEqual([]);
+    // The other vibes keep half a bar to two (spec 8.10): a card of four- or eight-bar chords is for these two only.
+    const long = PROGRESSION_IDS.filter((id) => PROGRESSIONS[id].chords.some(([, bars]) => bars >= 4));
+    for (const id of long) for (const v of PROGRESSIONS[id].vibes) expect(["ambient", "drone"], `${id}: ${v}`).toContain(v);
   });
 
   it("tags each vibe by choice, not by blanket group (C10): no two vibes share a set of cards, none shares most of another's", () => {
@@ -52,8 +55,9 @@ describe("the progression library", () => {
       for (let b = a + 1; b < sets.length; b++) {
         const both = [...sets[a]].filter((id) => sets[b].has(id)).length;
         const either = new Set([...sets[a], ...sets[b]]).size;
-        // The P4 library's six blanket groups gave whole groups of vibes the same list (overlap 1).
-        if (both / either > 0.8) close.push(`${LAUNCH_VIBES[a]} and ${LAUNCH_VIBES[b]}: ${both} of ${either}`);
+        // The P4 library's six blanket groups gave whole groups of vibes the same list (overlap 1). P8 review S5: 0.8
+        // let Trap and Melodic techno share 38 cards (0.70), so the limit is 0.6.
+        if (both / either > 0.6) close.push(`${LAUNCH_VIBES[a]} and ${LAUNCH_VIBES[b]}: ${both} of ${either}`);
       }
     expect(close).toEqual([]);
     // No progression suits nearly every vibe.

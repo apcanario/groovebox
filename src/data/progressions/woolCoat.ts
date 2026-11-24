@@ -4,7 +4,7 @@ export default {
   order: 107,
   name: "Wool coat",
   feels: ["warm"],
-  vibes: ["deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi"],
+  vibes: ["deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "futureGarage", "loFi", "trap"],
   mood: "deep",
   voicing: "extended",
   chords: [[1, 2], [0, 2]],

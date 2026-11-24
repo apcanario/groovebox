@@ -4,7 +4,7 @@ export default {
   order: 104,
   name: "Hearth",
   feels: ["warm"],
-  vibes: ["deepHouse", "tropicalHouse", "afroHouse", "loFi", "idm", "electro"],
+  vibes: ["deepHouse", "tropicalHouse", "afroHouse", "loFi", "idm", "electro", "trap"],
   mood: "deep",
   voicing: "extended",
   chords: [[0, 1], [6, 1], [3, 1], [0, 1]],

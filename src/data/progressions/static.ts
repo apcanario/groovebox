@@ -4,7 +4,7 @@ export default {
   order: 319,
   name: "Static",
   feels: ["dark"],
-  vibes: ["tropicalHouse", "twoStep", "loFi", "synthwave", "edm"],
+  vibes: ["tropicalHouse", "twoStep", "loFi", "synthwave", "edm", "trap"],
   mood: "minor",
   voicing: "triads",
   chords: [[0, 0.5], [0, 0.5], [6, 1], [5, 1]],

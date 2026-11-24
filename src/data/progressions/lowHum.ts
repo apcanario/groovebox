@@ -5,7 +5,7 @@ export default {
   order: 905,
   name: "Low hum",
   feels: ["dark", "tense"],
-  vibes: ["deepTechno", "minimalTechno", "ambient", "drone"],
+  vibes: ["ambient", "drone"],
   mood: "dark",
   voicing: "low",
   chords: [[0, 4], [1, 4], [0, 4], [6, 4]],

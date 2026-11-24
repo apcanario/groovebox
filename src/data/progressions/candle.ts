@@ -4,7 +4,7 @@ export default {
   order: 111,
   name: "Candle",
   feels: ["warm"],
-  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "dubstep", "downtempo"],
+  vibes: ["acidHouse", "deepTechno", "minimalTechno", "dubTechno", "drumAndBass", "dubstep", "downtempo", "trap"],
   mood: "house",
   voicing: "extended",
   chords: [[0, 2], [5, 2]],

@@ -46,7 +46,8 @@ export default {
     {
       name: "Groove",
       on: ["drums", "bass", "synth", "layer1", "layer2"],
-      chords: [[0, 4], [1, 4], [0, 4], [6, 4]],
+      // P8 review S4: eight bars a chord, so Drone stays longer than Ambient's four (the card Deep winter).
+      chords: [[0, 8], [5, 8]],
       beat: "slowPulse",
       bass: "pedal",
       synth: "sustained",

@@ -4,7 +4,7 @@ export default {
   order: 14,
   name: "Bright hall",
   feels: ["bright"],
-  vibes: ["progressive", "afroHouse", "melodicTechno", "twoStep", "dubstep", "futureGarage", "synthwave", "trance", "trap"],
+  vibes: ["progressive", "afroHouse", "melodicTechno", "twoStep", "dubstep", "futureGarage", "synthwave", "trance"],
   mood: "major",
   voicing: "triads",
   chords: [[0, 1], [4, 1], [1, 1], [3, 1]],

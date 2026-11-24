@@ -4,7 +4,7 @@ export default {
   order: 522,
   name: "Northern sky",
   feels: ["uplifting"],
-  vibes: ["progressive", "acidHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "dubstep", "futureGarage", "synthwave", "edm", "trance", "trap"],
+  vibes: ["progressive", "acidHouse", "deepTechno", "melodicTechno", "minimalTechno", "dubTechno", "drumAndBass", "dubstep", "futureGarage", "synthwave", "edm", "trance"],
   mood: "minor",
   voicing: "triads",
   chords: [[0, 2], [5, 2], [3, 2], [4, 2]],
