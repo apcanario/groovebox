@@ -1187,6 +1187,9 @@ export class Engine {
       this.takeFx();
       for (const id of INSTRUMENTS) g.instruments[id].releaseAll(time);
       this.applyAll(time);
+      // A tempo ramp started just before the bar line (a tempo change, a song load) can end after it, and Tone
+      // refuses an event before the last one it holds: what is scheduled from the bar line on gives way first.
+      Tone.getTransport().bpm.cancelScheduledValues(time);
       Tone.getTransport().bpm.setValueAtTime(doc.bpm, time);
       g.setTempo(doc.bpm, time);
       tempo = doc.bpm;

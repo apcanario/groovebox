@@ -2915,7 +2915,8 @@ def main() -> int:
                 args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"], **kwargs
             )
             page = browser.new_page(viewport={"width": 390, "height": 844})
-            page.on("pageerror", lambda e: errors.append(str(e)))
+            # The error and where it was thrown (the first frames of its stack).
+            page.on("pageerror", lambda e: errors.append(f"{e} [{' | '.join((getattr(e, 'stack', '') or '').splitlines()[1:4])}]"))
             page.on(
                 "response",
                 lambda r: errors.append(f"{r.status} {r.url}")
