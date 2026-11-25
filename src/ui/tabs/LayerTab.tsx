@@ -8,7 +8,7 @@
  * screen the name row gives way (Back and New idea sit beside the lane) and the XY pad and sends get a Filter page.
  */
 import { useState } from "preact/hooks";
-import { ARP_DIRECTIONS, LAYER_MODES, WAVES, type ArpDirection, type LayerInstrument } from "../../engine/index.ts";
+import { ARP_DIRECTIONS, LAYER_MODES, VOICING_STEPS, WAVES, voicingShift, type ArpDirection, type LayerInstrument } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Chips, Dial, GroupLabel, Pager } from "../components.tsx";
 import {
@@ -92,7 +92,13 @@ function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   );
 }
 
-/** Pad and Drone (P7): attack, release, brightness, motion and Swoop; a drone also picks root alone or root and fifth. */
+/** P11: the voicing dial's value as inversions from the chord as written: "0", "+1", "-2". */
+function voicingText(v: number | undefined): string {
+  const s = voicingShift(v);
+  return s > 0 ? `+${s}` : String(s);
+}
+
+/** Pad and Drone (P7): attack, release, brightness, motion and Swoop, and (P11) Voicing; a drone also picks root alone or root and fifth. */
 function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
   const layer = song.sections[edit][id];
@@ -112,7 +118,7 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
           />
         </>
       )}
-      <div class="dials n5">
+      <div class="dials n6 row">
         {PAD_KNOBS.map((k) => (
           <Dial
             key={k.key}
@@ -126,6 +132,18 @@ function Pad({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
             onChange={(p) => engine.setPad(edit, id, { [k.key]: knobValue(k, p) })}
           />
         ))}
+        {/* P11 (spec 8.11): voicing and register, an inversion a step (Morph moves it at phrase ends). */}
+        <Dial
+          id={`${id}:pad:voicing`}
+          label="Voicing"
+          value={pad.voicing ?? 0.5}
+          min={0}
+          max={1}
+          step={1 / (2 * VOICING_STEPS)}
+          display={voicingText(pad.voicing)}
+          color={INST_COLOR[id]}
+          onChange={(v) => engine.setPad(edit, id, { voicing: Math.round(v * 2 * VOICING_STEPS) / (2 * VOICING_STEPS) })}
+        />
       </div>
     </>
   );

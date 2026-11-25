@@ -372,6 +372,7 @@ A switch that lets the jam change by itself, slowly, so it can be left playing.
 - **It is seeded and recorded,** so a saved jam replays the same journey.
 - **Touching a control takes it back:** Morph leaves a control alone for 16 bars after it is moved by hand.
 - **It never writes to the song document** except through the same recorded events a hand would make.
+- P11, as built (25 Nov 2026). Each vibe sets the limits in its style file (`morph`: the Bright and Space ranges, how far Lock eases, the voicing range, the instruments that may drop out, 16 or 32 bars between section moves); a vibe without them takes moderate ones and never drops the drums or the bass. Bright and Space move one hundredth of the dial a bar at Speed 50 (half to twice that over the dial); a value that stands away from its dial (a vibe's own sends) is brought to it a step a bar before the dial moves it. Voicing is a new pad and drone dial on the Advanced Pad page: each step an inversion up or down (same notes, another register), changed at the end of the section's chord loop. One instrument at a time drops out, for one chord loop, never leaving fewer than two sounding. Sections stay off unless switched on. Depth scales every range within the vibe's limits. A drop holds Morph from the press to its end. The journey's seed comes from the vibe (or the song's name); it starts again on Play and when a song loads. Its moves are logged marked as Morph's.
 
 ### 8.12 The look
 

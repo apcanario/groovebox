@@ -83,7 +83,7 @@ export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, type DropBuild, type DropCliff, type DropIntent, type DropPhase, type DropRecipe, type DropSettings, type DropWind } from "../music/drop.ts";
 export type { Energy } from "./continuity.ts";
-export { HANDS_BARS, MORPH_THINGS, type MorphPlan, type MorphSettings, type MorphThing } from "../music/morph.ts";
+export { HANDS_BARS, MORPH_THINGS, VOICING_STEPS, voicingShift, type MorphPlan, type MorphSettings, type MorphThing } from "../music/morph.ts";
 
 /** P11: one move Morph made, for the smoke test and the tests: the journey's bar and the engine call it made. */
 export interface MorphMade {
@@ -311,6 +311,8 @@ export class Engine {
   private morphHands = new Map<string, number>();
   /** Morph is making its moves: they are logged as Morph's and hold nothing. */
   private morphing = false;
+  /** Morph's moves of this bar line changed the song (listeners hear it once, on the bar). */
+  private morphChanged = false;
   /** Morph's moves, newest last (kept to MORPH_KEEP). */
   readonly morphMoves: MorphMade[] = [];
   /** The bars as scheduled while the trace is on (kept to MORPH_KEEP). */
@@ -1514,7 +1516,7 @@ export class Engine {
    * P11: Morph at a bar line, before the sequencer plays the bar: its moves land on this bar line (toggles and a section
    * switch with the queue, values ramped as a hand's). It holds while a drop runs and while a song waits to land.
    */
-  private morphBarLine(): void {
+  private morphBarLine(time?: number): void {
     this.morphClock++;
     this.morphDropHeld = false;
     if (this.seq.songQueued) {
@@ -1540,11 +1542,15 @@ export class Engine {
     const moves = planner.bar(plan, this.morphView(), (c) => this.morphHeld(c));
     if (!moves.length) return;
     this.morphing = true;
+    this.morphChanged = false;
     try {
       for (const m of moves) this.morphMove(m, plan, bar);
     } finally {
       this.morphing = false;
     }
+    if (!this.morphChanged) return;
+    if (time !== undefined && this.graph) Tone.getDraw().schedule(() => this.changed(), time);
+    else this.changed();
   }
 
   private morphMade(bar: number, op: LogOp, a: unknown[]): void {
@@ -1971,7 +1977,7 @@ export class Engine {
     if (up.step === 0) {
       this.dropBarLine(time, up.bar);
       // P11: Morph's moves for this bar, after the Drop's conductor (a drop holds it) and before the bar is played.
-      this.morphBarLine();
+      this.morphBarLine(time);
     }
     const r: StepResult = this.seq.next();
     this.traceStep(r);
@@ -2122,6 +2128,12 @@ export class Engine {
 
   /** Tell listeners the song changed; when sections moved, the position's index may have too. */
   private changed(reindexed = false): void {
+    // P11: Morph's moves are made inside the scheduler's callback: the screen and the autosave hear them once, when
+    // the bar they land on is heard (morphBarLine), not from the audio clock's callback.
+    if (this.morphing && !reindexed) {
+      this.morphChanged = true;
+      return;
+    }
     if (reindexed) {
       // Sections were inserted or removed: the scheduler's section is now the reference index.
       this.layoutGen++;
