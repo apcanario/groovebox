@@ -221,18 +221,27 @@ def walk_morph(page, failures: list) -> None:
         time.sleep(0.5)  # the dial's last move reaches the engine
         hand_bar = page.evaluate(f"{E}.morphBar()")
         pos = page.evaluate(f"{E}.macroPos(1, 'synth', 'bright')")
-        wait_bars(page, HANDS_BARS + 1)
+        # The dial's value at the end of the hand's 16 bars: read while bar b0 + 16 (the first bar Morph may move it
+        # again) is not yet planned. Read after it, a move Morph rightly makes on that bar would look like one inside.
+        wait_for(page, f"{E}.morphBar() >= {b0 + HANDS_BARS}", (HANDS_BARS + 2) * bar_s(page) + 3.0)
+        now = page.evaluate(f"[{E}.macroPos(1, 'synth', 'bright'), {E}.morphBar()]")
+        if now[1] != b0 + HANDS_BARS:
+            failures.append(f"P11: the hand check read the dial at journey bar {now[1]}, not {b0 + HANDS_BARS}")
+        now = now[0]
+        wait_bars(page, 1)
         # The bars after the hand, sure to be inside its 16 whatever bar line passed during the drag.
         later = page.evaluate(f"{E}.morphMoves.filter(m => m.bar >= {hand_bar} && m.bar < {b0 + HANDS_BARS})")
         hit = [m for m in later if touches(m, "synth", "bright")]
         others = [m for m in later if not touches(m, "synth", "bright")]
-        now = page.evaluate(f"{E}.macroPos(1, 'synth', 'bright')")
         if hit or abs(now - pos) > 1e-9:
             failures.append(f"P11: Morph moved the synth's Bright within 16 bars of a hand: {hit[:3]} ({pos} -> {now})")
         elif not others:
             failures.append("P11: Morph stopped moving everything after a hand on one dial")
         else:
-            print(f"P11: a hand on the synth's Bright held it for 16 bars; {len(others)} other moves went on")
+            back = page.evaluate(f"{E}.morphMoves.filter(m => m.bar >= {b0 + HANDS_BARS})")
+            back = [m["bar"] for m in back if touches(m, "synth", "bright")]
+            print(f"P11: a hand on the synth's Bright held it for 16 bars (from bar {hand_bar}); {len(others)} other moves went on; "
+                  f"Morph took it up again at bars {back[:3]}")
     page.click('[data-tab="play"]')
 
     # A drop holds Morph from the press to its end (the trace marks each bar line a drop held).
