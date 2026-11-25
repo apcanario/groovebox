@@ -30,6 +30,8 @@ LEVEL_DROP_DB = 3.0
 # Bars read of the section before the drop and of the drop after the impact's bar: eight, so a section whose bars vary
 # (IDM's generative break: one four-bar window 1.3 dB from the next) is compared over enough of it.
 WINDOW = 8
+# The smoke runs the 24 vibes' drops in this many groups (parts drop-1 to drop-6), each in its own browser.
+DROP_GROUPS = 6
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:
@@ -407,11 +409,27 @@ def judge(r: dict, label: str, failures: list) -> None:
         failures.append(f"P10 {label}: the master peaks at {peak_db(r['peak']):.2f} dBFS ({r['peak_at']}), over {PEAK_DBFS} dBFS")
 
 
-def drop_vibes(page, failures: list) -> None:
+def drop_group(vibes: list, group: int | None) -> list:
+    """The vibes of one drop group (1 to DROP_GROUPS) in the order they are measured, or all of them for None: every
+    vibe in exactly one group, Ambient and Drone last (in the last group)."""
+    if group is None:
+        return vibes
+    size = math.ceil(len(vibes) / DROP_GROUPS)
+    return vibes[(group - 1) * size:group * size]
+
+
+def drop_vibes(page, failures: list, group: int | None = None) -> None:
+    """The drop measured in every vibe (group None) or in one group of them (the smoke's parts drop-1 to drop-6, each
+    in its own browser); the extra drop at the loudest settings runs with the last group."""
     vibes = page.evaluate("window.__vibes")
     # Ambient and Drone last: their tails ring for up to 20 s and would sit in the next vibe's bars before its drop.
     slow = ["ambient", "drone"]
     vibes = [v for v in vibes if v["id"] not in slow] + [v for s in slow for v in vibes if v["id"] == s]
+    mine = drop_group(vibes, group)
+    if not mine:
+        failures.append(f"P10: drop group {group} has no vibes ({len(vibes)} vibes in {DROP_GROUPS} groups)")
+    if group is not None:
+        print(f"P10 drop group {group} of {DROP_GROUPS}: {', '.join(v['id'] for v in mine)}", flush=True)
     if not page.evaluate(f"{E}.playing"):
         page.click("#play")
     rows = []
@@ -419,7 +437,7 @@ def drop_vibes(page, failures: list) -> None:
     worst_bar = (0.0, "")
     least_wide = (9.0, "")
     top_peak = (0.0, "")
-    for v in vibes:
+    for v in mine:
         page.evaluate(f"(v) => {E}.loadAtBar(window.__vibeSong(v.id), v.start)", v)
         if not wait_for(page, f"{E}.getSong().style === {v['id']!r}", 10.0):
             failures.append(f"P10 {v['id']}: did not load")
@@ -433,7 +451,7 @@ def drop_vibes(page, failures: list) -> None:
         rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}; the section's own within {r['spread']:.2f}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
                     f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
                     f" (out {db(r['n']):.1f}, ref {10 * math.log10(max(info['ref'], 1e-12)):.1f} dB K-weighted, {10 * math.log10(max(r['n']['flat'], 1e-12)):.1f} flat)")
-        print(f"  P10 drop measured in {v['id']} ({len(rows)} of {len(vibes)})", flush=True)  # progress; the rows print below
+        print(f"  P10 drop measured in {v['id']} ({len(rows)} of {len(mine)})", flush=True)  # progress; the rows print below
         if abs(r["loud"]) > abs(worst_loud[0]):
             worst_loud = (r["loud"], v["id"])
         wb = max(r["per_bar"], key=abs)
@@ -455,10 +473,11 @@ def drop_vibes(page, failures: list) -> None:
                     failures.append(f"P10 drone: the drop's bar lines are {dip:+.2f} dB from mid-bar (more than 1 dB)")
             else:
                 failures.append("P10 drone: no beats of the drop read")
-    # P10 review S3: one drop at the loudest settings: Width 1, Hold, Saturation 0.6.
+    # P10 review S3: one drop at the loudest settings: Width 1, Hold, Saturation 0.6 (after the last group).
     extra = next((v for v in vibes if v["id"] == "edm"), vibes[0])
-    page.evaluate(f"(v) => {E}.loadAtBar(window.__vibeSong(v.id), v.start)", extra)
-    if wait_for(page, f"{E}.getSong().style === {extra['id']!r}", 10.0):
+    if group in (None, DROP_GROUPS):
+        page.evaluate(f"(v) => {E}.loadAtBar(window.__vibeSong(v.id), v.start)", extra)
+    if group in (None, DROP_GROUPS) and wait_for(page, f"{E}.getSong().style === {extra['id']!r}", 10.0):
         sat = page.evaluate(f"{E}.getMix().saturation")
         page.evaluate(f"{E}.setMix('saturation', 0.6)")
         page.evaluate(f"{E}.setDrop({{build: 2, wind: 2, cliff: 'hold', width: 1}})")
@@ -472,6 +491,6 @@ def drop_vibes(page, failures: list) -> None:
     for r in rows:
         print("  P10 " + r)
     print(
-        f"P10 drop in {len(rows)} runs: loudness within {abs(worst_loud[0]):.2f} dB ({worst_loud[1]}), a single bar within {abs(worst_bar[0]):.2f} dB ({worst_bar[1]}), "
+        f"P10 drop{'' if group is None else f' group {group}'} in {len(rows)} runs: loudness within {abs(worst_loud[0]):.2f} dB ({worst_loud[1]}), a single bar within {abs(worst_bar[0]):.2f} dB ({worst_bar[1]}), "
         f"at least {least_wide[0]:.2f}x wider ({least_wide[1]}), highest peak {peak_db(top_peak[0]):.1f} dBFS ({top_peak[1]}) through build, impact, drop, wind-down and after"
     )

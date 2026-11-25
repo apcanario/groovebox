@@ -15,16 +15,17 @@ P6: every lead dial of every style turned while playing reaches the section, the
 counts the phrase's bars, and the layer switched off lets every voice go (no stuck note); Simple picks the style.
 P10: the Drop (tools/dropcheck.py): its button and motion, a drop that stays on, the wind-down landing on a bar line in
 the same section and in a tapped one, the song document unchanged, a cancel, the Drop page; and in all 24 vibes the
-drop within 1 dB of its section, measurably wider, the master never clipping.
+drop within 1 dB of its section, measurably wider, the master never clipping (parts drop-1 to drop-6, four vibes each).
 P11: Morph (tools/morphcheck.py): its switch beside DROP, the Speed dial and the Morph page; Morph off moving nothing;
 ten minutes of Ambient never repeating a 16-bar stretch and never leaving the key, its journey the seeded one; a hand
 holding a dial for 16 bars; a drop holding Morph.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
-in .smoke-ledger.json against a fingerprint of src/, public/, index.html, package.json, package-lock.json and tools/;
-a run on the same fingerprint skips the parts already green, so a run cut off by a restart resumes. --fresh ignores
-the ledger. `python3 tools/smoke.py dist --part NAME` runs one part alone and records nothing.
+in .smoke-ledger.json against its own fingerprint: the files that part exercises (tools/smoke_parts.py: part_inputs;
+`python3 tools/smoke_parts.py --files NAME` lists them). A run skips each part still green on its fingerprint, so a
+run cut off by a restart resumes and a change reruns only the parts it can reach. --fresh ignores the ledger.
+`python3 tools/smoke.py dist --part NAME` runs one part alone and records nothing.
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
 It checks that sound is produced and nothing throws. It cannot judge how it sounds.
 """
@@ -3256,11 +3257,32 @@ def part_effects(browser, page, failures: list, shot) -> None:
     walk_p9(page, failures)
 
 
-def part_drop(browser, page, failures: list, shot) -> None:
-    # P10's Drop and its loudness and width in all 24 vibes (tools/dropcheck.py).
-    # P10 (spec 8.9): the Drop, its button and Drop page, then its loudness and width in all 24 vibes.
+# P10's Drop (spec 8.9, tools/dropcheck.py) in six parts: drop-1 walks the Drop, its button and Drop page, then each
+# part measures its loudness and width in one group of four of the 24 vibes (Ambient and Drone in drop-6, which also
+# makes the drop at the loudest settings), each group in its own browser so a failure on one vibe reruns only its group.
+def part_drop_1(browser, page, failures: list, shot) -> None:
     walk_drop(page, failures)
-    drop_vibes(page, failures)
+    drop_vibes(page, failures, 1)
+
+
+def part_drop_2(browser, page, failures: list, shot) -> None:
+    drop_vibes(page, failures, 2)
+
+
+def part_drop_3(browser, page, failures: list, shot) -> None:
+    drop_vibes(page, failures, 3)
+
+
+def part_drop_4(browser, page, failures: list, shot) -> None:
+    drop_vibes(page, failures, 4)
+
+
+def part_drop_5(browser, page, failures: list, shot) -> None:
+    drop_vibes(page, failures, 5)
+
+
+def part_drop_6(browser, page, failures: list, shot) -> None:
+    drop_vibes(page, failures, 6)
 
 
 def part_morph(browser, page, failures: list, shot) -> None:
@@ -3296,12 +3318,16 @@ PARTS = [
     ("vibes", part_vibes, setup_vibes),
     ("additions", part_additions, None),
     ("effects", part_effects, None),
-    ("drop", part_drop, None),
+    ("drop-1", part_drop_1, None),
+    ("drop-2", part_drop_2, None),
+    ("drop-3", part_drop_3, None),
+    ("drop-4", part_drop_4, None),
+    ("drop-5", part_drop_5, None),
+    ("drop-6", part_drop_6, None),
     ("morph", part_morph, None),
     ("cost", part_cost, None),
 ]
 LEDGER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".smoke-ledger.json")
-FINGERPRINTED = ["src", "public", "index.html", "package.json", "package-lock.json", "tools"]
 
 
 def run_part(root: str, name: str, shot) -> int:
@@ -3360,42 +3386,21 @@ def run_part(root: str, name: str, shot) -> int:
     return 0
 
 
-def fingerprint() -> str:
-    """A hash of everything the smoke depends on: every file under src/, public/ and tools/ (not __pycache__), and
-    index.html, package.json and package-lock.json, by path and contents."""
-    import hashlib
+def read_ledger(fps: dict) -> dict:
+    """The parts green in .smoke-ledger.json on the fingerprint each has now (tools/smoke_parts.py: valid_green)."""
+    from smoke_parts import valid_green
 
-    base = os.path.dirname(LEDGER)
-    h = hashlib.sha256()
-    for top in FINGERPRINTED:
-        path = os.path.join(base, top)
-        files = []
-        if os.path.isfile(path):
-            files = [path]
-        elif os.path.isdir(path):
-            for d, dirs, names in os.walk(path):
-                dirs[:] = sorted(x for x in dirs if x != "__pycache__")
-                files += [os.path.join(d, n) for n in names if not n.endswith(".pyc")]
-        for f in sorted(files):
-            h.update(os.path.relpath(f, base).encode() + b"\0")
-            with open(f, "rb") as fh:
-                h.update(hashlib.sha256(fh.read()).digest())
-    return h.hexdigest()
-
-
-def read_ledger(fp: str) -> dict:
     try:
         with open(LEDGER) as fh:
-            led = json.load(fh)
+            return valid_green(json.load(fh), fps)
     except (OSError, ValueError):
         return {}
-    return led.get("green", {}) if led.get("fingerprint") == fp else {}
 
 
-def write_ledger(fp: str, green: dict) -> None:
+def write_ledger(green: dict) -> None:
     tmp = LEDGER + ".tmp"
     with open(tmp, "w") as fh:
-        json.dump({"fingerprint": fp, "green": green}, fh, indent=1)
+        json.dump({"green": green}, fh, indent=1)
     os.replace(tmp, LEDGER)
 
 
@@ -3419,15 +3424,17 @@ def main() -> int:
         print("SMOKE FAILED: checks in no part: " + ", ".join(missing))
         print("exit code 1")
         return 1
-    fp = fingerprint()
-    green = {} if fresh else read_ledger(fp)
-    write_ledger(fp, green)
+    from smoke_parts import fingerprints
+
+    fps = fingerprints()
+    green = {} if fresh else read_ledger(fps)
+    write_ledger(green)
     ran, skipped, failed = [], [], []
     t_all = time.time()
     for name, _, _ in PARTS:
         if name in green:
             skipped.append(name)
-            print(f"=== part {name}: green in the ledger for this fingerprint, skipped", flush=True)
+            print(f"=== part {name}: green in the ledger for its fingerprint {fps[name][:12]}, skipped", flush=True)
             continue
         print(f"=== part {name}: running", flush=True)
         t0 = time.time()
@@ -3438,19 +3445,21 @@ def main() -> int:
         mins = (time.time() - t0) / 60
         ran.append(f"{name} {'passed' if rc == 0 else 'FAILED'} ({mins:.1f} min)")
         if rc == 0:
-            green[name] = {"seconds": round(time.time() - t0), "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-            write_ledger(fp, green)
+            green[name] = {"fingerprint": fps[name], "seconds": round(time.time() - t0),
+                           "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            write_ledger(green)
         else:
             failed.append(name)
         print(f"=== part {name}: {'passed' if rc == 0 else 'FAILED'} in {mins:.1f} min", flush=True)
-    print(f"smoke fingerprint {fp[:12]}{' (--fresh: ledger ignored)' if fresh else ''}")
+    print("smoke fingerprints: " + ", ".join(f"{n} {fps[n][:12]}" for n, _, _ in PARTS)
+          + (" (--fresh: ledger ignored)" if fresh else ""))
     print("parts run: " + (", ".join(ran) if ran else "none"))
     print("parts skipped, green in the ledger: " + (", ".join(skipped) if skipped else "none"))
     print(f"this run: {(time.time() - t_all) / 60:.1f} min")
     if failed:
         print(f"SMOKE FAILED: {', '.join(failed)} (exit code 1)")
         return 1
-    print(f"SMOKE PASSED: all {len(PARTS)} parts green on this fingerprint (exit code 0)")
+    print(f"SMOKE PASSED: all {len(PARTS)} parts green on their fingerprints (exit code 0)")
     return 0
 
 

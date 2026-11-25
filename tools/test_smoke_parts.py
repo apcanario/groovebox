@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Unit tests of the smoke's parts and per-part ledger fingerprints (tools/smoke_parts.py), run by `npm run check`.
+
+Each test copies what the fingerprints read (src/, public/, tools/ and the build files) to a scratch folder, changes
+one file there and checks which parts' ledger entries stay valid: a change outside a part leaves its entry green, a
+change inside it clears it.
+"""
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import smoke_parts as sp  # noqa: E402
+
+DROPS = [f"drop-{i}" for i in range(1, 7)]
+
+
+class PartFingerprints(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="smoke-parts-")
+        for top in sp.SHARED_FILES + sp.SHARED_DIRS + ["tools"]:
+            src = os.path.join(ROOT, top)
+            if os.path.isdir(src):
+                shutil.copytree(src, os.path.join(cls.tmp, top), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+            elif os.path.isfile(src):
+                shutil.copy(src, os.path.join(cls.tmp, top))
+        cls.names = sp.part_names(cls.tmp)
+        cls.pristine = sp.fingerprints(cls.tmp)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    def fps(self) -> dict:
+        return sp.fingerprints(self.tmp)
+
+    def changed(self, rel: str, old: str | None = None, new: str | None = None) -> set:
+        """The parts whose ledger entry a change to REL clears: a full ledger recorded before the change, read after."""
+        before = self.pristine
+        ledger = {"green": {n: {"fingerprint": fp, "seconds": 1, "at": "x"} for n, fp in before.items()}}
+        path = os.path.join(self.tmp, rel)
+        with open(path) as fh:
+            text = fh.read()
+        try:
+            if old is None:
+                edited = text + "\n// a change\n" if not rel.endswith(".py") else text + "\n# a change\nX_CHANGE = 1\n"
+            else:
+                self.assertIn(old, text, f"{rel} has no {old!r}")
+                edited = text.replace(old, new, 1)
+            with open(path, "w") as fh:
+                fh.write(edited)
+            after = self.fps()
+            still = sp.valid_green(ledger, after)
+            return set(self.names) - set(still)
+        finally:
+            with open(path, "w") as fh:
+                fh.write(text)
+
+    def test_parts_named(self):
+        self.assertEqual(self.names, ["core", "vibes", "additions", "effects"] + DROPS + ["morph", "cost"])
+
+    def test_every_check_in_a_part(self):
+        self.assertEqual(sp.uncovered(), [])
+
+    def test_unchanged_tree_keeps_every_entry(self):
+        self.assertEqual(self.changed("package.json", '"private"', '"private"'), set())
+
+    def test_ui_only_change_leaves_drop_and_morph_green(self):
+        gone = self.changed(os.path.join("src", "ui", "tabs", "ChordsTab.tsx"))
+        self.assertIn("core", gone)
+        self.assertIn("vibes", gone)
+        for n in DROPS + ["morph", "additions", "cost"]:
+            self.assertNotIn(n, gone)
+
+    def test_tab_the_part_opens_clears_it(self):
+        # The Mix tab: drop-1 opens its Drop and Audio pages, morph its Master and Morph pages; the vibe groups do not.
+        gone = self.changed(os.path.join("src", "ui", "tabs", "MixTab.tsx"))
+        for n in ["core", "drop-1", "morph"]:
+            self.assertIn(n, gone)
+        for n in DROPS[1:] + ["additions", "cost"]:
+            self.assertNotIn(n, gone)
+        # The Layer tab's file is imported by the Simple Synth tab, which morph opens; the drop never opens it.
+        gone = self.changed(os.path.join("src", "ui", "tabs", "LayerTab.tsx"))
+        self.assertIn("morph", gone)
+        for n in DROPS:
+            self.assertNotIn(n, gone)
+
+    def test_shell_change_clears_every_part(self):
+        for rel in [os.path.join("src", "ui", "App.tsx"), os.path.join("src", "ui", "tabs", "PlayTab.tsx"),
+                    os.path.join("src", "ui", "drop.tsx")]:
+            self.assertEqual(self.changed(rel), set(self.names), rel)
+
+    def test_engine_and_build_changes_clear_every_part(self):
+        for rel in [os.path.join("src", "engine", "drop.ts"), os.path.join("src", "music", "morph.ts"),
+                    os.path.join("src", "style.css"), "package.json", "index.html"]:
+            self.assertEqual(self.changed(rel), set(self.names), rel)
+
+    def test_unit_test_change_clears_nothing(self):
+        tests = [os.path.join(d, f) for d, _x, fs in os.walk(os.path.join(self.tmp, "src")) for f in fs if f.endswith(".test.ts")]
+        self.assertTrue(tests)
+        self.assertEqual(self.changed(os.path.relpath(tests[0], self.tmp)), set())
+
+    def test_check_code_change_clears_only_its_parts(self):
+        tools = "tools"
+        # Morph's walk: morph alone.
+        self.assertEqual(self.changed(os.path.join(tools, "morphcheck.py"), "def walk_morph(page, failures: list) -> None:\n",
+                                      "def walk_morph(page, failures: list) -> None:\n    pass\n"), {"morph"})
+        # The Drop's walk runs in drop-1 only; the drop's measure in every drop group.
+        self.assertEqual(self.changed(os.path.join(tools, "dropcheck.py"), "def walk_drop(page, failures: list, vibe_song: str = \"deepHouse\") -> None:\n",
+                                      "def walk_drop(page, failures: list, vibe_song: str = \"deepHouse\") -> None:\n    pass\n"), {"drop-1"})
+        self.assertEqual(self.changed(os.path.join(tools, "dropcheck.py"), "def one_drop(page, v: dict, failures: list, label: str) -> dict | None:\n",
+                                      "def one_drop(page, v: dict, failures: list, label: str) -> dict | None:\n    pass\n"), set(DROPS))
+        # P9's walk in smoke.py: effects only.
+        self.assertEqual(self.changed(os.path.join(tools, "smoke.py"), "def walk_p9(page, failures: list) -> None:\n",
+                                      "def walk_p9(page, failures: list) -> None:\n    pass\n"), {"effects"})
+        # A shared helper (every part opens the app) and module-level code: every part.
+        self.assertEqual(self.changed(os.path.join(tools, "smoke.py"), "def open_app(page, failures: list) -> None:\n",
+                                      "def open_app(page, failures: list) -> None:\n    pass\n"), set(self.names))
+        self.assertEqual(self.changed(os.path.join(tools, "smoke.py")), set(self.names))
+        self.assertEqual(self.changed(os.path.join(tools, "smoke_parts.py")), set(self.names))
+        # A tools file the smoke never imports: nothing.
+        self.assertEqual(self.changed(os.path.join(tools, "landed.py")), set())
+
+    def test_old_ledger_is_not_trusted(self):
+        fps = self.fps()
+        self.assertEqual(sp.valid_green({"fingerprint": "x", "green": {"core": {"seconds": 1}}}, fps), {})
+        self.assertEqual(sp.valid_green({"green": {"gone": {"fingerprint": "x"}}}, fps), {})
+        self.assertEqual(sp.valid_green([], fps), {})
+
+
+class DropGroups(unittest.TestCase):
+    def test_groups_cover_every_vibe_once(self):
+        import dropcheck
+
+        vibes = [{"id": f"v{i}"} for i in range(22)] + [{"id": "ambient"}, {"id": "drone"}]
+        groups = [dropcheck.drop_group(vibes, g) for g in range(1, dropcheck.DROP_GROUPS + 1)]
+        self.assertEqual(dropcheck.DROP_GROUPS, 6)
+        self.assertEqual([len(g) for g in groups], [4] * 6)
+        self.assertEqual([v for g in groups for v in g], vibes)
+        self.assertEqual([v["id"] for v in groups[-1]][-2:], ["ambient", "drone"])
+        self.assertEqual(dropcheck.drop_group(vibes, None), vibes)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=1)

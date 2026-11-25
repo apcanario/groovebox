@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single --outDir dist-single",
     "preview": "vite preview",
-    "check": "tsc --noEmit && vitest run && vite build",
+    "check": "tsc --noEmit && vitest run && python3 tools/test_smoke_parts.py && vite build",
     "smoke": "vite build && python3 tools/smoke.py dist",
     "test": "vitest run",
     "record-test": "vite build && python3 tools/record_long.py dist 10",
