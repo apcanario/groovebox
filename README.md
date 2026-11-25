@@ -26,8 +26,9 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8 and P10, 22 to 25 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10 and P11, 22 to 25 Nov 2026):
 
+- **Morph (P11):** a Morph switch beside DROP on the Play tab, a Morph speed dial on the Simple Mix tab and a Morph page in Advanced Mix. With it on, a seeded plan slowly drifts Bright and Space, eases Lock, moves pad and drone voicing at the end of a phrase (a new Voicing dial on the Pad page) and takes one instrument out for a phrase and gives it back, all within limits each vibe sets. Ambient and Drone have it on by default; the other vibes start with it off. Moves are logged like a hand's. A hand on a control holds it for 16 bars; a drop holds all of Morph and Morph gives back anything it had out when it stops. Section moves are built but off. Measured in ten minutes of Ambient: no note out of key, the same seed gives the same journey, no 16-bar stretch repeats counting every value Morph moves; by the notes alone 12 stretches repeat. Whether it is good to coast on is for the ear.
 - **The Drop (P10):** a DROP button on the Play tab in both modes, with the same button and a Drop page (build length, cliffhanger, wind-down, Width) on the Advanced Mix tab. A press builds on the bar lines, hangs (a gap, a held chord or nothing), then lands wider with extra layers on top of the section, and stays on until the second press, which winds down over two or four bars into the same section or the one you tapped during the drop. A press during the build cancels it; a press during the wind-down does nothing. The extra layers are an overlay that never touches the song, with its own cap of 48 voices; the tempo never changes. Each of the 24 vibes has its own recipe in its style file. A level follower keeps the drop within about 1 dB of the section it came from. Measured: wider by at least 1.23 times in all 24, highest peak -0.7 dBFS. Whether it goes BAM is for the ear.
 - **All 24 vibes (P8):** the sixteen others join the eight: Progressive, Acid house, Afro house, Minimal techno, Dub techno, Breakbeat, Dubstep, Future garage, Drone, Downtempo, Synthwave, IDM, EDM, Trance, Electro and Trap, in five families, all on one picker screen (no title or Close: Continue last jam is the way back; on a 640 px screen the tiles sit 1 px apart). Each sets its beat, rhythms, five sounds, lead styles, mix and two effects per instrument. Drone holds one chord for eight bars on a Drone layer with Swoop glide, attacks and releases of up to twenty seconds, the air layer and a 16-second reverb; Lo-fi now plays through the lo-fi master and Ambient has a Shimmer pad. The pickers hold the full lists: 26 beats (Minimal, Acid, Garage, Breakbeat, DnB roller, Dubstep, Electro, Trance, EDM, Downtempo, Synthwave, Glitch, Slow pulse among the new), 14 bass rhythms (Octaves, Acid line, Reese hold, Wobble, 808 glide, Arp bass and Walking play chord tones and octaves), 10 synth rhythms (Gate, Skank, Swell, Broken) and 9 to 17 sounds per instrument (Boom, Machine, Big room, Dusty; Acid, Reese, 808, Rubber; Supersaw, Brass; Square, Acid, Pluck, Strings, Shimmer, Choir, Glass pad, Tape pad). The chord library's cards are chosen per vibe, at least seven per feel; Ambient's and Drone's cards hold every chord for four or eight bars. Whether each vibe sounds like its name is for the ear.
 - **Effects (P9):** two effect slots on every instrument, each holding one of twelve (Chorus, Phaser, Flanger, Fuzz, Crush, Tremolo, Pan, Gate, Ring, Vowel, Shifter, Echo), all synthesized; Tremolo, Pan, Gate, Vowel's movement and Echo's time follow the tempo, and Phaser and Flanger do at a note value. In Simple each instrument tab has two on/off buttons named after its effects, and the Mix tab's Space page has the lo-fi master as one on/off. In Advanced each instrument tab has an FX page: per slot the on/off, the effect (picked from a sheet of the twelve) and its three knobs. Switching, changing an effect or turning a knob while playing crossfades, with no click; Echo switched off lets its repeats ring out. Each vibe sets two effects per instrument and arrives with a few on (Lo-fi with Crush and Chorus on the keys). At most six slots play at once: switching on a seventh turns off the one switched on longest ago (all ten measured too heavy for a phone).
@@ -63,9 +64,6 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
-**Phase 2** (row P11; P7, P9, P8 and P10 are built)
-- **Morph:** a switch that lets the jam change by itself, slowly, so it can be left playing.
-
 **Install** (row G6): an Android APK built by GitHub Actions. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
 
 **Phase 3: tablet** (rows T1 to T3)
@@ -84,8 +82,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop | Done |
-| P11 | Phase 2: Morph | Planned |
+| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph | Done |
 | G6 | APK | Planned |
 | T1 to T3 | Phase 3: tablet, punch pads | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
