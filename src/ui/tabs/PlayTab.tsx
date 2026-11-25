@@ -12,6 +12,7 @@ import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane, Playhead } from "../lanes.tsx";
 import { VibeControl } from "../vibes.tsx";
 import { DropButton } from "../drop.tsx";
+import { MorphButton } from "../morph.tsx";
 
 function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   const { engine, song, pending, pos } = ctx;
@@ -84,6 +85,8 @@ export function PlayTab({ ctx }: { ctx: Ctx }) {
   const drop = (
     <div class="droprow">
       <DropButton ctx={ctx} />
+      {/* P11 (spec 8.6, 8.11): the Morph switch beside DROP. */}
+      <MorphButton ctx={ctx} />
     </div>
   );
   return (

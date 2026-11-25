@@ -10,6 +10,7 @@ import { knobPos, knobValue, meterFraction, secondsText, shownPage, simpleSweepL
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Icon } from "../icons.tsx";
+import { MorphPage, MorphSpeed } from "../morph.tsx";
 
 /** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
 function MasterMeter({ engine }: { engine: Engine }) {
@@ -67,15 +68,15 @@ const BUFFERS = [
   ["playback", "Safe"],
 ] as const;
 
-type MixPage = "master" | "levels" | "space" | "audio" | "drop";
+type MixPage = "master" | "levels" | "space" | "audio" | "drop" | "morph";
 const MIX_PAGES: PageDef<MixPage>[] = [
   ["master", "Master"],
   ["levels", "Levels"],
   ["space", "Space"],
   ["audio", "Audio"],
 ];
-/** P10 (spec 8.9): Advanced adds the Drop page. */
-const ADVANCED_PAGES: PageDef<MixPage>[] = [...MIX_PAGES, ["drop", "Drop"]];
+/** P10 (spec 8.9): Advanced adds the Drop page; P11 (spec 8.11) the Morph page. */
+const ADVANCED_PAGES: PageDef<MixPage>[] = [...MIX_PAGES, ["drop", "Drop"], ["morph", "Morph"]];
 
 const CLIFF_NAME = { gap: "Gap", hold: "Hold", none: "None" } as const;
 
@@ -148,6 +149,8 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
           <Dial id="sweep" label={ctx.advanced ? "Filter" : "Tone"} value={mix.sweep} min={-1} max={1} bipolar display={ctx.advanced ? sweepLabel(mix.sweep) : simpleSweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
           <Dial id="pump" label="Pump" value={mix.pump} min={0} max={0.95} display={String(Math.round(mix.pump * 100))} color="var(--teal)" onChange={set("pump")} />
           <Dial id="saturation" label={ctx.advanced ? "Saturate" : "Grit"} value={mix.saturation} min={0} max={1} color="var(--coral)" onChange={set("saturation")} />
+          {/* P11 (spec 8.11): Simple's one Morph dial; Advanced has it on the Morph page. */}
+          {!ctx.advanced && <MorphSpeed engine={engine} label="Morph speed" />}
         </div>
       )}
       {page === "levels" && (
@@ -201,6 +204,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
         </>
       )}
       {page === "drop" && <DropPage engine={engine} />}
+      {page === "morph" && <MorphPage engine={engine} />}
       {page === "audio" && (
         <>
           <div class="seg">

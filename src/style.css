@@ -1972,7 +1972,8 @@ button:disabled {
 .droprow {
   flex: none;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* P11 (spec 8.6): DROP, then the Morph switch beside it. */
+  grid-template-columns: minmax(0, 1fr) 104px;
   gap: var(--gap);
   margin-top: calc(var(--group) - var(--gap));
 }
@@ -2110,6 +2111,68 @@ button:disabled {
   opacity: 0;
 }
 
+/* ---- P11: the Morph switch beside DROP (spec 8.11, 8.12): its word and icon over On or Off; on, the icon turns slowly ---- */
+.tog.morph {
+  height: 56px;
+  min-height: var(--hit);
+  min-width: 0;
+  padding: 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  touch-action: manipulation;
+}
+.tog.morph .mword {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tog.morph .ic {
+  width: 18px;
+  height: 18px;
+}
+.tog.morph small {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+}
+.tog.morph.on small {
+  color: inherit;
+}
+/* A quarter turn a bar, with the clock (`--mb` the bar of four, `--p` the place in it). */
+.running .tog.morph.on .ic {
+  transform: rotate(calc((var(--mb, 0) + var(--p)) * 90deg));
+}
+.still .tog.morph .ic {
+  transform: none;
+}
+
+/* P11: the Mix tab's Morph page (Advanced): five switches, then Speed and Depth. */
+.morphpage {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.morphthings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.morphthings .tog.fxbtn {
+  height: var(--hit);
+}
+.morphpage .dials.n2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 /* P10: the Mix tab's Drop page (Advanced): Build and Cliffhanger rows, then Wind-down beside the Width dial. */
 .droppage {
   flex: 1 1 0;
@@ -2156,7 +2219,8 @@ button:disabled {
   .shell.now .droprow {
     margin-top: 0;
   }
-  .shell.now .drop {
+  .shell.now .drop,
+  .shell.now .tog.morph {
     height: 48px;
   }
   .shell.now .sec {
