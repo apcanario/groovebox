@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DROP_LAYERS, DROP_TYPICAL, dropLevels, dropSpread, resolveDrop, windSteps, type WindBar, type WindState } from "./drop.ts";
+import { DROP_LAYERS, DROP_TYPICAL, dropLevels, dropSpread, peakIn, resolveDrop, soundingAt, toLetGo, windCap, windSteps, type Sounding, type WindBar, type WindState } from "./drop.ts";
 import { STYLES, STYLE_IDS } from "./styles.ts";
 
 /** P10b (C21, spec 8.9): the wind-down eases every part of the drop back to the section, bar by bar. */
@@ -129,5 +129,38 @@ describe("the Drop's wind-down, bar by bar (P10b, C21)", () => {
     expect(one.length).toBe(1);
     expect(one[0].levels).toEqual(to.levels);
     expect(one[0].comp).toBe(1);
+  });
+});
+
+describe("the wind-down's voices on the audio clock (P10b, second fix)", () => {
+  const v = (start: number, off: number, held?: string): Sounding => ({ start, off, held });
+
+  it("counts a voice from its start until it is let go", () => {
+    const vs = [v(0, 1), v(0.5, 2), v(1, 1.5)];
+    expect(soundingAt(vs, 0.75)).toBe(2);
+    expect(soundingAt(vs, 1)).toBe(2); // the first is let go on 1, the third starts there
+    expect(soundingAt(vs, 2)).toBe(0);
+    expect(peakIn(vs, 0, 1)).toBe(2);
+    expect(peakIn(vs, 1, 2)).toBe(2);
+    expect(peakIn(vs, 2, 3)).toBe(0);
+  });
+
+  it("counts what sounds across the window's start", () => {
+    expect(peakIn([v(0, Infinity), v(0.2, 5)], 3, 4)).toBe(2);
+  });
+
+  it("lets go what sounds across a bar line past its allowance, held doubles last and the bass last of them", () => {
+    const vs = [v(0, Infinity, "bass"), v(0.1, Infinity, "layer2"), v(0.2, Infinity, "synth"), v(1.5, 2.5), v(1.8, 2.2), v(1.9, 2)];
+    expect(toLetGo(vs, 2, 6)).toEqual([]);
+    expect(toLetGo(vs, 2, 4)).toEqual([vs[3]]);
+    expect(toLetGo(vs, 2, 1)).toEqual([vs[3], vs[4], vs[1], vs[2]]);
+    expect(toLetGo(vs, 2, 0)).toHaveLength(5); // the one let go on 2 is not sounding across it
+  });
+
+  it("allows fewer each bar than sounded in the bar before, never under the section's", () => {
+    expect(windCap(20, 30)).toBe(20);
+    expect(windCap(20, 12)).toBe(11);
+    expect(windCap(5, 0)).toBe(0);
+    expect(windCap(5, 3, 2)).toBe(2);
   });
 });
