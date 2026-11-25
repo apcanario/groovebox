@@ -627,11 +627,16 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
         if not wid[i] < wid[i - 1] + WIND_WIDTH_TOL + step:
             bad.append(f"the width does not fall in wind-down bar {i} ({wid[i - 1]:.3f} -> {wid[i]:.3f}, the section's own bars move {step:.3f})")
     # P10b review S5: WIDER is the drop's eight-bar threshold; the drop's last bar, one bar, is wider than the section and
-    # within the drop's own bar-to-bar stray of its eight-bar mean (the drop's own width, not a narrower bar).
+    # not narrower than the drop's eight-bar mean by more than the drop's own bar-to-bar stray (the drop's own width, not
+    # a narrower bar). One-sided (P10b third fix): the last bar is the drop's ninth, the same place in the loop as its
+    # first and fifth, which are its widest bars (EDM 0.224 and 0.217, 0.222 and 0.216 against a mean of 0.198, while the
+    # overlay's level and spread still read the drop's full 2.7 dB and 1.0), so a wider last bar is the music, not the
+    # wind-down; it failed EDM at 0.266 and 0.233 (means 0.236 and 0.200). A wind-down begun at the press still fails
+    # here (shown on a scratch engine whose press narrowed the overlay at once).
     d_stray = max(abs(b["width"] - r["width"]) for b in r["drop_bars"])
-    if not (wid[0] > sec["width"] and abs(wid[0] - r["width"]) <= d_stray + WIND_WIDTH_TOL):
+    if not (wid[0] > sec["width"] and wid[0] >= r["width"] - d_stray - WIND_WIDTH_TOL):
         bad.append(f"the drop's last bar is not as wide as the drop ({wid[0]:.3f}; the section's {sec['width']:.3f}, "
-                   f"the drop's {r['width']:.3f} within {d_stray + WIND_WIDTH_TOL:.3f})")
+                   f"the drop's {r['width']:.3f} less at most {d_stray + WIND_WIDTH_TOL:.3f})")
     if not wid[1] - sec["width"] >= WIND_NOT_FIRST * (wid[0] - sec["width"]) - stray:
         bad.append(f"the width is spent in the first bar ({wid[0]:.3f} -> {wid[1]:.3f}, the section's {sec['width']:.3f}, its own bars within {stray:.3f})")
     # The end: the two bars after, against the section's own two-bar means (the same window), unless Morph owed or
