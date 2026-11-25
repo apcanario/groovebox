@@ -721,7 +721,13 @@ function rampFm(voices: readonly unknown[], ratio: number, index: number, at?: n
 
 export class Bass extends Instrument {
   private monos: VoiceSets<Mono>;
-  private sub: Tone.Synth;
+  /**
+   * The sub sine, one per voice set (P10 fix): it is swapped with the wave's voices, so the two start together on the
+   * next note. A sine wave and its sub sound the same pitch: a sub left running from the last voice set (a note held
+   * over a vibe's bar line) sat at any phase against the new voice, and cancelled it by up to 20 dB until both stopped.
+   */
+  private subs: VoiceSets<Tone.Synth>;
+  private subEnv = { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.08 };
   private subGain: Tone.Gain;
   private wave: Wave | null = null;
   private env = { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.08 };
@@ -736,11 +742,7 @@ export class Bass extends Instrument {
     this.channel.enableEnv();
     this.monos = new VoiceSets(this.channel.input);
     this.subGain = new Tone.Gain(subGain(0.75)).connect(this.channel.input);
-    this.sub = new Tone.Synth({
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.08 },
-    });
-    this.sub.connect(this.subGain);
+    this.subs = new VoiceSets(this.subGain);
     this.setWave("sawtooth");
   }
 
@@ -760,6 +762,7 @@ export class Bass extends Instrument {
   protected setWave(w: Wave, at?: number): void {
     if (w === this.wave) return;
     this.wave = w;
+    this.subs.swap(() => new Tone.Synth({ oscillator: { type: "sine" }, envelope: this.subEnv }), at);
     this.monos.swap(() => {
       if (w === "fm")
         return new Tone.FMSynth({
@@ -791,7 +794,8 @@ export class Bass extends Instrument {
     this.env = { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release };
     this.monos.each((m) => m.set({ envelope: this.env }));
     if (this.wave === "fm") this.monos.live?.synth.set({ modulationEnvelope: modEnv(this.env) } as never);
-    this.sub.set({ envelope: { ...this.env, sustain: Math.max(p.sustain, 0.6) } });
+    this.subEnv = { ...this.env, sustain: Math.max(p.sustain, 0.6) };
+    this.subs.each((s) => s.set({ envelope: this.subEnv }));
     this.breath?.shape(this.env);
   }
 
@@ -800,14 +804,17 @@ export class Bass extends Instrument {
       const hz = midiToHz(midi);
       // A mono bass: the next note ends one still held by the previous voice set.
       this.monos.old?.synth.triggerRelease(time);
+      this.subs.old?.synth.triggerRelease(time);
       this.monos.retireIf((m) => m.getLevelAtTime(Tone.now()) < 1e-4);
+      this.subs.retireIf((m) => m.getLevelAtTime(Tone.now()) < 1e-4);
       const live = this.monos.live!.synth;
+      const sub = this.subs.live!.synth;
       live.triggerAttackRelease(hz, dur, time, vel);
-      this.sub.triggerAttackRelease(hz, dur, time, vel);
+      sub.triggerAttackRelease(hz, dur, time, vel);
       this.breath?.play(hz * 2, time, dur, vel * 0.6);
       const g = glideSeconds(this.glide, dur);
       if (g > 0.003 && this.lastHz !== null && this.lastHz !== hz) {
-        for (const s of [live, this.sub]) {
+        for (const s of [live, sub]) {
           s.frequency.cancelScheduledValues(time);
           s.frequency.setValueAtTime(this.lastHz, time);
           s.frequency.exponentialRampToValueAtTime(hz, time + g);
@@ -820,7 +827,7 @@ export class Bass extends Instrument {
 
   releaseAll(time: number): void {
     this.monos.each((m) => m.triggerRelease(time));
-    this.sub.triggerRelease(time);
+    this.subs.each((m) => m.triggerRelease(time));
     this.breath?.release(time);
     this.lastHz = null;
   }
