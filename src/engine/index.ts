@@ -1640,15 +1640,18 @@ export class Engine {
   /**
    * For the tests and the smoke test: play `bars` bars of the loaded song without audio, as the scheduler would (Morph
    * at every bar line, then the sequencer's steps), from a fresh journey. Returns Morph's moves and each bar's trace.
-   * Refused while audio plays.
+   * Refused while audio plays. `atBar` runs at each bar line before Morph (a test's hand).
    */
-  morphDry(bars: number): { moves: MorphMade[]; trace: MorphBar[] } | null {
+  morphDry(bars: number, atBar?: (bar: number) => void): { moves: MorphMade[]; trace: MorphBar[] } | null {
     if (this.playing) return null;
     this.morphTraceOn(true);
     this.seq.start();
     this.morphPlanner = null;
     for (let i = 0; i < bars * STEPS_PER_BAR; i++) {
-      if (this.seq.upcoming.step === 0) this.morphBarLine();
+      if (this.seq.upcoming.step === 0) {
+        atBar?.(this.seq.upcoming.bar);
+        this.morphBarLine();
+      }
       this.traceStep(this.seq.next());
     }
     this.closeTrace();

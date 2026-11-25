@@ -47,6 +47,17 @@ export default {
     wind: 4,
     bloom: true,
   },
+  // P11 (spec 8.11): Morph arrives on. The pads and sends drift wide and wet; the pads and the drone change voicing
+  // two inversions each way; the beat, the bass, the keys and the shimmer pad may drop out for a phrase; never the drone.
+  morph: {
+    on: true,
+    bright: [0.25, 0.75],
+    space: [0.45, 0.95],
+    lock: 0.4,
+    voicing: [1 / 6, 5 / 6],
+    drop: ["drums", "bass", "synth", "layer1"],
+    sections: 32,
+  },
   sections: [
     {
       name: "Intro",

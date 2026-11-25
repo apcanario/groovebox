@@ -46,6 +46,17 @@ export default {
     wind: 4,
     bloom: true,
   },
+  // P11 (spec 8.11): Morph arrives on. Darker than Ambient: the filters drift low, the sends stay wet; the drone and the
+  // pad change voicing two inversions each way; the pulse, the bass, the organ and the pad may drop out for a phrase.
+  morph: {
+    on: true,
+    bright: [0.15, 0.55],
+    space: [0.5, 1],
+    lock: 0.4,
+    voicing: [1 / 6, 5 / 6],
+    drop: ["drums", "bass", "synth", "layer1"],
+    sections: 32,
+  },
   sections: [
     {
       name: "Intro",
