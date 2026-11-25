@@ -8,7 +8,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 (Done) | New sounds, effects, all 24 vibes |
 | 7 | P10 (Done), P11 (Done) | The Drop, Morph |
-| 7b | R1, P10b, P10c | A leaner build cycle, the drop's wind-down (C21), the bundle 7 player findings (C23) |
+| 7b | R1 (Done), P10b, P10c, P10d | A leaner build cycle, the drop's wind-down (C21), the bundle 7 player findings (C23), two live-build bugs from Pedro (play button, DROP and Morph position) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
 | 9 | G6 | The APK (parked by Pedro until after the tablet bundle, 24 Nov 2026) |
 | 10 | G7 | Retouch from notes |
@@ -74,20 +74,11 @@ Done (25 Nov 2026), see Done below. Its text left the queue.
 
 ## Bundle 7b: the cycle and the drop's wind-down
 
-Worked after bundle 7 and before bundle 8. R1 goes first: P10b is built with the cycle R1 writes, so it is also R1's trial.
+Worked after bundle 7 and before bundle 8. R1 is Done: P10b is built with the cycle R1 wrote, so it is also R1's trial.
 
 ### R1. A leaner build cycle
 
-Why: the cloud process restarts every 65 to 120 minutes and kills agents and background runs. In bundle 7 the builder was stopped twice (over an hour each), the fixers three times, and the builder, reviewer, fixer and main chat each ran the 47-minute full smoke, so one row cost hours of duplicate runs. Pedro asked for the cycle to be chunked (25 Nov 2026).
-
-- **One full smoke per row.** Builder, reviewer and fixer run `npm run check` plus only the smoke part their change touches (`python3 tools/smoke.py dist --part <name>`); the main chat runs the full seven-part smoke once, at close. Edit `docs/RUN.md` sections 3 and 4 and the `CLAUDE.md` Commands lines to say so.
-- **Per-part fingerprints.** `tools/smoke_parts.py` keys each part's ledger entry to the files that part exercises, not to all of `src/`, so a UI change does not rerun the 25-minute drop part. Prove with a test that a change to a file outside a part leaves its entry green and a change inside it clears it.
-- **Split the drop part by groups of vibes** (for example six groups of four), each its own ledger entry, so a failure on one vibe costs about 5 minutes. The measured limits and the 24 vibes checked stay the same; no threshold changes.
-- **Slices.** A row is written as slices of 45 minutes or less of work (for example a, b, c: engine, UI, the Done-when tests), each a commit with its own tests. RUN.md section 3 launches one fresh builder per slice, and each slice's prompt names the previous commit. A restart then loses one slice. Rows already in the backlog are not rewritten; the chat splits a row into slices in its notes before the first builder.
-- **Watchdog.** Use the saved `watchdog` skill: a self-rescheduling check every 10 to 12 minutes that resumes a stopped agent, never starts a second run, and switches off at close.
-- Keep the reviewer's job (read the diff, run `check`, write `docs/reviews/<row>.md`) and the fixer's job as they are.
-
-**Done when:** `docs/RUN.md` and `CLAUDE.md` say the above; the per-part fingerprint test passes; the drop part runs in groups; `check` and `smoke` pass; P10b is then built and closed under the new cycle and its changelog row says how long it took against P10 and P11.
+Done (25 Nov 2026), see Done below. Its text left the queue.
 
 ### P10b. The Drop's wind-down
 
@@ -106,6 +97,15 @@ From C23 (`docs/reviews/bundle-7.md`, 25 Nov 2026): the small fixes the bundle 7
 - **M5.** `tools/shots.py` captures Morph on (Ambient) and the DROP states (build, on, wind-down) in its walk of states.
 
 **Done when:** at 360 x 640 and 412 x 915 no Advanced Mix chip label is closer than its padding to the chip edge, with all six chips at one text size (tested: a check on the measured label and chip boxes that fails on the old layout); the band above DROP in Advanced Play at 412 x 915 is gone (tested the same way); the Morph help text matches the Sections state (tested against both states); the Morph speed dial shares a row on the Simple Mix Master page at 360 x 640 and 412 x 915; `shots.py` writes screenshots of Morph on and of the three DROP states and fails if one is missing; no threshold changed; `check` and `smoke` pass. C23 then leaves Carried and a Done line records M2 as kept.
+
+### P10d. Play button state and DROP and Morph position
+
+From Pedro's notes while this bundle ran (25 Nov 2026), worked after P10c in the same chat. No cause found yet for either.
+
+- **Play button.** Tapping Play, the button flickers to the playing state and then returns to the stopped state (Play, not Stop) while the music keeps playing. The button must show the transport's real state and stay on Stop while it plays, in Simple and Advanced, on the first tap after load and on later taps, and after a tap during a drop or morph. Look at how the button reads transport state (a stale or raced value, or a state update after the start promise) in `src/ui/` and the engine's start path.
+- **DROP and Morph position.** In Advanced mode the DROP and Morph controls sit higher on the screen than in Simple mode (and than in Advanced before a layout change moved them). They stay where they are for muscle memory: DROP and Morph keep one screen position, the same in Simple and Advanced and from one visit to the next, at phone sizes. Work out what moves them (probably the empty band C23 M1 describes, or a row above that changes height between modes) and fix it together with P10c M1 so the band above DROP is closed without moving DROP: the free space goes above or below the group, not between it and the transport. Spec 8.6 and 8.9 say where DROP lives; if they say nothing about position, add the rule to the spec in the same commit.
+
+**Done when:** a test taps Play and samples the button over 2 s while the transport runs and fails if it ever shows the stopped state (tested in Simple and Advanced); a test measures the DROP and Morph boxes at 360 x 640 and 412 x 915 in both modes and fails if their top edge differs between Simple and Advanced or moves when Advanced switches page; the stuck-note and click checks pass; `check` and `smoke` pass.
 
 ## Bundle 8: phase 3, tablet
 
@@ -202,3 +202,4 @@ Kept here so no row disappears without a record.
 - **P8. Sixteen more vibes and the full lists** (24 Nov 2026). Built, reviewed (fix: 1 error, 7 should-fix, 6 minor, all applied; the error was 1- and 2-bar chord cards padding Drone and Ambient against spec 8.10). Report in `docs/reviews/P8.md`, fix log in `docs/reviews/P8-fix-progress.md`. C9, C10 and C18 cleared.
 - **P10. The Drop** (25 Nov 2026). Built, reviewed (fix: 1 error, 10 should-fix, 7 minor, all applied; the error was the Filter knob doing nothing while the drop is on). Report in `docs/reviews/P10.md`. Conductor and overlay in `src/engine/drop.ts` with its own 48-voice cap, a recipe in each of the 24 style files, DROP on the Play tab in both modes and the Drop page on the Advanced Mix tab.
 - **P11. Morph** (25 Nov 2026). Built, reviewed (fix: 1 error, 2 should-fix, 5 minor, all applied, M5 (R1 says seven-part) at close; the error was Morph losing track of an instrument it had taken out or a Lock it had eased on Stop, a load, a new seed or a drop). Report in `docs/reviews/P11.md`. Planner in `src/music/morph.ts`, a Morph switch beside DROP, Morph speed on the Simple Mix tab, a Morph page in Advanced Mix and a Voicing dial on the Pad page; the smoke gained a seventh part, morph. Listen items and changed checks in C22. Bundle 7 is done.
+- **R1. A leaner build cycle** (25 Nov 2026). Built in two slices (R1a tools, R1b docs), reviewed (fix: 1 error, 3 should-fix, 5 minor, all applied; the error was a tab file named in no part's fingerprint). Report in `docs/reviews/R1.md`. Per-part smoke fingerprints, the drop part in six groups (twelve parts), one full smoke per row, slices, the watchdog.

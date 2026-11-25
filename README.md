@@ -62,7 +62,7 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 
 ## Where it is going
 
-**Next, bundle 7b:** a leaner build cycle (row R1), then the drop's wind-down eased over its bars (row P10b).
+**Next, bundle 7b:** the drop's wind-down eased over its bars (row P10b), then the page-chip and screenshot fixes (P10c), then the play button and the DROP and Morph position (P10d). R1, the leaner build cycle, is Done.
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
