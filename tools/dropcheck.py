@@ -457,7 +457,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     p_wind = {"peak": max(w["s"]["peak"] for w in wind[:length + 1])}
     p_after = {"peak": max(w["s"]["peak"] for w in wind[length + 1:])}
     winds = {"bars": wind, "length": length, "live_after": live_after, "pressed": pressed, "w0": w0, "end": end,
-             "same_song": doc(page) == song_before, "phase_after": shown(page)["phase"], "plan": plan,
+             "same_song": doc(page) == song_before, "morph": page.evaluate(f"{E}.morphPlan().on"), "phase_after": shown(page)["phase"], "plan": plan,
              "jump_ref": max(jumps) if jumps else 0.0}
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
@@ -522,14 +522,22 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
     stray = max(abs(b["width"] - sec["width"]) for b in r["sec_bars"])
     if not abs(after["s"]["width"] - sec["width"]) <= stray + WIND_WIDTH_TOL:
         bad.append(f"the width after the wind-down is not the section's ({after['s']['width']:.3f}, the section's {sec['width']:.3f} within {stray + WIND_WIDTH_TOL:.3f})")
-    if not abs(db(after["s"]) - db(sec)) <= LOUD_DB:
-        bad.append(f"the level after the wind-down is {db(after['s']) - db(sec):+.2f} dB from the section's (more than {LOUD_DB} dB)")
+    # The level after it: each of the two bars after within a single bar's tolerance of the section (BAR_DB past the
+    # section's own stray, as each drop bar); without Morph, their mean within LOUD_DB, as the drop's. Morph (on in
+    # Ambient and Drone) moves the section's own level by itself (a part out for a phrase), so there only per bar.
+    spread = max(abs(db(b) - db(sec)) for b in r["sec_bars"])
+    for k, b in enumerate(bars[n + 1:], 1):
+        off = db(b["s"]) - db(sec)
+        if abs(off) > BAR_DB + spread:
+            bad.append(f"bar {k} after the wind-down is {off:+.2f} dB from the section (more than {BAR_DB} dB past the section's own {spread:.2f} dB)")
+    two = 10 * math.log10(max(sum(b["s"]["energy"] for b in bars[n + 1:]) / len(bars[n + 1:]), 1e-12)) - db(sec)
+    if not w["morph"] and abs(two) > LOUD_DB:
+        bad.append(f"the two bars after the wind-down are {two:+.2f} dB from the section's level (more than {LOUD_DB} dB)")
     if not db(after["l"]) <= LAYERS_GONE_DB:
         bad.append(f"the extra layers still sound after the wind-down ({db(after['l']):.1f} dB)")
     if w["live_after"] != 0:
         bad.append(f"{w['live_after']} overlay voices still sound a bar after the wind-down (stuck notes)")
     # The master holds the section's level through the wind-down, as through the drop (nothing drops out at once).
-    spread = max(abs(db(b) - db(sec)) for b in r["sec_bars"])
     for i in range(1, n + 1):
         off = db(wind[i]["s"]) - db(sec)
         if abs(off) > BAR_DB + spread:
@@ -543,11 +551,13 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
         bad.append(f"a press during the wind-down did something: {w['pressed']}")
     if not w["end"] or w["end"]["bar"] != w["w0"] + n or w["end"]["cancelled"] or w["phase_after"] != "off":
         bad.append(f"the wind-down did not end on its bar line {n} bars on, back to off, after a press during it (end {w['end']}, now {w['phase_after']})")
-    if not w["same_song"]:
+    # Morph (on in Ambient and Drone) writes the document by itself, bar by bar; there the walk's check (Morph off) holds.
+    if not w["same_song"] and not w["morph"]:
         bad.append("the song document changed between the first press and the end of the wind-down")
     for b in bad:
         failures.append(f"P10b {label}: {b}")
-    return [f"{x:.1f}" for x in lay] + [f"{db(after['l']):.0f}"], [f"{x:.3f}" for x in wid] + [f"{after['s']['width']:.3f}"], most + [after["most"]]
+    return ([f"{x:.1f}" for x in lay] + [f"{db(after['l']):.0f}"], [f"{x:.3f}" for x in wid] + [f"{after['s']['width']:.3f}"],
+            most + [after["most"]], [round(db(b["s"]) - db(sec), 2) for b in bars[1:]])
 
 
 def judge(r: dict, label: str, failures: list) -> None:
@@ -602,8 +612,9 @@ def drop_vibes(page, failures: list, group: int | None = None) -> None:
         if not r:
             continue
         judge(r, v["id"], failures)
-        lay, wid, most = judge_wind(r, v["id"], failures)
-        winds.append(f"{v['id']} layers {' > '.join(lay)} dB, width {' > '.join(wid)} (section {r['n']['width']:.3f}), voices {' > '.join(map(str, most))}")
+        lay, wid, most, lev = judge_wind(r, v["id"], failures)
+        winds.append(f"{v['id']} layers {' > '.join(lay)} dB, width {' > '.join(wid)} (section {r['n']['width']:.3f}), voices {' > '.join(map(str, most))}, "
+                     f"master from the section {' '.join(f'{x:+.2f}' for x in lev)} dB{' (Morph on)' if r['wind']['morph'] else ''}")
         info = r["info"]
         rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}; the section's own within {r['spread']:.2f}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
                     f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
