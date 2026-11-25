@@ -3311,8 +3311,9 @@ def setup_vibes(page) -> None:
     wait_for(page, "!window.__groovebox.playing", 3.0)
 
 
-# The smoke in parts, run in this order, each in its own browser from a first launch (open_app). Together they are
-# the single run's walk, statement for statement (tools/smoke_parts.py checks that every check sits in a part).
+# The smoke in parts, run in this order, each in its own browser from a first launch (open_app). Together they run
+# every check of the old single run, with the drop's vibes split into groups drop-1 to drop-6 (tools/smoke_parts.py
+# checks that every check sits in a part and that DROP_GROUPS matches the drop parts).
 PARTS = [
     ("core", part_core, None),
     ("vibes", part_vibes, setup_vibes),
