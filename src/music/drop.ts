@@ -404,3 +404,54 @@ export function windSteps(bars: number, from: WindState, to: WindState): WindBar
   }
   return out;
 }
+
+/**
+ * P10b (second fix, spec 8.9): one overlay voice on the audio clock, from its start to the moment it is let go (a
+ * sustained note at its note-off, a hit when its decay has fallen 35 dB, a voice let go early on a wind-down bar line
+ * at that bar line). Its release after that is a tail, not a voice. `held` names the instrument whose held notes it
+ * doubles. The wind-down's allowance counts these, so "fewer voices each bar" is what sounds, not what was scheduled.
+ */
+export interface Sounding {
+  start: number;
+  off: number;
+  held?: string;
+}
+
+/** Voices sounding at audio time `t` (started at or before it, not yet let go). */
+export function soundingAt(voices: readonly Sounding[], t: number): number {
+  let n = 0;
+  for (const v of voices) if (v.start <= t + 1e-6 && v.off > t + 1e-6) n++;
+  return n;
+}
+
+/** The most voices sounding at once in the window [a, b) of audio time. */
+export function peakIn(voices: readonly Sounding[], a: number, b: number): number {
+  let most = soundingAt(voices, a);
+  for (const v of voices) if (v.start > a && v.start < b - 1e-6) most = Math.max(most, soundingAt(voices, v.start));
+  return most;
+}
+
+/** The order in which held notes' doubles leave in a wind-down: the layers first, the bass last. */
+export const HELD_ORDER = ["layer2", "layer1", "synth", "bass"];
+
+/**
+ * The voices to let go on a wind-down bar line `t` so that at most `cap` sound across it: every voice sounding there
+ * past the cap, the ones not holding an instrument's notes first (oldest first), then the held doubles in
+ * HELD_ORDER (oldest first within one).
+ */
+export function toLetGo<T extends Sounding>(voices: readonly T[], t: number, cap: number): T[] {
+  const on = voices.filter((v) => v.start <= t + 1e-6 && v.off > t + 1e-6);
+  const extra = on.length - Math.max(0, cap);
+  if (extra <= 0) return [];
+  const rank = (v: Sounding): number => (v.held === undefined ? -1 : Math.max(0, HELD_ORDER.indexOf(v.held)));
+  return [...on].sort((x, y) => rank(x) - rank(y) || x.start - y.start).slice(0, extra);
+}
+
+/**
+ * A wind-down bar's voice allowance (spec 8.9: fewer voices are let in each bar): the planned step, and never more
+ * than one fewer than the most that sounded at once in the bar before (a bar that played fewer than its allowance
+ * still leaves the next with fewer), never under the section's.
+ */
+export function windCap(planned: number, before: number, to = 0): number {
+  return Math.max(to, Math.min(planned, before - 1));
+}

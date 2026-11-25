@@ -20,7 +20,7 @@
  */
 import * as Tone from "tone";
 import { createRng } from "../music/random.ts";
-import { DROP_LAYERS, dropSpread, windSteps, type DropRecipe, type WindBar } from "../music/drop.ts";
+import { DROP_LAYERS, dropSpread, peakIn, soundingAt, toLetGo, windCap, windSteps, type DropRecipe, type Sounding, type WindBar } from "../music/drop.ts";
 
 /** At most this many overlay oscillators and noise hits sound at once (every voice of the overlay); one past it is not played. */
 export const VOICE_CAP = 48;
@@ -34,6 +34,11 @@ const IMPACT = Math.pow(10, -2 / 20);
 /** A voice that can be let go early (a held note's), with its release. */
 interface Voice {
   release(t: number): void;
+}
+
+/** P10b (second fix): a voice in the overlay's ledger, with how to let it go early on a bar line. */
+interface Entry extends Sounding {
+  cut(t: number): void;
 }
 
 const raw = (): AudioContext => Tone.getContext().rawContext as unknown as AudioContext;
@@ -182,7 +187,7 @@ export class DropOverlay {
   private groups: Record<OverlayGroup, Pair>;
   private noise: AudioBuffer;
   private rng = createRng(0x0d0b);
-  private riser: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
+  private riser: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode; entry: Entry } | null = null;
   private sources = new Set<AudioScheduledSourceNode>();
   /** Overlay voices sounding now, and voices not played because the cap was full in this drop (for the smoke test). */
   live = 0;
@@ -192,15 +197,25 @@ export class DropOverlay {
   private spreadNow = 0.8;
   /** Voices of the notes held over bar lines, by instrument (P10 review S8). */
   private held = new Map<string, Voice[]>();
-  /** Set while `holdNotes` starts voices: they are collected here. */
+  /** Set while `holdNotes` starts voices: they are collected here, and the instrument they hold. */
   private collect: Voice[] | null = null;
+  private collectKey: string | undefined;
+  /**
+   * P10b (second fix): every overlay voice on the audio clock, from its start until it is let go (`Sounding`), kept
+   * for 40 s. The wind-down's allowance counts these: a voice still sounding across a wind-down bar line past that
+   * bar's allowance is let go there, so the voices sounding fall every bar (the first fix counted voices from when
+   * they were scheduled until their tails ended, so the voices of the drop's last bar still counted in the first
+   * wind-down bar: Progressive 34 then 34).
+   */
+  private ledger: Entry[] = [];
+  /** For the smoke test's reads of the overlay's params (`params`). */
+  private keepAlive: ConstantSourceNode | null = null;
   /** A bloom keeps its grown reverb through the drop and lets it go over the wind-down (P10 review M4). */
   private keepVerb = false;
-  /** Most voices sounding at once in the bar now playing, and in the bar before (the wind-down starts from it). */
-  private barPeak = 0;
   /** P10b: the wind-down's voice allowance, bar by bar from its start (audio time), and its end; none outside one. */
   private windCaps: { from: number; cap: number }[] = [];
   private windUntil = 0;
+  private windBarSec = 0;
   /** Voices not played because the wind-down's allowance was full (not the cap's `dropped`). */
   thinned = 0;
   /** P10b: the last wind-down's schedule (audio time of its first bar line, bar length, per-bar targets), for tests and the smoke. */
@@ -320,14 +335,16 @@ export class DropOverlay {
     gain.gain.linearRampToValueAtTime(0.22, end);
     src.connect(filter).connect(gain).connect(this.fxBus);
     src.start(t);
-    this.track(src, [filter, gain]);
-    this.riser = { src, gain, filter };
+    const entry = this.entry(t, Infinity, gain);
+    this.track(src, [filter, gain], entry);
+    this.riser = { src, gain, filter, entry };
   }
 
   private stopRiser(t: number): void {
     const r = this.riser;
     if (!r) return;
     this.riser = null;
+    r.entry.off = Math.min(r.entry.off, t);
     hold(r.gain.gain, t);
     r.gain.gain.setTargetAtTime(0, t, 0.01);
     try {
@@ -389,7 +406,7 @@ export class DropOverlay {
         src.connect(f).connect(g).connect(p).connect(this.impactBus);
         src.start(t, this.rng.next());
         src.stop(t + bar * 1.2);
-        this.track(src, [f, g, p]);
+        this.track(src, [f, g, p], this.entry(t, t + Math.min(1.2, 4 / 3) * bar, g));
       }
     if (r.impact.sub && this.room(t)) {
       const o = c.createOscillator();
@@ -403,7 +420,7 @@ export class DropOverlay {
       o.connect(g).connect(this.impactBus);
       o.start(t);
       o.stop(t + 2.6);
-      this.track(o, [g]);
+      this.track(o, [g], this.entry(t, t + 0.05 + 4 * 0.45, g));
     }
     if (r.impact.burst)
       for (const pan of [-1, 1]) this.noiseHit(t, 0.5, 0.16 * IMPACT, "highpass", 2600, 0.7, this.impactBus, pan);
@@ -456,7 +473,8 @@ export class DropOverlay {
       spread: this.groups.synth.pan.at(t),
       verb: this.keepVerb ? this.verbAim.at(t) : 0,
       pump: pump.from,
-      voices: Math.max(this.barPeak, this.live),
+      // P10b (second fix): the most voices sounding at once in the drop's last bar, on the audio clock.
+      voices: peakIn(this.ledger, t - bar, t),
       held,
     };
     const to = { levels: { synth: 0, bass: 0, drums: 0, leads: 0 }, comp: 1, spread: 0, verb: 0, pump: pump.to, voices: 0, held: 0 };
@@ -488,14 +506,57 @@ export class DropOverlay {
     }
     this.windCaps = steps.map((s, i) => ({ from: t + i * bar, cap: s.voices }));
     this.windUntil = t + steps.length * bar;
+    this.windBarSec = bar;
     this.thinned = 0;
     this.windLog = { at: t, bar, steps };
+    this.letGoPast(t, steps[0].voices);
     return steps;
   }
 
-  /** A bar line while the drop sounds: the voice peak of the bar that ended is kept (the wind-down starts from it). */
-  barLine(): void {
-    this.barPeak = this.live;
+  /**
+   * P10b (second fix): a later bar line `t` of the wind-down (bar `i`, from 1): that bar's allowance is its planned
+   * step, and one fewer than the most that sounded in the bar before (`windCap`); what sounds across the bar line past
+   * it is let go there, so fewer voices sound in every bar. Returns the allowance.
+   */
+  windLine(t: number, i: number): number {
+    const c = this.windCaps[i];
+    if (!c) return 0;
+    c.cap = windCap(c.cap, peakIn(this.ledger, t - this.windBarSec, t));
+    this.letGoPast(t, c.cap);
+    return c.cap;
+  }
+
+  /** Every voice sounding across `t` past `cap` let go there (held doubles last, the bass last of them). */
+  private letGoPast(t: number, cap: number): void {
+    for (const e of toLetGo(this.ledger, t, cap)) e.cut(t);
+  }
+
+  /** For the smoke test: the most overlay voices sounding at once (audio clock) in each of `n` bars from `a`. */
+  voiceBars(a: number, bar: number, n: number): number[] {
+    return Array.from({ length: n }, (_, i) => peakIn(this.ledger, a + i * bar, a + (i + 1) * bar));
+  }
+
+  /** For the smoke test: the overlay's own controls as the audio thread has them now (each layer's level, the spread, the follower's gain). */
+  params(): { t: number; levels: number[]; spread: number; comp: number } {
+    // Chrome stops working out a node whose inputs have all fallen silent, and its params' `.value` then stays where it
+    // was: a source of zeros kept on every side keeps them read on the audio clock (nothing is added to the sound).
+    if (!this.keepAlive) {
+      const z = raw().createConstantSource();
+      z.offset.value = 0;
+      for (const g of Object.values(this.groups)) {
+        z.connect(g.l);
+        z.connect(g.r);
+      }
+      z.connect(this.comp);
+      z.start();
+      this.keepAlive = z;
+    }
+    return {
+      t: raw().currentTime,
+      levels: DROP_LAYERS.map((k) => this.groups[k].out.gain.value),
+      spread: this.groups.synth.pr.pan.value,
+      comp: this.comp.gain.value,
+    };
   }
 
   /** P10b, for the smoke test: the extra layers' own sound (all four pairs, before the music bus) also into `node`. */
@@ -525,6 +586,8 @@ export class DropOverlay {
     this.normalAt(t);
     this.setComp(1, t, 0.02);
     for (const k of [...this.held.keys()]) this.letGo(k, t);
+    // P10b (second fix): nothing of the overlay sounds across the end bar line.
+    this.letGoPast(t, 0);
     for (const g of Object.values(this.groups)) g.gain(0, t, 0.02);
   }
 
@@ -564,10 +627,12 @@ export class DropOverlay {
     this.letGo(key, t);
     const voices: Voice[] = [];
     this.collect = voices;
+    this.collectKey = key;
     if (kind === "synth") this.synth(notes, t, dur, vel, true);
     else if (kind === "bass") this.bass(notes[0], t, dur, vel, true);
     else this.lead(notes, t, dur, vel, pad);
     this.collect = null;
+    this.collectKey = undefined;
     this.held.set(key, voices);
   }
 
@@ -637,7 +702,8 @@ export class DropOverlay {
     if (this.windCaps.length && t < this.windUntil) {
       let cap = this.windCaps[0].cap;
       for (const c of this.windCaps) if (t + 1e-6 >= c.from) cap = c.cap;
-      if (this.live >= cap) {
+      // P10b (second fix): the voices sounding at `t` on the audio clock, not those scheduled with their tails.
+      if (soundingAt(this.ledger, t) >= cap) {
         this.thinned++;
         return false;
       }
@@ -645,10 +711,27 @@ export class DropOverlay {
     return true;
   }
 
-  private track(src: AudioScheduledSourceNode, nodes: AudioNode[]): void {
+  /** A ledger entry from `t` to `off`; let go early, `g` fades out over a few ms and the voice stops counting. */
+  private entry(t: number, off: number, g: GainNode): Entry {
+    const e: Entry = {
+      start: t,
+      off,
+      cut: (at: number) => {
+        if (e.off <= at + 1e-6) return;
+        e.off = at;
+        hold(g.gain, at);
+        g.gain.setTargetAtTime(0, Math.max(at, raw().currentTime), 0.008);
+      },
+    };
+    return e;
+  }
+
+  private track(src: AudioScheduledSourceNode, nodes: AudioNode[], entry: Entry): void {
+    const now = raw().currentTime;
+    if (this.ledger.length > 400 || (this.ledger.length && this.ledger[0].off < now - 40)) this.ledger = this.ledger.filter((e) => e.off >= now - 40);
+    this.ledger.push(entry);
     this.live++;
     this.most = Math.max(this.most, this.live);
-    this.barPeak = Math.max(this.barPeak, this.live);
     this.sources.add(src);
     src.onended = () => {
       this.live--;
@@ -674,25 +757,26 @@ export class DropOverlay {
       g.gain.setTargetAtTime(0, off, release / 4);
       o.stop(off + release * 1.3 + 0.02);
     };
-    if (Number.isFinite(dur)) {
-      const off = t + Math.max(attack, dur);
+    const off = Number.isFinite(dur) ? t + Math.max(attack, dur) : Infinity;
+    if (Number.isFinite(off)) {
       g.gain.setValueAtTime(peak, off);
       stopAt(off);
     }
-    this.track(o, [g]);
     let done = false;
-    this.collect?.push({
-      release: (at: number) => {
-        if (done) return;
-        done = true;
-        hold(g.gain, at);
-        try {
-          stopAt(Math.max(at, raw().currentTime));
-        } catch {
-          // already ended
-        }
-      },
-    });
+    const letGo = (at: number): void => {
+      if (done || entry.off <= at + 1e-6) return;
+      done = true;
+      entry.off = at;
+      hold(g.gain, at);
+      try {
+        stopAt(Math.max(at, raw().currentTime));
+      } catch {
+        // already ended
+      }
+    };
+    const entry: Entry = { start: t, off, held: this.collect ? this.collectKey : undefined, cut: letGo };
+    this.track(o, [g], entry);
+    this.collect?.push({ release: letGo });
   }
 
   private noiseSource(): AudioBufferSourceNode {
@@ -723,7 +807,7 @@ export class DropOverlay {
     } else g.connect(dest);
     src.start(t, this.rng.next() * 1.5);
     src.stop(t + decay * 1.5 + 0.02);
-    this.track(src, nodes);
+    this.track(src, nodes, this.entry(t, t + 0.002 + decay, g));
   }
 
   /** A short tuned hit falling from `from` to `to` Hz (the roll's body, the percussion). */
@@ -741,6 +825,6 @@ export class DropOverlay {
     o.connect(g).connect(dest);
     o.start(t);
     o.stop(t + decay * 1.5 + 0.02);
-    this.track(o, [g]);
+    this.track(o, [g], this.entry(t, t + 0.002 + decay, g));
   }
 }

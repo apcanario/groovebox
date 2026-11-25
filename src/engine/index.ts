@@ -1201,6 +1201,19 @@ export class Engine {
     return out;
   }
 
+  /**
+   * For the smoke test (P10b, second fix): the most overlay voices sounding at once on the audio clock in each of `n`
+   * bars of `bar` seconds from audio time `a`, from start to let-go (`Sounding`).
+   */
+  dropVoices(a: number, bar: number, n: number): number[] {
+    return this.graph ? this.graph.drop.voiceBars(a, bar, n) : [];
+  }
+
+  /** For the smoke test (P10b, second fix): the overlay's levels, spread and follower's gain as the audio thread has them, with the audio time. */
+  dropParams(): { t: number; levels: number[]; spread: number; comp: number } | null {
+    return this.graph ? this.graph.drop.params() : null;
+  }
+
   private stereoWatch: EnergyWatch | null = null;
   private layersWatch: EnergyWatch | null = null;
 
@@ -1312,7 +1325,6 @@ export class Engine {
       g.setMix("pump", mixValue(this.mix, "pump") + rec.pump);
     }
     if (plan.phase === "wind") this.windBar(time, barSec, plan, rec);
-    if (plan.phase === "on" || plan.phase === "wind") g.drop.barLine();
     if (plan.end) {
       this.windSteps = null;
       this.pumpShare = 1;
@@ -1364,6 +1376,8 @@ export class Engine {
       this.windKeep.delete(id);
       g.drop.letGo(id, time);
     }
+    // P10b (second fix): from the second bar line, fewer voices than sounded in the bar before (spec 8.9).
+    if (plan.index > 0) g.drop.windLine(time, plan.index);
   }
 
   /** Whether an instrument's held notes may be doubled now: in a wind-down only those it still keeps. */

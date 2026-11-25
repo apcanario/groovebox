@@ -35,16 +35,17 @@ DROP_GROUPS = 6
 # A click: a window whose largest sample-to-sample jump, over its largest sample, is this many times the steady
 # sound's (smoke.py imports it from here, so the wind-down's click check uses the same threshold as every other).
 CLICK_FACTOR = 2.5
-# P10b (C21), the wind-down measured bar by bar (spec 8.9): the extra layers' own level falls at least this many dB a
-# bar (measured on the layers alone, before they join the music: the follower keeps the master at the section's level).
-# P10b review M2 asked for half the smallest measured step; with each vibe at its own length (4 bars in nine) the
-# smallest measured is 0.2 dB (Progressive's first of four bars, the music's own bar-to-bar change against a planned
-# -1.6 dB), so half of it would loosen this: it stays 0.5.
+# P10b (C21), the wind-down measured bar by bar (spec 8.9): the extra layers' level falls at least this many dB a bar.
+# P10b second fix: measured on the overlay's own levels as the audio thread applies them (each bar's mean of the four
+# layers' summed squared gains, read every 15 ms with the audio time), not on the layers' sound: the notes and the
+# voices let in move that sound by themselves (Progressive's first of four bars read 0.2 dB against a planned 1.6 dB).
 WIND_STEP_DB = 0.5
-# The master's width may read this much (side over mid) higher than the bar before and still count as falling, and the
-# bar after the wind-down may be this much past the section's own bar-to-bar stray from its mean.
+# The master's width may read this much (side over mid) higher than the bar before, past the section's own largest
+# bar-to-bar change, and still count as falling (the section's own bars move: twoStep's by up to 0.10); the two bars
+# after the wind-down may be this much past the section's own two-bar stray from its mean.
 WIND_WIDTH_TOL = 0.01
-# At least this share of each descent (layers' energy, master width over the section's) is left after the first bar.
+# At least this share of each descent (the layers' level energy and their spread, as applied; the master's width over
+# the section's, past the section's own stray) is left after the first bar.
 WIND_NOT_FIRST = 0.15
 # The extra layers are silent (dB of energy) once the wind-down has ended.
 LAYERS_GONE_DB = -80.0
@@ -418,8 +419,9 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     sec_out = []  # P10b review M3: whether Morph had an instrument out, and (E3) each instrument's level, bar by bar
     sec_inst = []
     moves = [morph_last(page)]
+    sec_at = []
     for _ in range(WINDOW):
-        next_bar(page)
+        sec_at.append(next_bar(page))
         sec_bars.append(page.evaluate(f"{E}.stereo()"))
         jumps.append(jump_ratio(page))
         sec_out.append(morph_out(page))
@@ -435,11 +437,17 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     next_bar(page)  # the impact's bar
     p_imp = page.evaluate(f"{E}.stereo()")
     page.evaluate(f"{E}.jumps('master')")
+    page.evaluate(f"{E}.dropLayers()")
     bars = []
-    for _ in range(WINDOW):
-        next_bar(page)
+    drop_at = []
+    drop_layers = []
+    for k in range(WINDOW):
+        drop_at.append(next_bar(page))
         bars.append(page.evaluate(f"{E}.stereo()"))
+        drop_layers.append(page.evaluate(f"{E}.dropLayers()"))
         jumps.append(jump_ratio(page))
+        if k == WINDOW - 2:
+            start_params(page)
     info = page.evaluate(f"{E}.dropInfo()")
     beats = page.evaluate(f"{E}.dropBeats.slice(-16)")
     phase = shown(page)["phase"]
@@ -482,6 +490,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     after_out.append(morph_out(page))
     after_inst.append(inst_levels(page))
     moves.append(morph_last(page))
+    controls = wind_controls(page, length)
     end = page.evaluate(f"{E}.dropMarks.filter(m => m.end).slice(-1)[0]")
     plan = (page.evaluate(f"{E}.dropInfo().wind") or {}).get("steps")  # the engine's schedule (slice a), for the report
     p_wind = {"peak": max(w["s"]["peak"] for w in wind[:length + 1])}
@@ -489,7 +498,8 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     winds = {"bars": wind, "length": length, "live_after": live_after, "pressed": pressed, "w0": w0, "end": end,
              "same_song": song_end == song_before, "same_after": doc(page) == song_before, "morph": page.evaluate(f"{E}.morphPlan().on"),
              "phase_after": shown(page)["phase"], "plan": plan, "jump_ref": max(jumps) if jumps else 0.0,
-             "out": any(sec_out) or any(after_out), "moved": len(set(moves)) > 1, "sec_inst": sec_inst, "after_inst": after_inst}
+             "out": any(sec_out) or any(after_out), "moved": len(set(moves)) > 1, "sec_inst": sec_inst, "after_inst": after_inst,
+             "controls": controls, "sec_at": sec_at, "drop_at": drop_at, "drop_layers": drop_layers}
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
     loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
@@ -502,6 +512,36 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     top = max(peaks, key=peaks.get)
     return {"n": n, "loud": loud, "per_bar": per_bar, "spread": spread, "wider": width / max(n["width"], 1e-6), "width": width,
             "peak": peaks[top], "peak_at": top, "info": info, "beats": beats, "sec_bars": sec_bars, "drop_bars": bars, "wind": winds}
+
+
+def start_params(page) -> None:
+    """P10b (second fix): sample the overlay's own controls (each layer's level, the spread, the follower's gain) as the
+    audio thread has them, with the audio time, every 15 ms from the drop's second-to-last bar."""
+    page.evaluate(f"""() => {{ clearInterval(window.__dpT); window.__dp = [];
+      window.__dpT = setInterval(() => {{ const p = {E}.dropParams(); if (p) window.__dp.push(p); }}, 15); }}""")
+
+
+def wind_controls(page, length: int) -> dict:
+    """P10b (second fix): the overlay's controls bar by bar on the audio clock, for the drop's last bar (the bar before
+    the wind-down's first bar line), each wind-down bar and the bar after: the layers' level (dB of the summed squared
+    levels, each bar's mean), the spread (each bar's mean) and the most overlay voices sounding at once (the engine's
+    ledger: start to let-go). The bar lines are the conductor's own (`dropMarks`, audio time)."""
+    samples = page.evaluate("(() => { clearInterval(window.__dpT); const d = window.__dp || []; window.__dp = []; return d; })()")
+    marks = page.evaluate(f"{E}.dropMarks.slice(-12)")
+    first = [m for m in marks if m.get("phase") == "wind" and m.get("index") == 0]
+    if not first:
+        return {"ok": False, "why": f"no wind-down bar line among {[(m.get('phase'), m.get('index')) for m in marks]}"}
+    a = first[-1]["at"]
+    bar = bar_s(page)
+    lev, spr, cnt = [], [], []
+    for i in range(length + 2):
+        lo, hi = a + (i - 1) * bar, a + i * bar
+        s = [x for x in samples if lo <= x["t"] < hi]
+        cnt.append(len(s))
+        lev.append(10 * math.log10(max(sum(sum(g * g for g in x["levels"]) for x in s) / max(len(s), 1), 1e-12)))
+        spr.append(sum(abs(x["spread"]) for x in s) / max(len(s), 1))
+    voices = page.evaluate(f"{E}.dropVoices({a - bar}, {bar}, {length + 2})")
+    return {"ok": min(cnt) >= 10, "why": f"samples per bar {cnt}", "level": lev, "spread": spr, "voices": voices, "samples": cnt}
 
 
 def morph_out(page) -> bool:
@@ -554,37 +594,55 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
     wind = bars[:n + 1]
     after = bars[n + 1]
     sec = r["n"]
-    lay = [db(b["l"]) for b in wind]
+    lay = [db(b["l"]) for b in wind]  # the layers' sound, for the report
     wid = [b["s"]["width"] for b in wind]
-    lwid = [b["l"]["width"] for b in wind]  # the extra layers' own width (P10b review S3), free of the section's stray
-    most = [b["most"] for b in wind]
+    c = w["controls"]
     bad = []
+    if not c.get("ok"):
+        bad.append(f"the overlay's controls were not read through the wind-down ({c.get('why')})")
+        c = {"level": [0.0] * (n + 2), "spread": [0.0] * (n + 2), "voices": [0] * (n + 2)}
+    # P10b second fix: the layers' level, their spread and the voices sounding, as the engine applies them on the audio
+    # clock, bar by bar from the drop's last bar: each falls every bar, a share left after the first, the section's at
+    # the end. The notes cannot move these; the sound is judged below where the notes cannot hide it.
+    lev, spr, voi = c["level"], c["spread"], c["voices"]
     for i in range(1, n + 1):
-        if not lay[i] <= lay[i - 1] - WIND_STEP_DB:
-            bad.append(f"the extra layers do not fall in wind-down bar {i} ({lay[i - 1]:.1f} -> {lay[i]:.1f} dB, at least {WIND_STEP_DB} dB a bar)")
-        if not wid[i] < wid[i - 1] + WIND_WIDTH_TOL:
-            bad.append(f"the width does not fall in wind-down bar {i} ({wid[i - 1]:.3f} -> {wid[i]:.3f})")
-        if not lwid[i] < lwid[i - 1]:
-            bad.append(f"the extra layers' own width does not fall in wind-down bar {i} ({lwid[i - 1]:.3f} -> {lwid[i]:.3f})")
-        if not most[i] < most[i - 1]:
-            bad.append(f"the overlay's voices do not fall in wind-down bar {i} ({most[i - 1]} -> {most[i]})")
+        if not lev[i] <= lev[i - 1] - WIND_STEP_DB:
+            bad.append(f"the extra layers' level does not fall in wind-down bar {i} ({lev[i - 1]:.1f} -> {lev[i]:.1f} dB, at least {WIND_STEP_DB} dB a bar)")
+        if not spr[i] < spr[i - 1]:
+            bad.append(f"the extra layers' spread does not fall in wind-down bar {i} ({spr[i - 1]:.3f} -> {spr[i]:.3f})")
+        if not voi[i] < voi[i - 1]:
+            bad.append(f"the overlay's voices do not fall in wind-down bar {i} ({voi[i - 1]} -> {voi[i]})")
+    if not 10 ** (lev[1] / 10) >= WIND_NOT_FIRST * 10 ** (lev[0] / 10):
+        bad.append(f"the extra layers are spent in the first bar ({lev[1] - lev[0]:+.1f} dB, under {WIND_NOT_FIRST:.0%} of their energy left)")
+    if not spr[1] >= WIND_NOT_FIRST * spr[0]:
+        bad.append(f"the spread is spent in the first bar ({spr[0]:.3f} -> {spr[1]:.3f})")
+    if not (lev[n + 1] <= LAYERS_GONE_DB and spr[n + 1] <= 1e-3 and voi[n + 1] == 0):
+        bad.append(f"the overlay is not back at the section's after the wind-down (level {lev[n + 1]:.1f} dB, spread {spr[n + 1]:.3f}, {voi[n + 1]} voices)")
+    # The master's width (the sound): falls bar by bar, a bar rising no more than WIND_WIDTH_TOL past the section's own
+    # largest bar-to-bar change; a share of the drop's extra width left after the first bar, past the section's own stray.
+    sw = [b["width"] for b in r["sec_bars"]]
+    step = max(abs(sw[k] - sw[k - 1]) for k in range(1, len(sw)))
+    stray = max(abs(x - sec["width"]) for x in sw)
+    for i in range(1, n + 1):
+        if not wid[i] < wid[i - 1] + WIND_WIDTH_TOL + step:
+            bad.append(f"the width does not fall in wind-down bar {i} ({wid[i - 1]:.3f} -> {wid[i]:.3f}, the section's own bars move {step:.3f})")
     # P10b review S5: WIDER is the drop's eight-bar threshold; the drop's last bar, one bar, is wider than the section and
     # within the drop's own bar-to-bar stray of its eight-bar mean (the drop's own width, not a narrower bar).
     d_stray = max(abs(b["width"] - r["width"]) for b in r["drop_bars"])
     if not (wid[0] > sec["width"] and abs(wid[0] - r["width"]) <= d_stray + WIND_WIDTH_TOL):
         bad.append(f"the drop's last bar is not as wide as the drop ({wid[0]:.3f}; the section's {sec['width']:.3f}, "
                    f"the drop's {r['width']:.3f} within {d_stray + WIND_WIDTH_TOL:.3f})")
-    # Not all spent in the first bar: a share of each descent is left for the bars after it.
-    e = [b["l"]["energy"] for b in wind]
-    if not e[1] >= WIND_NOT_FIRST * e[0]:
-        bad.append(f"the extra layers are spent in the first bar ({10 * math.log10(max(e[1], 1e-12) / max(e[0], 1e-12)):+.1f} dB, "
-                   f"under {WIND_NOT_FIRST:.0%} of their energy left)")
-    if not wid[1] - sec["width"] >= WIND_NOT_FIRST * (wid[0] - sec["width"]):
-        bad.append(f"the width is spent in the first bar ({wid[0]:.3f} -> {wid[1]:.3f}, the section's {sec['width']:.3f})")
-    # The end: the section's own values on the bar after the last bar line.
-    stray = max(abs(b["width"] - sec["width"]) for b in r["sec_bars"])
-    if not abs(after["s"]["width"] - sec["width"]) <= stray + WIND_WIDTH_TOL:
-        bad.append(f"the width after the wind-down is not the section's ({after['s']['width']:.3f}, the section's {sec['width']:.3f} within {stray + WIND_WIDTH_TOL:.3f})")
+    if not wid[1] - sec["width"] >= WIND_NOT_FIRST * (wid[0] - sec["width"]) - stray:
+        bad.append(f"the width is spent in the first bar ({wid[0]:.3f} -> {wid[1]:.3f}, the section's {sec['width']:.3f}, its own bars within {stray:.3f})")
+    # The end: the two bars after, against the section's own two-bar means (the same window), unless Morph owed or
+    # moved something in the bars read (the section read is then not the music that plays after; as for the level).
+    two_w = sum(b["s"]["width"] for b in bars[n + 1:]) / len(bars[n + 1:])
+    pairs = [(sw[k] + sw[k - 1]) / 2 for k in range(1, len(sw))]
+    stray2 = max(abs(x - sec["width"]) for x in pairs)
+    if w["out"] or w["moved"]:
+        print(f"  P10b {label}: the two bars after the wind-down {two_w:.3f} wide against the section's {sec['width']:.3f}, not judged (Morph moved or owed in the bars read)")
+    elif not abs(two_w - sec["width"]) <= stray2 + WIND_WIDTH_TOL:
+        bad.append(f"the width after the wind-down is not the section's (two bars {two_w:.3f}, the section's {sec['width']:.3f} within {stray2 + WIND_WIDTH_TOL:.3f})")
     # The level after it: each of the two bars after within a single bar's tolerance of the section (BAR_DB past the
     # section's own stray, as each drop bar); their mean within LOUD_DB, as the drop's, unless Morph (on in Ambient and
     # Drone) owed something (an instrument out, a Lock eased) in a bar of the section read or of the two after, or moved
@@ -633,8 +691,8 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
         print(f"  P10b {label}: did not land; instruments' levels, dB: section {mean_levels(w['sec_inst'])}, after {mean_levels(w['after_inst'])}")
     for b in bad:
         failures.append(f"P10b {label}: {b}")
-    return ([f"{x:.1f}" for x in lay] + [f"{db(after['l']):.0f}"], [f"{x:.3f}" for x in wid] + [f"{after['s']['width']:.3f}"],
-            most + [after["most"]], [round(db(b["s"]) - db(sec), 2) for b in bars[1:]])
+    return ([f"{x:.1f}" for x in lev], [f"{x:.3f}" for x in spr], voi, [f"{x:.1f}" for x in lay] + [f"{db(after['l']):.0f}"],
+            [f"{x:.3f}" for x in wid] + [f"{after['s']['width']:.3f}"], [round(db(b["s"]) - db(sec), 2) for b in bars[1:]])
 
 
 def judge(r: dict, label: str, failures: list) -> None:
@@ -691,8 +749,9 @@ def drop_vibes(page, failures: list, group: int | None = None) -> None:
         if not r:
             continue
         judge(r, v["id"], failures)
-        lay, wid, most, lev = judge_wind(r, v["id"], failures)
-        winds.append(f"{v['id']} layers {' > '.join(lay)} dB, width {' > '.join(wid)} (section {r['n']['width']:.3f}), voices {' > '.join(map(str, most))}, "
+        clev, cspr, cvoi, lay, wid, lev = judge_wind(r, v["id"], failures)
+        winds.append(f"{v['id']} applied: layers' level {' > '.join(clev)} dB, spread {' > '.join(cspr)}, voices {' > '.join(map(str, cvoi))}; "
+                     f"heard: layers {' > '.join(lay)} dB, master width {' > '.join(wid)} (section {r['n']['width']:.3f}), "
                      f"master from the section {' '.join(f'{x:+.2f}' for x in lev)} dB, {r['wind']['length']} bars{' (Morph on)' if r['wind']['morph'] else ''}; "
                      f"instruments (dB) section {mean_levels(r['wind']['sec_inst'])}, after {mean_levels(r['wind']['after_inst'])}")
         info = r["info"]
