@@ -32,6 +32,19 @@ LEVEL_DROP_DB = 3.0
 WINDOW = 8
 # The smoke runs the 24 vibes' drops in this many groups (parts drop-1 to drop-6), each in its own browser.
 DROP_GROUPS = 6
+# A click: a window whose largest sample-to-sample jump, over its largest sample, is this many times the steady
+# sound's (smoke.py imports it from here, so the wind-down's click check uses the same threshold as every other).
+CLICK_FACTOR = 2.5
+# P10b (C21), the wind-down measured bar by bar (spec 8.9): the extra layers' own level falls at least this many dB a
+# bar (measured on the layers alone, before they join the music: the follower keeps the master at the section's level).
+WIND_STEP_DB = 0.5
+# The master's width may read this much (side over mid) higher than the bar before and still count as falling, and the
+# bar after the wind-down may be this much past the section's own bar-to-bar stray from its mean.
+WIND_WIDTH_TOL = 0.01
+# At least this share of each descent (layers' energy, master width over the section's) is left after the first bar.
+WIND_NOT_FIRST = 0.15
+# The extra layers are silent (dB of energy) once the wind-down has ended.
+LAYERS_GONE_DB = -80.0
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:
@@ -232,6 +245,38 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     else:
         print(f"P10 drop: wound down 2 bars, back in section {sec} on bar {w0 + 2}; the song document identical")
 
+    # P10b (spec 8.9): the Filter knob's own value, kept while the drop has the filter fully open, stays out through the
+    # whole wind-down and comes back on its last bar line: the master's low-pass read on the audio clock through it.
+    sweep0 = page.evaluate(f"{E}.getMix().sweep")
+    page.evaluate(f"{E}.setMix('sweep', -0.3)")
+    next_bar(page)
+    time.sleep(0.3)
+    lp_knob = page.evaluate(f"{E}.dropInfo().mix.lp")
+    page.click("#drop")
+    wait_for(page, f"{E}.dropShown().phase === 'on'", 3 * bs + 2.0)
+    time.sleep(0.3)
+    lp_on = page.evaluate(f"{E}.dropInfo().mix.lp")
+    page.click("#drop")
+    wait_for(page, f"{E}.dropShown().phase === 'wind'", bs + 1.5)
+    reads = []
+    until = time.time() + 2 * bar_s(page) + 1.2
+    while time.time() < until:
+        reads.append(page.evaluate(f"[{E}.cutoffNow('bass').now, {E}.dropInfo().mix.lp]"))
+        time.sleep(0.05)
+    fend = page.evaluate(f"{E}.dropMarks.filter(m => m.end).slice(-1)[0]")
+    page.evaluate(f"(v) => {E}.setMix('sweep', v)", sweep0)
+    early = [lp for t, lp in reads if fend and t < fend["at"] - 0.005]
+    late = [lp for t, lp in reads if fend and t > fend["at"] + 0.5]
+    if not (lp_knob < 15000 and lp_on > 15000 and early and min(early) > 15000 and late
+            and all(abs(lp - lp_knob) <= 0.05 * lp_knob for lp in late)):
+        failures.append(f"P10b: the Filter value kept during the drop is not applied on the wind-down's last bar line and not before "
+                        f"(knob {lp_knob:.0f} Hz, drop {lp_on:.0f} Hz, wind-down lowest {min(early or [0]):.0f} Hz in {len(early)} reads, "
+                        f"after the end {[round(x) for x in late[:3]]} in {len(late)} reads)")
+    else:
+        print(f"P10b drop: the Filter's {lp_knob:.0f} Hz kept through the drop and {len(early)} reads of the wind-down "
+              f"(lowest {min(early):.0f} Hz), applied on its last bar line ({late[-1]:.0f} Hz after it)")
+    next_bar(page)
+
     # Another section tapped during the drop: it waits for the wind-down ("After drop"), then lands on its bar line.
     other = (sec + 1) % len(page.evaluate(f"{E}.getSong().sections"))
     page.click("#drop")
@@ -353,22 +398,31 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     wind-down and two bars after it. Returns the figures, or None when the drop did not come on."""
     next_bar(page)
     page.evaluate(f"{E}.stereo()")
+    # P10b: the extra layers' own sound and the master's jumps (the click check's reference: the largest bar of the
+    # section's and the drop's own, as for any sound that moves by itself) are read bar by bar too.
+    page.evaluate(f"{E}.dropLayers()")
+    page.evaluate(f"{E}.jumps('master')")
     sec_bars = []
+    jumps = []
     for _ in range(WINDOW):
         next_bar(page)
         sec_bars.append(page.evaluate(f"{E}.stereo()"))
+        jumps.append(jump_ratio(page))
     n = {"energy": sum(b["energy"] for b in sec_bars) / WINDOW, "flat": sum(b["flat"] for b in sec_bars) / WINDOW,
          "width": sum(b["width"] for b in sec_bars) / WINDOW, "peak": max(b["peak"] for b in sec_bars)}
+    song_before = doc(page)
     page.evaluate(f"{E}.drop()")
     # The build (two bars from the next bar line) and its cliffhanger, then the impact's bar: read separately.
     wait_for(page, f"{E}.dropShown().phase === 'on'", 4 * bar_s(page) + 2.0)
     p_build = page.evaluate(f"{E}.stereo()")
     next_bar(page)  # the impact's bar
     p_imp = page.evaluate(f"{E}.stereo()")
+    page.evaluate(f"{E}.jumps('master')")
     bars = []
     for _ in range(WINDOW):
         next_bar(page)
         bars.append(page.evaluate(f"{E}.stereo()"))
+        jumps.append(jump_ratio(page))
     info = page.evaluate(f"{E}.dropInfo()")
     beats = page.evaluate(f"{E}.dropBeats.slice(-16)")
     phase = shown(page)["phase"]
@@ -376,12 +430,35 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
         failures.append(f"P10 {label}: the drop is not on after its build ({phase})")
         page.evaluate(f"{E}.drop()")
         return None
-    # The wind-down, its last bar line and two bars after it: read for the peak.
+    # The wind-down (P10b), bar by bar from the second press: the master (level, width, jumps), the extra layers' own
+    # level and the overlay's voices (the most sounding at once in each bar), then the two bars after it.
+    page.evaluate(f"{E}.dropLayers()")
+    page.evaluate(f"{E}.dropInfo()")  # the voice count starts over
     page.evaluate(f"{E}.drop()")
-    wait_for(page, f"{E}.dropShown().phase === 'off'", 6 * bar_s(page) + 2.0)
-    p_wind = page.evaluate(f"{E}.stereo()")
-    next_bar(page, 2)
-    p_after = page.evaluate(f"{E}.stereo()")
+    length = page.evaluate(f"{E}.dropRecipe().wind")
+    wait_for(page, f"{E}.dropShown().phase === 'wind'", bar_s(page) + 2.0)
+    wind = [read_wind(page)]  # the drop's last bar: from the press to the wind-down's first bar line
+    w0 = page.evaluate(f"{E}.position().bar")
+    for i in range(length):
+        if i == 0:
+            # A press during the wind-down does nothing (spec 8.9): mid first bar, it is ignored.
+            time.sleep(bar_s(page) * 0.4)
+            page.evaluate(f"{E}.drop()")
+            pressed = shown(page)
+        next_bar(page)
+        wind.append(read_wind(page))
+    next_bar(page)
+    wind.append(read_wind(page))  # the first bar after the wind-down
+    live_after = page.evaluate(f"{E}.dropInfo().live")
+    next_bar(page)
+    wind.append(read_wind(page))
+    end = page.evaluate(f"{E}.dropMarks.filter(m => m.end).slice(-1)[0]")
+    plan = (page.evaluate(f"{E}.dropInfo().wind") or {}).get("steps")  # the engine's schedule (slice a), for the report
+    p_wind = {"peak": max(w["s"]["peak"] for w in wind[:length + 1])}
+    p_after = {"peak": max(w["s"]["peak"] for w in wind[length + 1:])}
+    winds = {"bars": wind, "length": length, "live_after": live_after, "pressed": pressed, "w0": w0, "end": end,
+             "same_song": doc(page) == song_before, "phase_after": shown(page)["phase"], "plan": plan,
+             "jump_ref": max(jumps) if jumps else 0.0}
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
     loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
@@ -393,7 +470,84 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
              "wind": p_wind["peak"], "after": p_after["peak"]}
     top = max(peaks, key=peaks.get)
     return {"n": n, "loud": loud, "per_bar": per_bar, "spread": spread, "wider": width / max(n["width"], 1e-6), "width": width,
-            "peak": peaks[top], "peak_at": top, "info": info, "beats": beats}
+            "peak": peaks[top], "peak_at": top, "info": info, "beats": beats, "sec_bars": sec_bars, "wind": winds}
+
+
+def jump_ratio(page) -> float:
+    """The master's largest sample-to-sample jump over its largest sample since the last read (0 when silent)."""
+    r = page.evaluate(f"{E}.jumps('master')") or {"jump": 0.0, "peak": 0.0}
+    return r["jump"] / r["peak"] if r["peak"] > 1e-3 else 0.0
+
+
+def read_wind(page) -> dict:
+    """One bar of the wind-down's reads: the master (`s`), the extra layers alone (`l`), the most overlay voices sounding
+    at once (`most`), the master's jumps over its peak (`j`)."""
+    return {"s": page.evaluate(f"{E}.stereo()"), "l": page.evaluate(f"{E}.dropLayers()"),
+            "most": page.evaluate(f"{E}.dropInfo().most"), "j": jump_ratio(page)}
+
+
+def judge_wind(r: dict, label: str, failures: list) -> list:
+    """P10b (C21, spec 8.9): the wind-down measured bar by bar. From the drop's last bar through each wind-down bar the
+    extra layers' own level, the master's width and the overlay's voices fall bar by bar, a share left after the first
+    bar, and on the bar after the end they are the section's (layers silent, no voice sounding, the master's level and
+    width the section's); the master's level holds the section's through it; no click; a press during it does nothing;
+    the song document unchanged. Returns the report's figures."""
+    w = r["wind"]
+    n = w["length"]
+    bars = w["bars"]  # the drop's last bar, the n wind-down bars, two bars after
+    wind = bars[:n + 1]
+    after = bars[n + 1]
+    sec = r["n"]
+    lay = [db(b["l"]) for b in wind]
+    wid = [b["s"]["width"] for b in wind]
+    most = [b["most"] for b in wind]
+    bad = []
+    for i in range(1, n + 1):
+        if not lay[i] <= lay[i - 1] - WIND_STEP_DB:
+            bad.append(f"the extra layers do not fall in wind-down bar {i} ({lay[i - 1]:.1f} -> {lay[i]:.1f} dB, at least {WIND_STEP_DB} dB a bar)")
+        if not wid[i] < wid[i - 1] + WIND_WIDTH_TOL:
+            bad.append(f"the width does not fall in wind-down bar {i} ({wid[i - 1]:.3f} -> {wid[i]:.3f})")
+        if not most[i] < most[i - 1]:
+            bad.append(f"the overlay's voices do not fall in wind-down bar {i} ({most[i - 1]} -> {most[i]})")
+    if not wid[0] > sec["width"] * WIDER:
+        bad.append(f"the drop's last bar is not wider than the section ({sec['width']:.3f} -> {wid[0]:.3f})")
+    # Not all spent in the first bar: a share of each descent is left for the bars after it.
+    e = [b["l"]["energy"] for b in wind]
+    if not e[1] >= WIND_NOT_FIRST * e[0]:
+        bad.append(f"the extra layers are spent in the first bar ({10 * math.log10(max(e[1], 1e-12) / max(e[0], 1e-12)):+.1f} dB, "
+                   f"under {WIND_NOT_FIRST:.0%} of their energy left)")
+    if not wid[1] - sec["width"] >= WIND_NOT_FIRST * (wid[0] - sec["width"]):
+        bad.append(f"the width is spent in the first bar ({wid[0]:.3f} -> {wid[1]:.3f}, the section's {sec['width']:.3f})")
+    # The end: the section's own values on the bar after the last bar line.
+    stray = max(abs(b["width"] - sec["width"]) for b in r["sec_bars"])
+    if not abs(after["s"]["width"] - sec["width"]) <= stray + WIND_WIDTH_TOL:
+        bad.append(f"the width after the wind-down is not the section's ({after['s']['width']:.3f}, the section's {sec['width']:.3f} within {stray + WIND_WIDTH_TOL:.3f})")
+    if not abs(db(after["s"]) - db(sec)) <= LOUD_DB:
+        bad.append(f"the level after the wind-down is {db(after['s']) - db(sec):+.2f} dB from the section's (more than {LOUD_DB} dB)")
+    if not db(after["l"]) <= LAYERS_GONE_DB:
+        bad.append(f"the extra layers still sound after the wind-down ({db(after['l']):.1f} dB)")
+    if w["live_after"] != 0:
+        bad.append(f"{w['live_after']} overlay voices still sound a bar after the wind-down (stuck notes)")
+    # The master holds the section's level through the wind-down, as through the drop (nothing drops out at once).
+    spread = max(abs(db(b) - db(sec)) for b in r["sec_bars"])
+    for i in range(1, n + 1):
+        off = db(wind[i]["s"]) - db(sec)
+        if abs(off) > BAR_DB + spread:
+            bad.append(f"wind-down bar {i} is {off:+.2f} dB from the section (more than {BAR_DB} dB past the section's own {spread:.2f} dB)")
+    # No click in the wind-down or the bars after it, against the largest jump of the section's and the drop's own bars.
+    ref = w["jump_ref"]
+    for i, b in enumerate(bars[1:], 1):
+        if ref > 0 and b["j"] > CLICK_FACTOR * ref:
+            bad.append(f"a click in {'wind-down bar ' + str(i) if i <= n else 'bar ' + str(i - n) + ' after it'} (jump {b['j'] / ref:.1f} times the section's and drop's own, over {CLICK_FACTOR})")
+    if w["pressed"]["phase"] != "wind" or w["pressed"]["intent"] == "on":
+        bad.append(f"a press during the wind-down did something: {w['pressed']}")
+    if not w["end"] or w["end"]["bar"] != w["w0"] + n or w["end"]["cancelled"] or w["phase_after"] != "off":
+        bad.append(f"the wind-down did not end on its bar line {n} bars on, back to off, after a press during it (end {w['end']}, now {w['phase_after']})")
+    if not w["same_song"]:
+        bad.append("the song document changed between the first press and the end of the wind-down")
+    for b in bad:
+        failures.append(f"P10b {label}: {b}")
+    return [f"{x:.1f}" for x in lay] + [f"{db(after['l']):.0f}"], [f"{x:.3f}" for x in wid] + [f"{after['s']['width']:.3f}"], most + [after["most"]]
 
 
 def judge(r: dict, label: str, failures: list) -> None:
@@ -433,6 +587,7 @@ def drop_vibes(page, failures: list, group: int | None = None) -> None:
     if not page.evaluate(f"{E}.playing"):
         page.click("#play")
     rows = []
+    winds = []
     worst_loud = (0.0, "")
     worst_bar = (0.0, "")
     least_wide = (9.0, "")
@@ -447,6 +602,8 @@ def drop_vibes(page, failures: list, group: int | None = None) -> None:
         if not r:
             continue
         judge(r, v["id"], failures)
+        lay, wid, most = judge_wind(r, v["id"], failures)
+        winds.append(f"{v['id']} layers {' > '.join(lay)} dB, width {' > '.join(wid)} (section {r['n']['width']:.3f}), voices {' > '.join(map(str, most))}")
         info = r["info"]
         rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}; the section's own within {r['spread']:.2f}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
                     f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
@@ -485,11 +642,14 @@ def drop_vibes(page, failures: list, group: int | None = None) -> None:
         page.evaluate(f"(v) => {E}.setMix('saturation', v)", sat)
         if r:
             judge(r, f"{extra['id']} at Width 1, Hold, Saturation 0.6", failures)
+            judge_wind(r, f"{extra['id']} at Width 1, Hold, Saturation 0.6", failures)
             rows.append(f"{extra['id']} at Width 1, Hold, Saturation 0.6: {r['loud']:+.2f} dB, peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']})")
             if r["peak"] > top_peak[0]:
                 top_peak = (r["peak"], extra["id"] + " loudest settings")
     for r in rows:
         print("  P10 " + r)
+    for r in winds:
+        print("  P10b wind-down " + r)
     print(
         f"P10 drop{'' if group is None else f' group {group}'} in {len(rows)} runs: loudness within {abs(worst_loud[0]):.2f} dB ({worst_loud[1]}), a single bar within {abs(worst_bar[0]):.2f} dB ({worst_bar[1]}), "
         f"at least {least_wide[0]:.2f}x wider ({least_wide[1]}), highest peak {peak_db(top_peak[0]):.1f} dBFS ({top_peak[1]}) through build, impact, drop, wind-down and after"

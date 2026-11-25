@@ -42,7 +42,7 @@ from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
 from shots import SMALL, simple_words, walk_frame  # noqa: E402
-from dropcheck import drop_vibes, walk_drop  # noqa: E402
+from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
@@ -1065,8 +1065,8 @@ OPTIONAL_GEN = ["style", "shape", "phrase", "range", "register", "noteLength", "
 
 # A click: a window whose largest sample-to-sample jump, over its largest sample, is this many times the steady
 # sound's. Measured on a sine (a saw's own edge is as large as a click): there the wave's own jump is 2 pi f / rate
-# of its peak, under a tenth for a lead's notes, and a step in level is up to the whole peak.
-CLICK_FACTOR = 2.5
+# of its peak, under a tenth for a lead's notes, and a step in level is up to the whole peak. CLICK_FACTOR (2.5) is
+# defined in tools/dropcheck.py, imported above, so the Drop's wind-down is judged by the same threshold.
 
 
 def read_jumps(page, inst: str) -> tuple:
