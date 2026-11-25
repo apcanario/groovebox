@@ -346,8 +346,12 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     wind-down and two bars after it. Returns the figures, or None when the drop did not come on."""
     next_bar(page)
     page.evaluate(f"{E}.stereo()")
-    next_bar(page, 4)
-    n = page.evaluate(f"{E}.stereo()")
+    sec_bars = []
+    for _ in range(4):
+        next_bar(page)
+        sec_bars.append(page.evaluate(f"{E}.stereo()"))
+    n = {"energy": sum(b["energy"] for b in sec_bars) / 4, "flat": sum(b["flat"] for b in sec_bars) / 4,
+         "width": sum(b["width"] for b in sec_bars) / 4, "peak": max(b["peak"] for b in sec_bars)}
     page.evaluate(f"{E}.drop()")
     # The build (two bars from the next bar line) and its cliffhanger, then the impact's bar: read separately.
     wait_for(page, f"{E}.dropShown().phase === 'on'", 4 * bar_s(page) + 2.0)
@@ -374,7 +378,10 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
     loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
-    per_bar = [db(b) - db(n) for b in bars]
+    # Each drop bar against the section's bar at the same place in its four-bar phrase (the drop's first bar is seven
+    # bars after the section's first read: four read, two of build, the impact's), so a phrase louder on some chords
+    # than others compares like with like.
+    per_bar = [db(b) - db(sec_bars[(k + 3) % 4]) for k, b in enumerate(bars)]
     peaks = {"section": n["peak"], "build": p_build["peak"], "impact": p_imp["peak"], "drop": max(b["peak"] for b in bars),
              "wind": p_wind["peak"], "after": p_after["peak"]}
     top = max(peaks, key=peaks.get)

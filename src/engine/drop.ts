@@ -117,7 +117,7 @@ export class DropOverlay {
   private rng = createRng(0x0d0b);
   private riser: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private sources = new Set<AudioScheduledSourceNode>();
-  /** Overlay voices sounding now, and notes not played because the cap was full (for the smoke test). */
+  /** Overlay voices sounding now, and voices not played because the cap was full in this drop (for the smoke test). */
   live = 0;
   dropped = 0;
   /** Most voices sounding at once since the last read (for the smoke test's cost line). */
@@ -454,10 +454,11 @@ export class DropOverlay {
   synth(notes: number[], t: number, dur: number, vel: number, soft = false): void {
     const g = this.groups.synth;
     const [a, r] = soft ? [0.25, 0.6] : [0.006, 0.12];
+    // P10 review S4: two voices a note (was three): a detuned saw on one side, the octave up on the other, alternating
+    // by note, so a four-note chord still spreads both across the field.
     for (const [i, m] of notes.slice(0, 4).entries()) {
-      this.osc("sawtooth", m, -16, t, dur, 0.04 * vel, a, r, g.l);
-      this.osc("sawtooth", m, 16, t, dur, 0.04 * vel, a, r, g.r);
-      this.osc("triangle", m + 12, 0, t, dur, 0.035 * vel, a, r, g.side(i));
+      this.osc("sawtooth", m, i % 2 ? 16 : -16, t, dur, 0.052 * vel, a, r, g.side(i));
+      this.osc("triangle", m + 12, 0, t, dur, 0.035 * vel, a, r, g.side(i + 1));
     }
   }
 

@@ -240,6 +240,8 @@ export class Engine {
   private compSteady = new Map<string, number>();
   /** Readings the follower has acted on in this drop's "on" phase (P10 review S2: it holds after FOLLOW_BEATS). */
   private dropFollowed = 0;
+  /** The first bar whose beats count in the follower's reference (the bar after a section or song landed). */
+  private refFrom = 0;
   /** The follower's last reading of the drop (mean energy of its last beats, as heard). */
   private dropMeasured = 0;
   /** The drop's mix (deeper pump, filter fully open) is on the master: the knobs' own values wait in `mix`. */
@@ -1164,6 +1166,7 @@ export class Engine {
     if (plan.phase === "build" && plan.index === 0) {
       this.dropRec = rec;
       this.dropWindow = [];
+      g.drop.dropped = 0;
       const e = [...this.beatEnergy.values()];
       this.dropRefs = new Map(this.beatEnergy);
       this.dropRef = e.length ? e.reduce((a, b) => a + b, 0) / e.length : 0;
@@ -1631,10 +1634,15 @@ export class Engine {
     // P9: Gate's pattern moves on the straight sixteenths.
     g.fxStep(time, r.step);
     // P10: the level follower reads every beat; a new section or song starts its reference afresh.
-    if (r.applied?.section != null || r.loaded) this.beatEnergy.clear();
+    if (r.applied?.section != null || r.loaded) {
+      this.beatEnergy.clear();
+      // The landing bar (a new vibe's patches arriving, the last one's tails) is not the section's level: the
+      // reference starts on the bar after it.
+      this.refFrom = r.bar + 1;
+    }
     if (this.dropWatch && r.step % 4 === 0) {
       const phase = this.dropPlan.phase;
-      const ready = r.step === 0 ? r.applied?.section == null && !r.loaded : true;
+      const ready = r.bar > this.refFrom || (r.bar === this.refFrom && r.step > 0);
       // The reading holds the beat that just ended: its place in the section's loop (P10 review S5).
       const loop = loopBeats((this.seq.song.sections[r.section]?.chords ?? []).map((c) => c.bars));
       const key = (((r.bar * 4 + r.step / 4 - 1) % loop) + loop) % loop;
