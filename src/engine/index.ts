@@ -102,6 +102,8 @@ export interface MorphBar {
   /** Notes scheduled in the bar (bass, synth and layers), and those outside the song's key. */
   notes: number;
   out: number[];
+  /** A drop held Morph at this bar line. */
+  held: boolean;
 }
 
 /** What the DROP button shows (spec 8.9), as heard: the phase, the bar in it, its length, what a press waits for and the section queued behind the drop. */
@@ -314,7 +316,9 @@ export class Engine {
   /** The bars as scheduled while the trace is on (kept to MORPH_KEEP). */
   readonly morphTrace: MorphBar[] = [];
   private traceOn = false;
-  private traceBar: { bar: number; section: number; state: string; events: string[]; notes: number; out: number[] } | null = null;
+  /** A drop held Morph at the last bar line. */
+  private morphDropHeld = false;
+  private traceBar: { bar: number; section: number; state: string; events: string[]; notes: number; out: number[]; held: boolean } | null = null;
 
   constructor(given: Song = defaultSong()) {
     // A song saved before P2 plays at P2's balance (P2 review S1).
@@ -1439,6 +1443,11 @@ export class Engine {
     return true;
   }
 
+  /** The journey's next bar to plan (bars planned so far), for the smoke test; 0 before one starts. */
+  morphBar(): number {
+    return this.morphPlanner?.bars ?? 0;
+  }
+
   /** Whether a control is left alone: moved by hand within the last HANDS_BARS bars (spec 8.11). */
   morphHeld(control: string): boolean {
     const t = this.morphHands.get(control);
@@ -1507,18 +1516,26 @@ export class Engine {
    */
   private morphBarLine(): void {
     this.morphClock++;
+    this.morphDropHeld = false;
     if (this.seq.songQueued) {
       // A vibe lands on this bar line: its journey starts with it (this is its first bar).
       const q = this.queued;
       const plan = q ? resolveMorph(q.style ? VIBES[q.style]?.morph : undefined, q.morph, q.style ?? q.name) : null;
       this.morphPlanner = plan ? new MorphPlanner(plan.seed) : null;
       this.morphPlanner?.pass();
+      // The trace (smoke test) follows the new journey from its first bar.
+      if (this.traceOn) {
+        this.traceBar = null;
+        this.morphTrace.length = 0;
+        this.morphMoves.length = 0;
+      }
       return;
     }
     const plan = this.morphPlan();
     if (!this.morphPlanner || this.morphPlanner.seed !== plan.seed) this.morphPlanner = new MorphPlanner(plan.seed);
     const planner = this.morphPlanner;
-    if (!plan.on || this.dropper.active || this.dropRec !== null) return void planner.pass();
+    this.morphDropHeld = plan.on && (this.dropper.active || this.dropRec !== null);
+    if (!plan.on || this.morphDropHeld) return void planner.pass();
     const bar = planner.bars;
     const moves = planner.bar(plan, this.morphView(), (c) => this.morphHeld(c));
     if (!moves.length) return;
@@ -1608,7 +1625,7 @@ export class Engine {
           ])
         : "";
       const bar = this.morphPlanner ? this.morphPlanner.bars - 1 : -1;
-      this.traceBar = { bar, section: r.section, state, events: [], notes: 0, out: [] };
+      this.traceBar = { bar, section: r.section, state, events: [], notes: 0, out: [], held: this.morphDropHeld };
     }
     const t = this.traceBar;
     if (!t) return;
@@ -1632,7 +1649,7 @@ export class Engine {
     let h = 0x811c9dc5;
     const text = t.state + "|" + t.events.join(",");
     for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
-    this.morphTrace.push({ bar: t.bar, section: t.section, sig: h.toString(16), notes: t.notes, out: t.out });
+    this.morphTrace.push({ bar: t.bar, section: t.section, sig: h.toString(16), notes: t.notes, out: t.out, held: t.held });
     if (this.morphTrace.length > MORPH_KEEP) this.morphTrace.shift();
     this.traceBar = null;
   }

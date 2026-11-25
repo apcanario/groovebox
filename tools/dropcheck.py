@@ -93,6 +93,7 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     sec = page.evaluate(f"{E}.position().section")
 
     # The button: Simple Play, full width, between the instruments and the strip, its icon beside DROP, 48 px or more.
+    # P11 (spec 8.6): the Morph switch sits beside it, so DROP and Morph together fill the row.
     d = drop_dom(page)
     if not d:
         return failures.append("P10: no DROP button on the Simple Play tab")
@@ -100,7 +101,8 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     strip = page.evaluate("document.querySelector('.secs').getBoundingClientRect().top")
     if not (d["top"] >= lanes - 0.5 and d["bottom"] <= strip + 0.5):
         failures.append(f"P10: DROP is not between the instruments and the strip ({d['top']:.0f}..{d['bottom']:.0f}, lanes end {lanes:.0f}, strip {strip:.0f})")
-    if d["w"] < d["vw"] - 40 or d["h"] < 48 or not d["icon"]:
+    morph_w = page.evaluate("(() => { const m = document.querySelector('#morph'); return m ? m.getBoundingClientRect().width + 2 : 0; })()")
+    if d["w"] + morph_w < d["vw"] - 40 or d["w"] < d["vw"] / 2 or d["h"] < 48 or not d["icon"]:
         failures.append(f"P10: DROP is not a full-width tile of 48 px or more with its icon: {d}")
     if d["phase"] != "off" or d["lit"] != 0:
         failures.append(f"P10: DROP at rest is not off with dim segments: {d}")

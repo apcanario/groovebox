@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The smoke's parts cover every check.
 
-`uncovered()` (run by tools/smoke.py before any part) lists every function of tools/smoke.py and tools/dropcheck.py
+`uncovered()` (run by tools/smoke.py before any part) lists every function of tools/smoke.py, tools/dropcheck.py and
+tools/morphcheck.py
 that records a failure (`failures.append`) but is reached from no part of PARTS: a check that would never run.
 
     python3 tools/smoke_parts.py              exits 1 if a check sits in no part
@@ -15,7 +16,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FILES = ["smoke.py", "dropcheck.py"]
+FILES = ["smoke.py", "dropcheck.py", "morphcheck.py"]
 
 
 def _defs(tree) -> dict:

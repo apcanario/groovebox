@@ -16,6 +16,9 @@ counts the phrase's bars, and the layer switched off lets every voice go (no stu
 P10: the Drop (tools/dropcheck.py): its button and motion, a drop that stays on, the wind-down landing on a bar line in
 the same section and in a tapped one, the song document unchanged, a cancel, the Drop page; and in all 24 vibes the
 drop within 1 dB of its section, measurably wider, the master never clipping.
+P11: Morph (tools/morphcheck.py): its switch beside DROP, the Speed dial and the Morph page; Morph off moving nothing;
+ten minutes of Ambient never repeating a 16-bar stretch and never leaving the key, its journey the seeded one; a hand
+holding a dial for 16 bars; a drop holding Morph.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
@@ -39,6 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
 from shots import SMALL, simple_words, walk_frame  # noqa: E402
 from dropcheck import drop_vibes, walk_drop  # noqa: E402
+from morphcheck import walk_morph  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -3229,6 +3233,11 @@ def part_drop(browser, page, failures: list, shot) -> None:
     drop_vibes(page, failures)
 
 
+def part_morph(browser, page, failures: list, shot) -> None:
+    # P11 (spec 8.11): Morph, its controls, and ten minutes of Ambient left to it.
+    walk_morph(page, failures)
+
+
 def part_cost(browser, page, failures: list, shot) -> None:
     # The P9 worklet load with the transport stopped, then P7's and P9's cost with everything on.
     walk_fx_load(browser, page, failures)
@@ -3258,6 +3267,7 @@ PARTS = [
     ("additions", part_additions, None),
     ("effects", part_effects, None),
     ("drop", part_drop, None),
+    ("morph", part_morph, None),
     ("cost", part_cost, None),
 ]
 LEDGER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".smoke-ledger.json")

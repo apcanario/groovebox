@@ -50,6 +50,7 @@ async function boot(): Promise<void> {
     __data: { beats: readonly string[]; bass: readonly string[]; synth: readonly string[] };
     __fx: { defs: typeof EFFECT_DEFS };
     __vibeSong: typeof vibeSong;
+    __morphDry: (song: unknown, section: number, bars: number) => unknown;
   };
   // P3: every vibe and every beat and rhythm that exists, so the smoke test loops whatever is there.
   w.__vibes = STYLE_IDS.map((id) => ({ id, name: STYLES[id].name, bpm: STYLES[id].bpm, start: vibeStart(id) }));
@@ -60,6 +61,13 @@ async function boot(): Promise<void> {
   w.__macros = MACROS;
   // P10: a vibe's song by id, so the smoke test loads each one mid-jam and measures its drop.
   w.__vibeSong = vibeSong;
+  // P11: Morph's journey for a song played from a section, worked out without audio on an engine of its own, so the
+  // smoke test can hold what the live engine did against it.
+  w.__morphDry = (song, section, bars) => {
+    const e = new Engine();
+    e.loadSong(song as Parameters<Engine["loadSong"]>[0], section);
+    return e.morphDry(bars);
+  };
   w.__groovebox = engine;
   w.__keeper = keeper;
 }
