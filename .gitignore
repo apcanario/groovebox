@@ -4,3 +4,5 @@ dist-single
 *.log
 __pycache__
 shots/
+.smoke-ledger.json
+.smoke-ledger.json.tmp

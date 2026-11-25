@@ -17,7 +17,11 @@ P10: the Drop (tools/dropcheck.py): its button and motion, a drop that stays on,
 the same section and in a tapped one, the song document unchanged, a cancel, the Drop page; and in all 24 vibes the
 drop within 1 dB of its section, measurably wider, the master never clipping.
 
-Usage: python3 tools/smoke.py dist [screenshot.png]
+Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
+The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
+in .smoke-ledger.json against a fingerprint of src/, public/, index.html, package.json, package-lock.json and tools/;
+a run on the same fingerprint skips the parts already green, so a run cut off by a restart resumes. --fresh ignores
+the ledger. `python3 tools/smoke.py dist --part NAME` runs one part alone and records nothing.
 Exits 1 on any failure. Needs Python Playwright and Chrome or Chromium.
 It checks that sound is produced and nothing throws. It cannot judge how it sounds.
 """
@@ -3057,9 +3061,215 @@ def wait_for(page, expr: str, timeout: float) -> bool:
     return False
 
 
-def main() -> int:
-    root = sys.argv[1] if len(sys.argv) > 1 else "dist"
-    shot = sys.argv[2] if len(sys.argv) > 2 else None
+def open_app(page, failures: list) -> None:
+    """The opening of every part, as the single run opened: the vibe picker on a first launch, Escape keeps the
+    first launch's song (FIRST_SONG), the app starts in Simple, Play."""
+    # P3: the vibe picker opens the app; on a first launch there is no jam to continue.
+    walk_picker_open(page, failures, first=True)
+    page.keyboard.press("Escape")  # C9: no Close; Escape keeps the first launch's song
+    if not wait_for(page, "!document.querySelector('.vibes')", 2.0):
+        failures.append("Escape did not close the vibe picker")
+    FIRST_SONG.append(page.evaluate(SONG))
+    if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
+        failures.append("the app does not start in Simple")
+    page.click("#play")
+    time.sleep(0.5)
+
+
+def part_engine(browser, page, failures: list, shot) -> None:
+    # Sound and switching: the C4 and P5 layer levels, the Now view, the P1b look, P2's modes, a section and three toggles landing on the bar, the master level and peak, every layer soloed.
+    walk_c4(page, failures)
+    walk_p5(page, failures)
+    walk_now(page, failures)
+    walk_look(page, failures)
+    walk_p2(page, failures)
+    # The rest of the walk uses Advanced's controls (the Song grid, Edit without playing).
+    page.click('[data-appmode="advanced"]')
+
+    # Section B (Groove) has every instrument on. A tap on the strip waits for the bar line.
+    page.click('[data-strip="1"]')
+    if "pending" not in (page.get_attribute('[data-strip="1"]', "class") or ""):
+        failures.append("queued section is not shown as pending")
+    if "next bar" not in page.inner_text('[data-strip="1"]').lower():
+        failures.append(f"queued section does not say Next bar: {page.inner_text('.secs')!r}")
+    if page.evaluate("window.__groovebox.pending().section") != 1:
+        failures.append("section switch was not queued")
+    if not wait_for(page, "window.__groovebox.position().section === 1", 4.0):
+        failures.append("section switch did not land")
+    landed = page.evaluate("window.__groovebox.landed.slice(-1)[0]")
+    if not landed or landed["pending"]["section"] != 1:
+        failures.append("section switch did not land on a bar line")
+
+    # Three toggles tapped inside one bar land on the same bar line.
+    wait_for(page, "window.__groovebox.position().step === 1", 3.0)
+    for inst in ["bass", "synth", "layer1"]:
+        page.click(f'[data-cell="1:{inst}"]')
+        time.sleep(0.05)
+    if "pending" not in (page.get_attribute('[data-cell="1:bass"]', "class") or ""):
+        failures.append("queued toggle is not shown as pending")
+    n = page.evaluate("window.__groovebox.pending().toggles.length")
+    if n != 3:
+        failures.append(f"expected 3 pending toggles, got {n}")
+    if not wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0):
+        failures.append("toggles did not land")
+    last = page.evaluate("window.__groovebox.landed.slice(-1)[0]")
+    got = sorted(t["instrument"] for t in last["pending"]["toggles"]) if last else []
+    if got != ["bass", "layer1", "synth"]:
+        failures.append(f"toggles did not land together: {got}")
+    on = page.evaluate("window.__groovebox.getSong().sections[1].on")
+    if on["bass"] or on["synth"] or on["layer1"]:
+        failures.append("toggled instruments are still on")
+    print(f"three toggles landed together on bar {last['bar'] + 1 if last else '?'}")
+    # Turn them back on for the solos.
+    for inst in ["bass", "synth", "layer1"]:
+        page.click(f'[data-cell="1:{inst}"]')
+    wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
+
+    levels = []
+    peaks = []
+    for _ in range(32):
+        time.sleep(0.25)
+        v = page.evaluate("window.__groovebox.level()")
+        if v is not None and v > -200:
+            levels.append(v)
+        pk = page.evaluate("window.__groovebox.peak()")
+        if pk is not None and pk > -200:
+            peaks.append(pk)
+    if not page.evaluate("window.__groovebox.playing"):
+        failures.append("transport did not start")
+    if not levels:
+        failures.append("no output level measured")
+    else:
+        lo, hi = min(levels), max(levels)
+        print(f"master level: {lo:.1f} to {hi:.1f} dB")
+        if hi < -40:
+            failures.append(f"output too quiet ({hi:.1f} dB)")
+        if hi > -3:
+            failures.append(f"output too hot before the limiter ({hi:.1f} dB)")
+    # The meter is a smoothed RMS; the peak reads raw samples after the limiter.
+    if not peaks:
+        failures.append("no output peak measured")
+    else:
+        top = max(peaks)
+        print(f"output peak: {top:.1f} dBFS")
+        if top >= 0:
+            failures.append(f"output clips ({top:.1f} dBFS)")
+
+    solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
+    for layer in LAYERS:
+        page.evaluate(solo, layer)
+        time.sleep(0.6)
+        peak = -999.0
+        for _ in range(16):
+            time.sleep(0.125)
+            v = page.evaluate("window.__groovebox.level()")
+            if v is not None:
+                peak = max(peak, v)
+        print(f"  solo {layer}: {peak:.1f} dB")
+        if peak < -60:
+            failures.append(f"layer {layer} is silent ({peak:.1f} dB)")
+    page.evaluate(solo, None)
+
+
+def part_screens(browser, page, failures: list, shot) -> None:
+    # The screens, in Advanced while playing: the G2 shell, G3 and G4 controls, P6's lead dials, a G5 take, the frame walk, the narrow pass, Stop, then G5's songs and the armed take.
+    walk_shell(page, failures)
+    walk_g3(page, failures)
+    walk_g4(page, failures)
+    walk_p6(page, failures)
+    walk_g5_record(page, failures)
+    if page.locator("#new-jam").is_disabled():
+        failures.append("New jam is disabled while playing (P3 enables it: a vibe loads as a new song)")
+    n = walk_frame(page, failures)
+    print(f"frame walk: {n} screens at 360 x 640 and 412 x 915, both modes")
+    page.click('[data-appmode="advanced"]')
+    narrow_pass(page, failures)
+    if not page.evaluate("window.__groovebox.playing"):
+        failures.append("the transport stopped during the shell walk")
+
+    if shot:
+        page.click('[data-tab="layer1"]')
+        page.click('[data-mode="layer1:generative"]')
+        time.sleep(0.3)
+        page.screenshot(path=shot)
+    # Stop just after a bar line: nothing scheduled in the lookahead may start after Stop.
+    wait_for(page, "window.__groovebox.position().step === 0", 3.0)
+    page.click("#play")
+    at_stop = page.evaluate("window.__groovebox.attacks()")
+    time.sleep(1.0)
+    after = page.evaluate("window.__groovebox.attacks()")
+    if after != at_stop:
+        failures.append(f"{after - at_stop} attacks started after Stop")
+    else:
+        print("no attacks after Stop")
+    if page.evaluate("window.__groovebox.playing"):
+        failures.append("transport did not stop")
+    walk_g5_songs(page, failures, f"http://localhost:{PORT}/index.html")
+
+
+def part_vibes(browser, page, failures: list, shot) -> None:
+    # P3's 24 vibes from the picker and P4's Simple Chords.
+    walk_p3(page, failures)
+    walk_p4(page, failures)
+
+
+def part_additions(browser, page, failures: list, shot) -> None:
+    # P7's additions and their switches on a drone.
+    walk_p7(page, failures)
+
+
+def part_effects(browser, page, failures: list, shot) -> None:
+    # P9's effects: audible, tempo-synced, no clicks, the cap, the Simple and Advanced FX pages.
+    walk_p9(page, failures)
+
+
+def part_drop(browser, page, failures: list, shot) -> None:
+    # P10's Drop and its loudness and width in all 24 vibes (tools/dropcheck.py).
+    # P10 (spec 8.9): the Drop, its button and Drop page, then its loudness and width in all 24 vibes.
+    walk_drop(page, failures)
+    drop_vibes(page, failures)
+
+
+def part_cost(browser, page, failures: list, shot) -> None:
+    # The P9 worklet load with the transport stopped, then P7's and P9's cost with everything on.
+    walk_fx_load(browser, page, failures)
+    walk_cost(browser, page, failures)
+
+
+def setup_screens(page) -> None:
+    # Where the single run's engine walk left the app: Advanced, the Play tab, Groove (section 1) playing.
+    page.click('[data-appmode="advanced"]')
+    page.click('[data-tab="play"]')
+    page.evaluate("window.__groovebox.switchSection(1)")
+    wait_for(page, "window.__groovebox.position().section === 1", 4.0)
+
+
+def setup_vibes(page) -> None:
+    # Where the single run's songs walk left the app: Advanced, the transport stopped.
+    page.click('[data-appmode="advanced"]')
+    page.click("#play")
+    wait_for(page, "!window.__groovebox.playing", 3.0)
+
+
+# The smoke in parts, run in this order, each in its own browser from a first launch (open_app). Together they are
+# the single run's walk, statement for statement (tools/smoke_parts.py checks that every check sits in a part).
+PARTS = [
+    ("engine", part_engine, None),
+    ("screens", part_screens, setup_screens),
+    ("vibes", part_vibes, setup_vibes),
+    ("additions", part_additions, None),
+    ("effects", part_effects, None),
+    ("drop", part_drop, None),
+    ("cost", part_cost, None),
+]
+LEDGER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".smoke-ledger.json")
+FINGERPRINTED = ["src", "public", "index.html", "package.json", "package-lock.json", "tools"]
+
+
+def run_part(root: str, name: str, shot) -> int:
+    """One part in its own browser: open_app, the part's setup, the part, then the oscillator patch check (which the
+    single run made once at its end). Exits 1 on any failure or page error."""
+    fn, setup = next((f, s) for n, f, s in PARTS if n == name)
     server = subprocess.Popen(
         [sys.executable, "-m", "http.server", str(PORT), "--directory", root],
         stdout=subprocess.DEVNULL,
@@ -3091,162 +3301,118 @@ def main() -> int:
             )
             page.goto(f"http://localhost:{PORT}/index.html")
             wait_for(page, "!!window.__groovebox", 5.0)
-            # P3: the vibe picker opens the app; on a first launch there is no jam to continue.
-            walk_picker_open(page, failures, first=True)
-            page.keyboard.press("Escape")  # C9: no Close; Escape keeps the first launch's song
-            if not wait_for(page, "!document.querySelector('.vibes')", 2.0):
-                failures.append("Escape did not close the vibe picker")
-            FIRST_SONG.append(page.evaluate(SONG))
-            if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
-                failures.append("the app does not start in Simple")
-            page.click("#play")
-            time.sleep(0.5)
-            walk_c4(page, failures)
-            walk_p5(page, failures)
-            walk_now(page, failures)
-            walk_look(page, failures)
-            walk_p2(page, failures)
-            # The rest of the walk uses Advanced's controls (the Song grid, Edit without playing).
-            page.click('[data-appmode="advanced"]')
-
-            # Section B (Groove) has every instrument on. A tap on the strip waits for the bar line.
-            page.click('[data-strip="1"]')
-            if "pending" not in (page.get_attribute('[data-strip="1"]', "class") or ""):
-                failures.append("queued section is not shown as pending")
-            if "next bar" not in page.inner_text('[data-strip="1"]').lower():
-                failures.append(f"queued section does not say Next bar: {page.inner_text('.secs')!r}")
-            if page.evaluate("window.__groovebox.pending().section") != 1:
-                failures.append("section switch was not queued")
-            if not wait_for(page, "window.__groovebox.position().section === 1", 4.0):
-                failures.append("section switch did not land")
-            landed = page.evaluate("window.__groovebox.landed.slice(-1)[0]")
-            if not landed or landed["pending"]["section"] != 1:
-                failures.append("section switch did not land on a bar line")
-
-            # Three toggles tapped inside one bar land on the same bar line.
-            wait_for(page, "window.__groovebox.position().step === 1", 3.0)
-            for inst in ["bass", "synth", "layer1"]:
-                page.click(f'[data-cell="1:{inst}"]')
-                time.sleep(0.05)
-            if "pending" not in (page.get_attribute('[data-cell="1:bass"]', "class") or ""):
-                failures.append("queued toggle is not shown as pending")
-            n = page.evaluate("window.__groovebox.pending().toggles.length")
-            if n != 3:
-                failures.append(f"expected 3 pending toggles, got {n}")
-            if not wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0):
-                failures.append("toggles did not land")
-            last = page.evaluate("window.__groovebox.landed.slice(-1)[0]")
-            got = sorted(t["instrument"] for t in last["pending"]["toggles"]) if last else []
-            if got != ["bass", "layer1", "synth"]:
-                failures.append(f"toggles did not land together: {got}")
-            on = page.evaluate("window.__groovebox.getSong().sections[1].on")
-            if on["bass"] or on["synth"] or on["layer1"]:
-                failures.append("toggled instruments are still on")
-            print(f"three toggles landed together on bar {last['bar'] + 1 if last else '?'}")
-            # Turn them back on for the solos.
-            for inst in ["bass", "synth", "layer1"]:
-                page.click(f'[data-cell="1:{inst}"]')
-            wait_for(page, "window.__groovebox.pending().toggles.length === 0", 4.0)
-
-            levels = []
-            peaks = []
-            for _ in range(32):
-                time.sleep(0.25)
-                v = page.evaluate("window.__groovebox.level()")
-                if v is not None and v > -200:
-                    levels.append(v)
-                pk = page.evaluate("window.__groovebox.peak()")
-                if pk is not None and pk > -200:
-                    peaks.append(pk)
-            if not page.evaluate("window.__groovebox.playing"):
-                failures.append("transport did not start")
-            if not levels:
-                failures.append("no output level measured")
-            else:
-                lo, hi = min(levels), max(levels)
-                print(f"master level: {lo:.1f} to {hi:.1f} dB")
-                if hi < -40:
-                    failures.append(f"output too quiet ({hi:.1f} dB)")
-                if hi > -3:
-                    failures.append(f"output too hot before the limiter ({hi:.1f} dB)")
-            # The meter is a smoothed RMS; the peak reads raw samples after the limiter.
-            if not peaks:
-                failures.append("no output peak measured")
-            else:
-                top = max(peaks)
-                print(f"output peak: {top:.1f} dBFS")
-                if top >= 0:
-                    failures.append(f"output clips ({top:.1f} dBFS)")
-
-            solo = "(keep)=>{const e=window.__groovebox;for(const l of %r)e.setLayer(l,keep===null||l===keep)}" % LAYERS
-            for layer in LAYERS:
-                page.evaluate(solo, layer)
-                time.sleep(0.6)
-                peak = -999.0
-                for _ in range(16):
-                    time.sleep(0.125)
-                    v = page.evaluate("window.__groovebox.level()")
-                    if v is not None:
-                        peak = max(peak, v)
-                print(f"  solo {layer}: {peak:.1f} dB")
-                if peak < -60:
-                    failures.append(f"layer {layer} is silent ({peak:.1f} dB)")
-            page.evaluate(solo, None)
-
-            walk_shell(page, failures)
-            walk_g3(page, failures)
-            walk_g4(page, failures)
-            walk_p6(page, failures)
-            walk_g5_record(page, failures)
-            if page.locator("#new-jam").is_disabled():
-                failures.append("New jam is disabled while playing (P3 enables it: a vibe loads as a new song)")
-            n = walk_frame(page, failures)
-            print(f"frame walk: {n} screens at 360 x 640 and 412 x 915, both modes")
-            page.click('[data-appmode="advanced"]')
-            narrow_pass(page, failures)
-            if not page.evaluate("window.__groovebox.playing"):
-                failures.append("the transport stopped during the shell walk")
-
-            if shot:
-                page.click('[data-tab="layer1"]')
-                page.click('[data-mode="layer1:generative"]')
-                time.sleep(0.3)
-                page.screenshot(path=shot)
-            # Stop just after a bar line: nothing scheduled in the lookahead may start after Stop.
-            wait_for(page, "window.__groovebox.position().step === 0", 3.0)
-            page.click("#play")
-            at_stop = page.evaluate("window.__groovebox.attacks()")
-            time.sleep(1.0)
-            after = page.evaluate("window.__groovebox.attacks()")
-            if after != at_stop:
-                failures.append(f"{after - at_stop} attacks started after Stop")
-            else:
-                print("no attacks after Stop")
-            if page.evaluate("window.__groovebox.playing"):
-                failures.append("transport did not stop")
-            walk_g5_songs(page, failures, f"http://localhost:{PORT}/index.html")
-            walk_p3(page, failures)
-            walk_p4(page, failures)
-            walk_p7(page, failures)
-            walk_p9(page, failures)
-            # P10 (spec 8.9): the Drop, its button and Drop page, then its loudness and width in all 24 vibes.
-            walk_drop(page, failures)
-            drop_vibes(page, failures)
-            walk_fx_load(browser, page, failures)
-            walk_cost(browser, page, failures)
+            open_app(page, failures)
+            if setup:
+                setup(page)
+            fn(browser, page, failures, shot)
             check_osc_patch(page, failures)
             browser.close()
     finally:
         server.terminate()
+        server.wait()
 
     for e in errors:
         failures.append(f"page error: {e}")
     if failures:
-        print("SMOKE FAILED")
+        print(f"PART {name} FAILED")
         for f in failures:
             print(" -", f)
         return 1
-    print("SMOKE PASSED")
+    print(f"PART {name} PASSED")
+    return 0
+
+
+def fingerprint() -> str:
+    """A hash of everything the smoke depends on: every file under src/, public/ and tools/ (not __pycache__), and
+    index.html, package.json and package-lock.json, by path and contents."""
+    import hashlib
+
+    base = os.path.dirname(LEDGER)
+    h = hashlib.sha256()
+    for top in FINGERPRINTED:
+        path = os.path.join(base, top)
+        files = []
+        if os.path.isfile(path):
+            files = [path]
+        elif os.path.isdir(path):
+            for d, dirs, names in os.walk(path):
+                dirs[:] = sorted(x for x in dirs if x != "__pycache__")
+                files += [os.path.join(d, n) for n in names if not n.endswith(".pyc")]
+        for f in sorted(files):
+            h.update(os.path.relpath(f, base).encode() + b"\0")
+            with open(f, "rb") as fh:
+                h.update(hashlib.sha256(fh.read()).digest())
+    return h.hexdigest()
+
+
+def read_ledger(fp: str) -> dict:
+    try:
+        with open(LEDGER) as fh:
+            led = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return led.get("green", {}) if led.get("fingerprint") == fp else {}
+
+
+def write_ledger(fp: str, green: dict) -> None:
+    tmp = LEDGER + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump({"fingerprint": fp, "green": green}, fh, indent=1)
+    os.replace(tmp, LEDGER)
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    fresh = "--fresh" in args
+    part = None
+    if "--part" in args:
+        part = args[args.index("--part") + 1]
+        args = [a for a in args if a not in ("--part", part)]
+    args = [a for a in args if a != "--fresh"]
+    root = args[0] if args else "dist"
+    shot = args[1] if len(args) > 1 else None
+    if part:
+        return run_part(root, part, shot)
+
+    from smoke_parts import uncovered
+
+    missing = uncovered()
+    if missing:
+        print("SMOKE FAILED: checks in no part: " + ", ".join(missing))
+        print("exit code 1")
+        return 1
+    fp = fingerprint()
+    green = {} if fresh else read_ledger(fp)
+    write_ledger(fp, green)
+    ran, skipped, failed = [], [], []
+    t_all = time.time()
+    for name, _, _ in PARTS:
+        if name in green:
+            skipped.append(name)
+            print(f"=== part {name}: green in the ledger for this fingerprint, skipped", flush=True)
+            continue
+        print(f"=== part {name}: running", flush=True)
+        t0 = time.time()
+        cmd = [sys.executable, os.path.abspath(__file__), root, "--part", name]
+        if shot and name == "screens":
+            cmd.append(shot)
+        rc = subprocess.call(cmd)
+        mins = (time.time() - t0) / 60
+        ran.append(f"{name} {'passed' if rc == 0 else 'FAILED'} ({mins:.1f} min)")
+        if rc == 0:
+            green[name] = {"seconds": round(time.time() - t0), "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            write_ledger(fp, green)
+        else:
+            failed.append(name)
+        print(f"=== part {name}: {'passed' if rc == 0 else 'FAILED'} in {mins:.1f} min", flush=True)
+    print(f"smoke fingerprint {fp[:12]}{' (--fresh: ledger ignored)' if fresh else ''}")
+    print("parts run: " + (", ".join(ran) if ran else "none"))
+    print("parts skipped, green in the ledger: " + (", ".join(skipped) if skipped else "none"))
+    print(f"this run: {(time.time() - t_all) / 60:.1f} min")
+    if failed:
+        print(f"SMOKE FAILED: {', '.join(failed)} (exit code 1)")
+        return 1
+    print(f"SMOKE PASSED: all {len(PARTS)} parts green on this fingerprint (exit code 0)")
     return 0
 
 
