@@ -10,7 +10,7 @@ import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { DiffWatch, EnergyWatch, JumpWatch, type Energy, type Jumps } from "./continuity.ts";
-import { DropConductor, checkDropSettings, followRef, followStep, refSettleBars, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
+import { DropConductor, checkDropSettings, followRef, followStep, refSettleBars, trackBound, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
 import { COMP_TOP, type OverlayGroup } from "./drop.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
@@ -118,6 +118,10 @@ const FINE_DB = 0.5;
 const DEADBAND_DB = 0.3;
 /** The follower's curve (seconds) for its fine moves: slow, so a correction later in the drop is not heard as a step. */
 const FINE_TAU = 0.6;
+/** Once settled: at most TRACK_DB a beat on a TRACK_TAU curve, within TRACK_RANGE_DB of the settled gain. */
+const TRACK_DB = 0.25;
+const TRACK_TAU = 1.2;
+const TRACK_RANGE_DB = 3;
 
 const DROP_OFF: DropBar = { phase: "off", index: 0, length: 0, impact: false, cliff: false, end: false, cancelled: false };
 export { MP3_KBPS, type Take } from "./recorder.ts";
@@ -245,6 +249,13 @@ export class Engine {
   private compSteady = new Map<string, number>();
   /** Readings the follower has acted on in this drop's "on" phase (P10 review S2: it holds after FOLLOW_BEATS). */
   private dropFollowed = 0;
+  /** A hand on a control during this drop: the follower holds where it is (P10 review S2). */
+  private dropHand = false;
+  /** The gain the follower settled on in this drop, and the section's last bar before the build (mean beat energy). */
+  private dropSettled = 1;
+  private dropLast = 0;
+  /** The last beats heard at normal size (the section's last bar). */
+  private lastBeats: number[] = [];
   /** Readings of this drop's "on" phase after the impact's bar, heard or not (the first bar's moves may be coarse). */
   private dropOnBeats = 0;
   /** The first bar whose beats count in the follower's reference (the bar after a section or song landed). */
@@ -512,7 +523,7 @@ export class Engine {
   /** Log an edit to the take's event log, if a take is running. */
   private note(op: LogOp, args: unknown[]): void {
     // P10 review S2: a hand on the controls while the drop sounds stops the level follower where it is.
-    if (op !== "drop" && this.doubling()) this.dropFollowed = FOLLOW_BEATS;
+    if (op !== "drop" && this.doubling()) this.dropHand = true;
     const w = this.rec.writer;
     if (!w || this.rec.state !== "recording") return;
     const transport = Tone.getTransport();
@@ -1179,6 +1190,8 @@ export class Engine {
       const e = [...this.beatEnergy.values()];
       this.dropRefs = new Map(this.beatEnergy);
       this.dropRef = e.length ? e.reduce((a, b) => a + b, 0) / e.length : 0;
+      this.dropLast = this.lastBeats.length ? this.lastBeats.reduce((a, b) => a + b, 0) / this.lastBeats.length : this.dropRef;
+      this.dropHand = false;
       g.drop.begin(time, rec, barSec * plan.length, this.dropLevels(rec));
     }
     if (plan.phase === "build") {
@@ -1196,6 +1209,7 @@ export class Engine {
       this.dropSkip = rec.bloom ? 0 : 5;
       this.dropFollowed = 0;
       this.dropOnBeats = 0;
+      this.dropSettled = 1;
       if (!rec.bloom) this.dropWindow = [];
       this.dropMixOn = true;
       g.setMix("sweep", 0, time);
@@ -1303,17 +1317,22 @@ export class Engine {
    */
   private dropFollow(e: Energy, phase: DropPhase, ready: boolean, key: number): void {
     if (phase === "off" && !this.dropper.active) {
-      if (ready) this.beatEnergy.set(key, e.energy);
+      if (ready) {
+        this.beatEnergy.set(key, e.energy);
+        this.lastBeats.push(e.energy);
+        if (this.lastBeats.length > 4) this.lastBeats.shift();
+      }
       return;
     }
     const bloomBuild = phase === "build" && !!this.dropRec?.bloom;
     if (phase !== "on" && !bloomBuild) return;
     if (this.dropSkip > 0) return void this.dropSkip--;
-    if (phase === "on" && this.dropFollowed >= FOLLOW_BEATS) return;
-    if (!this.graph || !(this.dropRef > 0)) return;
+    if (this.dropHand || !this.graph || !(this.dropRef > 0)) return;
     if (phase === "on") this.dropOnBeats++;
-    // P10 fix: a place in the loop not heard before the build has no reference: the follower holds through it.
-    const ref = followRef(this.dropRefs, key);
+    const settling = !(phase === "on" && this.dropFollowed >= FOLLOW_BEATS);
+    // P10 fix: each beat against the same place of the section's loop; while settling, a place not heard before the
+    // build is read against the section's last bar before it; once settled, only heard places move the gain.
+    const ref = followRef(this.dropRefs, key, settling ? this.dropLast : 0);
     if (ref === null) return;
     const c = Math.max(0.05, this.graph.drop.compValue);
     this.dropWindow.push({ e: e.energy, c, ref });
@@ -1322,12 +1341,23 @@ export class Engine {
     this.dropMeasured = w.reduce((a, b) => a + b.e, 0) / w.length;
     const ratio = w.reduce((a, b) => a + b.e / (b.c * b.c * b.ref), 0) / w.length;
     if (!(ratio > 0)) return;
+    const aim = 1 / Math.sqrt(ratio);
+    if (!settling) {
+      // Settled: it keeps the drop with the section as the section's own level moves (a long reverb or attack still
+      // building), slowly (TRACK_DB a beat on a TRACK_TAU curve) and within TRACK_RANGE_DB of where it settled.
+      const target = followStep(c, trackBound(aim, this.dropSettled, TRACK_RANGE_DB), TRACK_DB, DEADBAND_DB, COMP_TOP);
+      if (target !== c) this.graph.drop.setComp(target, undefined, TRACK_TAU);
+      return;
+    }
     // Coarse only in the drop's first bar (after the impact's bar): later moves are fine and slow.
     const coarse = phase === "on" && this.dropFollowed < 4 && this.dropOnBeats <= 4 && !this.dropRec?.bloom;
-    const target = followStep(c, 1 / Math.sqrt(ratio), coarse ? 3 : FINE_DB, coarse ? 0 : DEADBAND_DB, COMP_TOP);
+    const target = followStep(c, aim, coarse ? 3 : FINE_DB, coarse ? 0 : DEADBAND_DB, COMP_TOP);
     if (phase === "on") this.dropFollowed++;
     if (target !== c) this.graph.drop.setComp(target, undefined, coarse ? 0.15 : FINE_TAU);
-    if (phase === "on" && this.dropFollowed >= FOLLOW_BEATS) this.compSteady.set(this.seq.song.style ?? "", Math.max(0.2, target));
+    if (phase === "on" && this.dropFollowed >= FOLLOW_BEATS) {
+      this.dropSettled = Math.max(0.2, target);
+      this.compSteady.set(this.seq.song.style ?? "", this.dropSettled);
+    }
   }
 
   // ---- Diagnostics and test hooks ------------------------------------------------
@@ -1661,6 +1691,7 @@ export class Engine {
     // P10: the level follower reads every beat; a new section or song starts its reference afresh.
     if (r.applied?.section != null || r.loaded) {
       this.beatEnergy.clear();
+      this.lastBeats = [];
       // The landing bar (a new vibe's patches arriving, the last one's tails) is not the section's level: the
       // reference starts on the bar after it.
       this.refFrom = r.bar + 1 + refSettleBars(this.sectionAttacks(r.section), sixteenth * STEPS_PER_BAR);

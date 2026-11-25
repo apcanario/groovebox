@@ -287,13 +287,21 @@ export function refSettleBars(attacks: readonly number[], barSeconds: number): n
 }
 
 /**
- * P10 fix: the section's own level at a place in its loop (`key`), as heard before the build; null for a place not
- * heard (a section played for less than its loop). Never the mean of other places: on a vibe whose chords differ in
- * level, that pulled the drop away from the section and held it there.
+ * P10 fix: the section's own level at a place in its loop (`key`), as heard before the build. A place not heard (a
+ * section played for less than its loop) has none: `fallback` (the section's last bar before the build, while the
+ * follower settles) or null. Never the mean of every place: on a vibe whose chords differ in level, that pulled the
+ * drop away from the section and held it there.
  */
-export function followRef(refs: ReadonlyMap<number, number>, key: number): number | null {
+export function followRef(refs: ReadonlyMap<number, number>, key: number, fallback = 0): number | null {
   const r = refs.get(key);
-  return r !== undefined && r > 0 ? r : null;
+  if (r !== undefined && r > 0) return r;
+  return fallback > 0 ? fallback : null;
+}
+
+/** P10 fix: the settled follower's aim, kept within `rangeDb` of the gain it settled on. */
+export function trackBound(aim: number, settled: number, rangeDb: number): number {
+  const k = Math.pow(10, rangeDb / 20);
+  return Math.min(settled * k, Math.max(settled / k, aim));
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DROP, DropConductor, checkDropRecipe, followRef, followStep, loopBeats, refSettleBars, resolveDrop, rollHits, type DropBar } from "./drop.ts";
+import { DEFAULT_DROP, DropConductor, checkDropRecipe, followRef, followStep, loopBeats, refSettleBars, trackBound, resolveDrop, rollHits, type DropBar } from "./drop.ts";
 import { STYLES, STYLE_IDS, vibeSong } from "./styles.ts";
 import { defaultSong, validateSong } from "../engine/song.ts";
 
@@ -152,6 +152,9 @@ describe("P10 review: the level follower's steps and loop", () => {
     expect(followRef(refs, 1)).toBe(0.01);
     expect(followRef(refs, 7)).toBeNull();
     expect(followRef(new Map([[3, 0]]), 3)).toBeNull();
+    // While settling, a place not heard is read against the section's last bar, not the mean of every place.
+    expect(followRef(refs, 7, 0.03)).toBe(0.03);
+    expect(followRef(refs, 1, 0.03)).toBe(0.01);
     // Ambient's case: a 16-bar loop with a loud chord (+1.2 dB) and a quiet one (-1.4 dB); only the quiet places and
     // two bars of the loud ones were heard. The drop adds nothing past the limiter, so the right gain is 1. Its first
     // two bars land on loud places not heard: the follower holds there, then settles on heard places, and the drop
@@ -175,6 +178,12 @@ describe("P10 review: the level follower's steps and loop", () => {
     }
     expect(followed).toBe(8);
     expect(Math.abs(20 * Math.log10(c))).toBeLessThan(0.3);
+  });
+  it("P10 fix: once settled, the follower tracks within 3 dB of where it settled", () => {
+    const k = Math.pow(10, 3 / 20);
+    expect(trackBound(0.5, 1, 3)).toBeCloseTo(1 / k, 9);
+    expect(trackBound(2, 1, 3)).toBeCloseTo(k, 9);
+    expect(trackBound(0.9, 1, 3)).toBe(0.9);
   });
   it("P10 fix: the reference waits out the section's longest attack", () => {
     expect(refSettleBars([0.005, 0.01], 2)).toBe(0);
