@@ -81,8 +81,15 @@ function SongView({ ctx }: { ctx: Ctx }) {
 }
 
 export function PlayTab({ ctx }: { ctx: Ctx }) {
+  const drop = (
+    <div class="droprow">
+      <DropButton ctx={ctx} />
+    </div>
+  );
   return (
     <section class={`playtab ${ctx.advanced ? "song" : "nowview"}`}>
+      {/* P10 review S6: in Advanced the grid sits directly on the strip (spec 8.6), so DROP goes above the grid. */}
+      {ctx.advanced && drop}
       {ctx.advanced ? (
         <SongView ctx={ctx} />
       ) : (
@@ -91,10 +98,8 @@ export function PlayTab({ ctx }: { ctx: Ctx }) {
           <NowView ctx={ctx} />
         </>
       )}
-      {/* P10 (spec 8.9): between the instruments and the section strip, full width, in both modes. */}
-      <div class="droprow">
-        <DropButton ctx={ctx} />
-      </div>
+      {/* P10 (spec 8.9): in Simple between the instruments and the section strip, full width. */}
+      {!ctx.advanced && drop}
     </section>
   );
 }

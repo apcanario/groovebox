@@ -250,6 +250,8 @@ export class Engine {
    * long as it is held (P10 review S8), so a drop that starts in the middle of an eight-bar chord still has it.
    */
   private sustain: Partial<Record<Exclude<InstrumentId, "drums">, { notes: number[]; vel: number; until: number; pad: boolean }>> = {};
+  /** The follower's readings while the drop is on: the bar and step read at, and the beat before it (smoke test). */
+  readonly dropBeats: { bar: number; step: number; energy: number }[] = [];
   /** Every bar line of the Drop's phases (kept short), for the smoke test. */
   readonly dropMarks: DropMark[] = [];
 
@@ -1636,7 +1638,15 @@ export class Engine {
       // The reading holds the beat that just ended: its place in the section's loop (P10 review S5).
       const loop = loopBeats((this.seq.song.sections[r.section]?.chords ?? []).map((c) => c.bars));
       const key = (((r.bar * 4 + r.step / 4 - 1) % loop) + loop) % loop;
-      void this.dropWatch.read().then((e) => this.dropFollow(e, phase, ready, key));
+      const at = { bar: r.bar, step: r.step };
+      void this.dropWatch.read().then((e) => {
+        // P10 review S8: each beat of the drop as heard, for the smoke test (the reading at a step holds the beat before it).
+        if (phase === "on") {
+          this.dropBeats.push({ ...at, energy: e.energy });
+          if (this.dropBeats.length > 64) this.dropBeats.shift();
+        }
+        this.dropFollow(e, phase, ready, key);
+      });
     }
     const doubling = this.doubling();
     const ov = g.drop;

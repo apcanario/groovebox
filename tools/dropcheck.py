@@ -5,9 +5,12 @@ until the second press, the song document identical after the wind-down, the win
 same section and in a section tapped during the drop (shown as waiting, "After drop"), a cancel during the build, the
 Drop page in Advanced and the presses in the event log.
 
-drop_vibes: every vibe loaded mid-jam, its drop played (a two-bar build, set on the Drop page), and its loudness and
-stereo width measured on the master output over four whole bars of the section before and four whole bars of the drop
-(after the impact's bar): whole four-bar phrases, so a phrase louder on some chords than others compares like with like: within 1 dB, and wider. The master's largest sample over every bar stays under 0 dBFS.
+drop_vibes: every vibe loaded mid-jam, its drop played (a two-bar build and wind-down, set on the Drop page), and its
+loudness (K-weighted, P10 review S7) and stereo width measured on the master output over four whole bars of the section
+before and four whole bars of the drop (after the impact's bar): within 1 dB, each of those bars within 1.5 dB, and
+wider. The master's largest sample over the section, build, impact, drop, wind-down and two bars after stays under
+-0.5 dBFS, also at Width 1, Hold and Saturation 0.6 (P10 review S1, S3). On Drone the drop's bar lines do not dip
+(P10 review S8).
 """
 import json
 import math
@@ -17,6 +20,13 @@ E = "window.__groovebox"
 # The drop's loudness against the section it came from (spec 8.9: within 1 dB), and how much wider it must be.
 LOUD_DB = 1.0
 WIDER = 1.15
+# P10 review S1: no single bar of the drop after the impact's bar strays further than this from the section.
+BAR_DB = 1.5
+# P10 review S3: the master's largest sample stays under this (dBFS), so a small regression shows before it clips.
+PEAK_DBFS = -0.5
+# P10 review S2: every instrument's level dial halved during the drop (once the follower holds) lowers the master by at
+# least this many dB four beats later, and the follower's gain does not move.
+LEVEL_DROP_DB = 3.0
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:
@@ -97,6 +107,7 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     if fit[0] > fit[1] + 1 or fit[2] < 48:
         failures.append(f"P10: with DROP the Simple lanes do not fit at 360 x 640 (need {fit[0]} px, have {fit[1]}, lowest tile {fit[2]:.0f} px)")
     before = doc(page)
+    mix_before = page.evaluate(f"{E}.dropInfo().mix")
     # First press, mid-bar: nothing immediate; armed (queued for the next bar: hatched) with its build length.
     wait_for(page, f"{E}.position().step === 5", 3.0)
     page.click("#drop")
@@ -137,6 +148,40 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
         failures.append("P10: the drop did not stay on until the second press")
     else:
         print("P10 drop: armed, built 2 bars with the countdown, landed, stayed on 6 bars")
+    # P10 review E1: knobs still work during the drop: Filter to -0.8 closes the master's low-pass, then back.
+    sweep0 = page.evaluate(f"{E}.getMix().sweep")
+    page.evaluate(f"{E}.setMix('sweep', -0.8)")
+    time.sleep(0.4)
+    lp = page.evaluate(f"{E}.dropInfo().mix.lp")
+    page.evaluate(f"(v) => {E}.setMix('sweep', v)", sweep0)
+    time.sleep(0.4)
+    lp_back = page.evaluate(f"{E}.dropInfo().mix.lp")
+    if not (lp < 2000 and lp_back > 15000):
+        failures.append(f"P10: the Filter knob does nothing during the drop (low-pass {lp:.0f} Hz at -0.8, {lp_back:.0f} Hz back at {sweep0})")
+    else:
+        print(f"P10 drop: Filter during the drop: low-pass {lp:.0f} Hz at -0.8, {lp_back:.0f} Hz back")
+    # P10 review S2: the follower does not work against a hand: every level halved, the master falls and stays down.
+    levels = page.evaluate(f"(() => {{ const d = {E}.getDocument(); return Object.fromEntries(Object.entries(d.patches).map(([k, p]) => [k, p.level])); }})()")
+    next_bar(page)
+    page.evaluate(f"{E}.stereo()")
+    next_bar(page)
+    e_before = page.evaluate(f"{E}.stereo()")
+    c_before = page.evaluate(f"{E}.dropInfo().comp")
+    page.evaluate(f"(l) => {{ for (const [k, v] of Object.entries(l)) {E}.setParam(k, 'level', v / 2); }}", levels)
+    next_bar(page)
+    page.evaluate(f"{E}.stereo()")
+    next_bar(page)
+    e_after = page.evaluate(f"{E}.stereo()")
+    c_after = page.evaluate(f"{E}.dropInfo().comp")
+    page.evaluate(f"(l) => {{ for (const [k, v] of Object.entries(l)) {E}.setParam(k, 'level', v); }}", levels)
+    fell = db(e_before) - db(e_after)
+    moved = 20 * math.log10(max(c_after, 1e-9) / max(c_before, 1e-9))
+    if fell < LEVEL_DROP_DB or abs(moved) > 0.1:
+        failures.append(f"P10: the follower works against the level dials during the drop (master fell {fell:.2f} dB, wanted {LEVEL_DROP_DB}; its gain moved {moved:+.2f} dB)")
+    else:
+        print(f"P10 drop: every level halved during the drop: master down {fell:.2f} dB, follower's gain moved {moved:+.2f} dB")
+    if shown(page)["phase"] != "on":
+        failures.append("P10: the drop did not stay on through the knob checks")
     # Still: the band stops; the state reads by fill alone.
     page.click('[data-tab="mix"]')
     page.click('[data-page="mix:audio"]')
@@ -170,6 +215,10 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
         failures.append(f"P10: the wind-down did not end on the bar line two bars after it began (bar {w0 + 2}): {end}")
     if page.evaluate(f"{E}.position().section") != sec or shown(page)["phase"] != "off":
         failures.append("P10: the wind-down did not land in the same section, back to normal")
+    mix_after = page.evaluate(f"{E}.dropInfo().mix")
+    # P10 review S9: the graph's Filter and Pump are back at the knobs' values, not only the document.
+    if abs(mix_after["lp"] - mix_before["lp"]) > 1 or abs(mix_after["hp"] - mix_before["hp"]) > 1 or abs(mix_after["pump"] - mix_before["pump"]) > 1e-6:
+        failures.append(f"P10: after the wind-down the master's filter and pump are not the knobs' ({mix_before} before, {mix_after} after)")
     after = doc(page)
     if after != before:
         failures.append("P10: the song document changed between the first press and the end of the wind-down")
@@ -184,6 +233,13 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     sub = page.inner_text(f'[data-strip="{other}"]').lower()
     if page.evaluate(f"{E}.pending().section") != other or "after drop" not in sub:
         failures.append(f"P10: a section tapped during the drop is not shown waiting for it: {sub!r}")
+    # P10 review S9: tapping the playing section takes the waiting one back; tapping it again queues it again.
+    page.click(f'[data-strip="{sec}"]')
+    if page.evaluate(f"{E}.pending().section") is not None:
+        failures.append("P10: tapping the playing section during the drop did not take the waiting one back")
+    page.click(f'[data-strip="{other}"]')
+    if page.evaluate(f"{E}.pending().section") != other:
+        failures.append("P10: a section tapped again during the drop is not waiting for it")
     next_bar(page, 2)
     if page.evaluate(f"{E}.position().section") != sec:
         failures.append("P10: a section tapped during the drop switched before the wind-down")
@@ -214,6 +270,24 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     else:
         print("P10 drop: a press during the build cancelled it on the next bar line")
 
+    # P10 review S9: armed, a section tapped waits for the drop; a second press before the bar line disarms the drop and
+    # the section moves into the ordinary next-bar queue.
+    here = page.evaluate(f"{E}.position().section")
+    there = (here + 1) % len(page.evaluate(f"{E}.getSong().sections"))
+    next_bar(page)
+    wait_for(page, f"{E}.position().step >= 2 && {E}.position().step <= 8", 3.0)
+    page.click("#drop")
+    page.click(f'[data-strip="{there}"]')
+    held = shown(page)["queued"]
+    page.click("#drop")
+    queued = page.evaluate(f"{E}.pending().section")
+    d0 = next_bar(page)
+    time.sleep(0.3)
+    if held != there or queued != there or page.evaluate(f"{E}.position().section") != there or shown(page)["phase"] != "off":
+        failures.append(f"P10: a disarmed drop did not move its waiting section into the next-bar queue (held {held}, queued {queued}, now {page.evaluate(f'{E}.position().section')}, bar {d0})")
+    else:
+        print(f"P10 drop: disarmed before the bar line, section {there} moved to the next bar and landed")
+
     # Recorded as events: a take holds the presses.
     page.evaluate(f"{E}.record()")
     page.click("#drop")
@@ -232,6 +306,16 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     page.click('[data-appmode="advanced"]')
     if not page.locator("#drop").count():
         failures.append("P10: no DROP button on the Advanced Play tab")
+    else:
+        # P10 review S6: the grid sits directly on the strip (spec 8.6); DROP is above the grid, not between them.
+        for vw, vh in ((360, 640), (390, 844)):
+            page.set_viewport_size({"width": vw, "height": vh})
+            time.sleep(0.15)
+            f = page.evaluate("""() => { const r = (s) => document.querySelector(s).getBoundingClientRect();
+              return { grid: r('.playtab .grid').bottom, gtop: r('.playtab .grid').top, strip: r('.secs').top, drop: r('#drop').bottom, h: r('#drop').height }; }""")
+            if not (0 <= f["strip"] - f["grid"] <= 12 and f["drop"] <= f["gtop"] + 0.5 and f["h"] >= 48):
+                failures.append(f"P10: on Advanced Play at {vw} x {vh} the grid is not directly on the strip with DROP above it: {f}")
+        page.set_viewport_size({"width": 360, "height": 640})
     page.click('[data-tab="mix"]')
     page.click('[data-page="mix:drop"]')
     for sel, want in [('[data-dropbuild="8"]', ("build", 8)), ('[data-dropcliff="hold"]', ("cliff", "hold")), ('[data-dropwind="4"]', ("wind", 4))]:
@@ -253,6 +337,63 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     page.set_viewport_size({"width": 390, "height": 844})
 
 
+def peak_db(x: float) -> float:
+    return 20 * math.log10(max(x, 1e-9))
+
+
+def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
+    """One vibe's drop measured: the section's four bars, the build, the impact's bar, each of four drop bars, the
+    wind-down and two bars after it. Returns the figures, or None when the drop did not come on."""
+    next_bar(page)
+    page.evaluate(f"{E}.stereo()")
+    next_bar(page, 4)
+    n = page.evaluate(f"{E}.stereo()")
+    page.evaluate(f"{E}.drop()")
+    # The build (two bars from the next bar line) and its cliffhanger, then the impact's bar: read separately.
+    wait_for(page, f"{E}.dropShown().phase === 'on'", 4 * bar_s(page) + 2.0)
+    p_build = page.evaluate(f"{E}.stereo()")
+    next_bar(page)  # the impact's bar
+    p_imp = page.evaluate(f"{E}.stereo()")
+    bars = []
+    for _ in range(4):
+        next_bar(page)
+        bars.append(page.evaluate(f"{E}.stereo()"))
+    info = page.evaluate(f"{E}.dropInfo()")
+    beats = page.evaluate(f"{E}.dropBeats.slice(-16)")
+    phase = shown(page)["phase"]
+    if phase != "on":
+        failures.append(f"P10 {label}: the drop is not on after its build ({phase})")
+        page.evaluate(f"{E}.drop()")
+        return None
+    # The wind-down, its last bar line and two bars after it: read for the peak.
+    page.evaluate(f"{E}.drop()")
+    wait_for(page, f"{E}.dropShown().phase === 'off'", 6 * bar_s(page) + 2.0)
+    p_wind = page.evaluate(f"{E}.stereo()")
+    next_bar(page, 2)
+    p_after = page.evaluate(f"{E}.stereo()")
+    energy = sum(b["energy"] for b in bars) / len(bars)
+    width = sum(b["width"] for b in bars) / len(bars)
+    loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
+    per_bar = [db(b) - db(n) for b in bars]
+    peaks = {"section": n["peak"], "build": p_build["peak"], "impact": p_imp["peak"], "drop": max(b["peak"] for b in bars),
+             "wind": p_wind["peak"], "after": p_after["peak"]}
+    top = max(peaks, key=peaks.get)
+    return {"n": n, "loud": loud, "per_bar": per_bar, "wider": width / max(n["width"], 1e-6), "width": width,
+            "peak": peaks[top], "peak_at": top, "info": info, "beats": beats}
+
+
+def judge(r: dict, label: str, failures: list) -> None:
+    if abs(r["loud"]) > LOUD_DB:
+        failures.append(f"P10 {label}: the drop is {r['loud']:+.2f} dB from the section it came from (more than {LOUD_DB} dB)")
+    worst_bar = max(r["per_bar"], key=abs)
+    if abs(worst_bar) > BAR_DB:
+        failures.append(f"P10 {label}: a bar of the drop is {worst_bar:+.2f} dB from the section (more than {BAR_DB} dB): {[round(x, 2) for x in r['per_bar']]}")
+    if r["wider"] < WIDER:
+        failures.append(f"P10 {label}: the drop is not measurably wider ({r['n']['width']:.3f} -> {r['width']:.3f})")
+    if peak_db(r["peak"]) > PEAK_DBFS:
+        failures.append(f"P10 {label}: the master peaks at {peak_db(r['peak']):.2f} dBFS ({r['peak_at']}), over {PEAK_DBFS} dBFS")
+
+
 def drop_vibes(page, failures: list) -> None:
     vibes = page.evaluate("window.__vibes")
     # Ambient and Drone last: their tails ring for up to 20 s and would sit in the next vibe's bars before its drop.
@@ -262,6 +403,7 @@ def drop_vibes(page, failures: list) -> None:
         page.click("#play")
     rows = []
     worst_loud = (0.0, "")
+    worst_bar = (0.0, "")
     least_wide = (9.0, "")
     top_peak = (0.0, "")
     for v in vibes:
@@ -269,45 +411,53 @@ def drop_vibes(page, failures: list) -> None:
         if not wait_for(page, f"{E}.getSong().style === {v['id']!r}", 10.0):
             failures.append(f"P10 {v['id']}: did not load")
             continue
-        page.evaluate(f"{E}.setDrop({{build: 2}})")
-        next_bar(page)
-        page.evaluate(f"{E}.stereo()")
-        next_bar(page, 4)
-        n = page.evaluate(f"{E}.stereo()")
-        page.evaluate(f"{E}.drop()")
-        # The build (two bars from the next bar line), its cliffhanger and the impact: read whole, for the peak.
-        wait_for(page, f"{E}.dropShown().phase === 'on'", 4 * bar_s(page) + 2.0)
-        next_bar(page)  # the impact's bar
-        p2 = page.evaluate(f"{E}.stereo()")
-        next_bar(page, 4)
-        dr = page.evaluate(f"{E}.stereo()")
-        p1 = p2
-        phase = shown(page)["phase"]
-        info = page.evaluate(f"{E}.dropInfo()")
-        if phase != "on":
-            failures.append(f"P10 {v['id']}: the drop is not on after its build ({phase})")
-        loud = db(dr) - db(n)
-        wider = dr["width"] / max(n["width"], 1e-6)
-        peak = max(x["peak"] for x in (n, p1, p2, dr))
-        rows.append(f"{v['id']} {loud:+.2f} dB, width {n['width']:.3f} -> {dr['width']:.3f}, peak {20 * math.log10(max(peak, 1e-9)):.1f} dBFS, gain {info['comp']:.2f}"
-                    f" (follower {10 * math.log10(max(info['measured'], 1e-12) / max(info['ref'], 1e-12)) + 20 * math.log10(max(info['comp'], 1e-9)):+.2f} dB; out {db(n):.1f} -> {db(dr):.1f}, ref {10 * math.log10(max(info['ref'], 1e-12)):.1f})")
-        if abs(loud) > abs(worst_loud[0]):
-            worst_loud = (loud, v["id"])
-        if wider < least_wide[0]:
-            least_wide = (wider, v["id"])
-        if peak > top_peak[0]:
-            top_peak = (peak, v["id"])
-        if abs(loud) > LOUD_DB:
-            failures.append(f"P10 {v['id']}: the drop is {loud:+.2f} dB from the section it came from (more than {LOUD_DB} dB)")
-        if wider < WIDER:
-            failures.append(f"P10 {v['id']}: the drop is not measurably wider ({n['width']:.3f} -> {dr['width']:.3f})")
-        if peak >= 1.0:
-            failures.append(f"P10 {v['id']}: the master clips ({peak:.3f})")
-        # Back to normal for the next vibe: the wind-down's press, then the next vibe lands (it ends any drop).
-        page.evaluate(f"{E}.drop()")
+        page.evaluate(f"{E}.setDrop({{build: 2, wind: 2}})")
+        r = one_drop(page, v, failures, v["id"])
+        if not r:
+            continue
+        judge(r, v["id"], failures)
+        info = r["info"]
+        rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
+                    f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
+                    f" (out {db(r['n']):.1f}, ref {10 * math.log10(max(info['ref'], 1e-12)):.1f} dB K-weighted, {10 * math.log10(max(r['n']['flat'], 1e-12)):.1f} flat)")
+        if abs(r["loud"]) > abs(worst_loud[0]):
+            worst_loud = (r["loud"], v["id"])
+        wb = max(r["per_bar"], key=abs)
+        if abs(wb) > abs(worst_bar[0]):
+            worst_bar = (wb, v["id"])
+        if r["wider"] < least_wide[0]:
+            least_wide = (r["wider"], v["id"])
+        if r["peak"] > top_peak[0]:
+            top_peak = (r["peak"], v["id"])
+        if v["id"] == "drone":
+            # P10 review S8: held notes are doubled once, so the drop does not dip on its bar lines: the beat that
+            # starts each bar against the beat in the middle of it (the reading at step 4 holds beat 1, at 12 beat 3).
+            b1 = [b["energy"] for b in r["beats"] if b["step"] == 4]
+            b3 = [b["energy"] for b in r["beats"] if b["step"] == 12]
+            if b1 and b3:
+                dip = 10 * math.log10(max(sum(b1) / len(b1), 1e-12) / max(sum(b3) / len(b3), 1e-12))
+                print(f"  P10 drone: the drop's first beat of a bar against its third: {dip:+.2f} dB")
+                if abs(dip) > 1.0:
+                    failures.append(f"P10 drone: the drop's bar lines are {dip:+.2f} dB from mid-bar (more than 1 dB)")
+            else:
+                failures.append("P10 drone: no beats of the drop read")
+    # P10 review S3: one drop at the loudest settings: Width 1, Hold, Saturation 0.6.
+    extra = next((v for v in vibes if v["id"] == "edm"), vibes[0])
+    page.evaluate(f"(v) => {E}.loadAtBar(window.__vibeSong(v.id), v.start)", extra)
+    if wait_for(page, f"{E}.getSong().style === {extra['id']!r}", 10.0):
+        sat = page.evaluate(f"{E}.getMix().saturation")
+        page.evaluate(f"{E}.setMix('saturation', 0.6)")
+        page.evaluate(f"{E}.setDrop({{build: 2, wind: 2, cliff: 'hold', width: 1}})")
+        r = one_drop(page, extra, failures, f"{extra['id']} at Width 1, Hold, Saturation 0.6")
+        page.evaluate(f"(v) => {E}.setMix('saturation', v)", sat)
+        if r:
+            judge(r, f"{extra['id']} at Width 1, Hold, Saturation 0.6", failures)
+            rows.append(f"{extra['id']} at Width 1, Hold, Saturation 0.6: {r['loud']:+.2f} dB, peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']})")
+            if r["peak"] > top_peak[0]:
+                top_peak = (r["peak"], extra["id"] + " loudest settings")
     for r in rows:
         print("  P10 " + r)
     print(
-        f"P10 drop in {len(rows)} vibes: loudness within {abs(worst_loud[0]):.2f} dB ({worst_loud[1]}), "
-        f"at least {least_wide[0]:.2f}x wider ({least_wide[1]}), highest peak {20 * math.log10(max(top_peak[0], 1e-9)):.1f} dBFS ({top_peak[1]})"
+        f"P10 drop in {len(rows)} runs: loudness within {abs(worst_loud[0]):.2f} dB ({worst_loud[1]}), a single bar within {abs(worst_bar[0]):.2f} dB ({worst_bar[1]}), "
+        f"at least {least_wide[0]:.2f}x wider ({least_wide[1]}), highest peak {peak_db(top_peak[0]):.1f} dBFS ({top_peak[1]}) through build, impact, drop, wind-down and after"
     )

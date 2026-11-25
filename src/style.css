@@ -1976,6 +1976,11 @@ button:disabled {
   gap: var(--gap);
   margin-top: calc(var(--group) - var(--gap));
 }
+/* P10 review S6: in Advanced, DROP sits above the grid, so the grid stays directly on the strip (spec 8.6). */
+.playtab.song .droprow {
+  margin-top: 0;
+  margin-bottom: calc(var(--group) - var(--gap));
+}
 .drop {
   --c: var(--yellow);
   --hc: var(--yellow);

@@ -22,6 +22,11 @@ P10: "drop" plays each vibe named (EDM, Trance, Deep house and Ambient by defaul
 for six seconds, then its drop (a two-bar build, measured from the bar after the impact), and reports both loads, the
 worst stalls, and the most overlay voices sounding at once against the overlay's cap (VOICE_CAP in src/engine/drop.ts):
     python3 tools/cost.py dist 3 drop [edm,trance,...]
+
+P10 review S4: "dropheavy" plays the heaviest scene (everything on and the six heaviest effects, as `all,fx6max`), then
+its drop on top (a two-bar build, measured from the bar after the impact), the median of `runs`, against spec 8.8's
+71% ceiling:
+    python3 tools/cost.py dist 5 dropheavy
 """
 import os
 import subprocess
@@ -150,8 +155,56 @@ def drops(root: str, runs: int, only: list | None = None) -> int:
     return 0
 
 
+def drop_heavy(root: str, runs: int) -> int:
+    """P10 review S4: the drop on top of the heaviest scene (everything on, the six heaviest effects)."""
+    server = subprocess.Popen([sys.executable, "-m", "http.server", str(PORT), "--directory", root],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1)
+    E = "window.__groovebox"
+    rows = []
+    try:
+        with sync_playwright() as p:
+            chrome = "/usr/bin/google-chrome"
+            kwargs = {"executable_path": chrome} if os.path.exists(chrome) else {}
+            browser = p.chromium.launch(args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"], **kwargs)
+            for _ in range(runs):
+                page = browser.new_page(viewport={"width": 390, "height": 844})
+                page.goto(f"http://localhost:{PORT}/index.html")
+                wait_for(page, "!!window.__groovebox && !!document.querySelector('.vibes')", 5.0)
+                page.keyboard.press("Escape")
+                FIRST_SONG[:] = [page.evaluate(SONG)]
+                page.click("#play")
+                page.evaluate(f"{E}.switchSection(1)")
+                wait_for(page, f"{E}.position().section === 1", 4.0)
+                base = measure_cost(browser, page, "heaviest scene (all,fx6max)", ["all", "fx6max"])
+                page.evaluate(f"{E}.setDrop({{build: 2}})")
+                page.evaluate(f"{E}.drop()")
+                wait_for(page, f"{E}.dropShown().phase === 'on'", 15.0)
+                b0 = page.evaluate(f"{E}.position().bar")
+                wait_for(page, f"{E}.position().bar > {b0}", 6.0)
+                page.evaluate(f"{E}.dropInfo()")
+                on = load_of(trace_audio(browser, page, lambda: time.sleep(6.0)))
+                info = page.evaluate(f"{E}.dropInfo()")
+                fx = page.evaluate(f"{E}.fxState()")
+                n_fx = sum(x["on"] for r in fx["slots"].values() for x in r)
+                page.close()
+                rows.append((base.get("load", float("nan")), base.get("worst_ms", float("nan")), on[0], on[1], info["most"], info["dropped"]))
+                print(f"cost drop on the heaviest scene ({n_fx} slots on): {rows[-1][0]:.1f}% / {rows[-1][1]:.2f} ms -> drop {on[0]:.1f}% / {on[1]:.2f} ms, "
+                      f"overlay voices at most {info['most']}, {info['dropped']} over the cap", flush=True)
+            browser.close()
+    finally:
+        server.terminate()
+    med = lambda xs: sorted(xs)[len(xs) // 2]  # noqa: E731
+    print(f"heaviest scene, median of {runs}: {med([r[0] for r in rows]):.1f}% (min {min(r[0] for r in rows):.1f}, max {max(r[0] for r in rows):.1f}) "
+          f"-> drop {med([r[2] for r in rows]):.1f}% (min {min(r[2] for r in rows):.1f}, max {max(r[2] for r in rows):.1f}); worst stall "
+          f"{med([r[1] for r in rows]):.2f} -> {med([r[3] for r in rows]):.2f} ms; voices at most {max(r[4] for r in rows)}, over the cap {max(r[5] for r in rows)}")
+    return 0
+
+
 def main() -> int:
     root = sys.argv[1] if len(sys.argv) > 1 else "dist"
+    if len(sys.argv) > 3 and sys.argv[3] == "dropheavy":
+        return drop_heavy(root, int(sys.argv[2]))
     if len(sys.argv) > 3 and sys.argv[3] == "drop":
         return drops(root, int(sys.argv[2]), sys.argv[4].split(",") if len(sys.argv) > 4 else None)
     if len(sys.argv) > 3 and sys.argv[3] == "vibes":
