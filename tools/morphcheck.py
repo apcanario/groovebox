@@ -218,6 +218,7 @@ def walk_morph(page, failures: list) -> None:
     else:
         b0 = page.evaluate(f"{E}.morphBar()")
         drag(page, sel, 0, 50)
+        time.sleep(0.5)  # the dial's last move reaches the engine
         hand_bar = page.evaluate(f"{E}.morphBar()")
         pos = page.evaluate(f"{E}.macroPos(1, 'synth', 'bright')")
         wait_bars(page, HANDS_BARS + 1)
