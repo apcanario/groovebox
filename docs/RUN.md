@@ -47,7 +47,7 @@ For each row of the bundle, in order:
 
 ## 4. Close the row
 
-1. The chat runs `npm run check` and `npm run smoke` itself. Both must pass.
+1. The chat runs `npm run check` and the full smoke (`npm run smoke`) itself, once per row; the ledger skips parts already green on their own fingerprints. Both must pass.
 2. Update `docs/BACKLOG.md`: move the row to Done. Add anything found but not fixed to **Carried**, with the row it belongs to.
 3. Update `README.md` as `CLAUDE.md` says: what the app does today, and the status table.
 4. Add the row to `docs/CHANGELOG.md`: date, row, models that ran, what changed, script results, choices taken.
@@ -56,18 +56,25 @@ For each row of the bundle, in order:
 
 ## 4b. Close the bundle
 
-After the last row of the bundle is pushed, one more fresh agent, the **player**, checks the bundle as a whole on the final build. Prompt it with: the rows of the bundle; "read `CLAUDE.md`, the spec sections the bundle names and those rows; build; run `npm run check`, `npm run smoke` and, once it exists, `python3 tools/shots.py`; then go through every Done-when line of every row in the bundle again and say for each whether it is true now, looking at the screenshots for anything a script cannot judge (cut-off or wrapped text, a control under 48 px, a screen that differs from `docs/design/look/`); check that `README.md` describes what the app does now; write `docs/reviews/bundle-<n>.md` with every finding; change no source file; reply in six lines or fewer".
+After the last row of the bundle is pushed, one more fresh agent, the **player**, checks the bundle as a whole on the final build. Prompt it with: the rows of the bundle; "read `CLAUDE.md`, the spec sections the bundle names and those rows; build; run `npm run check`, the full `npm run smoke` (the ledger skips parts already green) and, once it exists, `python3 tools/shots.py`; then go through every Done-when line of every row in the bundle again and say for each whether it is true now, looking at the screenshots for anything a script cannot judge (cut-off or wrapped text, a control under 48 px, a screen that differs from `docs/design/look/`); check that `README.md` describes what the app does now; write `docs/reviews/bundle-<n>.md` with every finding; change no source file; reply in six lines or fewer".
 
 - Any finding goes to a fixer agent as in section 3, then the chat runs both scripts again and pushes.
 - A finding that cannot be fixed in this chat goes to **Carried** with the row it belongs to.
 
 ## 4c. Keeping quality across a long chat
 
-- A bundle has up to four rows and each row is three or four agents. The main chat stays thin so that this fits: it never reads source, the spec or a report.
+- A bundle has up to four rows and each row is one builder per slice, then a reviewer and a fixer. The main chat stays thin so that this fits: it never reads source, the spec or a report.
 - The reviewer checks that every Done-when line marked "(tested)" has a test that would fail if the line were false, and lists each one that does not as an error.
 - From row P1 on, the reviewer of any row that changes a screen runs `python3 tools/shots.py` and looks at the screenshots.
 - If the chat is running out of room, it stops after closing the current row (never mid-row), and gives the reply. The same starter resumes at the next row.
 - A row is never skipped. If a row cannot be finished, the chat stops there and says why.
+
+## 4d. Watchdog
+
+- At the start the main chat turns on the saved `watchdog` skill (a `.watchdog` file): a `send_later` check every 10 minutes while work is in flight, every 15 when idle.
+- Each check resumes a stopped agent with `SendMessage`. It never starts a second copy of anything running, never runs two smokes at once, and never loosens a threshold or a test.
+- A restart that kills a smoke is answered by running `npm run smoke` again.
+- The chat switches the watchdog off before its final reply.
 
 ## 5. The reply
 
