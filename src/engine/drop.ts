@@ -49,6 +49,59 @@ function hold(p: AudioParam, t: number): void {
   }
 }
 
+/**
+ * P10b review S1: where a param is heading, kept in JS as it is set, so its value at a future time `t` can be worked
+ * out (`.value` is only where it is now, and a move scheduled between now and `t` keeps moving it up to `t`). Each
+ * setting starts from the value this predicts at its own start time.
+ */
+export class Aim {
+  private t0 = 0;
+  private v0: number;
+  private aim: number;
+  /** A setTargetAtTime's time constant, or a linear ramp's end time. */
+  private tau = 1;
+  private t1 = 0;
+  private linear = false;
+
+  constructor(v: number) {
+    this.v0 = v;
+    this.aim = v;
+  }
+
+  /** The value at audio time `t`. */
+  at(t: number): number {
+    if (t <= this.t0) return this.v0;
+    if (this.linear) return t >= this.t1 ? this.aim : this.v0 + ((this.aim - this.v0) * (t - this.t0)) / (this.t1 - this.t0);
+    return this.aim + (this.v0 - this.aim) * Math.exp(-(t - this.t0) / this.tau);
+  }
+
+  /** setValueAtTime(v, t). */
+  set(v: number, t: number): void {
+    this.v0 = v;
+    this.t0 = t;
+    this.aim = v;
+    this.linear = false;
+  }
+
+  /** setTargetAtTime(aim, t, tau). */
+  target(aim: number, t: number, tau: number): void {
+    this.v0 = this.at(t);
+    this.t0 = t;
+    this.aim = aim;
+    this.tau = tau;
+    this.linear = false;
+  }
+
+  /** A linear ramp from where it is at `t` to `aim` at `t1`. */
+  ramp(aim: number, t: number, t1: number): void {
+    this.v0 = this.at(t);
+    this.t0 = t;
+    this.aim = aim;
+    this.t1 = Math.max(t1, t + 1e-6);
+    this.linear = true;
+  }
+}
+
 /** A left and a right bus, each through an optional filter and a panner, into one level. */
 class Pair {
   readonly l: GainNode;
@@ -57,6 +110,9 @@ class Pair {
   readonly pr: StereoPannerNode;
   readonly out: GainNode;
   readonly filters: BiquadFilterNode[] = [];
+  /** P10b review S1: where the level and the right pan (the left is its mirror) are heading. */
+  readonly level = new Aim(0);
+  readonly pan = new Aim(0);
 
   constructor(dest: AudioNode, filter?: { type: BiquadFilterType; hz: number; q: number }) {
     const c = raw();
@@ -89,6 +145,14 @@ class Pair {
     hold(this.pr.pan, t);
     this.pl.pan.setTargetAtTime(-s, t, tau);
     this.pr.pan.setTargetAtTime(s, t, tau);
+    this.pan.target(s, Math.max(t, raw().currentTime), tau);
+  }
+
+  /** The level to `v` from `t`, over `tau`. */
+  gain(v: number, t: number, tau: number): void {
+    hold(this.out.gain, t);
+    this.out.gain.setTargetAtTime(v, t, tau);
+    this.level.target(v, Math.max(t, raw().currentTime), tau);
   }
 
   side(i: number): GainNode {
@@ -105,6 +169,9 @@ export class DropOverlay {
   readonly pre: GainNode;
   private gap: GainNode;
   private comp: GainNode;
+  /** P10b review S1: where the follower's gain and the build's reverb send are heading. */
+  private compAim = new Aim(1);
+  private verbAim = new Aim(0);
   private hp: BiquadFilterNode;
   private lp: BiquadFilterNode;
   private impactBus: GainNode;
@@ -222,13 +289,16 @@ export class DropOverlay {
       hold(this.verb.gain, t);
       this.verb.gain.setValueAtTime(0, t);
       this.verb.gain.linearRampToValueAtTime(0.45, end);
+      this.verbAim.set(0, t);
+      this.verbAim.ramp(0.45, t, end);
     }
     if (r.parts.riser) this.startRiser(t, end);
     if (r.bloom) {
       for (const k of Object.keys(levels) as OverlayGroup[]) {
-        const g = this.groups[k].out.gain;
-        hold(g, t);
-        g.linearRampToValueAtTime(levels[k], end);
+        const p = this.groups[k];
+        hold(p.out.gain, t);
+        p.out.gain.linearRampToValueAtTime(levels[k], end);
+        p.level.ramp(levels[k], Math.max(t, raw().currentTime), end);
       }
     }
   }
@@ -300,11 +370,7 @@ export class DropOverlay {
     // P10 review S1: a bloom arrives with no step in the gain (the follower has been at it through the build).
     if (comp !== null) this.setComp(comp, t, 0.01);
     if (!r.bloom)
-      for (const k of Object.keys(levels) as OverlayGroup[]) {
-        const g = this.groups[k].out.gain;
-        hold(g, t);
-        g.setTargetAtTime(levels[k], t, 0.01);
-      }
+      for (const k of Object.keys(levels) as OverlayGroup[]) this.groups[k].gain(levels[k], t, 0.01);
     const c = raw();
     if (r.impact.sweep)
       for (const pan of [-0.6, 0.6]) {
@@ -346,9 +412,7 @@ export class DropOverlay {
   /** The level of one group from `t` (the Width knob turned while the drop is on). Not during a wind-down: it eases them. */
   level(k: OverlayGroup, v: number, t: number): void {
     if (this.winding(t)) return;
-    const g = this.groups[k].out.gain;
-    hold(g, t);
-    g.setTargetAtTime(v, t, 0.05);
+    this.groups[k].gain(v, t, 0.05);
   }
 
   /** Spread every pair to the width `w` (0..1) from `t`. */
@@ -366,8 +430,10 @@ export class DropOverlay {
     // P10b: a late reading of the follower never cuts into the wind-down's steps.
     if (this.winding(t)) return;
     const g = this.comp.gain;
+    const aim = Math.max(0.2, Math.min(COMP_TOP, v));
     hold(g, t);
-    g.setTargetAtTime(Math.max(0.2, Math.min(COMP_TOP, v)), t, tau);
+    g.setTargetAtTime(aim, t, tau);
+    this.compAim.target(aim, Math.max(t, raw().currentTime), tau);
   }
 
   get compValue(): number {
@@ -382,11 +448,13 @@ export class DropOverlay {
    * instruments whose held notes are doubled now. Returns the steps (the engine steps the pump and the held notes).
    */
   wind(t: number, bar: number, bars: number, pump: { from: number; to: number }, held: number): WindBar[] {
+    // P10b review S1: each value as it will be on the bar line `t` (from where each param was last aimed), not as it is
+    // now in the look-ahead: a Width move or a follower reading just before the bar line keeps moving it up to `t`.
     const from = {
-      levels: Object.fromEntries(DROP_LAYERS.map((k) => [k, this.groups[k].out.gain.value])) as Record<OverlayGroup, number>,
-      comp: this.comp.gain.value,
-      spread: this.spreadNow,
-      verb: this.keepVerb ? this.verb.gain.value : 0,
+      levels: Object.fromEntries(DROP_LAYERS.map((k) => [k, this.groups[k].level.at(t)])) as Record<OverlayGroup, number>,
+      comp: this.compAim.at(t),
+      spread: this.groups.synth.pan.at(t),
+      verb: this.keepVerb ? this.verbAim.at(t) : 0,
       pump: pump.from,
       voices: Math.max(this.barPeak, this.live),
       held,
@@ -401,13 +469,22 @@ export class DropOverlay {
       p.setValueAtTime(start, t);
       steps.forEach((s, i) => p.linearRampToValueAtTime(v(s), t + (i + 1) * bar));
     };
+    const until = t + steps.length * bar;
+    const last = steps[steps.length - 1];
     ramp(this.comp.gain, from.comp, (s) => s.comp);
-    if (this.keepVerb) ramp(this.verb.gain, from.verb, (s) => s.verb);
+    this.compAim.ramp(last.comp, t, until);
+    if (this.keepVerb) {
+      ramp(this.verb.gain, from.verb, (s) => s.verb);
+      this.verbAim.ramp(last.verb, t, until);
+    }
     for (const k of DROP_LAYERS) {
       const g = this.groups[k];
       ramp(g.out.gain, from.levels[k], (s) => s.levels[k]);
       ramp(g.pl.pan, -from.spread, (s) => -s.spread);
       ramp(g.pr.pan, from.spread, (s) => s.spread);
+      // Between the bar lines the aims are only approximate (nothing reads them during the wind-down); the end is exact.
+      g.level.ramp(last.levels[k], t, until);
+      g.pan.ramp(last.spread, t, until);
     }
     this.windCaps = steps.map((s, i) => ({ from: t + i * bar, cap: s.voices }));
     this.windUntil = t + steps.length * bar;
@@ -448,10 +525,7 @@ export class DropOverlay {
     this.normalAt(t);
     this.setComp(1, t, 0.02);
     for (const k of [...this.held.keys()]) this.letGo(k, t);
-    for (const g of Object.values(this.groups)) {
-      hold(g.out.gain, t);
-      g.out.gain.setTargetAtTime(0, t, 0.02);
-    }
+    for (const g of Object.values(this.groups)) g.gain(0, t, 0.02);
   }
 
   /** Everything back at once (Stop). */
@@ -477,6 +551,7 @@ export class DropOverlay {
     if (!keepVerb) {
       hold(this.verb.gain, t);
       this.verb.gain.setTargetAtTime(0, t, 0.4);
+      this.verbAim.target(0, Math.max(t, raw().currentTime), 0.4);
     }
     this.stopRiser(t);
   }

@@ -92,13 +92,36 @@ describe("the Drop's wind-down, bar by bar (P10b, C21)", () => {
     }
   });
 
-  it("the level falls an even step in loudness, not all in the last beats: half the bars in, the layers are well under half", () => {
+  it("the level falls an even step in amplitude and the spread on its square root: half the bars in, half the level", () => {
     const { from, to } = dropState(STYLE_IDS[0], 4, 0.8);
     const s = windSteps(4, from, to);
-    // Share left 0.5 after two of four bars: the layers at a quarter of their level (-12 dB), the follower half-way in step.
-    for (const k of DROP_LAYERS) expect(s[1].levels[k]).toBeCloseTo(from.levels[k] * 0.25, 9);
-    expect(s[1].spread).toBeCloseTo(from.spread * 0.5, 9);
+    // Share left 0.5 after two of four bars: the layers at half their level (-6 dB), the spread at 0.71 of the drop's.
+    for (const k of DROP_LAYERS) expect(s[1].levels[k]).toBeCloseTo(from.levels[k] * 0.5, 9);
+    expect(s[1].spread).toBeCloseTo(from.spread * Math.SQRT1_2, 9);
   });
+
+  // P10b review E1: the layers' side energy (level times spread, squared) is what widens the master; on the share
+  // squared it was nearly all spent in the first bar. Averaged over the first bar (each value a linear ramp) it keeps
+  // at least 40% of the drop's, at 2 and 4 bars, in every vibe.
+  for (const wind of [2, 4] as const)
+    it(`${wind} bars: the layers' side energy is not spent in the first bar`, () => {
+      for (const id of STYLE_IDS) {
+        const { from, to, bars } = dropState(id, wind, 0.8);
+        const s = windSteps(bars, from, to)[0];
+        for (const k of DROP_LAYERS) {
+          if (from.levels[k] === 0) continue;
+          const N = 200;
+          let e = 0;
+          for (let j = 0; j <= N; j++) {
+            const x = j / N;
+            const l = from.levels[k] + (s.levels[k] - from.levels[k]) * x;
+            const p = from.spread + (s.spread - from.spread) * x;
+            e += (l * p) ** 2 / (N + 1);
+          }
+          expect(e / (from.levels[k] * from.spread) ** 2, `${id} ${k}`).toBeGreaterThanOrEqual(0.4);
+        }
+      }
+    });
 
   it("a one-bar or odd length still lands on the section", () => {
     const { from, to } = dropState(STYLE_IDS[0], 2, 0.8);
