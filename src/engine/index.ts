@@ -10,7 +10,7 @@ import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { DiffWatch, EnergyWatch, JumpWatch, type Energy, type Jumps } from "./continuity.ts";
-import { DropConductor, checkDropSettings, followStep, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
+import { DropConductor, checkDropSettings, followRef, followStep, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
 import { COMP_TOP, type OverlayGroup } from "./drop.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
@@ -106,13 +106,18 @@ export interface DropMark extends DropBar {
 const DROP_TYPICAL = Math.pow(10, -1.9);
 
 /**
- * P10 review S1, S2: the level follower acts on the drop's first two bars (FOLLOW_BEATS beats after the impact's bar),
- * then holds, so knobs moved during the drop are heard as moved. In the first bar it moves at most 3 dB a beat; after
- * it at most FINE_DB a beat, and not at all for an error under DEADBAND_DB.
+ * P10 review S1, S2: the level follower settles on FOLLOW_BEATS beats of the drop, then holds, so knobs moved during the
+ * drop are heard as moved (and a hand on any control holds it at once). It reads only beats whose place in the
+ * section's loop was heard before the build (P10 fix: a section heard for less than its loop has places with no
+ * level of their own; against the section's mean the follower pulled a loud chord down, or a quiet one up, and held
+ * that offset over the rest of the drop). In the drop's first bar it moves at most 3 dB a beat; after it at most
+ * FINE_DB a beat on a slow curve, and not at all for an error under DEADBAND_DB.
  */
 const FOLLOW_BEATS = 8;
 const FINE_DB = 0.5;
 const DEADBAND_DB = 0.3;
+/** The follower's curve (seconds) for its fine moves: slow, so a correction later in the drop is not heard as a step. */
+const FINE_TAU = 0.6;
 
 const DROP_OFF: DropBar = { phase: "off", index: 0, length: 0, impact: false, cliff: false, end: false, cancelled: false };
 export { MP3_KBPS, type Take } from "./recorder.ts";
@@ -240,6 +245,8 @@ export class Engine {
   private compSteady = new Map<string, number>();
   /** Readings the follower has acted on in this drop's "on" phase (P10 review S2: it holds after FOLLOW_BEATS). */
   private dropFollowed = 0;
+  /** Readings of this drop's "on" phase after the impact's bar, heard or not (the first bar's moves may be coarse). */
+  private dropOnBeats = 0;
   /** The first bar whose beats count in the follower's reference (the bar after a section or song landed). */
   private refFrom = 0;
   /** The follower's last reading of the drop (mean energy of its last beats, as heard). */
@@ -504,6 +511,8 @@ export class Engine {
 
   /** Log an edit to the take's event log, if a take is running. */
   private note(op: LogOp, args: unknown[]): void {
+    // P10 review S2: a hand on the controls while the drop sounds stops the level follower where it is.
+    if (op !== "drop" && this.doubling()) this.dropFollowed = FOLLOW_BEATS;
     const w = this.rec.writer;
     if (!w || this.rec.state !== "recording") return;
     const transport = Tone.getTransport();
@@ -1186,6 +1195,7 @@ export class Engine {
       // beat line holds the cliffhanger's last beat, so five readings).
       this.dropSkip = rec.bloom ? 0 : 5;
       this.dropFollowed = 0;
+      this.dropOnBeats = 0;
       if (!rec.bloom) this.dropWindow = [];
       this.dropMixOn = true;
       g.setMix("sweep", 0, time);
@@ -1290,18 +1300,22 @@ export class Engine {
     if (this.dropSkip > 0) return void this.dropSkip--;
     if (phase === "on" && this.dropFollowed >= FOLLOW_BEATS) return;
     if (!this.graph || !(this.dropRef > 0)) return;
+    if (phase === "on") this.dropOnBeats++;
+    // P10 fix: a place in the loop not heard before the build has no reference: the follower holds through it.
+    const ref = followRef(this.dropRefs, key);
+    if (ref === null) return;
     const c = Math.max(0.05, this.graph.drop.compValue);
-    const ref = this.dropRefs.get(key) ?? this.dropRef;
     this.dropWindow.push({ e: e.energy, c, ref });
     if (this.dropWindow.length > 4) this.dropWindow.shift();
     const w = this.dropWindow;
     this.dropMeasured = w.reduce((a, b) => a + b.e, 0) / w.length;
     const ratio = w.reduce((a, b) => a + b.e / (b.c * b.c * b.ref), 0) / w.length;
     if (!(ratio > 0)) return;
-    const coarse = phase === "on" && this.dropFollowed < 4 && !this.dropRec?.bloom;
+    // Coarse only in the drop's first bar (after the impact's bar): later moves are fine and slow.
+    const coarse = phase === "on" && this.dropFollowed < 4 && this.dropOnBeats <= 4 && !this.dropRec?.bloom;
     const target = followStep(c, 1 / Math.sqrt(ratio), coarse ? 3 : FINE_DB, coarse ? 0 : DEADBAND_DB, COMP_TOP);
     if (phase === "on") this.dropFollowed++;
-    if (target !== c) this.graph.drop.setComp(target);
+    if (target !== c) this.graph.drop.setComp(target, undefined, coarse ? 0.15 : FINE_TAU);
     if (phase === "on" && this.dropFollowed >= FOLLOW_BEATS) this.compSteady.set(this.seq.song.style ?? "", Math.max(0.2, target));
   }
 

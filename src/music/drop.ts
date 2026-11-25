@@ -277,6 +277,16 @@ export function loopBeats(chordBars: number[]): number {
 }
 
 /**
+ * P10 fix: the section's own level at a place in its loop (`key`), as heard before the build; null for a place not
+ * heard (a section played for less than its loop). Never the mean of other places: on a vibe whose chords differ in
+ * level, that pulled the drop away from the section and held it there.
+ */
+export function followRef(refs: ReadonlyMap<number, number>, key: number): number | null {
+  const r = refs.get(key);
+  return r !== undefined && r > 0 ? r : null;
+}
+
+/**
  * The follower's next gain from the current one `c` and the gain that would bring the drop to the section's level
  * (`aim`), never over `top`: at most `stepDb` a beat, and unchanged when within `deadDb` of it.
  */

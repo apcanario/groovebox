@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DROP, DropConductor, checkDropRecipe, followStep, loopBeats, resolveDrop, rollHits, type DropBar } from "./drop.ts";
+import { DEFAULT_DROP, DropConductor, checkDropRecipe, followRef, followStep, loopBeats, resolveDrop, rollHits, type DropBar } from "./drop.ts";
 import { STYLES, STYLE_IDS, vibeSong } from "./styles.ts";
 import { defaultSong, validateSong } from "../engine/song.ts";
 
@@ -146,6 +146,35 @@ describe("P10 review: the level follower's steps and loop", () => {
     expect(20 * Math.log10(up / 0.8)).toBeCloseTo(0.5, 6);
     expect(followStep(1.24, 2, 3, 0, 1.25)).toBe(1.25);
     expect(followStep(1, 0.9, 3, 0)).toBeCloseTo(0.9, 9);
+  });
+  it("P10 fix: a place in the loop not heard before the build has no reference, never the section's mean", () => {
+    const refs = new Map([[0, 0.02], [1, 0.01]]);
+    expect(followRef(refs, 1)).toBe(0.01);
+    expect(followRef(refs, 7)).toBeNull();
+    expect(followRef(new Map([[3, 0]]), 3)).toBeNull();
+    // Ambient's case: a 16-bar loop with a loud chord (+1.2 dB) and a quiet one (-1.4 dB); only the quiet places and
+    // two bars of the loud ones were heard. The drop adds nothing past the limiter, so the right gain is 1. Its first
+    // two bars land on loud places not heard: the follower holds there, then settles on heard places, and the drop
+    // stays at the section's level wherever it is (with the mean in their place it settled 1.2 dB low and held there).
+    const loud = Math.pow(10, 0.12);
+    const quiet = Math.pow(10, -0.14);
+    const level = (beat: number): number => (Math.floor(beat / 16) % 4 < 2 ? loud : quiet);
+    const heard = new Map<number, number>();
+    for (let b = 24; b < 64; b++) heard.set(b, level(b));
+    let c = 1;
+    let followed = 0;
+    const window: { e: number; c: number; ref: number }[] = [];
+    for (let b = 0; b < 32 && followed < 8; b++) {
+      const ref = followRef(heard, b);
+      if (ref === null) continue;
+      window.push({ e: level(b) * c * c, c, ref });
+      if (window.length > 4) window.shift();
+      const ratio = window.reduce((a, w) => a + w.e / (w.c * w.c * w.ref), 0) / window.length;
+      c = followStep(c, 1 / Math.sqrt(ratio), 0.5, 0.3, 1.25);
+      followed++;
+    }
+    expect(followed).toBe(8);
+    expect(Math.abs(20 * Math.log10(c))).toBeLessThan(0.3);
   });
   it("S5: keys the reference by the section's own loop, 8 bars or more", () => {
     expect(loopBeats([1, 1, 1, 1])).toBe(32);
