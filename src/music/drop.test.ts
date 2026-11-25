@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DROP, DropConductor, checkDropRecipe, followRef, followStep, loopBeats, resolveDrop, rollHits, type DropBar } from "./drop.ts";
+import { DEFAULT_DROP, DropConductor, checkDropRecipe, followRef, followStep, loopBeats, refSettleBars, resolveDrop, rollHits, type DropBar } from "./drop.ts";
 import { STYLES, STYLE_IDS, vibeSong } from "./styles.ts";
 import { defaultSong, validateSong } from "../engine/song.ts";
 
@@ -175,6 +175,12 @@ describe("P10 review: the level follower's steps and loop", () => {
     }
     expect(followed).toBe(8);
     expect(Math.abs(20 * Math.log10(c))).toBeLessThan(0.3);
+  });
+  it("P10 fix: the reference waits out the section's longest attack", () => {
+    expect(refSettleBars([0.005, 0.01], 2)).toBe(0);
+    expect(refSettleBars([3, 4, 0.005], 3.75)).toBe(1); // Ambient's groove at 64 bpm
+    expect(refSettleBars([8, 4], 4)).toBe(2); // Drone's organ at 60 bpm
+    expect(refSettleBars([], 2)).toBe(0);
   });
   it("S5: keys the reference by the section's own loop, 8 bars or more", () => {
     expect(loopBeats([1, 1, 1, 1])).toBe(32);

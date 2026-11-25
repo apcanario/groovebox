@@ -277,6 +277,16 @@ export function loopBeats(chordBars: number[]): number {
 }
 
 /**
+ * P10 fix: the bars after a section lands (past its landing bar) before its beats count as its level: as many as the
+ * longest attack of its sounding instruments takes, so a pad or drone still swelling in (Ambient, Drone: 3 to 8 s)
+ * is not taken for the section's level. 0 for attacks under a bar.
+ */
+export function refSettleBars(attacks: readonly number[], barSeconds: number): number {
+  const a = Math.max(0, ...attacks.filter((x) => Number.isFinite(x)));
+  return barSeconds > 0 ? Math.floor(a / barSeconds) : 0;
+}
+
+/**
  * P10 fix: the section's own level at a place in its loop (`key`), as heard before the build; null for a place not
  * heard (a section played for less than its loop). Never the mean of other places: on a vibe whose chords differ in
  * level, that pulled the drop away from the section and held it there.

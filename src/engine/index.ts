@@ -10,7 +10,7 @@ import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { DiffWatch, EnergyWatch, JumpWatch, type Energy, type Jumps } from "./continuity.ts";
-import { DropConductor, checkDropSettings, followRef, followStep, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
+import { DropConductor, checkDropSettings, followRef, followStep, refSettleBars, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
 import { COMP_TOP, type OverlayGroup } from "./drop.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
@@ -1228,6 +1228,17 @@ export class Engine {
     this.showDrop(time);
   }
 
+  /** The attacks (seconds) of a section's sounding instruments: a layer in Pad or Drone mode by its pad dials. */
+  private sectionAttacks(index: number): number[] {
+    const song = this.seq.song;
+    const sec = song.sections[index];
+    if (!sec) return [];
+    return INSTRUMENTS.filter((id) => id !== "drums" && sec.on[id]).map((id) => {
+      const l = id === "layer1" || id === "layer2" ? sec[id] : null;
+      return l && (l.mode === "pad" || l.mode === "drone") ? l.pad.attack : song.patches[id].attack;
+    });
+  }
+
   /** One instrument's notes into its extra layer (`soft`: a slow attack and release, for notes carried over a bar line). */
   private doubleNotes(id: Exclude<InstrumentId, "drums">, notes: number[], t: number, dur: number, vel: number, soft: boolean, pad: boolean): void {
     const ov = this.graph!.drop;
@@ -1652,7 +1663,7 @@ export class Engine {
       this.beatEnergy.clear();
       // The landing bar (a new vibe's patches arriving, the last one's tails) is not the section's level: the
       // reference starts on the bar after it.
-      this.refFrom = r.bar + 1;
+      this.refFrom = r.bar + 1 + refSettleBars(this.sectionAttacks(r.section), sixteenth * STEPS_PER_BAR);
     }
     if (this.dropWatch && r.step % 4 === 0) {
       const phase = this.dropPlan.phase;
