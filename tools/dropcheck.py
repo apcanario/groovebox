@@ -6,9 +6,9 @@ same section and in a section tapped during the drop (shown as waiting, "After d
 Drop page in Advanced and the presses in the event log.
 
 drop_vibes: every vibe loaded mid-jam, its drop played (a two-bar build and wind-down, set on the Drop page), and its
-loudness (K-weighted, P10 review S7) and stereo width measured on the master output over four whole bars of the section
-before and four whole bars of the drop (after the impact's bar): within 1 dB, each of those bars within 1.5 dB, and
-wider. The master's largest sample over the section, build, impact, drop, wind-down and two bars after stays under
+loudness (K-weighted, P10 review S7) and stereo width measured on the master output over eight whole bars of the section
+before and eight whole bars of the drop (after the impact's bar): within 1 dB, each of those bars within 1.5 dB past the
+section's own largest bar-to-bar stray, and wider. The master's largest sample over the section, build, impact, drop, wind-down and two bars after stays under
 -0.5 dBFS, also at Width 1, Hold and Saturation 0.6 (P10 review S1, S3). On Drone the drop's bar lines do not dip
 (P10 review S8).
 """
@@ -27,6 +27,9 @@ PEAK_DBFS = -0.5
 # P10 review S2: every instrument's level dial halved during the drop (once the follower holds) lowers the master by at
 # least this many dB four beats later, and the follower's gain does not move.
 LEVEL_DROP_DB = 3.0
+# Bars read of the section before the drop and of the drop after the impact's bar: eight, so a section whose bars vary
+# (IDM's generative break: one four-bar window 1.3 dB from the next) is compared over enough of it.
+WINDOW = 8
 
 
 def wait_for(page, expr: str, timeout: float) -> bool:
@@ -347,11 +350,11 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     next_bar(page)
     page.evaluate(f"{E}.stereo()")
     sec_bars = []
-    for _ in range(4):
+    for _ in range(WINDOW):
         next_bar(page)
         sec_bars.append(page.evaluate(f"{E}.stereo()"))
-    n = {"energy": sum(b["energy"] for b in sec_bars) / 4, "flat": sum(b["flat"] for b in sec_bars) / 4,
-         "width": sum(b["width"] for b in sec_bars) / 4, "peak": max(b["peak"] for b in sec_bars)}
+    n = {"energy": sum(b["energy"] for b in sec_bars) / WINDOW, "flat": sum(b["flat"] for b in sec_bars) / WINDOW,
+         "width": sum(b["width"] for b in sec_bars) / WINDOW, "peak": max(b["peak"] for b in sec_bars)}
     page.evaluate(f"{E}.drop()")
     # The build (two bars from the next bar line) and its cliffhanger, then the impact's bar: read separately.
     wait_for(page, f"{E}.dropShown().phase === 'on'", 4 * bar_s(page) + 2.0)
@@ -359,7 +362,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     next_bar(page)  # the impact's bar
     p_imp = page.evaluate(f"{E}.stereo()")
     bars = []
-    for _ in range(4):
+    for _ in range(WINDOW):
         next_bar(page)
         bars.append(page.evaluate(f"{E}.stereo()"))
     info = page.evaluate(f"{E}.dropInfo()")
@@ -378,14 +381,14 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
     loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
-    # Each drop bar against the section's bar at the same place in its four-bar phrase (the drop's first bar is seven
-    # bars after the section's first read: four read, two of build, the impact's), so a phrase louder on some chords
-    # than others compares like with like.
-    per_bar = [db(b) - db(sec_bars[(k + 3) % 4]) for k, b in enumerate(bars)]
+    # Each drop bar against the section's level; the section's own bars spread round it too (a generative lead or
+    # break varies bar to bar), so a drop bar may stray BAR_DB beyond the section's own largest stray.
+    per_bar = [db(b) - db(n) for b in bars]
+    spread = max(abs(db(b) - db(n)) for b in sec_bars)
     peaks = {"section": n["peak"], "build": p_build["peak"], "impact": p_imp["peak"], "drop": max(b["peak"] for b in bars),
              "wind": p_wind["peak"], "after": p_after["peak"]}
     top = max(peaks, key=peaks.get)
-    return {"n": n, "loud": loud, "per_bar": per_bar, "wider": width / max(n["width"], 1e-6), "width": width,
+    return {"n": n, "loud": loud, "per_bar": per_bar, "spread": spread, "wider": width / max(n["width"], 1e-6), "width": width,
             "peak": peaks[top], "peak_at": top, "info": info, "beats": beats}
 
 
@@ -393,8 +396,9 @@ def judge(r: dict, label: str, failures: list) -> None:
     if abs(r["loud"]) > LOUD_DB:
         failures.append(f"P10 {label}: the drop is {r['loud']:+.2f} dB from the section it came from (more than {LOUD_DB} dB)")
     worst_bar = max(r["per_bar"], key=abs)
-    if abs(worst_bar) > BAR_DB:
-        failures.append(f"P10 {label}: a bar of the drop is {worst_bar:+.2f} dB from the section (more than {BAR_DB} dB): {[round(x, 2) for x in r['per_bar']]}")
+    if abs(worst_bar) > BAR_DB + r["spread"]:
+        failures.append(f"P10 {label}: a bar of the drop is {worst_bar:+.2f} dB from the section (more than {BAR_DB} dB past the section's own "
+                        f"{r['spread']:.2f} dB): {[round(x, 2) for x in r['per_bar']]}")
     if r["wider"] < WIDER:
         failures.append(f"P10 {label}: the drop is not measurably wider ({r['n']['width']:.3f} -> {r['width']:.3f})")
     if peak_db(r["peak"]) > PEAK_DBFS:
@@ -424,7 +428,7 @@ def drop_vibes(page, failures: list) -> None:
             continue
         judge(r, v["id"], failures)
         info = r["info"]
-        rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
+        rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}; the section's own within {r['spread']:.2f}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
                     f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
                     f" (out {db(r['n']):.1f}, ref {10 * math.log10(max(info['ref'], 1e-12)):.1f} dB K-weighted, {10 * math.log10(max(r['n']['flat'], 1e-12)):.1f} flat)")
         if abs(r["loud"]) > abs(worst_loud[0]):
