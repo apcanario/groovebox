@@ -1402,6 +1402,11 @@ export class Graph {
     }
   }
 
+  /** P10 review S9: the master's sweep filters (Hz) and pump depth as the graph has them, for the smoke test. */
+  mixState(): { lp: number; hp: number; pump: number } {
+    return { lp: nativeValue(this.lp.frequency), hp: nativeValue(this.hp.frequency), pump: this.pumpDepth };
+  }
+
   /** A mix value from audio time `time`, on the audio clock (P3 review E1). */
   setMixAt(key: MixKey, v: number, time: number): void {
     this.setMix(key, v, time);

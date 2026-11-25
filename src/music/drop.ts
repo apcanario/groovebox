@@ -265,3 +265,23 @@ export function rollHits(index: number, length: number, cutAt = 16): { at: numbe
   const kept = out.filter((h) => h.at < cutAt);
   return kept.map((h) => ({ at: h.at, vel: 0.35 + 0.6 * ((index + h.at / 16) / Math.max(1, length)) }));
 }
+
+/**
+ * P10 review S5: the follower keys each beat by its place in the section's own loop: its chord cycle, repeated to
+ * 8 bars or more. In beats.
+ */
+export function loopBeats(chordBars: number[]): number {
+  const cycle = chordBars.reduce((a, b) => a + b, 0);
+  if (!(cycle > 0)) return 32;
+  return Math.max(1, Math.round(4 * cycle * Math.ceil(8 / cycle - 1e-9)));
+}
+
+/**
+ * The follower's next gain from the current one `c` and the gain that would bring the drop to the section's level
+ * (`aim`), never over `top`: at most `stepDb` a beat, and unchanged when within `deadDb` of it.
+ */
+export function followStep(c: number, aim: number, stepDb: number, deadDb: number, top = Infinity): number {
+  if (Math.abs(20 * Math.log10(aim / c)) < deadDb) return c;
+  const k = Math.pow(10, stepDb / 20);
+  return Math.min(top, c * k, Math.max(c / k, aim));
+}

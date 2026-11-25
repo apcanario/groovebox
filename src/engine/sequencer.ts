@@ -697,6 +697,12 @@ export class Sequencer {
     return { bar: Math.floor(this.globalStep / STEPS_PER_BAR), step: this.globalStep % STEPS_PER_BAR };
   }
 
+  /** P10 review M5: the chord the playing section plays `ahead` steps after the next one (the Drop's Hold hangs it), as MIDI notes. */
+  chordAhead(ahead = 0): number[] {
+    const section = this.song.sections[this.current];
+    return section ? chordAt(this.song, section, this.sectionStep + ahead).chord.notes.slice() : [];
+  }
+
   /** Produce the events of the next sixteenth. */
   next(): StepResult {
     const step = this.globalStep % STEPS_PER_BAR;

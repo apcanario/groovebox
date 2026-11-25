@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { LOCK_FROZEN } from "../music/lead.ts";
 import {
   addChord,
+  dropLabel,
+  dropSegments,
   chipPage,
   LEAD_PAGES,
   leadDialSet,
@@ -360,5 +362,32 @@ describe("chipPage (P3 review M8)", () => {
     expect(chipPage(ten, "j", 5)).toEqual({ pages: 3, page: 2, shown: ["i", "j"], pad: 2 });
     expect(chipPage(ten, "j", 5, 3).page).toBe(0);
     expect(chipPage(ten, null, 5, -1).page).toBe(2);
+  });
+});
+
+describe("P10 review S9: the DROP button and the strip's After drop", () => {
+  const look = (phase: "off" | "build" | "on" | "wind", intent: "none" | "on" | "cancel" | "off", barsLeft: number, length: number) => ({ phase, intent, barsLeft, length });
+  it("lights four segments armed and on, counts an 8-bar build 4-4-3-3-2-2-1-1, none off", () => {
+    expect(dropSegments(look("off", "on", 8, 8))).toBe(4);
+    expect([8, 7, 6, 5, 4, 3, 2, 1].map((n) => dropSegments(look("build", "none", n, 8)))).toEqual([4, 4, 3, 3, 2, 2, 1, 1]);
+    expect(dropSegments(look("on", "none", 0, 0))).toBe(4);
+    expect([2, 1].map((n) => dropSegments(look("wind", "none", n, 2)))).toEqual([4, 2]);
+    expect(dropSegments(look("off", "none", 0, 0))).toBe(0);
+  });
+  it("speaks each phase and intent", () => {
+    expect(dropLabel(look("off", "none", 0, 0), false)).toBe("Drop: press Play first");
+    expect(dropLabel(look("off", "none", 0, 0), true)).toBe("Drop: tap to build to the drop from the next bar");
+    expect(dropLabel(look("off", "on", 2, 2), true)).toBe("Drop: building from the next bar, 2 bars. Tap to call it off");
+    expect(dropLabel(look("build", "none", 1, 2), true)).toBe("Drop: building, 1 bar left. Tap to cancel");
+    expect(dropLabel(look("build", "cancel", 1, 2), true)).toBe("Drop: cancelled, back to normal on the next bar");
+    expect(dropLabel(look("on", "none", 0, 0), true)).toBe("Drop: on. Tap to wind down");
+    expect(dropLabel(look("on", "off", 0, 0), true)).toBe("Drop: on, winding down from the next bar");
+    expect(dropLabel(look("wind", "none", 4, 4), true)).toBe("Drop: winding down, 4 bars left");
+  });
+  it("shows a section queued behind the drop as After drop, else Next bar", () => {
+    const s = { chosen: null, playing: 0, running: true, queued: 1, name: "B" };
+    expect(stripState(1, { ...s, afterDrop: true }).sub).toBe("After drop");
+    expect(stripState(1, { ...s, afterDrop: false }).sub).toBe("Next bar");
+    expect(stripState(1, { ...s, afterDrop: true }).isNext).toBe(true);
   });
 });

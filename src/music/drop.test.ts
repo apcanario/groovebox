@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DROP, DropConductor, checkDropRecipe, resolveDrop, rollHits, type DropBar } from "./drop.ts";
+import { DEFAULT_DROP, DropConductor, checkDropRecipe, followStep, loopBeats, resolveDrop, rollHits, type DropBar } from "./drop.ts";
 import { STYLES, STYLE_IDS, vibeSong } from "./styles.ts";
 import { defaultSong, validateSong } from "../engine/song.ts";
 
@@ -134,5 +134,25 @@ describe("recipes", () => {
     expect(validateSong({ ...song, drop: { width: 2 } })).not.toEqual([]);
     // A vibe's song carries no settings: the recipe is read from the style file.
     expect(vibeSong("edm")!.drop).toBeUndefined();
+  });
+});
+
+describe("P10 review: the level follower's steps and loop", () => {
+  it("S1: ignores an error under the dead band and limits a fine step to 0.5 dB", () => {
+    expect(followStep(1, Math.pow(10, -0.2 / 20), 0.5, 0.3)).toBe(1);
+    const down = followStep(1, 0.5, 0.5, 0.3);
+    expect(20 * Math.log10(down)).toBeCloseTo(-0.5, 6);
+    const up = followStep(0.8, 1.2, 0.5, 0.3, 1.25);
+    expect(20 * Math.log10(up / 0.8)).toBeCloseTo(0.5, 6);
+    expect(followStep(1.24, 2, 3, 0, 1.25)).toBe(1.25);
+    expect(followStep(1, 0.9, 3, 0)).toBeCloseTo(0.9, 9);
+  });
+  it("S5: keys the reference by the section's own loop, 8 bars or more", () => {
+    expect(loopBeats([1, 1, 1, 1])).toBe(32);
+    expect(loopBeats([2, 2, 2, 2, 2, 2, 2, 2])).toBe(64);
+    expect(loopBeats([3])).toBe(36);
+    expect(loopBeats([0.5, 0.5])).toBe(32);
+    expect(loopBeats([8])).toBe(32);
+    expect(loopBeats([])).toBe(32);
   });
 });

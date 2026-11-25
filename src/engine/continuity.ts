@@ -5,7 +5,7 @@
  * A click is a jump far above what the sound's own waveform makes; the smoke test compares the two ratios.
  */
 
-const JUMP_SOURCE = `
+export const JUMP_SOURCE = `
 // P9 review E3: last starts from the first sample seen (no jump from silence on the first read); M9: both
 // channels, the larger jump and sample of the two.
 class GrooveJump extends AudioWorkletProcessor {
@@ -65,24 +65,44 @@ registerProcessor("groove-diff", GrooveDiff);
 
 // P10: energy of the left and right channels, of their mid and side, and the largest sample since the last read. A
 // stretch with no input counts as silence (the Drop's loudness and width, measured over whole bars).
+// P10 review S7: the energy is K-weighted as in ITU-R BS.1770 (a +4 dB shelf above about 1.5 kHz, then a high-pass at
+// 38 Hz), so the drop's added top end counts as the ear hears it; the unweighted energy, the width and the peak are
+// read from the signal itself.
 class GrooveEnergy extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.l = 0; this.r = 0; this.m = 0; this.s = 0; this.n = 0; this.pk = 0;
+    this.l = 0; this.r = 0; this.m = 0; this.s = 0; this.n = 0; this.pk = 0; this.kl = 0; this.kr = 0;
+    const fs = sampleRate;
+    let K = Math.tan(Math.PI * 1681.974450955533 / fs), Q = 0.7071752369554196;
+    const Vh = Math.pow(10, 3.999843853973347 / 20), Vb = Math.pow(Vh, 0.4996667741545416);
+    let a0 = 1 + K / Q + K * K;
+    this.s1 = [(Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
+    K = Math.tan(Math.PI * 38.13547087602444 / fs); Q = 0.5003270373238773;
+    a0 = 1 + K / Q + K * K;
+    this.s2 = [1, -2, 1, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
+    // Per channel, per stage: x1, x2, y1, y2.
+    this.z = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
     this.port.onmessage = () => {
-      this.port.postMessage({ l: this.l, r: this.r, m: this.m, s: this.s, n: this.n, peak: this.pk });
-      this.l = 0; this.r = 0; this.m = 0; this.s = 0; this.n = 0; this.pk = 0;
+      this.port.postMessage({ l: this.l, r: this.r, m: this.m, s: this.s, n: this.n, peak: this.pk, kl: this.kl, kr: this.kr });
+      this.l = 0; this.r = 0; this.m = 0; this.s = 0; this.n = 0; this.pk = 0; this.kl = 0; this.kr = 0;
     };
+  }
+  bq(c, z, x) {
+    const y = c[0] * x + c[1] * z[0] + c[2] * z[1] - c[3] * z[2] - c[4] * z[3];
+    z[1] = z[0]; z[0] = x; z[3] = z[2]; z[2] = y;
+    return y;
   }
   process(inputs) {
     const inp = inputs[0];
     if (!inp || !inp.length) { this.n += 128; return true; }
-    const a = inp[0], b = inp[1] || inp[0];
+    const a = inp[0], b = inp[1] || inp[0], z = this.z;
     for (let i = 0; i < a.length; i++) {
       const x = a[i], y = b[i], m = 0.5 * (x + y), d = 0.5 * (x - y);
       this.l += x * x; this.r += y * y; this.m += m * m; this.s += d * d;
       const p = Math.max(Math.abs(x), Math.abs(y));
       if (p > this.pk) this.pk = p;
+      const wx = this.bq(this.s2, z[1], this.bq(this.s1, z[0], x)), wy = this.bq(this.s2, z[3], this.bq(this.s1, z[2], y));
+      this.kl += wx * wx; this.kr += wy * wy;
     }
     this.n += a.length;
     return true;
@@ -163,8 +183,10 @@ export class DiffWatch {
 
 /** P10: what an energy watch read: the mean energy of the two channels, their side over mid, and the largest sample. */
 export interface Energy {
-  /** Mean square of left and right together (0 for silence). */
+  /** Mean square of left and right together, K-weighted (ITU-R BS.1770; 0 for silence). */
   energy: number;
+  /** The same, unweighted. */
+  flat: number;
   /** RMS of the side over RMS of the mid (0: mono). */
   width: number;
   /** Largest sample of either channel. */
@@ -187,9 +209,9 @@ export class EnergyWatch {
   read(): Promise<Energy> {
     return new Promise((resolve) => {
       this.node.port.onmessage = (e: MessageEvent) => {
-        const d = e.data as { l: number; r: number; m: number; s: number; n: number; peak: number };
+        const d = e.data as { l: number; r: number; m: number; s: number; n: number; peak: number; kl: number; kr: number };
         const n = Math.max(1, d.n);
-        resolve({ energy: (d.l + d.r) / (2 * n), width: d.m > 0 ? Math.sqrt(d.s / d.m) : 0, peak: d.peak, n: d.n });
+        resolve({ energy: (d.kl + d.kr) / (2 * n), flat: (d.l + d.r) / (2 * n), width: d.m > 0 ? Math.sqrt(d.s / d.m) : 0, peak: d.peak, n: d.n });
       };
       this.node.port.postMessage("read");
     });
