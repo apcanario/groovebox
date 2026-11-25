@@ -97,7 +97,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 npm ci
 npm run dev      # local server
 npm run check    # type-check, unit tests, build
-npm run smoke    # build, then play it in headless Chrome in seven resumable parts (a ledger skips green ones; --fresh runs all)
+npm run smoke    # build, then play it in headless Chrome in twelve resumable parts (a ledger skips green ones; --fresh runs all)
 npm run record-test   # a ten-minute take: checks the MP3 and that memory stays flat
 ```
 

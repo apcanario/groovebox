@@ -14,7 +14,7 @@ TypeScript, Vite, Tone.js. Preact from row G2. No other runtime dependency witho
 - `npm ci` installs.
 - `npm run check` type-checks and builds (from G1 it also runs the unit tests). It must pass before any commit.
 - `npm run smoke` is the full smoke: it builds, then plays the app in headless Chrome and checks that every layer makes sound. The main chat runs it once per row, at close; it must pass before any push.
-- `python3 tools/smoke.py dist --part <name>` runs one smoke part. Builders, reviewers and fixers run only the part(s) their change touches (`python3 tools/smoke_parts.py --files <name>` lists what a part hashes), never the full smoke.
+- `python3 tools/smoke.py dist --part <name>` runs one smoke part. Builders, reviewers and fixers run only the part(s) their change touches (`python3 tools/smoke_parts.py --files <name>` lists what a part hashes), never the full smoke. An engine change (`src/` outside `src/ui/`) touches every part's fingerprint, so they run the one part nearest the change (for example `src/engine/drop.ts` → drop-1), at most two; the full smoke at close covers the rest.
 - `npm run dev` serves locally.
 
 ## Rules

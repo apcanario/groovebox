@@ -32,7 +32,7 @@ Give both to the first builder as fixes to make before the row's own work. A not
 
 For each row of the bundle, in order:
 
-**Smoke parts.** Builder, reviewer and fixer run `npm run check` plus only the smoke part(s) their change touches: `python3 tools/smoke.py dist --part <name>`, with `python3 tools/smoke_parts.py --files <name>` to see what a part hashes. None of them runs the full smoke.
+**Smoke parts.** Builder, reviewer and fixer run `npm run check` plus only the smoke part(s) their change touches: `python3 tools/smoke.py dist --part <name>`, with `python3 tools/smoke_parts.py --files <name>` to see what a part hashes. None of them runs the full smoke. The part is chosen by what the change does, not by which fingerprints it clears: a change to `src/` outside `src/ui/` (engine, music, data, styles, store) clears every part's fingerprint, so they run the one part whose checks are nearest the change (for example `src/engine/drop.ts` → drop-1), plus the drop group holding any vibe the row names, at most two parts, one at a time; the full smoke at close covers the rest.
 
 **Slices.** A row is worked as slices of 45 minutes or less of work (for example a engine, b UI, c the Done-when tests), each a commit with its own tests. Before the first builder the chat splits the row into slices in its notes. It launches one fresh builder per slice, each slice's prompt naming the previous commit. Builders commit every 15 minutes, so a restart loses little.
 
@@ -71,7 +71,7 @@ After the last row of the bundle is pushed, one more fresh agent, the **player**
 
 ## 4d. Watchdog
 
-- At the start the main chat turns on the saved `watchdog` skill (a `.watchdog` file): a `send_later` check every 10 minutes while work is in flight, every 15 when idle.
+- At the start the main chat turns on the saved `watchdog` skill (a `.watchdog` file): a `send_later` check every 10 to 12 minutes.
 - Each check resumes a stopped agent with `SendMessage`. It never starts a second copy of anything running, never runs two smokes at once, and never loosens a threshold or a test.
 - A restart that kills a smoke is answered by running `npm run smoke` again.
 - The chat switches the watchdog off before its final reply.
