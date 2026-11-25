@@ -1202,6 +1202,20 @@ export class Engine {
   }
 
   private stereoWatch: EnergyWatch | null = null;
+  private layersWatch: EnergyWatch | null = null;
+
+  /**
+   * For the smoke test (P10b): the drop's extra layers' own sound (the overlay's four pairs, before they join the
+   * music) since the last call: its energy, width and peak (the first call starts the watch).
+   */
+  async dropLayers(): Promise<Energy | null> {
+    if (!this.graph) return null;
+    if (!this.layersWatch) {
+      this.layersWatch = await EnergyWatch.make(Tone.getContext());
+      this.graph.drop.tapLayers(this.layersWatch.node);
+    }
+    return this.layersWatch.read();
+  }
 
   /**
    * For the smoke test (P10): the master output's energy, stereo width (side over mid) and peak since the last call

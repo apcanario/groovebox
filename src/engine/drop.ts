@@ -393,17 +393,21 @@ export class DropOverlay {
     };
     const to = { levels: { synth: 0, bass: 0, drums: 0, leads: 0 }, comp: 1, spread: 0, verb: 0, pump: pump.to, voices: 0, held: 0 };
     const steps = windSteps(bars, from, to);
-    const ramp = (p: AudioParam, v: (s: WindBar) => number): void => {
-      hold(p, t);
+    // P10b-b: each ramp starts from an explicit value on the bar line. After hold() (cancelAndHoldAtTime over a
+    // setTargetAtTime) Chrome started the first ramp near 0: the smoke measured the follower's gain at 0.03 and the
+    // layers 20 dB down at the wind-down's first bar line, the master 3 to 4 dB under the section for that bar.
+    const ramp = (p: AudioParam, start: number, v: (s: WindBar) => number): void => {
+      p.cancelScheduledValues(Math.max(t, raw().currentTime));
+      p.setValueAtTime(start, t);
       steps.forEach((s, i) => p.linearRampToValueAtTime(v(s), t + (i + 1) * bar));
     };
-    ramp(this.comp.gain, (s) => s.comp);
-    if (this.keepVerb) ramp(this.verb.gain, (s) => s.verb);
+    ramp(this.comp.gain, from.comp, (s) => s.comp);
+    if (this.keepVerb) ramp(this.verb.gain, from.verb, (s) => s.verb);
     for (const k of DROP_LAYERS) {
       const g = this.groups[k];
-      ramp(g.out.gain, (s) => s.levels[k]);
-      ramp(g.pl.pan, (s) => -s.spread);
-      ramp(g.pr.pan, (s) => s.spread);
+      ramp(g.out.gain, from.levels[k], (s) => s.levels[k]);
+      ramp(g.pl.pan, -from.spread, (s) => -s.spread);
+      ramp(g.pr.pan, from.spread, (s) => s.spread);
     }
     this.windCaps = steps.map((s, i) => ({ from: t + i * bar, cap: s.voices }));
     this.windUntil = t + steps.length * bar;
@@ -415,6 +419,11 @@ export class DropOverlay {
   /** A bar line while the drop sounds: the voice peak of the bar that ended is kept (the wind-down starts from it). */
   barLine(): void {
     this.barPeak = this.live;
+  }
+
+  /** P10b, for the smoke test: the extra layers' own sound (all four pairs, before the music bus) also into `node`. */
+  tapLayers(node: AudioNode): void {
+    for (const g of Object.values(this.groups)) g.out.connect(node);
   }
 
   /** The instruments whose held notes are doubled now. */
