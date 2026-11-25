@@ -3076,8 +3076,11 @@ def open_app(page, failures: list) -> None:
     time.sleep(0.5)
 
 
-def part_engine(browser, page, failures: list, shot) -> None:
-    # Sound and switching: the C4 and P5 layer levels, the Now view, the P1b look, P2's modes, a section and three toggles landing on the bar, the master level and peak, every layer soloed.
+def part_core(browser, page, failures: list, shot) -> None:
+    # Sound and switching, then the screens, as one span of the single run (its walks build on one another's state):
+    # the C4 and P5 layer levels, the Now view, the P1b look, P2's modes, a section and three toggles landing on the
+    # bar, the master level and peak, every layer soloed; then in Advanced the G2 shell, G3 and G4 controls, P6's lead
+    # dials, a G5 take, the frame walk, the narrow pass, Stop, G5's songs and the armed take.
     walk_c4(page, failures)
     walk_p5(page, failures)
     walk_now(page, failures)
@@ -3169,10 +3172,6 @@ def part_engine(browser, page, failures: list, shot) -> None:
         if peak < -60:
             failures.append(f"layer {layer} is silent ({peak:.1f} dB)")
     page.evaluate(solo, None)
-
-
-def part_screens(browser, page, failures: list, shot) -> None:
-    # The screens, in Advanced while playing: the G2 shell, G3 and G4 controls, P6's lead dials, a G5 take, the frame walk, the narrow pass, Stop, then G5's songs and the armed take.
     walk_shell(page, failures)
     walk_g3(page, failures)
     walk_g4(page, failures)
@@ -3236,16 +3235,16 @@ def part_cost(browser, page, failures: list, shot) -> None:
     walk_cost(browser, page, failures)
 
 
-def setup_screens(page) -> None:
-    # Where the single run's engine walk left the app: Advanced, the Play tab, Groove (section 1) playing.
-    page.click('[data-appmode="advanced"]')
-    page.click('[data-tab="play"]')
-    page.evaluate("window.__groovebox.switchSection(1)")
-    wait_for(page, "window.__groovebox.position().section === 1", 4.0)
-
-
 def setup_vibes(page) -> None:
-    # Where the single run's songs walk left the app: Advanced, the transport stopped.
+    # Where the single run's songs walk left the app: the jam renamed and edited, so it is kept in Songs (an untouched
+    # first-launch song is replaced by the first vibe, not kept), Advanced, the transport stopped.
+    page.click('[data-tab="play"]')
+    page.click("#songs-open")
+    page.fill("#song-name", "Smoke jam")
+    page.click("#song-rename")
+    page.click('[data-tab="mix"]')
+    drag(page, '[data-dial="saturation"]', 0, -40)
+    time.sleep(0.8)  # the save follows edits after 0.4 s
     page.click('[data-appmode="advanced"]')
     page.click("#play")
     wait_for(page, "!window.__groovebox.playing", 3.0)
@@ -3254,8 +3253,7 @@ def setup_vibes(page) -> None:
 # The smoke in parts, run in this order, each in its own browser from a first launch (open_app). Together they are
 # the single run's walk, statement for statement (tools/smoke_parts.py checks that every check sits in a part).
 PARTS = [
-    ("engine", part_engine, None),
-    ("screens", part_screens, setup_screens),
+    ("core", part_core, None),
     ("vibes", part_vibes, setup_vibes),
     ("additions", part_additions, None),
     ("effects", part_effects, None),
@@ -3393,8 +3391,8 @@ def main() -> int:
             continue
         print(f"=== part {name}: running", flush=True)
         t0 = time.time()
-        cmd = [sys.executable, os.path.abspath(__file__), root, "--part", name]
-        if shot and name == "screens":
+        cmd = [sys.executable, "-u", os.path.abspath(__file__), root, "--part", name]
+        if shot and name == "core":
             cmd.append(shot)
         rc = subprocess.call(cmd)
         mins = (time.time() - t0) / 60

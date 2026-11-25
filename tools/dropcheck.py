@@ -431,6 +431,7 @@ def drop_vibes(page, failures: list) -> None:
         rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}; the section's own within {r['spread']:.2f}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
                     f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
                     f" (out {db(r['n']):.1f}, ref {10 * math.log10(max(info['ref'], 1e-12)):.1f} dB K-weighted, {10 * math.log10(max(r['n']['flat'], 1e-12)):.1f} flat)")
+        print(f"  P10 drop measured in {v['id']} ({len(rows)} of {len(vibes)})", flush=True)  # progress; the rows print below
         if abs(r["loud"]) > abs(worst_loud[0]):
             worst_loud = (r["loud"], v["id"])
         wb = max(r["per_bar"], key=abs)
