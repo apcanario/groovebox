@@ -368,11 +368,12 @@ export interface WindBar extends WindState {
  * P10b (C21, spec 8.9): the wind-down's targets bar by bar, a calm-down that mirrors the build. Over `bars` bars the
  * share of the drop left falls by an even step a bar, 1 - (i+1)/bars at the close of bar i, so every bar takes some
  * and the last bar line lands exactly on the section's values. Levels (and the follower's gain, which makes up for
- * them) fall on the share, an even step in amplitude; the spread falls on the share's square root. The layers' side
- * energy goes with level squared times spread squared, so on the share squared (P10b review E1) the width was nearly
- * all spent in the first bar (dubTechno: 13% of it left) and the level fell 4 then 17 dB: on share and its root the
- * layers' side energy keeps about half after the first of two bars, and a linear fall in amplitude still leaves the
- * last bar the largest step in dB (it ends in silence). Voices, held notes and the pump step down bar by bar on the
+ * them) fall on the share to the power 1.5, between an even step in amplitude and one in loudness; the spread falls on
+ * the share's square root. The layers' side energy (what widens the master) goes with level squared times spread
+ * squared: on the share squared and the share (P10b review E1) nearly all of it went in the first bar (dubTechno: 13%
+ * of the extra width left after the first of two bars). Measured per bar the layers' level also follows the notes
+ * (dubTechno's own bars differ by up to 4 to 6 dB), so the first bar takes little (2 bars: -3 dB; 4 bars: -1.6 dB on
+ * the bar's mean) and each later bar more (4 bars: 4, 6, then the last to silence). Voices, held notes and the pump step down bar by bar on the
  * bar's middle share (counts rounded up, at least one fewer a bar while any are left): a share leaves every bar,
  * fewest remaining in the last; at the end bar line all of them are the section's (`to`).
  */
@@ -385,7 +386,7 @@ export function windSteps(bars: number, from: WindState, to: WindState): WindBar
     Math.max(to, Math.min(prev - 1, Math.ceil(to + (from - to) * mid - 1e-9)));
   for (let i = 0; i < n; i++) {
     const share = i === n - 1 ? 0 : 1 - (i + 1) / n;
-    const loud = share;
+    const loud = Math.pow(share, 1.5);
     const wide = Math.sqrt(share);
     const mid = 1 - (i + 0.5) / n;
     const levels = {} as Record<DropLayer, number>;

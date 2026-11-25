@@ -680,7 +680,8 @@ def drop_vibes(page, failures: list, group: int | None = None) -> None:
         judge(r, v["id"], failures)
         lay, wid, most, lev = judge_wind(r, v["id"], failures)
         winds.append(f"{v['id']} layers {' > '.join(lay)} dB, width {' > '.join(wid)} (section {r['n']['width']:.3f}), voices {' > '.join(map(str, most))}, "
-                     f"master from the section {' '.join(f'{x:+.2f}' for x in lev)} dB, {r['wind']['length']} bars{' (Morph on)' if r['wind']['morph'] else ''}")
+                     f"master from the section {' '.join(f'{x:+.2f}' for x in lev)} dB, {r['wind']['length']} bars{' (Morph on)' if r['wind']['morph'] else ''}; "
+                     f"instruments (dB) section {mean_levels(r['wind']['sec_inst'])}, after {mean_levels(r['wind']['after_inst'])}")
         info = r["info"]
         rows.append(f"{v['id']} {r['loud']:+.2f} dB (bars {' '.join(f'{x:+.2f}' for x in r['per_bar'])}; the section's own within {r['spread']:.2f}), width {r['n']['width']:.3f} -> {r['width']:.3f}, "
                     f"peak {peak_db(r['peak']):.1f} dBFS ({r['peak_at']}), gain {info['comp']:.2f} after {info['followed']} beats, voices at most {info['most']}, {info['dropped']} over the cap"
