@@ -176,13 +176,16 @@ def walk_morph(page, failures: list) -> None:
         return failures.append(f"P11: only {len(trace)} of {bars} bars of Ambient traced in {mins:.1f} min")
     sigs = [t["sig"] for t in trace]
     rep = repeats(sigs)
+    # P11 review S2: the notes alone, for the record (the Done-when line counts the notes and every value Morph moves).
+    tune = [t["tune"] for t in trace]
+    tune_rep = repeats(tune)
     out = [n for t in trace for n in t["out"]]
     notes = sum(t["notes"] for t in trace)
     ops = {}
     for m in moves:
         ops[m["op"]] = ops.get(m["op"], 0) + 1
     print(f"P11: {bars} bars of Ambient ({mins:.1f} min) with Morph on: {notes} notes, {len(out)} out of key, "
-          f"{len(rep)} 16-bar stretches repeated, moves {ops}, master peak {20 * __import__('math').log10(max(peak, 1e-9)):.1f} dBFS, loudest {loud:.1f} dB")
+          f"{len(rep)} 16-bar stretches repeated (the notes alone: {len(tune_rep)} repeated, {len(set(tune))} distinct bars), moves {ops}, master peak {20 * __import__('math').log10(max(peak, 1e-9)):.1f} dBFS, loudest {loud:.1f} dB")
     if rep:
         failures.append(f"P11: ten minutes of Ambient repeat a 16-bar stretch exactly, from bars {rep[:8]}")
     if out:
@@ -254,12 +257,26 @@ def walk_morph(page, failures: list) -> None:
     wait_bars(page, 1)
     held = page.evaluate(f"{E}.morphTrace.filter(t => t.held).map(t => t.bar)")
     during = page.evaluate(f"(h) => {E}.morphMoves.filter(m => h.includes(m.bar))", held)
+    # P11 review S1: on the drop's first bar line Morph gives back what it owes (an instrument it had out switched on
+    # again, a Lock it had eased set back), before it holds. Only those moves, only on that bar line, and each must
+    # leave the instrument on.
+    given = [m for m in during if held and m["bar"] == held[0] and m["op"] in ("toggleInstrument", "setGen")]
+    during = [m for m in during if m not in given]
+    for m in given:
+        if m["op"] == "toggleInstrument" and not page.evaluate(f"{E}.getSong().sections[{m['a'][0]}].on['{m['a'][1]}']"):
+            failures.append(f"P11: what Morph gave back at the drop's start left the instrument off: {m}")
     if len(held) < 6:
         failures.append(f"P11: a drop (two bars of build, two on, two of wind-down) held Morph only at bars {held}")
     elif during:
         failures.append(f"P11: Morph moved during a drop: {during[:3]}")
     else:
-        print(f"P11: no Morph move through a drop ({len(held)} bars held, {held[0]} to {held[-1]})")
+        print(f"P11: no Morph move through a drop ({len(held)} bars held, {held[0]} to {held[-1]}); given back at its start: {given}")
+        # P11 review M2: Morph takes up its journey again once the drop has ended.
+        if not wait_for(page, f"{E}.morphMoves.some(m => m.bar > {held[-1]})", 8 * bar_s(page) + 2.0):
+            failures.append(f"P11: Morph made no move in the 8 bars after a drop ended (bar {held[-1]})")
+        else:
+            resumed = page.evaluate(f"{E}.morphMoves.find(m => m.bar > {held[-1]}).bar")
+            print(f"P11: Morph moved again at bar {resumed}, after the drop's last held bar {held[-1]}")
 
     # Off: no move from the next bar line.
     page.click("#morph")

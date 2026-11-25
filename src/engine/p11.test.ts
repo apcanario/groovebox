@@ -5,7 +5,10 @@ import { LogWriter, checkEvents } from "./eventlog.ts";
 import { Sequencer, STEPS_PER_BAR } from "./sequencer.ts";
 import { cloneSong, defaultSong, validateSong, type Song } from "./song.ts";
 import { STYLES, STYLE_IDS, vibeSong, vibeStart } from "../music/styles.ts";
-import { HANDS_BARS } from "../music/morph.ts";
+import { HANDS_BARS, voiceNotes } from "../music/morph.ts";
+import { buildChord } from "../music/chords.ts";
+import { MOODS, NOTE_NAMES } from "../music/scales.ts";
+import { droneNotes } from "./sequencer.ts";
 
 /** Ten minutes of a vibe, in whole bars. */
 const tenMinutes = (id: string): number => Math.ceil(600 / ((4 * 60) / STYLES[id].bpm));
@@ -153,6 +156,27 @@ describe("Morph in the engine (P11, spec 8.11)", () => {
       const same = Array.from({ length: 64 * STEPS_PER_BAR }, () => seq2.next().events);
       expect(same, id).toEqual(plain);
     }
+  });
+
+  it("the voicing dial as written plays the notes as written, in their order, for every chord there is (review M3)", () => {
+    // Not a comparison of two P11 paths: the dial at 0 shifts returns exactly what the pad and drone played before P11,
+    // order included (a drone's or swooping pad's glide pairs go note for note), and every chord is stored ascending.
+    expect(voiceNotes([64, 52, 59], 0)).toEqual([64, 52, 59]);
+    let chords = 0;
+    for (const key of NOTE_NAMES)
+      for (const mood of MOODS)
+        for (let degree = 0; degree < 7; degree++) {
+          const c = buildChord(key, mood, degree);
+          const pad = c.notes.slice(0, 4);
+          expect(voiceNotes(pad, 0), `${key} ${mood} ${degree}`).toEqual(pad);
+          expect([...c.notes].sort((a, b) => a - b), `${key} ${mood} ${degree} ascending`).toEqual(c.notes);
+          for (const fifth of [true, false]) {
+            const d = droneNotes(c, { fifth } as Parameters<typeof droneNotes>[1]);
+            expect(voiceNotes(d, 0)).toEqual(d);
+          }
+          chords++;
+        }
+    expect(chords).toBe(NOTE_NAMES.length * MOODS.length * 7);
   });
 
   it("switching Morph off stops it from the next bar line; on again, it goes on", () => {

@@ -99,6 +99,8 @@ export interface MorphBar {
   section: number;
   /** A hash of the bar's notes and of every value Morph moves, as they stood at the bar line. */
   sig: string;
+  /** P11 review S2: a hash of the bar's notes alone (what the sequencer played, none of the values Morph moves). */
+  tune: string;
   /** Notes scheduled in the bar (bass, synth and layers), and those outside the song's key. */
   notes: number;
   out: number[];
@@ -1704,10 +1706,13 @@ export class Engine {
   private closeTrace(): void {
     const t = this.traceBar;
     if (!t) return;
-    let h = 0x811c9dc5;
-    const text = t.state + "|" + t.events.join(",");
-    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
-    this.morphTrace.push({ bar: t.bar, section: t.section, sig: h.toString(16), notes: t.notes, out: t.out, held: t.held });
+    const hash = (text: string): string => {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+      return h.toString(16);
+    };
+    const tune = t.events.join(",");
+    this.morphTrace.push({ bar: t.bar, section: t.section, sig: hash(t.state + "|" + tune), tune: hash(tune), notes: t.notes, out: t.out, held: t.held });
     if (this.morphTrace.length > MORPH_KEEP) this.morphTrace.shift();
     this.traceBar = null;
   }

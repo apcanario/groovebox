@@ -167,9 +167,11 @@ export function voicingShift(v: number | undefined): number {
 
 /**
  * A chord's notes moved by `shift` inversions: up, its lowest note goes up an octave each time; down, its highest
- * goes down an octave. The same pitch classes, so it never leaves the key; ascending.
+ * goes down an octave. The same pitch classes, so it never leaves the key; ascending. At 0 (the dial as written, or
+ * missing) the notes come back as given, in their order: what played before P11 (P11 review M3).
  */
 export function voiceNotes(notes: readonly number[], shift: number): number[] {
+  if (shift === 0) return [...notes];
   const out = [...notes].sort((a, b) => a - b);
   if (out.length === 0) return out;
   for (let i = 0; i < shift; i++) {

@@ -340,7 +340,7 @@ One large button, DROP, that turns whatever section is playing into its biggest 
 - **The extra layers are an overlay.** They sit on top of the song while the drop is on and change nothing in the song document. After the wind-down, every knob is where it was. Knobs still work during a drop.
 - **The button shows where it is:** a countdown of bars during the build and the wind-down, lit steadily while the drop is on.
 - **Each vibe has its own recipe,** as data in its style file: build length and parts, the cliffhanger, the impact, which extra layers and how wide, the wind-down length. Deep techno's is restrained (hats out, filter down, kick back in, wider chords). Ambient's and Drone's are a slow bloom with no impact. Lo-fi's is a filter-down and the beat falling back in. EDM's and Trance's are the full thing.
-- **Where it is:** Simple, on the Play tab between the instruments and the section strip, full width. Advanced shows the same button and adds a Drop page on the Mix tab: build length, cliffhanger, wind-down length and one Width knob.
+- **Where it is:** Simple, on the Play tab between the instruments and the section strip, full width (from P11 sharing its row with the Morph switch beside it, spec 8.6). Advanced shows the same button and adds a Drop page on the Mix tab: build length, cliffhanger, wind-down length and one Width knob.
 - **Recorded as events** (on, off), so a saved jam replays it identically.
 - **Cost** (P10 review S4, 25 Nov 2026, `tools/cost.py dist 3 dropheavy`, median of 3): the drop on the heaviest scene (everything on, the six heaviest effects) measured 66.2% (64.6 to 66.4) against 61.1% before it, worst stall 17.5 ms against 12.7 ms, at most 35 overlay voices of the 48 and none over the cap; under 8.8's 71%.
 
@@ -467,7 +467,7 @@ Movement shows where things are and what is about to happen. Every animation is 
 **Other**
 - The XY pad has a dot grid, hairline crosshairs and a readout of the value in the corner.
 - The beat indicator is four square lights.
-- DROP is a full-width yellow tile with its icon and four bar segments that count down.
+- DROP is a full-width yellow tile (from P11 sharing its row with the Morph switch beside it, spec 8.6) with its icon and four bar segments that count down.
 
 ## 9. Phase 3: tablet
 

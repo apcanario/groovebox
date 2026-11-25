@@ -166,4 +166,22 @@ describe("Morph gives back what it owes (P11 review E1, S1)", () => {
     expect(off).toEqual([OUT_BAR + 1]);
     expect(drums(e)).toBe(true);
   });
+
+  it("a drop holds Morph from its first bar line to its end, then Morph moves again (review M2)", async () => {
+    const e = await playing(vibeSong("ambient")!, vibeStart("ambient"));
+    e.setDrop({ build: 2, wind: 2 });
+    bars(e, 30);
+    e.morphTraceOn(true);
+    e.drop();
+    // Two bars of build, then on; the second press starts the two-bar wind-down on the next bar line.
+    bars(e, 4);
+    e.drop();
+    bars(e, 12);
+    const held = e.morphTrace.filter((t) => t.held).map((t) => t.bar);
+    expect(held.length).toBeGreaterThanOrEqual(6);
+    expect(e.morphMoves.filter((m) => held.includes(m.bar))).toEqual([]);
+    const after = e.morphMoves.filter((m) => m.bar > held[held.length - 1]);
+    expect(after.length).toBeGreaterThan(0);
+    expect(after[0].bar).toBeLessThanOrEqual(held[held.length - 1] + 4);
+  });
 });
