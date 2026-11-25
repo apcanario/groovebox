@@ -32,6 +32,7 @@ import {
 } from "./data.ts";
 import { LEAD_STYLES } from "./lead.ts";
 import { checkDropRecipe } from "./drop.ts";
+import { checkMorphRecipe } from "./morph.ts";
 import { EFFECTS, MAX_ACTIVE_FX, fxSlot, type FxRack } from "./effects.ts";
 import { BASS_PRESETS, DRUM_PRESETS, SYNTH_PRESETS } from "./presets.ts";
 import { deriveSeed } from "./random.ts";
@@ -149,6 +150,7 @@ export function checkStyle(def: StyleDef, id: string, patches: Readonly<Record<s
     }
   }
   out.push(...checkDropRecipe(def.drop));
+  out.push(...checkMorphRecipe(def.morph));
   if (fxOn > MAX_ACTIVE_FX) out.push(`fx: ${fxOn} slots on, more than the ${MAX_ACTIVE_FX} the app plays at once`);
   for (const [i, s] of (def.sections ?? []).entries()) {
     if (!DRUM_PRESETS.includes(s.beat)) out.push(`sections[${i}].beat: unknown ${s.beat}`);

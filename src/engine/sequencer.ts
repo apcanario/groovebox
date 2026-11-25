@@ -29,6 +29,7 @@ import {
   type SynthPreset,
 } from "../music/presets.ts";
 import { createRng, deriveSeed, type Rng } from "../music/random.ts";
+import { voiceNotes, voicingShift } from "../music/morph.ts";
 import { DRONE_SWOOP, PAD_TRIM, swoopSeconds } from "../music/sound.ts";
 import { MOODS, scalePitchClasses, type KeyName, type Mood } from "../music/scales.ts";
 import { SwitchQueue, type Pending, type PendingChords } from "./queue.ts";
@@ -420,6 +421,7 @@ export class Sequencer {
       brightness: [0, 1],
       motion: [0, 1],
       swoop: [0, 1],
+      voicing: [0, 1],
     };
     const pad = { ...s[id].pad };
     for (const k of Object.keys(values) as (keyof PadParams)[]) {
@@ -428,7 +430,10 @@ export class Sequencer {
       if (v === null) return false;
       pad[k] = v;
     }
+    const revoiced = values.voicing !== undefined && voicingShift(pad.voicing) !== voicingShift(s[id].pad.voicing);
     s[id].pad = pad;
+    // P11: a new voicing reaches a held drone or swooping pad of the playing section at once, gliding.
+    if (revoiced && this.running && section === this.current) this.reshape.add(id);
     return true;
   }
 
@@ -693,6 +698,11 @@ export class Sequencer {
   }
 
   /** P10: the bar and step the next call to `next` produces (the Drop's conductor runs on its bar lines). */
+  /** P11: bars the playing section has played before the next step (0 on its first bar). */
+  get sectionBar(): number {
+    return Math.floor(this.sectionStep / STEPS_PER_BAR);
+  }
+
   get upcoming(): { bar: number; step: number } {
     return { bar: Math.floor(this.globalStep / STEPS_PER_BAR), step: this.globalStep % STEPS_PER_BAR };
   }
@@ -936,7 +946,7 @@ export class Sequencer {
     if (p.mode === "drone" || (p.mode === "pad" && (p.pad.swoop ?? 0) > 0)) {
       // P7 (spec 8.10): a drone, or a pad with Swoop, holds its notes and glides them to the next chord's; it starts
       // them only when it begins sounding (switched on, a new mode, Play, a vibe) or held something else before.
-      const notes = p.mode === "drone" ? droneNotes(pos.chord, p.drone) : pos.chord.notes.slice(0, 4);
+      const notes = voiceNotes(p.mode === "drone" ? droneNotes(pos.chord, p.drone) : pos.chord.notes.slice(0, 4), voicingShift(p.pad.voicing));
       const vel = 0.7 * PAD_TRIM;
       if (held && held.mode !== p.mode) letGo.push(id);
       if (!held || held.mode !== p.mode || entering) {
@@ -959,7 +969,7 @@ export class Sequencer {
       return {
         inst: id,
         mode: "pad",
-        notes: pos.chord.notes.slice(0, 4),
+        notes: voiceNotes(pos.chord.notes.slice(0, 4), voicingShift(p.pad.voicing)),
         len: pos.remaining,
         vel: 0.7 * PAD_TRIM,
         shift,

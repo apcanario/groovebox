@@ -53,6 +53,8 @@ import { PATCHES, PATCH_IDS, STYLES as VIBES, patchFor, resolvePatch } from "../
 import { EFFECTS, EFFECT_DEFS, MAX_ACTIVE_FX, activate, deactivate, fxKey, type EffectId, type FxKnobs, type FxSlot } from "../music/effects.ts";
 import { fxCounts, fxDebug, fxWorklets, type FxSlotNode } from "./fx.ts";
 import { songFx } from "./song.ts";
+import { HANDS_BARS, MORPH_MACROS, MorphPlanner, checkMorphSettings, morphStep, resolveMorph, type MorphMove, type MorphPlan, type MorphSettings } from "../music/morph.ts";
+import { inScale } from "../music/scales.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
@@ -81,6 +83,26 @@ export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, type DropBuild, type DropCliff, type DropIntent, type DropPhase, type DropRecipe, type DropSettings, type DropWind } from "../music/drop.ts";
 export type { Energy } from "./continuity.ts";
+export { HANDS_BARS, MORPH_THINGS, type MorphPlan, type MorphSettings, type MorphThing } from "../music/morph.ts";
+
+/** P11: one move Morph made, for the smoke test and the tests: the journey's bar and the engine call it made. */
+export interface MorphMade {
+  bar: number;
+  op: LogOp;
+  a: unknown[];
+}
+
+/** P11: one bar as scheduled, while the trace is on (smoke test, tests): what played and the state Morph moves. */
+export interface MorphBar {
+  /** The journey's bar (bars since the song or Play began). */
+  bar: number;
+  section: number;
+  /** A hash of the bar's notes and of every value Morph moves, as they stood at the bar line. */
+  sig: string;
+  /** Notes scheduled in the bar (bass, synth and layers), and those outside the song's key. */
+  notes: number;
+  out: number[];
+}
 
 /** What the DROP button shows (spec 8.9), as heard: the phase, the bar in it, its length, what a press waits for and the section queued behind the drop. */
 export interface DropShown {
@@ -122,6 +144,9 @@ const FINE_TAU = 0.6;
 const TRACK_DB = 0.25;
 const TRACK_TAU = 1.2;
 const TRACK_RANGE_DB = 3;
+
+/** P11: Morph's moves and the bar trace kept for the smoke test (a little over 40 minutes at 120 bpm). */
+const MORPH_KEEP = 1200;
 
 const DROP_OFF: DropBar = { phase: "off", index: 0, length: 0, impact: false, cliff: false, end: false, cancelled: false };
 export { MP3_KBPS, type Take } from "./recorder.ts";
@@ -275,6 +300,22 @@ export class Engine {
   /** Every bar line of the Drop's phases (kept short), for the smoke test. */
   readonly dropMarks: DropMark[] = [];
 
+  // ---- Morph (P11, spec 8.11) ----
+  /** The journey under way; null until the next bar line starts one (Play, a song loaded). */
+  private morphPlanner: MorphPlanner | null = null;
+  /** Bar lines scheduled while playing, ever: the clock hand moves are held against. */
+  private morphClock = 0;
+  /** When each control was last moved by hand (morphClock). */
+  private morphHands = new Map<string, number>();
+  /** Morph is making its moves: they are logged as Morph's and hold nothing. */
+  private morphing = false;
+  /** Morph's moves, newest last (kept to MORPH_KEEP). */
+  readonly morphMoves: MorphMade[] = [];
+  /** The bars as scheduled while the trace is on (kept to MORPH_KEEP). */
+  readonly morphTrace: MorphBar[] = [];
+  private traceOn = false;
+  private traceBar: { bar: number; section: number; state: string; events: string[]; notes: number; out: number[] } | null = null;
+
   constructor(given: Song = defaultSong()) {
     // A song saved before P2 plays at P2's balance (P2 review S1).
     const song = migrateSong(given);
@@ -346,6 +387,7 @@ export class Engine {
     const song = migrateSong(given);
     this.queued = null;
     this.dropReset();
+    this.morphPlanner = null;
     this.takeDocument(song);
     this.seq.load(bareSong(song), section);
     this.takeFx();
@@ -388,6 +430,8 @@ export class Engine {
     this.seq.start();
     this.inFlight.clear();
     this.landed.length = 0;
+    // P11: a new journey from where the song stands.
+    this.morphPlanner = null;
     const at = Tone.now() + 0.05;
     Tone.getTransport().start(at);
     // P7: the synced LFOs start on bar 1 with the transport; the hiss and the air play while it runs.
@@ -523,12 +567,16 @@ export class Engine {
   /** Log an edit to the take's event log, if a take is running. */
   private note(op: LogOp, args: unknown[]): void {
     // P10 review S2: a hand on the controls while the drop sounds stops the level follower where it is.
-    if (op !== "drop" && this.doubling()) this.dropHand = true;
+    // P11: Morph's own moves are not a hand: they hold neither the follower nor Morph.
+    if (!this.morphing) {
+      if (op !== "drop" && this.doubling()) this.dropHand = true;
+      this.markHand(op, args);
+    }
     const w = this.rec.writer;
     if (!w || this.rec.state !== "recording") return;
     const transport = Tone.getTransport();
     const ticks = transport.state === "started" ? transport.ticks - this.rec.startTicks : 0;
-    w.push(ticks / transport.PPQ, op, args);
+    w.push(ticks / transport.PPQ, op, args, this.morphing ? "morph" : undefined);
   }
 
   /** Keep a loaded document's mix and log; the sequencer gets the song alone. */
@@ -1360,6 +1408,256 @@ export class Engine {
     }
   }
 
+  // ---- Morph (P11, spec 8.11) ---------------------------------------------------------
+
+  /** Morph as the song plays it: the vibe's limits with the Morph page's settings over them. */
+  morphPlan(): MorphPlan {
+    const song = this.seq.song;
+    return resolveMorph(song.style ? VIBES[song.style]?.morph : undefined, song.morph, song.style ?? song.name);
+  }
+
+  /** The Morph page's settings as the song holds them (a copy). */
+  getMorphSettings(): MorphSettings {
+    const m = this.seq.song.morph;
+    return m ? { ...m, ...(m.moves ? { moves: { ...m.moves } } : {}) } : {};
+  }
+
+  /**
+   * The Morph button and the Morph page: on or off, Speed, Depth and a switch per thing it may move. Stored in the
+   * song, acting from the next bar line. Returns false when refused. Recorded.
+   */
+  setMorph(values: MorphSettings): boolean {
+    const errors: string[] = [];
+    checkMorphSettings(values, "morph", errors);
+    if (errors.length) return false;
+    const cur = this.seq.song.morph ?? {};
+    const next: MorphSettings = { ...cur, ...values };
+    if (values.moves) next.moves = { ...cur.moves, ...values.moves };
+    this.seq.song.morph = next;
+    this.note("setMorph", [values]);
+    this.changed();
+    return true;
+  }
+
+  /** Whether a control is left alone: moved by hand within the last HANDS_BARS bars (spec 8.11). */
+  morphHeld(control: string): boolean {
+    const t = this.morphHands.get(control);
+    return t !== undefined && this.morphClock - t <= HANDS_BARS;
+  }
+
+  /** P11: a hand moved a control: Morph leaves it alone for HANDS_BARS bars. Names as `controlOf` in music/morph.ts. */
+  private markHand(op: LogOp, a: unknown[]): void {
+    const mark = (c: string): void => void this.morphHands.set(c, this.morphClock);
+    const patchKeys = (inst: unknown, keys: string[]): void => {
+      for (const m of MORPH_MACROS)
+        if (m.inst === inst && findMacro(m.inst, m.id)?.targets.some((t) => t.kind === "patch" && keys.includes(t.key))) mark(`macro:${m.inst}.${m.id}`);
+    };
+    const keys = (v: unknown): string[] => (v && typeof v === "object" ? Object.keys(v) : []);
+    switch (op) {
+      case "setParam":
+      case "releaseMacros":
+        return patchKeys(a[0], [String(a[1])]);
+      case "setParams":
+        return patchKeys(a[0], keys(a[1]));
+      case "setMacro":
+        if (a[2] === "bright" || a[2] === "space") mark(`macro:${String(a[1])}.${a[2]}`);
+        if (a[2] === "evolve") mark(`lock:${String(a[1])}`);
+        return;
+      case "setGen":
+        if (keys(a[2]).includes("lock")) mark(`lock:${String(a[1])}`);
+        return;
+      case "setPad":
+        if (keys(a[2]).includes("voicing")) mark(`voicing:${String(a[1])}`);
+        return;
+      case "setLayerMode":
+      case "setDrone":
+        mark(`voicing:${String(a[1])}`);
+        mark(`lock:${String(a[1])}`);
+        return;
+      case "toggleInstrument":
+        return mark(`on:${String(a[1])}`);
+      case "switchSection":
+        return mark("section");
+    }
+  }
+
+  /** P11: what Morph sees of the playing section at a bar line. */
+  private morphView(): Parameters<MorphPlanner["bar"]>[1] {
+    const song = this.seq.song;
+    const si = this.seq.section;
+    const sec = song.sections[si];
+    const macros: Record<string, number> = {};
+    for (const m of MORPH_MACROS) macros[`${m.inst}.${m.id}`] = macroPosition(song, si, m.inst, m.id);
+    const layer = (id: LayerInstrument) => ({ mode: sec[id].mode, lock: sec[id].gen.lock, voicing: sec[id].pad.voicing ?? 0.5 });
+    return {
+      section: si,
+      sections: song.sections.length,
+      loopBars: Math.max(1, Math.ceil(sec.chords.reduce((a, c) => a + c.bars, 0))),
+      sectionBar: this.seq.sectionBar,
+      macros,
+      on: { ...sec.on },
+      layers: { layer1: layer("layer1"), layer2: layer("layer2") },
+      sounding: song.sections.map((s) => INSTRUMENTS.filter((id) => s.on[id]).length),
+    };
+  }
+
+  /**
+   * P11: Morph at a bar line, before the sequencer plays the bar: its moves land on this bar line (toggles and a section
+   * switch with the queue, values ramped as a hand's). It holds while a drop runs and while a song waits to land.
+   */
+  private morphBarLine(): void {
+    this.morphClock++;
+    if (this.seq.songQueued) {
+      // A vibe lands on this bar line: its journey starts with it (this is its first bar).
+      const q = this.queued;
+      const plan = q ? resolveMorph(q.style ? VIBES[q.style]?.morph : undefined, q.morph, q.style ?? q.name) : null;
+      this.morphPlanner = plan ? new MorphPlanner(plan.seed) : null;
+      this.morphPlanner?.pass();
+      return;
+    }
+    const plan = this.morphPlan();
+    if (!this.morphPlanner || this.morphPlanner.seed !== plan.seed) this.morphPlanner = new MorphPlanner(plan.seed);
+    const planner = this.morphPlanner;
+    if (!plan.on || this.dropper.active || this.dropRec !== null) return void planner.pass();
+    const bar = planner.bars;
+    const moves = planner.bar(plan, this.morphView(), (c) => this.morphHeld(c));
+    if (!moves.length) return;
+    this.morphing = true;
+    try {
+      for (const m of moves) this.morphMove(m, plan, bar);
+    } finally {
+      this.morphing = false;
+    }
+  }
+
+  private morphMade(bar: number, op: LogOp, a: unknown[]): void {
+    this.morphMoves.push({ bar, op, a: JSON.parse(JSON.stringify(a)) as unknown[] });
+    if (this.morphMoves.length > MORPH_KEEP) this.morphMoves.shift();
+  }
+
+  /** One of Morph's moves, made through the call a hand makes. */
+  private morphMove(m: MorphMove, plan: MorphPlan, bar: number): void {
+    const si = this.seq.section;
+    switch (m.kind) {
+      case "macro": {
+        // A macro whose values stand away from its dial (a vibe's own sends, an Advanced edit) is brought to it a step a
+        // bar, value by value (setParams), never in one jump; then the dial moves them together (setMacro).
+        const def = findMacro(m.inst, m.id)!;
+        const patch = this.seq.song.patches[m.inst];
+        const step = morphStep(plan) * 1.5;
+        const values: Partial<Record<NumericPatchKey, number>> = {};
+        let there = true;
+        for (const t of def.targets) {
+          if (t.kind !== "patch") continue;
+          const want = targetValue(t, m.pos);
+          const cur = patch[t.key];
+          const max = step * Math.abs(t.to - t.from);
+          const next = Math.abs(want - cur) <= max ? want : cur + Math.sign(want - cur) * max;
+          if (Math.abs(next - want) > 1e-6) there = false;
+          values[t.key] = Math.round(next * 1e4) / 1e4;
+        }
+        if (there) {
+          this.setMacro(si, m.inst, m.id, m.pos);
+          this.morphMade(bar, "setMacro", [si, m.inst, m.id, m.pos]);
+        } else {
+          this.setParams(m.inst, values);
+          this.morphMade(bar, "setParams", [m.inst, values]);
+        }
+        return;
+      }
+      case "lock":
+        this.setGen(m.section, m.layer, { lock: m.lock });
+        return this.morphMade(bar, "setGen", [m.section, m.layer, { lock: m.lock }]);
+      case "voicing":
+        this.setPad(m.section, m.layer, { voicing: m.voicing });
+        return this.morphMade(bar, "setPad", [m.section, m.layer, { voicing: m.voicing }]);
+      case "toggle":
+        this.toggleInstrument(m.section, m.inst);
+        return this.morphMade(bar, "toggleInstrument", [m.section, m.inst]);
+      case "section":
+        this.switchSection(m.index);
+        return this.morphMade(bar, "switchSection", [m.index]);
+    }
+  }
+
+  /** For the smoke test: start (or stop) keeping each scheduled bar's trace, cleared. */
+  morphTraceOn(on: boolean): void {
+    this.traceOn = on;
+    this.traceBar = null;
+    this.morphTrace.length = 0;
+    this.morphMoves.length = 0;
+  }
+
+  /** P11: the bar's notes into the trace; at a bar line the last bar is closed and the state Morph moves is read. */
+  private traceStep(r: StepResult): void {
+    if (!this.traceOn) return;
+    if (r.step === 0) {
+      this.closeTrace();
+      const song = this.seq.song;
+      const sec = song.sections[r.section];
+      const state = sec
+        ? JSON.stringify([
+            r.section,
+            sec.on,
+            MORPH_MACROS.map((m) => Math.round(macroPosition(song, r.section, m.inst, m.id) * 1000)),
+            (["bass", "synth", "layer1", "layer2"] as const).map((id) => {
+              const p = song.patches[id];
+              return [p.cutoff, p.envAmount, p.delay, p.reverb].map((x) => Math.round(x * 1e4));
+            }),
+            LAYER_IDS.map((id) => [sec[id].mode, sec[id].pad.voicing ?? 0.5, sec[id].gen.lock]),
+          ])
+        : "";
+      const bar = this.morphPlanner ? this.morphPlanner.bars - 1 : -1;
+      this.traceBar = { bar, section: r.section, state, events: [], notes: 0, out: [] };
+    }
+    const t = this.traceBar;
+    if (!t) return;
+    const song = this.seq.song;
+    for (const e of r.events) {
+      if (e.inst === "drums") t.events.push(`${r.step}d${e.voice}`);
+      else {
+        const notes = e.inst === "bass" ? [e.midi] : e.notes;
+        t.events.push(`${r.step}${e.inst}${notes.join(".")}:${Math.round(e.len * 100)}`);
+        for (const n of notes) {
+          t.notes++;
+          if (!inScale(n, song.key, song.mood)) t.out.push(n);
+        }
+      }
+    }
+  }
+
+  private closeTrace(): void {
+    const t = this.traceBar;
+    if (!t) return;
+    let h = 0x811c9dc5;
+    const text = t.state + "|" + t.events.join(",");
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+    this.morphTrace.push({ bar: t.bar, section: t.section, sig: h.toString(16), notes: t.notes, out: t.out });
+    if (this.morphTrace.length > MORPH_KEEP) this.morphTrace.shift();
+    this.traceBar = null;
+  }
+
+  /**
+   * For the tests and the smoke test: play `bars` bars of the loaded song without audio, as the scheduler would (Morph
+   * at every bar line, then the sequencer's steps), from a fresh journey. Returns Morph's moves and each bar's trace.
+   * Refused while audio plays.
+   */
+  morphDry(bars: number): { moves: MorphMade[]; trace: MorphBar[] } | null {
+    if (this.playing) return null;
+    this.morphTraceOn(true);
+    this.seq.start();
+    this.morphPlanner = null;
+    for (let i = 0; i < bars * STEPS_PER_BAR; i++) {
+      if (this.seq.upcoming.step === 0) this.morphBarLine();
+      this.traceStep(this.seq.next());
+    }
+    this.closeTrace();
+    this.seq.stop();
+    const out = { moves: [...this.morphMoves], trace: [...this.morphTrace] };
+    this.morphTraceOn(false);
+    return out;
+  }
+
   // ---- Diagnostics and test hooks ------------------------------------------------
 
   /** Mute or unmute an instrument at once, outside the bar-line queue. Used by the smoke test's solo. */
@@ -1650,8 +1948,13 @@ export class Engine {
     // P10: the Drop's conductor decides each bar at its bar line, before the sequencer plays it (a section held
     // behind the drop is queued here, so it lands on this very bar line).
     const up = this.seq.upcoming;
-    if (up.step === 0) this.dropBarLine(time, up.bar);
+    if (up.step === 0) {
+      this.dropBarLine(time, up.bar);
+      // P11: Morph's moves for this bar, after the Drop's conductor (a drop holds it) and before the bar is played.
+      this.morphBarLine();
+    }
     const r: StepResult = this.seq.next();
+    this.traceStep(r);
     const bpm = Tone.getTransport().bpm.value;
     let sixteenth = 60 / bpm / 4;
     let tempo = bpm;

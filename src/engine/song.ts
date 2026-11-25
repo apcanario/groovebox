@@ -1,5 +1,6 @@
 /** Song document (spec section 6): types, default song, validation. No audio dependency. */
 import { checkDropSettings, type DropSettings } from "../music/drop.ts";
+import { checkMorphSettings, type MorphSettings } from "../music/morph.ts";
 import { ARP_DIRECTIONS, type ArpParams } from "../music/arp.ts";
 import { LEAD_SHAPES, LEAD_STYLES, PHRASE_BARS, type LeadParams } from "../music/lead.ts";
 import {
@@ -189,6 +190,11 @@ export interface PadParams {
   motion: number; // 0..1 (used from G4)
   /** Optional (P7, spec 8.10's Swoop): 0 or missing, a pad lets go and restarts on each chord; above 0 it holds and glides. */
   swoop?: number;
+  /**
+   * Optional (P11, spec 8.11): the voicing and register, 0..1, 0.5 (or missing) as the chord is written; each sixth up
+   * or down moves the held notes one inversion up or down (same notes, another register). Morph moves it at phrase ends.
+   */
+  voicing?: number;
 }
 
 /** Longest attack and release of a pad or drone, in seconds (spec 8.10). */
@@ -308,6 +314,8 @@ export interface Song {
   fx?: Record<InstrumentId, FxRack>;
   /** Optional (P10, spec 8.9): the Drop page's settings over the vibe's recipe. Missing means the recipe as it is. */
   drop?: DropSettings;
+  /** Optional (P11, spec 8.11): the Morph switch and the Morph page's settings over the vibe's limits. Missing means the vibe's. */
+  morph?: MorphSettings;
 }
 
 /** The effect slots a song plays: its own, else each instrument's defaults (all off). A copy. */
@@ -487,6 +495,7 @@ function checkLayer(l: unknown, at: string, errors: string[]): void {
     if (!inRange(pad.brightness, 0, 1)) errors.push(`${at}.pad.brightness: must be 0..1`);
     if (!inRange(pad.motion, 0, 1)) errors.push(`${at}.pad.motion: must be 0..1`);
     if (pad.swoop !== undefined && !inRange(pad.swoop, 0, 1)) errors.push(`${at}.pad.swoop: must be 0..1`);
+    if (pad.voicing !== undefined && !inRange(pad.voicing, 0, 1)) errors.push(`${at}.pad.voicing: must be 0..1`);
   }
   const g = l.gen;
   if (!isObj(g)) errors.push(`${at}.gen: not an object`);
@@ -590,6 +599,7 @@ export function validateSong(doc: unknown): string[] {
   if (doc.style !== undefined && (typeof doc.style !== "string" || !doc.style)) errors.push("style: must be a style id");
   if (doc.fx !== undefined) checkFx(doc.fx, "fx", errors);
   if (doc.drop !== undefined) checkDropSettings(doc.drop, "drop", errors);
+  if (doc.morph !== undefined) checkMorphSettings(doc.morph, "morph", errors);
   if (doc.version !== 1) errors.push("version: must be 1");
   if (typeof doc.name !== "string") errors.push("name: must be a string");
   if (!oneOf(doc.key, NOTE_NAMES)) errors.push("key: unknown key");

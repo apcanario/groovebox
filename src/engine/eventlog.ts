@@ -41,6 +41,8 @@ export const LOG_OPS = [
   // P10 (spec 8.9): the DROP button and the Drop page.
   "drop",
   "setDrop",
+  // P11 (spec 8.11): the Morph button and the Morph page.
+  "setMorph",
 ] as const;
 export type LogOp = (typeof LOG_OPS)[number];
 
@@ -49,6 +51,8 @@ export interface LogEvent {
   b: number;
   op: LogOp;
   a: unknown[];
+  /** P11: "morph" on a move Morph made (spec 8.11: the same call a hand makes, marked so a replay can tell them apart). */
+  by?: "morph";
 }
 
 /** Moves of one knob closer together than this merge into one event (a 32nd note). */
@@ -83,6 +87,7 @@ export function coalesceKey(op: LogOp, a: readonly unknown[]): string | null {
     case "setFx":
       return `${op}:${String(a[0])}:${String(a[1])}:${keys(a[2])}`;
     case "setDrop":
+    case "setMorph":
       return `${op}:${keys(a[0])}`;
     default:
       return null;
@@ -96,11 +101,13 @@ export class LogWriter {
   private lastBeat = 0;
   dropped = 0;
 
-  push(beat: number, op: LogOp, args: readonly unknown[]): void {
+  push(beat: number, op: LogOp, args: readonly unknown[], by?: "morph"): void {
     // Beats never run backwards (the transport resets to 0 on Stop while the tail still records).
     const b = Math.max(this.lastBeat, Math.round(Math.max(0, beat) * 1000) / 1000);
     const a = JSON.parse(JSON.stringify(args)) as unknown[];
-    const key = coalesceKey(op, a);
+    // A hand's move and Morph's never merge into one event.
+    const k = coalesceKey(op, a);
+    const key = k === null ? null : by ? `${by}|${k}` : k;
     const prev = this.events[this.events.length - 1];
     if (prev && key !== null && key === this.lastKey && b - prev.b < COALESCE_BEATS) {
       prev.a = a;
@@ -110,7 +117,7 @@ export class LogWriter {
       this.dropped++;
       return;
     }
-    this.events.push({ b, op, a });
+    this.events.push(by ? { b, op, a, by } : { b, op, a });
     this.lastKey = key;
     this.lastBeat = b;
   }
@@ -140,6 +147,10 @@ export function checkEvents(events: unknown, at: string, errors: string[]): void
     }
     if (!Array.isArray(e.a)) {
       errors.push(`${at}[${i}].a: must be a list`);
+      break;
+    }
+    if (e.by !== undefined && e.by !== "morph") {
+      errors.push(`${at}[${i}].by: unknown`);
       break;
     }
   }

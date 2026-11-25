@@ -5,6 +5,7 @@
  * folder, so a data file can import its types from here without a cycle. No audio dependency.
  */
 import type { DropRecipe } from "./drop.ts";
+import type { MorphRecipe } from "./morph.ts";
 import type { DroneParams, InstrumentId, LayerMode, MixState, PadParams, Patch } from "../engine/song.ts";
 import type { ArpParams } from "./arp.ts";
 import type { LeadParams, LeadStyle } from "./lead.ts";
@@ -269,4 +270,6 @@ export interface StyleDef {
   start?: number;
   /** P10 (spec 8.9): the vibe's drop. */
   drop: DropRecipe;
+  /** P11 (spec 8.11): Morph's limits for the vibe, and whether it arrives on; missing parts take DEFAULT_MORPH's. */
+  morph?: Partial<MorphRecipe>;
 }
