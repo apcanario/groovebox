@@ -94,12 +94,15 @@ def uncovered() -> list:
 #    tests (*.test.ts) are left out: they are not in the build and `npm run check` runs them.
 #  - src/ui/: every part has App.tsx and what it imports outside src/ui/tabs/ (the shell, the picker, the sheets,
 #    components, logic). A tab's file is in a part when the part's check code opens that tab: a literal
-#    `data-tab="name"` in it, or every tab for a computed one (`data-tab="{...}"`) or the TABS list. A tab brings what it
-#    imports, tabs included. The Play tab is in every part (the app opens on it).
+#    `data-tab="name"` in it, or every tab for a computed one (`data-tab="{...}"`) or the TABS list, or every instrument
+#    and layer tab for a Play tab tile or row head (`data-now`, `data-row`, which open a tab by goTab). A tab brings
+#    what it imports, tabs included. The Play tab is in every part (the app opens on it).
+#  - Fail closed: a src/ui/ file reached neither from App.tsx outside src/ui/tabs/ nor from any TAB_FILES entry (a new
+#    tab not yet listed, or a file nothing imports by a static line) is in every part, with what it imports.
 #  - tools/: tools/smoke_parts.py whole; of tools/smoke.py and the files it imports (dropcheck, morphcheck, shots,
 #    mp3check), every top-level statement that is not a function (imports, constants, PARTS) and every function the
 #    part reaches from run_part, main, open_app, its setup and its own function, by name; nothing else of tools/.
-# core opens every tab, so it has every file: a change that breaks the app for all parts still reruns core.
+# core opens every tab, so it has every src/ui/ file: a change that breaks the app for all parts still reruns core.
 SHARED_FILES = ["package.json", "package-lock.json", "index.html", "vite.config.ts", "tsconfig.json"]
 SHARED_DIRS = ["public", "src"]  # src/ui/ is split by part, below
 TAB_FILES = {
@@ -113,6 +116,7 @@ TAB_FILES = {
     "layer2": ["LayerTab.tsx", "SimpleTab.tsx"],
 }
 ROOTS = ["run_part", "main", "open_app"]
+PLAY_OPENS = ["drums", "bass", "synth", "layer1", "layer2"]  # the tabs a Play tab tile or row head opens
 
 
 def _base(base: str | None) -> str:
@@ -158,6 +162,19 @@ def _ui_closure(base: str, start: list, into_tabs: bool) -> set:
     return seen
 
 
+def _unplaced(base: str) -> set:
+    """The src/ui/ files (not unit tests) that neither App.tsx outside src/ui/tabs/ nor any TAB_FILES entry reaches,
+    with what they import: no part's tab list can place them, so every part has them."""
+    import re
+
+    ui = os.path.join("src", "ui")
+    placed = _ui_closure(base, [os.path.join(ui, "App.tsx")], into_tabs=False)
+    placed |= _ui_closure(base, [os.path.join(ui, "tabs", t) for ts in TAB_FILES.values() for t in ts
+                                 if os.path.isfile(os.path.join(base, ui, "tabs", t))], into_tabs=True)
+    loose = [f for f in _files(base, ui) if not re.search(r"\.test\.tsx?$", f) and f not in placed]
+    return _ui_closure(base, loose, into_tabs=True) if loose else set()
+
+
 def _tool_defs(base: str) -> dict:
     """tools/smoke.py and the tools files it imports: per file, its top-level functions (name -> node), the source of
     its other top-level statements, and the names it imports from which file."""
@@ -170,7 +187,7 @@ def _tool_defs(base: str) -> dict:
             src = fh.read()
         tree = ast.parse(src)
         lines = src.splitlines()
-        fns, rest, names, mods, consts, text, refs, attrs, used = {}, [], {}, set(), {}, {}, {}, {}, {}
+        fns, rest, names, mods, consts, text, refs, attrs, used, cnames = {}, [], {}, set(), {}, {}, {}, {}, {}, {}
         for node in tree.body:
             seg = "\n".join(lines[node.lineno - 1:node.end_lineno])
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -185,6 +202,7 @@ def _tool_defs(base: str) -> dict:
                 for t in getattr(node, "targets", None) or [getattr(node, "target", None)]:
                     if isinstance(t, ast.Name):
                         consts[t.id] = rest[-1]
+                        cnames[t.id] = {x.id for x in ast.walk(node) if isinstance(x, ast.Name)} - {t.id}
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module and os.path.isfile(os.path.join(base, "tools", node.module + ".py")):
                 for a in node.names:
@@ -196,14 +214,38 @@ def _tool_defs(base: str) -> dict:
                         mods.add(a.name + ".py")
                         todo.append(a.name + ".py")
         out[f] = {"src": src, "fns": fns, "rest": rest, "names": names, "mods": mods, "consts": consts,
-                  "text": text, "refs": refs, "attrs": attrs, "used": used, "tree": tree}
+                  "text": text, "refs": refs, "attrs": attrs, "used": used, "cnames": cnames, "tree": tree}
     return out
 
 
 def _reach(tools: dict, roots: list) -> set:
     """(file, function) pairs reached from smoke.py's roots by name: a name resolves in its own file, then to the
-    file it was imported from; an attribute also to any tools module the file imports."""
+    file it was imported from; an attribute also to any tools module the file imports. A module constant a reached
+    function uses brings the functions it names (PARTS excepted: each part reaches only its own)."""
     seen, todo = set(), [("smoke.py", r) for r in roots]
+
+    def resolve(f: str, x: str, attr: bool, consts_seen: set) -> None:
+        t = tools[f]
+        if x in t["fns"]:
+            todo.append((f, x))
+        if x in t["names"] and t["names"][x] in tools:
+            todo.append((t["names"][x], x))
+            resolve_const(t["names"][x], x, consts_seen)
+        if attr:
+            todo.extend((m, x) for m in t["mods"] if m in tools)
+            for m in t["mods"]:
+                if m in tools:
+                    resolve_const(m, x, consts_seen)
+        resolve_const(f, x, consts_seen)
+
+    def resolve_const(f: str, x: str, consts_seen: set) -> None:
+        if x == "PARTS" or x not in tools[f]["consts"] or (f, x) in consts_seen:
+            return
+        consts_seen.add((f, x))
+        for y in tools[f]["cnames"][x]:
+            resolve(f, y, False, consts_seen)
+
+    consts_seen = set()
     while todo:
         f, n = todo.pop()
         if (f, n) in seen or n not in tools[f]["fns"]:
@@ -211,12 +253,7 @@ def _reach(tools: dict, roots: list) -> set:
         seen.add((f, n))
         t = tools[f]
         for x in t["refs"][n]:
-            if x in t["fns"]:
-                todo.append((f, x))
-            if x in t["names"] and t["names"][x] in tools:
-                todo.append((t["names"][x], x))
-            if x in t["attrs"][n]:
-                todo += [(m, x) for m in t["mods"] if m in tools]
+            resolve(f, x, x in t["attrs"][n], consts_seen)
     return seen
 
 
@@ -241,10 +278,13 @@ def part_inputs(name: str, base: str | None = None, tools: dict | None = None) -
     tabs = {"play"} | set(re.findall(r'data-tab="(\w+)"', text))
     if re.search(r'data-tab="\{', text) or "TABS" in used:
         tabs |= set(TAB_FILES)
+    if re.search(r"data-(now|row)\b", text):
+        tabs |= set(PLAY_OPENS)
     ui = os.path.join("src", "ui")
     start = [os.path.join(ui, "App.tsx")]
     shown = _ui_closure(base, start, into_tabs=False)
     shown |= _ui_closure(base, [os.path.join(ui, "tabs", t) for tab in sorted(tabs) for t in TAB_FILES.get(tab, [])], into_tabs=True)
+    shown |= _unplaced(base)
     files = []
     for top in SHARED_FILES + SHARED_DIRS:
         for f in _files(base, top):

@@ -126,6 +126,74 @@ class PartFingerprints(unittest.TestCase):
         # A tools file the smoke never imports: nothing.
         self.assertEqual(self.changed(os.path.join(tools, "landed.py")), set())
 
+    def edited(self, edits: list):
+        """Apply (rel, old, new) edits in the scratch copy (old None: create rel with new); undo on exit."""
+        tmp = self
+
+        class Ctx:
+            def __enter__(self):
+                self.saved = []
+                for rel, old, new in edits:
+                    path = os.path.join(tmp.tmp, rel)
+                    prev = open(path).read() if os.path.exists(path) else None
+                    self.saved.append((path, prev))
+                    if old is None:
+                        text = new
+                    else:
+                        tmp.assertIn(old, prev, f"{rel} has no {old!r}")
+                        text = prev.replace(old, new, 1)
+                    with open(path, "w") as fh:
+                        fh.write(text)
+
+            def __exit__(self, *exc):
+                for path, prev in reversed(self.saved):
+                    if prev is None:
+                        os.remove(path)
+                    else:
+                        with open(path, "w") as fh:
+                            fh.write(prev)
+
+        return Ctx()
+
+    def test_unlisted_tab_is_in_every_part(self):
+        # A new tab imported by App.tsx but in no TAB_FILES entry: a change to it clears every part (fails closed).
+        new_tab = os.path.join("src", "ui", "tabs", "NewTab.tsx")
+        app = os.path.join("src", "ui", "App.tsx")
+        imp = 'import { PlayTab } from "./tabs/PlayTab.tsx";\n'
+        with self.edited([(new_tab, None, "export const NewTab = () => null;\n"),
+                          (app, imp, imp + 'import { NewTab } from "./tabs/NewTab.tsx";\n')]):
+            before = self.fps()
+            for n in self.names:
+                self.assertIn(new_tab, sp.part_inputs(n, self.tmp)["files"], n)
+            with self.edited([(new_tab, "null", "undefined")]):
+                after = self.fps()
+        self.assertEqual({n for n in self.names if before[n] != after[n]}, set(self.names))
+
+    def test_play_tab_tile_opens_instrument_and_layer_tabs(self):
+        # A check that holds a Now tile or taps a row head on the Play tab opens an instrument or layer tab by goTab.
+        ui = os.path.join("src", "ui", "tabs")
+        want = {os.path.join(ui, "InstrumentTab.tsx"), os.path.join(ui, "LayerTab.tsx"), os.path.join(ui, "SimpleTab.tsx")}
+        self.assertFalse(want & set(sp.part_inputs("drop-1", self.tmp)["files"]))
+        head = "def walk_drop(page, failures: list, vibe_song: str = \"deepHouse\") -> None:\n"
+        with self.edited([(os.path.join("tools", "dropcheck.py"), head, head + "    page.locator('[data-now=\"bass\"]')\n")]):
+            self.assertTrue(want <= set(sp.part_inputs("drop-1", self.tmp)["files"]))
+        with self.edited([(os.path.join("tools", "dropcheck.py"), head, head + "    page.locator('[data-row=\"layer1\"]')\n")]):
+            self.assertTrue(want <= set(sp.part_inputs("drop-1", self.tmp)["files"]))
+
+    def test_check_threshold_clears_its_parts(self):
+        self.assertTrue(set(DROPS) <= self.changed(os.path.join("tools", "dropcheck.py"), "LEVEL_DROP_DB = 3.0", "LEVEL_DROP_DB = 3.5"))
+
+    def test_functions_named_in_a_constant_are_reached(self):
+        # walk_drop uses a module constant naming a function: that function is in drop-1's check code, not in morph's.
+        rel = os.path.join("tools", "dropcheck.py")
+        head = "def walk_drop(page, failures: list, vibe_song: str = \"deepHouse\") -> None:\n"
+        with open(os.path.join(self.tmp, rel)) as fh:
+            text = fh.read()
+        with self.edited([(rel, None, text + "\n\ndef zz_hook(page):\n    pass\n\n\nZZ_HOOKS = [zz_hook]\n")]):
+            with self.edited([(rel, head, head + "    ZZ_HOOKS\n")]):
+                self.assertIn("dropcheck.py:zz_hook", sp.part_inputs("drop-1", self.tmp)["tools"])
+                self.assertNotIn("dropcheck.py:zz_hook", sp.part_inputs("morph", self.tmp)["tools"])
+
     def test_old_ledger_is_not_trusted(self):
         fps = self.fps()
         self.assertEqual(sp.valid_green({"fingerprint": "x", "green": {"core": {"seconds": 1}}}, fps), {})
