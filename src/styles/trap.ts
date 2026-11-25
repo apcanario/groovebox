@@ -22,7 +22,7 @@ export default {
     layer1: [{ effect: "echo", on: true, knobs: [0.3, 0.6, 0.4] }, { effect: "shifter" }],
     layer2: [{ effect: "chorus" }, { effect: "phaser" }],
   },
-  // P10 (spec 8.9): a hat-and-snare roll, half a bar of silence, an 808 sub hit.
+  // P10 (spec 8.9): a snare roll, half a bar of silence, an 808 sub hit.
   drop: {
     build: 4,
     parts: { sweep: "high", roll: true, riser: true, reverb: true, climb: false, hatsOut: false, kickOut: true },

@@ -689,17 +689,7 @@ export class Drums extends Instrument {
           return void this.shaker.triggerAttackRelease(d, time, vel);
       }
     };
-    // P10: a hit whose decay was fitted to end before the next one can leave its noise source's stop at exactly the
-    // next start, which Tone refuses ("Start time must be strictly greater than previous start time", seen once in a
-    // smoke run). Such a hit starts 0.2 ms later instead of throwing out of the scheduler.
-    const safe = (t: number): void => {
-      try {
-        hit(t);
-      } catch {
-        hit(t + 0.0002);
-      }
-    };
-    this.atTime(time, safe, voice);
+    this.atTime(time, hit, voice);
   }
 
   releaseAll(time: number): void {
