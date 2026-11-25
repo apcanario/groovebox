@@ -37,7 +37,9 @@ DROP_GROUPS = 6
 CLICK_FACTOR = 2.5
 # P10b (C21), the wind-down measured bar by bar (spec 8.9): the extra layers' own level falls at least this many dB a
 # bar (measured on the layers alone, before they join the music: the follower keeps the master at the section's level).
-WIND_STEP_DB = 0.5
+# P10b review M2: about half the smallest step measured on the levels on the share to the power 1.5 (1.6 dB, dubTechno's
+# second of four bars; Ambient's and Drone's first 1.8 dB; drop-3 and drop-6, 25 Nov 2026); was 0.5.
+WIND_STEP_DB = 0.8
 # The master's width may read this much (side over mid) higher than the bar before and still count as falling, and the
 # bar after the wind-down may be this much past the section's own bar-to-bar stray from its mean.
 WIND_WIDTH_TOL = 0.01
@@ -414,6 +416,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     jumps = []
     sec_out = []  # P10b review M3: whether Morph had an instrument out, and (E3) each instrument's level, bar by bar
     sec_inst = []
+    moves = [morph_last(page)]
     for _ in range(WINDOW):
         next_bar(page)
         sec_bars.append(page.evaluate(f"{E}.stereo()"))
@@ -423,6 +426,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     n = {"energy": sum(b["energy"] for b in sec_bars) / WINDOW, "flat": sum(b["flat"] for b in sec_bars) / WINDOW,
          "width": sum(b["width"] for b in sec_bars) / WINDOW, "peak": max(b["peak"] for b in sec_bars)}
     song_before = doc(page)
+    moves.append(morph_last(page))
     page.evaluate(f"{E}.drop()")
     # The build (two bars from the next bar line) and its cliffhanger, then the impact's bar: read separately.
     wait_for(page, f"{E}.dropShown().phase === 'on'", 4 * bar_s(page) + 2.0)
@@ -476,6 +480,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     wind.append(read_wind(page))
     after_out.append(morph_out(page))
     after_inst.append(inst_levels(page))
+    moves.append(morph_last(page))
     end = page.evaluate(f"{E}.dropMarks.filter(m => m.end).slice(-1)[0]")
     plan = (page.evaluate(f"{E}.dropInfo().wind") or {}).get("steps")  # the engine's schedule (slice a), for the report
     p_wind = {"peak": max(w["s"]["peak"] for w in wind[:length + 1])}
@@ -483,7 +488,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     winds = {"bars": wind, "length": length, "live_after": live_after, "pressed": pressed, "w0": w0, "end": end,
              "same_song": song_end == song_before, "same_after": doc(page) == song_before, "morph": page.evaluate(f"{E}.morphPlan().on"),
              "phase_after": shown(page)["phase"], "plan": plan, "jump_ref": max(jumps) if jumps else 0.0,
-             "out": any(sec_out) or any(after_out), "sec_inst": sec_inst, "after_inst": after_inst}
+             "out": any(sec_out) or any(after_out), "moved": len(set(moves)) > 1, "sec_inst": sec_inst, "after_inst": after_inst}
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
     loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
@@ -499,10 +504,14 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
 
 
 def morph_out(page) -> bool:
-    """P10b review M3: whether Morph has an instrument out now (the song as played against the document, which gives back
-    what Morph owes)."""
-    return page.evaluate(f"""(() => {{ const s = {E}.getSong().sections, d = {E}.getDocument().sections;
-      return s.some((x, i) => d[i] && Object.keys(x.on).some(k => x.on[k] !== d[i].on[k])); }})()""")
+    """P10b review M3: whether Morph owes anything now (an instrument out or a Lock eased: the song as played against the
+    document, which gives back what Morph owes)."""
+    return page.evaluate(f"JSON.stringify({E}.getSong().sections) !== JSON.stringify({E}.getDocument().sections)")
+
+
+def morph_last(page) -> str:
+    """Morph's last move, to tell whether it moved between two reads."""
+    return json.dumps(page.evaluate(f"{E}.morphMoves.slice(-1)[0] ?? null"))
 
 
 def inst_levels(page) -> dict:
@@ -577,8 +586,8 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
         bad.append(f"the width after the wind-down is not the section's ({after['s']['width']:.3f}, the section's {sec['width']:.3f} within {stray + WIND_WIDTH_TOL:.3f})")
     # The level after it: each of the two bars after within a single bar's tolerance of the section (BAR_DB past the
     # section's own stray, as each drop bar); their mean within LOUD_DB, as the drop's, unless Morph (on in Ambient and
-    # Drone) had an instrument out in a bar of the section read or of the two after (P10b review M3): that moves the
-    # section's own level by itself, so there only per bar.
+    # Drone) owed something (an instrument out, a Lock eased) in a bar of the section read or of the two after, or moved
+    # in those bars (P10b review M3): the section read is then not the music that plays after, so there only per bar.
     spread = max(abs(db(b) - db(sec)) for b in r["sec_bars"])
     landed = True
     for k, b in enumerate(bars[n + 1:], 1):
@@ -587,7 +596,10 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
             landed = False
             bad.append(f"bar {k} after the wind-down is {off:+.2f} dB from the section (more than {BAR_DB} dB past the section's own {spread:.2f} dB)")
     two = 10 * math.log10(max(sum(b["s"]["energy"] for b in bars[n + 1:]) / len(bars[n + 1:]), 1e-12)) - db(sec)
-    if not w["out"] and abs(two) > LOUD_DB:
+    if w["out"] or w["moved"]:
+        print(f"  P10b {label}: the two bars after the wind-down {two:+.2f} dB from the section, not judged on their mean "
+              f"(Morph {'owed a move' if w['out'] else ''}{' and ' if w['out'] and w['moved'] else ''}{'moved' if w['moved'] else ''} in the bars read)")
+    elif abs(two) > LOUD_DB:
         landed = False
         bad.append(f"the two bars after the wind-down are {two:+.2f} dB from the section's level (more than {LOUD_DB} dB)")
     if not db(after["l"]) <= LAYERS_GONE_DB:
