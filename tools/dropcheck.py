@@ -47,6 +47,9 @@ WIND_WIDTH_TOL = 0.01
 # At least this share of each descent (the layers' level energy and their spread, as applied; the master's width over
 # the section's, past the section's own stray) is left after the first bar.
 WIND_NOT_FIRST = 0.15
+# P10b fourth fix: in the wind-down's last bar, at most this share of the drop's extra width (over the section's, at
+# that bar's place in the drop's own width loop) is left on the master (measured 0.0 to 0.1 in drop-5's four vibes).
+WIND_LAST_SHARE = 0.5
 # The extra layers are silent (dB of energy) once the wind-down has ended.
 LAYERS_GONE_DB = -80.0
 
@@ -582,6 +585,17 @@ def read_wind(page) -> dict:
             "most": page.evaluate(f"{E}.dropInfo().most"), "j": jump_ratio(page)}
 
 
+def drop_loop(w: list) -> tuple:
+    """P10b fourth fix: the drop's own width loop from its bars (eight, from the bar after the impact's): the period of
+    1, 2 or 4 bars whose bars that far apart differ least (ties to the shorter), each place's mean width, and the
+    largest distance of a bar from its place's mean (the loop's own stray)."""
+    def gap(p: int) -> float:
+        return sum(abs(w[k] - w[k - p]) for k in range(p, len(w))) / (len(w) - p)
+    loop = min((1, 2, 4), key=lambda p: (round(gap(p), 6), p))
+    places = [sum(w[k::loop]) / len(w[k::loop]) for k in range(loop)]
+    return loop, places, max(abs(x - places[k % loop]) for k, x in enumerate(w))
+
+
 def judge_wind(r: dict, label: str, failures: list) -> list:
     """P10b (C21, spec 8.9): the wind-down measured bar by bar. From the drop's last bar through each wind-down bar the
     extra layers' own level, the master's width and the overlay's voices fall bar by bar, a share left after the first
@@ -623,9 +637,26 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
     sw = [b["width"] for b in r["sec_bars"]]
     step = max(abs(sw[k] - sw[k - 1]) for k in range(1, len(sw)))
     stray = max(abs(x - sec["width"]) for x in sw)
+    # P10b fourth fix: each bar is judged at its place in the drop's own width loop. Synthwave's drop runs a 4-bar loop
+    # (0.144, 0.207, 0.245, 0.241); a press whose last drop bar sits at the narrowest place read 0.137 -> 0.160 in
+    # wind-down bar 1 while the applied spread fell 0.925 -> 0.79. The loop's period (1, 2 or 4 bars) is measured from
+    # the drop's eight bars; the wind-down's last bar is the drop's ninth, its bar i the drop's (9 + i)th. A bar may rise
+    # past the old allowance only by the loop's own rise between the two places (less the loop's own stray at a place),
+    # scaled by the share of the drop's extra width the bar before still held (0 to 1): a flat loop is the old check.
+    loop, places, p_stray = drop_loop([b["width"] for b in r["drop_bars"]])
+    over = [max(places[(WINDOW + i) % loop] - sec["width"], step + WIND_WIDTH_TOL) for i in range(n + 1)]
+    share = [(wid[i] - sec["width"]) / over[i] for i in range(n + 1)]
     for i in range(1, n + 1):
-        if not wid[i] < wid[i - 1] + WIND_WIDTH_TOL + step:
-            bad.append(f"the width does not fall in wind-down bar {i} ({wid[i - 1]:.3f} -> {wid[i]:.3f}, the section's own bars move {step:.3f})")
+        rise = max(0.0, places[(WINDOW + i) % loop] - places[(WINDOW + i - 1) % loop] - p_stray)
+        credit = min(max(share[i - 1], 0.0), 1.0) * rise
+        if not wid[i] < wid[i - 1] + WIND_WIDTH_TOL + step + credit:
+            bad.append(f"the width does not fall in wind-down bar {i} ({wid[i - 1]:.3f} -> {wid[i]:.3f}, the section's own bars move {step:.3f}; "
+                       f"the drop's {loop}-bar loop rises {rise:.3f} between these places, {credit:.3f} of it allowed)")
+    # The wind-down narrows the sound, not only the controls: in its last bar under WIND_LAST_SHARE of the drop's extra
+    # width at that place in its loop is left (a wind-down held at full and let go on the end bar line fails here).
+    if not share[n] <= WIND_LAST_SHARE:
+        bad.append(f"the width does not narrow over the wind-down (its last bar {wid[n]:.3f} holds {share[n]:.0%} of the drop's extra width "
+                   f"at that place, {places[(WINDOW + n) % loop]:.3f} over the section's {sec['width']:.3f}; at most {WIND_LAST_SHARE:.0%})")
     # P10b review S5: WIDER is the drop's eight-bar threshold; the drop's last bar, one bar, is wider than the section and
     # not narrower than the drop's eight-bar mean by more than the drop's own bar-to-bar stray (the drop's own width, not
     # a narrower bar). One-sided (P10b third fix): the last bar is the drop's ninth, the same place in the loop as its
