@@ -320,7 +320,7 @@ One large button, DROP, that turns whatever section is playing into its biggest 
 3. **Swoosh and impact** on the bar line: a falling noise sweep, a sub hit and a bright noise burst.
 4. **The drop:** every instrument of the section, plus extra layers. It stays on.
 
-**Switching it off.** A second press runs the reverse: over 2 or 4 bars (set by the vibe) the extra layers narrow and fall away, and on a bar line the music is back at its normal size.
+**Switching it off.** A second press runs the reverse, a calm-down that mirrors the build: over 2 or 4 bars (set by the vibe), from the next bar line, every part of the drop eases back in steps, bar by bar, and on the last bar line the music is back at its normal size. Each bar takes an even share: the extra layers' level (an even step in loudness, with the level follower coming back to the section's level with them), their width, a bloom's reverb and the deeper pump; and fewer of the extra voices are let in each bar, the held notes' doubles leaving one instrument at a time (layers first, bass last), the fewest remaining in the last bar. Nothing jumps: each step is a ramp on the audio clock. The Filter knob's own value comes back on the last bar line (P10b, from Pedro's report C21 that the wind-down was heard as everything stopping at once).
 - If another section was tapped during the drop, the wind-down lands in that section. Otherwise it lands in the same one.
 - A section tapped during the drop does not switch at once; it waits for the wind-down. This is the one exception to the next-bar rule, and the section shows as queued until then.
 - A press during the build cancels it, back to normal on the next bar line.

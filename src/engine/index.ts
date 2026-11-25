@@ -10,7 +10,7 @@ import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { DiffWatch, EnergyWatch, JumpWatch, type Energy, type Jumps } from "./continuity.ts";
-import { DropConductor, checkDropSettings, followRef, followStep, refSettleBars, trackBound, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
+import { DropConductor, checkDropSettings, dropLevels as recipeLevels, type WindBar, followRef, followStep, refSettleBars, trackBound, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
 import { COMP_TOP, type OverlayGroup } from "./drop.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
@@ -81,7 +81,7 @@ export { LEAD_SHAPES, LEAD_STYLES, LOCK_FROZEN, PHRASE_BARS, type LeadParams, ty
 export type { Pending, PendingChords, PendingToggle } from "./queue.ts";
 export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
-export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, type DropBuild, type DropCliff, type DropIntent, type DropPhase, type DropRecipe, type DropSettings, type DropWind } from "../music/drop.ts";
+export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, windSteps, type WindBar, type WindState, type DropBuild, type DropCliff, type DropIntent, type DropPhase, type DropRecipe, type DropSettings, type DropWind } from "../music/drop.ts";
 export type { Energy } from "./continuity.ts";
 export { HANDS_BARS, MORPH_THINGS, VOICING_STEPS, voicingShift, type MorphPlan, type MorphSettings, type MorphThing } from "../music/morph.ts";
 
@@ -128,8 +128,6 @@ export interface DropMark extends DropBar {
   at: number;
 }
 
-/** A typical groove's energy on the master output (-19 dB), against which the drop's extra layers are sized. */
-const DROP_TYPICAL = Math.pow(10, -1.9);
 
 /**
  * P10 review S1, S2: the level follower settles on FOLLOW_BEATS beats of the drop, then holds, so knobs moved during the
@@ -293,6 +291,11 @@ export class Engine {
   private dropMeasured = 0;
   /** The drop's mix (deeper pump, filter fully open) is on the master: the knobs' own values wait in `mix`. */
   private dropMixOn = false;
+  /** P10b: the wind-down's steps, bar by bar, while one runs; and the instruments whose held notes it still doubles. */
+  private windSteps: WindBar[] | null = null;
+  private windKeep = new Set<string>();
+  /** The share of the recipe's extra pump the drop has now (1 while on; the bar's share in a wind-down). */
+  private pumpShare = 1;
   /**
    * What each instrument holds past the bar it started in (a long bass note, a sustained chord, a pad, a drone), until
    * when (audio time; Infinity while a drone holds) and whether it is a pad: the extra layers double it once, for as
@@ -645,7 +648,8 @@ export class Engine {
     this.mix[key] = v;
     // P10: the drop arrives with the filter fully open and the pump deeper (spec 8.9); the knobs still work during it
     // (P10 review E1: a Filter move acts on the graph), and on the bar line the drop ends the knobs' values come back.
-    if (this.dropMixOn && key === "pump" && this.dropRec) this.graph?.setMix("pump", v + this.dropRec.pump);
+    // P10b: in a wind-down the pump's extra is the share its bar has left.
+    if (this.dropMixOn && key === "pump" && this.dropRec) this.graph?.setMix("pump", v + this.dropRec.pump * this.pumpShare);
     else this.graph?.setMix(key, v);
     this.changed();
   }
@@ -1160,7 +1164,7 @@ export class Engine {
       this.dropRec = { ...this.dropRec, width: values.width };
       const t = Tone.getContext().currentTime;
       this.graph.drop.width(values.width, t);
-      if (this.dropRec.bloom || this.dropPlan.phase === "on") {
+      if ((this.dropRec.bloom && this.dropPlan.phase === "build") || this.dropPlan.phase === "on") {
         const lv = this.dropLevels(this.dropRec);
         for (const k of Object.keys(lv) as OverlayGroup[]) this.graph.drop.level(k, lv[k], t);
       }
@@ -1170,8 +1174,12 @@ export class Engine {
     return true;
   }
 
-  /** For the smoke test: the follower's gain, its reference, voices sounding, the most at once, notes over the cap. */
-  dropInfo(): { comp: number; ref: number; measured: number; steady: number; followed: number; live: number; most: number; dropped: number; follower: boolean; mix: { lp: number; hp: number; pump: number } } | null {
+  /**
+   * For the smoke test: the follower's gain, its reference, voices sounding, the most at once, notes over the cap; and
+   * (P10b) the last wind-down's schedule (audio time of its first bar line, bar seconds, per-bar targets) and the voices
+   * it held back.
+   */
+  dropInfo(): { comp: number; ref: number; measured: number; steady: number; followed: number; live: number; most: number; dropped: number; thinned: number; wind: { at: number; bar: number; steps: WindBar[] } | null; follower: boolean; mix: { lp: number; hp: number; pump: number } } | null {
     const g = this.graph;
     if (!g) return null;
     const d = g.drop;
@@ -1184,6 +1192,8 @@ export class Engine {
       live: d.live,
       most: d.most,
       dropped: d.dropped,
+      thinned: d.thinned,
+      wind: d.windLog,
       follower: !!this.dropWatch,
       mix: g.mixState(),
     };
@@ -1212,9 +1222,7 @@ export class Engine {
    * it, as a quiet groove does. The follower then brings the whole to the section's loudness.
    */
   private dropLevels(r: DropRecipe): Record<OverlayGroup, number> {
-    const size = this.dropRef > 0 ? Math.max(0.5, Math.min(3, Math.sqrt(this.dropRef / DROP_TYPICAL))) : 1;
-    const w = (0.5 + 0.5 * r.width) * size;
-    return { synth: r.layers.synth * w, bass: r.layers.bass * w, drums: r.layers.drums * w, leads: r.layers.leads * w };
+    return recipeLevels(r, this.dropRef);
   }
 
   /** Back to normal at once: Stop, a song loaded, a vibe landing. */
@@ -1228,6 +1236,8 @@ export class Engine {
     this.dropHeard = { phase: "off", index: 0, length: 0, barsLeft: 0 };
     this.sustain = {};
     this.dropWindow = [];
+    this.windSteps = null;
+    this.pumpShare = 1;
     if (!this.graph || !was) return;
     if (time === undefined) this.graph.drop.reset();
     else this.graph.drop.end(time);
@@ -1287,8 +1297,11 @@ export class Engine {
       g.setMix("sweep", 0, time);
       g.setMix("pump", mixValue(this.mix, "pump") + rec.pump);
     }
-    if (plan.phase === "wind" && plan.index === 0) g.drop.wind(time, barSec * plan.length);
+    if (plan.phase === "wind") this.windBar(time, barSec, plan, rec);
+    if (plan.phase === "on" || plan.phase === "wind") g.drop.barLine();
     if (plan.end) {
+      this.windSteps = null;
+      this.pumpShare = 1;
       g.drop.end(time);
       if (this.dropMixOn) {
         this.dropMixOn = false;
@@ -1308,10 +1321,40 @@ export class Engine {
     // until it lets go (P10 review S8).
     if (this.dropRec && this.doubling())
       for (const [id, h] of Object.entries(this.sustain))
-        if (h.until > time + 0.01 && !g.drop.holding(id)) this.holdOver(id as Exclude<InstrumentId, "drums">, h.notes, time, h.until - time, h.vel, h.pad);
+        if (h.until > time + 0.01 && !g.drop.holding(id) && this.mayHold(id)) this.holdOver(id as Exclude<InstrumentId, "drums">, h.notes, time, h.until - time, h.vel, h.pad);
     this.dropMarks.push({ ...plan, bar, at: time });
     if (this.dropMarks.length > 48) this.dropMarks.shift();
     this.showDrop(time);
+  }
+
+  /**
+   * P10b (C21, spec 8.9): one bar line of the wind-down. On its first the overlay schedules every bar's steps (levels,
+   * spread, the follower's gain, a bloom's reverb, the voices let in); on each the pump steps down and the held notes
+   * it doubles leave, the layers first and the bass last, so a share goes every bar. The Filter knob waits for the end.
+   */
+  private windBar(time: number, barSec: number, plan: DropBar, rec: DropRecipe): void {
+    const g = this.graph!;
+    const knob = mixValue(this.mix, "pump");
+    if (plan.index === 0) {
+      const held = g.drop.heldKeys();
+      this.windKeep = new Set(held);
+      this.windSteps = g.drop.wind(time, barSec, plan.length, { from: this.dropMixOn ? knob + rec.pump : knob, to: knob }, held.length);
+    }
+    const step = this.windSteps?.[plan.index];
+    if (!step) return;
+    this.pumpShare = 1 - (plan.index + 0.5) / plan.length;
+    if (this.dropMixOn) g.setMix("pump", step.pump);
+    const order = ["layer2", "layer1", "synth", "bass"].filter((id) => this.windKeep.has(id));
+    while (order.length > step.held) {
+      const id = order.shift()!;
+      this.windKeep.delete(id);
+      g.drop.letGo(id, time);
+    }
+  }
+
+  /** Whether an instrument's held notes may be doubled now: in a wind-down only those it still keeps. */
+  private mayHold(id: string): boolean {
+    return this.dropPlan.phase !== "wind" || this.windKeep.has(id);
   }
 
   /** The attacks (seconds) of a section's sounding instruments: a layer in Pad or Drone mode by its pad dials. */
@@ -1398,6 +1441,8 @@ export class Engine {
     }
     const bloomBuild = phase === "build" && !!this.dropRec?.bloom;
     if (phase !== "on" && !bloomBuild) return;
+    // P10b: a reading taken before the wind-down that arrives after it began never moves the gain.
+    if (this.dropPlan.phase === "wind" || this.dropPlan.phase === "off") return;
     if (this.dropSkip > 0) return void this.dropSkip--;
     if (this.dropHand || !this.graph || !(this.dropRef > 0)) return;
     if (phase === "on") this.dropOnBeats++;
@@ -2123,7 +2168,10 @@ export class Engine {
         const long = until > barEnd + 0.01 && notes.length > 0;
         if (long) this.sustain[e.inst] = { notes, vel: e.vel, until, pad };
         else if (notes.length) this.unsustain(e.inst, t);
-        if (doubling && long) this.holdOver(e.inst, notes, t, until - t, e.vel, pad);
+        if (doubling && long) {
+          if (this.mayHold(e.inst)) this.holdOver(e.inst, notes, t, until - t, e.vel, pad);
+          else this.unsustain(e.inst, t);
+        }
         else if (doubling && notes.length) this.doubleNotes(e.inst, notes, t, until - t, e.vel, false, pad);
       }
       switch (e.inst) {

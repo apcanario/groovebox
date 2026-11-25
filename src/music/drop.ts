@@ -313,3 +313,89 @@ export function followStep(c: number, aim: number, stepDb: number, deadDb: numbe
   const k = Math.pow(10, stepDb / 20);
   return Math.min(top, c * k, Math.max(c / k, aim));
 }
+
+// ---- The wind-down (P10b, C21) ------------------------------------------------------------------
+
+/** The extra layers' groups (the recipe's `layers`). */
+export type DropLayer = keyof DropRecipe["layers"];
+export const DROP_LAYERS: readonly DropLayer[] = ["synth", "bass", "drums", "leads"];
+
+/** A typical groove's energy on the master output (-19 dB), against which the drop's extra layers are sized. */
+export const DROP_TYPICAL = Math.pow(10, -1.9);
+
+/**
+ * The extra layers' levels: the recipe's amounts, a little more with the width, and sized to the section's own level
+ * (`ref`, its energy before the build, against a typical groove's), so a loud drone gets layers as large, relative to
+ * it, as a quiet groove does. 0 or no reading: sized as a typical groove.
+ */
+export function dropLevels(r: DropRecipe, ref: number): Record<DropLayer, number> {
+  const size = ref > 0 ? Math.max(0.5, Math.min(3, Math.sqrt(ref / DROP_TYPICAL))) : 1;
+  const w = (0.5 + 0.5 * r.width) * size;
+  return { synth: r.layers.synth * w, bass: r.layers.bass * w, drums: r.layers.drums * w, leads: r.layers.leads * w };
+}
+
+/** How far the drop's extra layers are panned out at width `w` (0..1). */
+export const dropSpread = (w: number): number => 0.5 + 0.5 * w;
+
+/** Everything the wind-down eases, as the drop has it (from) or as the section has it (to). */
+export interface WindState {
+  /** Each extra layer's level. */
+  levels: Record<DropLayer, number>;
+  /** The level follower's gain (1 at the section's level). */
+  comp: number;
+  /** How far the extra layers are panned out (0: centre). */
+  spread: number;
+  /** The build's reverb send (a bloom keeps it through the drop; 0 otherwise). */
+  verb: number;
+  /** The master's pump depth (the Pump knob, plus the recipe's extra while the drop is on). */
+  pump: number;
+  /** Overlay voices allowed to sound at once. */
+  voices: number;
+  /** Instruments whose held notes are doubled (P10 review S8). */
+  held: number;
+}
+
+/**
+ * One bar of the wind-down. The continuous values (levels, comp, spread, verb) are ramped across the bar and reached
+ * exactly on its closing bar line; the counted ones (pump, voices, held) hold for the whole bar.
+ */
+export interface WindBar extends WindState {
+  /** Share of the drop left at the bar's closing bar line (1: the drop, 0: the section). */
+  share: number;
+}
+
+/**
+ * P10b (C21, spec 8.9): the wind-down's targets bar by bar, a calm-down that mirrors the build. Over `bars` bars the
+ * share of the drop left falls by an even step a bar, 1 - (i+1)/bars at the close of bar i, so every bar takes some
+ * and the last bar line lands exactly on the section's values. Levels (and the follower's gain, which makes up for
+ * them) fall on the share squared, an even step in loudness rather than in amplitude, so the layers are heard going
+ * from the first bar and not only in the last beats. Voices, held notes and the pump step down bar by bar on the
+ * bar's middle share (counts rounded up, at least one fewer a bar while any are left): a share leaves every bar,
+ * fewest remaining in the last; at the end bar line all of them are the section's (`to`).
+ */
+export function windSteps(bars: number, from: WindState, to: WindState): WindBar[] {
+  const n = Math.max(1, Math.round(bars));
+  const lerp = (a: number, b: number, s: number): number => b + (a - b) * s;
+  const out: WindBar[] = [];
+  // A count leaves at least one a bar while it is above the section's, so every bar is heard to take some.
+  const count = (from: number, to: number, mid: number, prev: number): number =>
+    Math.max(to, Math.min(prev - 1, Math.ceil(to + (from - to) * mid - 1e-9)));
+  for (let i = 0; i < n; i++) {
+    const share = i === n - 1 ? 0 : 1 - (i + 1) / n;
+    const loud = share * share;
+    const mid = 1 - (i + 0.5) / n;
+    const levels = {} as Record<DropLayer, number>;
+    for (const k of DROP_LAYERS) levels[k] = lerp(from.levels[k], to.levels[k], loud);
+    out.push({
+      share,
+      levels,
+      comp: lerp(from.comp, to.comp, loud),
+      spread: lerp(from.spread, to.spread, share),
+      verb: lerp(from.verb, to.verb, share),
+      pump: lerp(from.pump, to.pump, mid),
+      voices: count(from.voices, to.voices, mid, i ? out[i - 1].voices : from.voices),
+      held: count(from.held, to.held, mid, i ? out[i - 1].held : from.held),
+    });
+  }
+  return out;
+}

@@ -20,7 +20,7 @@
  */
 import * as Tone from "tone";
 import { createRng } from "../music/random.ts";
-import type { DropRecipe } from "../music/drop.ts";
+import { DROP_LAYERS, dropSpread, windSteps, type DropRecipe, type WindBar } from "../music/drop.ts";
 
 /** At most this many overlay oscillators and noise hits sound at once (every voice of the overlay); one past it is not played. */
 export const VOICE_CAP = 48;
@@ -129,6 +129,15 @@ export class DropOverlay {
   private collect: Voice[] | null = null;
   /** A bloom keeps its grown reverb through the drop and lets it go over the wind-down (P10 review M4). */
   private keepVerb = false;
+  /** Most voices sounding at once in the bar now playing, and in the bar before (the wind-down starts from it). */
+  private barPeak = 0;
+  /** P10b: the wind-down's voice allowance, bar by bar from its start (audio time), and its end; none outside one. */
+  private windCaps: { from: number; cap: number }[] = [];
+  private windUntil = 0;
+  /** Voices not played because the wind-down's allowance was full (not the cap's `dropped`). */
+  thinned = 0;
+  /** P10b: the last wind-down's schedule (audio time of its first bar line, bar length, per-bar targets), for tests and the smoke. */
+  windLog: { at: number; bar: number; steps: WindBar[] } | null = null;
 
   constructor(dest: { duck: Tone.InputNode; drums: Tone.InputNode; reverb: Tone.InputNode }) {
     const c = raw();
@@ -197,7 +206,8 @@ export class DropOverlay {
   begin(t: number, r: DropRecipe, seconds: number, levels: Record<OverlayGroup, number>): void {
     const end = t + seconds;
     this.keepVerb = r.bloom && r.parts.reverb;
-    this.spreadNow = 0.5 + 0.5 * r.width;
+    this.clearWind();
+    this.spreadNow = dropSpread(r.width);
     for (const g of Object.values(this.groups)) g.spread(this.spreadNow, t);
     if (r.parts.sweep === "high") {
       hold(this.hp.frequency, t);
@@ -225,7 +235,7 @@ export class DropOverlay {
 
   private startRiser(t: number, end: number): void {
     this.stopRiser(t);
-    if (!this.room()) return;
+    if (!this.room(t)) return;
     const c = raw();
     const src = c.createBufferSource();
     src.buffer = this.noise;
@@ -298,7 +308,7 @@ export class DropOverlay {
     const c = raw();
     if (r.impact.sweep)
       for (const pan of [-0.6, 0.6]) {
-        if (!this.room()) break;
+        if (!this.room(t)) break;
         const src = this.noiseSource();
         const f = c.createBiquadFilter();
         f.type = "bandpass";
@@ -315,7 +325,7 @@ export class DropOverlay {
         src.stop(t + bar * 1.2);
         this.track(src, [f, g, p]);
       }
-    if (r.impact.sub && this.room()) {
+    if (r.impact.sub && this.room(t)) {
       const o = c.createOscillator();
       o.type = "sine";
       o.frequency.setValueAtTime(78, t);
@@ -333,8 +343,9 @@ export class DropOverlay {
       for (const pan of [-1, 1]) this.noiseHit(t, 0.5, 0.16 * IMPACT, "highpass", 2600, 0.7, this.impactBus, pan);
   }
 
-  /** The level of one group from `t` (the Width knob turned while the drop is on). */
+  /** The level of one group from `t` (the Width knob turned while the drop is on). Not during a wind-down: it eases them. */
   level(k: OverlayGroup, v: number, t: number): void {
+    if (this.winding(t)) return;
     const g = this.groups[k].out.gain;
     hold(g, t);
     g.setTargetAtTime(v, t, 0.05);
@@ -342,7 +353,8 @@ export class DropOverlay {
 
   /** Spread every pair to the width `w` (0..1) from `t`. */
   width(w: number, t: number): void {
-    this.spreadNow = 0.5 + 0.5 * w;
+    if (this.winding(t)) return;
+    this.spreadNow = dropSpread(w);
     for (const g of Object.values(this.groups)) g.spread(this.spreadNow, t, 0.05);
   }
 
@@ -351,6 +363,8 @@ export class DropOverlay {
    * COMP_TOP, only to make up what the deeper pump takes, never past the section's own level (the engine aims at it).
    */
   setComp(v: number, t = raw().currentTime, tau = 0.15): void {
+    // P10b: a late reading of the follower never cuts into the wind-down's steps.
+    if (this.winding(t)) return;
     const g = this.comp.gain;
     hold(g, t);
     g.setTargetAtTime(Math.max(0.2, Math.min(COMP_TOP, v)), t, tau);
@@ -361,29 +375,67 @@ export class DropOverlay {
   }
 
   /**
-   * The wind-down from `t` over `seconds`: the extra layers narrow and fall away, and the follower's gain comes back
-   * to 1 with them (P10 review S2: the follower is held after the drop's first two bars); a bloom's reverb goes too.
+   * P10b (C21): the wind-down from the bar line `t`, `bars` bars of `bar` seconds, a calm-down that mirrors the build.
+   * Bar by bar (`windSteps`) the extra layers' levels and spread, the follower's gain (back to 1 with them) and a
+   * bloom's reverb ramp to that bar's targets, reached on its closing bar line, and fewer voices are let in each bar;
+   * on the last bar line everything is the section's. `pump` is the pump depth now and the knob's; `held` the
+   * instruments whose held notes are doubled now. Returns the steps (the engine steps the pump and the held notes).
    */
-  wind(t: number, seconds: number): void {
-    hold(this.comp.gain, t);
-    this.comp.gain.linearRampToValueAtTime(1, t + seconds);
-    if (this.keepVerb) {
-      hold(this.verb.gain, t);
-      this.verb.gain.linearRampToValueAtTime(0, t + seconds);
+  wind(t: number, bar: number, bars: number, pump: { from: number; to: number }, held: number): WindBar[] {
+    const from = {
+      levels: Object.fromEntries(DROP_LAYERS.map((k) => [k, this.groups[k].out.gain.value])) as Record<OverlayGroup, number>,
+      comp: this.comp.gain.value,
+      spread: this.spreadNow,
+      verb: this.keepVerb ? this.verb.gain.value : 0,
+      pump: pump.from,
+      voices: Math.max(this.barPeak, this.live),
+      held,
+    };
+    const to = { levels: { synth: 0, bass: 0, drums: 0, leads: 0 }, comp: 1, spread: 0, verb: 0, pump: pump.to, voices: 0, held: 0 };
+    const steps = windSteps(bars, from, to);
+    const ramp = (p: AudioParam, v: (s: WindBar) => number): void => {
+      hold(p, t);
+      steps.forEach((s, i) => p.linearRampToValueAtTime(v(s), t + (i + 1) * bar));
+    };
+    ramp(this.comp.gain, (s) => s.comp);
+    if (this.keepVerb) ramp(this.verb.gain, (s) => s.verb);
+    for (const k of DROP_LAYERS) {
+      const g = this.groups[k];
+      ramp(g.out.gain, (s) => s.levels[k]);
+      ramp(g.pl.pan, (s) => -s.spread);
+      ramp(g.pr.pan, (s) => s.spread);
     }
-    for (const g of Object.values(this.groups)) {
-      hold(g.out.gain, t);
-      g.out.gain.linearRampToValueAtTime(0, t + seconds);
-      hold(g.pl.pan, t);
-      hold(g.pr.pan, t);
-      g.pl.pan.linearRampToValueAtTime(0, t + seconds);
-      g.pr.pan.linearRampToValueAtTime(0, t + seconds);
-    }
+    this.windCaps = steps.map((s, i) => ({ from: t + i * bar, cap: s.voices }));
+    this.windUntil = t + steps.length * bar;
+    this.thinned = 0;
+    this.windLog = { at: t, bar, steps };
+    return steps;
+  }
+
+  /** A bar line while the drop sounds: the voice peak of the bar that ended is kept (the wind-down starts from it). */
+  barLine(): void {
+    this.barPeak = this.live;
+  }
+
+  /** The instruments whose held notes are doubled now. */
+  heldKeys(): string[] {
+    return [...this.held.keys()];
+  }
+
+  /** A wind-down's steps are scheduled over audio time `t`. */
+  private winding(t: number): boolean {
+    return this.windCaps.length > 0 && t < this.windUntil - 1e-6;
+  }
+
+  private clearWind(): void {
+    this.windCaps = [];
+    this.windUntil = 0;
   }
 
   /** The bar line where the music is back at its normal size (after the wind-down, or a cancelled build). */
   end(t: number): void {
     this.keepVerb = false;
+    this.clearWind();
     this.normalAt(t);
     this.setComp(1, t, 0.02);
     for (const k of [...this.held.keys()]) this.letGo(k, t);
@@ -492,10 +544,19 @@ export class DropOverlay {
 
   // ---- Voices -----------------------------------------------------------------------------------
 
-  private room(): boolean {
+  /** Whether a voice starting at `t` may sound: under the cap, and in a wind-down under that bar's allowance. */
+  private room(t: number): boolean {
     if (this.live >= VOICE_CAP) {
       this.dropped++;
       return false;
+    }
+    if (this.windCaps.length && t < this.windUntil) {
+      let cap = this.windCaps[0].cap;
+      for (const c of this.windCaps) if (t + 1e-6 >= c.from) cap = c.cap;
+      if (this.live >= cap) {
+        this.thinned++;
+        return false;
+      }
     }
     return true;
   }
@@ -503,6 +564,7 @@ export class DropOverlay {
   private track(src: AudioScheduledSourceNode, nodes: AudioNode[]): void {
     this.live++;
     this.most = Math.max(this.most, this.live);
+    this.barPeak = Math.max(this.barPeak, this.live);
     this.sources.add(src);
     src.onended = () => {
       this.live--;
@@ -513,7 +575,7 @@ export class DropOverlay {
   }
 
   private osc(type: OscillatorType, midi: number, detune: number, t: number, dur: number, peak: number, attack: number, release: number, dest: AudioNode): void {
-    if (!this.room()) return;
+    if (!this.room(t)) return;
     const c = raw();
     const o = c.createOscillator();
     o.type = type;
@@ -556,7 +618,7 @@ export class DropOverlay {
   }
 
   private noiseHit(t: number, decay: number, peak: number, type: BiquadFilterType, f: number, q: number, dest: AudioNode, pan = 0): void {
-    if (!this.room()) return;
+    if (!this.room(t)) return;
     const c = raw();
     const src = this.noiseSource();
     const filter = c.createBiquadFilter();
@@ -582,7 +644,7 @@ export class DropOverlay {
 
   /** A short tuned hit falling from `from` to `to` Hz (the roll's body, the percussion). */
   private tone(t: number, from: number, to: number, decay: number, peak: number, dest: AudioNode): void {
-    if (!this.room()) return;
+    if (!this.room(t)) return;
     const c = raw();
     const o = c.createOscillator();
     o.type = "sine";
