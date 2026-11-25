@@ -37,9 +37,10 @@ DROP_GROUPS = 6
 CLICK_FACTOR = 2.5
 # P10b (C21), the wind-down measured bar by bar (spec 8.9): the extra layers' own level falls at least this many dB a
 # bar (measured on the layers alone, before they join the music: the follower keeps the master at the section's level).
-# P10b review M2: about half the smallest step measured on the levels on the share to the power 1.5 (1.6 dB, dubTechno's
-# second of four bars; Ambient's and Drone's first 1.8 dB; drop-3 and drop-6, 25 Nov 2026); was 0.5.
-WIND_STEP_DB = 0.8
+# P10b review M2 asked for half the smallest measured step; with each vibe at its own length (4 bars in nine) the
+# smallest measured is 0.2 dB (Progressive's first of four bars, the music's own bar-to-bar change against a planned
+# -1.6 dB), so half of it would loosen this: it stays 0.5.
+WIND_STEP_DB = 0.5
 # The master's width may read this much (side over mid) higher than the bar before and still count as falling, and the
 # bar after the wind-down may be this much past the section's own bar-to-bar stray from its mean.
 WIND_WIDTH_TOL = 0.01
