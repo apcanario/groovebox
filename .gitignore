@@ -6,3 +6,4 @@ __pycache__
 shots/
 .smoke-ledger.json
 .smoke-ledger.json.tmp
+.watchdog

@@ -8,7 +8,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | 5 | P3, P4, P5, P6 (Done) | Eight vibes, Simple chords, five lead styles |
 | 6 | P7, P9, P8 (Done) | New sounds, effects, all 24 vibes |
 | 7 | P10 (Done), P11 (Done) | The Drop, Morph |
-| 7b | R1, P10b | A leaner build cycle, then the drop's wind-down (C21) |
+| 7b | R1, P10b, P10c | A leaner build cycle, the drop's wind-down (C21), the bundle 7 player findings (C23) |
 | 8 | T1, T2, T3 | Tablet layouts, punch pads |
 | 9 | G6 | The APK (parked by Pedro until after the tablet bundle, 24 Nov 2026) |
 | 10 | G7 | Retouch from notes |
@@ -94,6 +94,18 @@ Why: the cloud process restarts every 65 to 120 minutes and kills agents and bac
 From C21 (Pedro, 25 Nov 2026): the second press jumps back to the pre-drop settings and the 2- or 4-bar wind-down is not heard; everything stops at once. It should ease every part of the drop (extra layers, width, filter, level, effects) back down to the pre-drop state over the wind-down bars, a calm-down that mirrors the build. Spec 8.9 and `src/engine/drop.ts` are the places to look; no cause found yet.
 
 **Done when:** a test measures the descent bar by bar (level, width and the number of overlay voices fall in steps across the wind-down and reach the section's own values at its end, in all 24 vibes), a press during the wind-down still does nothing, the song document is unchanged after it, the Filter value kept during the drop is applied at the end and not before, the stuck-note and click checks pass, `check` and `smoke` pass. Whether it feels like a calm-down is Pedro's call.
+
+### P10c. Bundle 7 player findings
+
+From C23 (`docs/reviews/bundle-7.md`, 25 Nov 2026): the small fixes the bundle 7 player found, worked as one row after R1 so the per-part fingerprints keep the cost down. Slices as R1 defines them. M2 is not in this row: the spec wins and the Off rule's purple edge on Morph stays, recorded for veto in the changelog.
+
+- **S1.** The Advanced Mix page chips (Master, Levels, Space, Audio, Drop, Morph): one text size for the whole row, set so every label sits inside the chip's padding at 360 x 640 and 412 x 915; no label touches or passes the chip edge (Morph is 0.4 px past it at 412 px today). No change to the `shots.py` threshold of 0.5 px.
+- **M1.** The empty band of about 95 px above DROP in Advanced Play at 412 x 915: remove it, or use the space, so the DROP row sits against the controls above it.
+- **M3.** The Morph page help text says what is true while Sections is off (sections do not move every 32 bars then), and what is true when it is on.
+- **M4.** The Morph speed dial no longer sits alone on a second row of the Simple Mix Master page.
+- **M5.** `tools/shots.py` captures Morph on (Ambient) and the DROP states (build, on, wind-down) in its walk of states.
+
+**Done when:** at 360 x 640 and 412 x 915 no Advanced Mix chip label is closer than its padding to the chip edge, with all six chips at one text size (tested: a check on the measured label and chip boxes that fails on the old layout); the band above DROP in Advanced Play at 412 x 915 is gone (tested the same way); the Morph help text matches the Sections state (tested against both states); the Morph speed dial shares a row on the Simple Mix Master page at 360 x 640 and 412 x 915; `shots.py` writes screenshots of Morph on and of the three DROP states and fails if one is missing; no threshold changed; `check` and `smoke` pass. C23 then leaves Carried and a Done line records M2 as kept.
 
 ## Bundle 8: phase 3, tablet
 
