@@ -373,6 +373,13 @@ export class Engine {
   getDocument(): Song {
     if (this.queued) return cloneSong(this.queued);
     const doc: Song = { ...this.getSong(), mix: { ...this.mix } };
+    // P11 review E1: what Morph has out or eased is saved as Morph will give it back, so a jam saved (or closed) in the
+    // middle of a drop-out never keeps it.
+    for (const m of this.morphPlanner?.owed() ?? []) {
+      if (!this.morphOwes(m)) continue;
+      if (m.kind === "toggle") doc.sections[m.section].on[m.inst] = true;
+      else if (m.kind === "lock") doc.sections[m.section][m.layer].gen.lock = m.lock;
+    }
     if (this.log) doc.log = this.log;
     return doc;
   }
@@ -393,6 +400,9 @@ export class Engine {
     const song = migrateSong(given);
     this.queued = null;
     this.dropReset();
+    // P11 review E1: stopped, Morph gives back what it took from the old song before its journey ends (playing, the
+    // sequencer drops the old song's queue; its document is saved whole either way, see getDocument).
+    if (!this.seq.isRunning) this.morphRelease();
     this.morphPlanner = null;
     this.takeDocument(song);
     this.seq.load(bareSong(song), section);
@@ -428,6 +438,8 @@ export class Engine {
 
   play(): void {
     if (!this.graph || this.playing) return;
+    // P11 review E1: anything Morph still owes is given back before a new journey starts (Stop gives it back already).
+    this.morphRelease();
     // Play during the Stop tail: close the old take now, so the new run is not recorded into it (G5 review M3).
     if (this.rec.state === "finishing" && !this.rec.closing) {
       this.rec.endTime = Math.min(this.rec.endTime || Infinity, Tone.getContext().currentTime);
@@ -450,6 +462,8 @@ export class Engine {
     const transport = Tone.getTransport();
     transport.stop();
     this.seq.stop();
+    // P11 review E1: the journey pauses: Morph gives back the instrument it has out and the Locks it has eased, at once.
+    this.morphRelease();
     const now = Tone.now();
     // Drop attacks still waiting on the clock (swung steps), then release what already started.
     for (const id of INSTRUMENTS) {
@@ -581,6 +595,8 @@ export class Engine {
     const w = this.rec.writer;
     if (!w || this.rec.state !== "recording") return;
     const transport = Tone.getTransport();
+    // P11 review E1: what Morph gives back at Stop (or a load while stopped) is not played music: not in the take.
+    if (this.morphing && transport.state !== "started") return;
     const ticks = transport.state === "started" ? transport.ticks - this.rec.startTicks : 0;
     w.push(ticks / transport.PPQ, op, args, this.morphing ? "morph" : undefined);
   }
@@ -1522,6 +1538,8 @@ export class Engine {
     if (this.seq.songQueued) {
       // A vibe lands on this bar line: its journey starts with it (this is its first bar).
       const q = this.queued;
+      // P11 review E1: the old song's journey ends with it. What it owed is not made here (the sequencer drops the old
+      // song's queue on this bar line); its document was saved whole, as getDocument gives back what Morph owes.
       const plan = q ? resolveMorph(q.style ? VIBES[q.style]?.morph : undefined, q.morph, q.style ?? q.name) : null;
       this.morphPlanner = plan ? new MorphPlanner(plan.seed) : null;
       this.morphPlanner?.pass();
@@ -1534,12 +1552,46 @@ export class Engine {
       return;
     }
     const plan = this.morphPlan();
-    if (!this.morphPlanner || this.morphPlanner.seed !== plan.seed) this.morphPlanner = new MorphPlanner(plan.seed);
+    if (!this.morphPlanner || this.morphPlanner.seed !== plan.seed) {
+      // P11 review E1: a new seed is a new journey: the old one gives back what it owes first.
+      this.morphRelease(time);
+      this.morphPlanner = new MorphPlanner(plan.seed);
+    }
     const planner = this.morphPlanner;
     this.morphDropHeld = plan.on && (this.dropper.active || this.dropRec !== null);
-    if (!plan.on || this.morphDropHeld) return void planner.pass();
+    if (!plan.on || this.morphDropHeld) {
+      // P11 review E1 and S1: Morph switched off, or a drop starting, gives back what Morph owes on this bar line (the
+      // drop plays every instrument of the section), then the journey's clock goes on without moves.
+      this.morphRelease(time);
+      return void planner.pass();
+    }
     const bar = planner.bars;
-    const moves = planner.bar(plan, this.morphView(), (c) => this.morphHeld(c));
+    this.morphApply(planner.bar(plan, this.morphView(), (c) => this.morphHeld(c)), plan, bar, time);
+  }
+
+  /** P11 review E1: whether a move Morph owes back is still owed (no hand has made it moot or holds that control). */
+  private morphOwes(m: MorphMove): boolean {
+    if (m.kind !== "toggle" && m.kind !== "lock") return false;
+    const sec = this.seq.song.sections[m.section];
+    if (!sec) return false;
+    if (m.kind === "toggle") return !sec.on[m.inst] && !this.morphHeld(`on:${m.inst}`);
+    return sec[m.layer].gen.lock !== m.lock && !this.morphHeld(`lock:${m.layer}`);
+  }
+
+  /**
+   * P11 review E1: Morph gives back at once, through the same calls, what it owes (the instrument it has out, the Locks
+   * it has eased) and forgets it. Playing, a toggle of the playing section lands on the next bar line (at a bar line, on
+   * this one).
+   */
+  private morphRelease(time?: number): void {
+    const planner = this.morphPlanner;
+    if (!planner) return;
+    const moves = planner.release().filter((m) => this.morphOwes(m));
+    if (moves.length) this.morphApply(moves, this.morphPlan(), planner.bars, time);
+  }
+
+  /** Morph's moves of a bar line made, logged as Morph's; listeners hear them once, on the bar (`time`). */
+  private morphApply(moves: MorphMove[], plan: MorphPlan, bar: number, time?: number): void {
     if (!moves.length) return;
     this.morphing = true;
     this.morphChanged = false;
@@ -1667,6 +1719,8 @@ export class Engine {
    */
   morphDry(bars: number, atBar?: (bar: number) => void): { moves: MorphMade[]; trace: MorphBar[] } | null {
     if (this.playing) return null;
+    // As Play: what the last journey owes is given back, then a new one starts.
+    this.morphRelease();
     this.morphTraceOn(true);
     this.seq.start();
     this.morphPlanner = null;
@@ -1681,6 +1735,8 @@ export class Engine {
     this.seq.stop();
     const out = { moves: [...this.morphMoves], trace: [...this.morphTrace] };
     this.morphTraceOn(false);
+    // As Stop: Morph gives back what it owes (after the journey's record above, which stops where the bars stop).
+    this.morphRelease();
     return out;
   }
 

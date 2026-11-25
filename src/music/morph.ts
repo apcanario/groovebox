@@ -273,6 +273,26 @@ export class MorphPlanner {
     return this.n;
   }
 
+  /**
+   * What Morph owes back (P11 review E1): the instrument it has out and the Locks it has eased, as the moves that give
+   * them back (the instrument toggled on again where it went out, each Lock set to its base). The engine skips a move a
+   * hand made moot (the instrument already on, a Lock held by hand).
+   */
+  owed(): MorphMove[] {
+    const out: MorphMove[] = [];
+    if (this.out) out.push({ kind: "toggle", section: this.out.section, inst: this.out.inst });
+    for (const [layer, e] of this.ease) out.push({ kind: "lock", section: e.section, layer, lock: e.base });
+    return out;
+  }
+
+  /** The moves of `owed()`, now forgotten: the journey stops, pauses or starts again (Stop, Play, a song, a seed, Morph off, a drop). */
+  release(): MorphMove[] {
+    const out = this.owed();
+    this.out = null;
+    this.ease.clear();
+    return out;
+  }
+
   bar(plan: MorphPlan, v: MorphView, held: (control: string) => boolean): MorphMove[] {
     const bar = this.n++;
     if (bar === 0) return [];
