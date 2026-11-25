@@ -1452,11 +1452,11 @@ def walk_g4(page, failures: list) -> None:
         if lvl < -60:
             failures.append(f"{lid} arp is silent ({lvl:.1f} dB)")
 
-        # Pad: five dials (P7 adds Swoop); brightness moves the pad filter at once; it opens again outside Pad mode.
+        # Pad: six dials (P7 adds Swoop, P11 Voicing); brightness moves the pad filter at once; it opens again outside Pad mode.
         page.click(f'[data-mode="{lid}:pad"]')
         ids = dials_on_screen(page, f"{lid} pad", failures)
-        if len(ids) != 5:
-            failures.append(f"{lid}: pad page has {len(ids)} dials, not 5")
+        if len(ids) != 6:
+            failures.append(f"{lid}: pad page has {len(ids)} dials, not 6")
         for d in ids:
             before = page.evaluate(f"{L}.pad")
             turn(page, f'[data-dial="{d}"]')
