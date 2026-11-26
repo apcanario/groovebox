@@ -2306,3 +2306,153 @@ button:disabled {
 .tablet.portrait .rail {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/*
+ * T1 slice b (spec 9.2): tablet landscape, the desk. The header (New jam, Songs, the vibe control, the mode switch) over
+ * the pads (58 %) and one instrument (42 %). The pads: the punch pads' space (T3), the grid as large pads with labelled
+ * rows, the strip as the grid's column labels, then DROP with Morph and the transport bar side by side. The pads of the
+ * playing section draw their notes; motion is the phone's (the band, the hatched frame, the playhead) from one loop.
+ */
+.tablet.landscape {
+  --rowhead: clamp(124px, 12vw, 160px);
+  --punch: 56px;
+}
+.tablet.landscape .pads {
+  flex: 58 1 0;
+}
+.tablet.landscape .inst {
+  flex: 42 1 0;
+}
+.tablet.landscape .hdr {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.6fr) minmax(0, 2.6fr) minmax(0, 1.6fr);
+}
+.tablet.landscape .hdr .vibectl {
+  margin: 0 0 0 8px;
+  min-width: 0;
+}
+.tablet.landscape .hdr .vibectl .varrow,
+.tablet.landscape .hdr .vibectl .vmain {
+  min-height: var(--hit);
+}
+.tablet.landscape .hdr .vibectl .vmain b {
+  font-size: 19px;
+}
+.deskpads {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Kept clear for the punch pads of T3. */
+.punchslot {
+  flex: none;
+  height: var(--punch);
+  margin-bottom: var(--group);
+}
+.deskgrid {
+  grid-template-rows: repeat(5, minmax(var(--hit), 1fr));
+}
+/* A row's label: the instrument over what it plays; it brightens on each note it plays (--f from the motion loop). */
+.rowhead.deskrow {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 10px 0 12px;
+  box-shadow: inset 4px 0 0 var(--c);
+}
+.rowhead.deskrow b {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text);
+}
+.rowhead.deskrow b .ic {
+  color: var(--c);
+}
+.rowhead.deskrow > span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+}
+.rowhead.deskrow .flash {
+  position: absolute;
+  inset: 0;
+  background: var(--c);
+  opacity: calc(var(--f) * 0.18);
+  pointer-events: none;
+  z-index: -1;
+}
+.still .rowhead.deskrow .flash {
+  display: none;
+}
+.deskgrid .cell {
+  position: relative;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+/* The column a section switch lands on: an outline in the strip's colour until the bar line. */
+.deskgrid .cell.nextcol:not(.pending) {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
+}
+/* The bar's notes inside a pad of the playing section, with the playhead through them (spec 8.12). */
+.padnotes {
+  position: absolute;
+  inset: 10px 8px;
+  z-index: 1;
+  pointer-events: none;
+}
+.padnotes .n {
+  position: absolute;
+  min-width: 2px;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  opacity: calc(0.62 + 0.38 * clamp(0, (var(--p16) - var(--s)) * 8 + 1, 1) * clamp(0, (var(--e) - var(--p16)) * 8, 1));
+}
+.cell.off .padnotes .n {
+  background: var(--mute);
+}
+.cell.pending .padnotes .n {
+  background: var(--c);
+}
+.still .padnotes .n {
+  opacity: 1;
+}
+/* DROP and Morph beside the transport bar (spec 9.2, 9.4). */
+.deck {
+  flex: none;
+  display: flex;
+  gap: var(--gap);
+  padding: var(--gap) var(--pad) 8px;
+}
+.deck .droprow {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  grid-template-columns: minmax(0, 1fr) 72px;
+}
+.deck .drop,
+.deck .tog.morph {
+  height: 52px;
+}
+.deck .drop {
+  gap: 8px;
+  padding: 0 10px;
+}
+.deck .drop b {
+  font-size: 22px;
+}
+.deck .top {
+  padding: 0;
+}
+.deck .play {
+  width: 56px;
+}

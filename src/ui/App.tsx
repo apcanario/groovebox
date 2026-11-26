@@ -14,11 +14,14 @@ import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState, tapPlay } from "./logic.ts";
 import { SectionSheet, SongsSheet } from "./sheets.tsx";
-import { VibePicker } from "./vibes.tsx";
+import { VibeControl, VibePicker } from "./vibes.tsx";
 import { loadMode, saveMode } from "./mode.ts";
 import { TABS, TAB_COLOR, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
 import { PANEL_TABS, tabletPanel, type PanelTab, type SizeClass, type SizeWatch } from "./size.ts";
 import { PlayTab } from "./tabs/PlayTab.tsx";
+import { DeskPads } from "./tabs/DeskPads.tsx";
+import { DropButton } from "./drop.tsx";
+import { MorphButton } from "./morph.tsx";
 import { ChordsTab } from "./tabs/ChordsTab.tsx";
 import { InstrumentTab } from "./tabs/InstrumentTab.tsx";
 import { MixTab } from "./tabs/MixTab.tsx";
@@ -235,8 +238,9 @@ function Rail({ panel, setTab }: { panel: PanelTab; setTab: (t: Tab) => void }) 
 /**
  * The tablet frame (T1 slice a, spec 9.1 to 9.3): the pads (the Play tab, the section strip, the transport) and one
  * instrument (the rail and the chosen panel) both on screen. Landscape puts them side by side, the pads on the left;
- * portrait puts the panel on top and the pads in a dock at the bottom, the rail as its tab bar. The panels and the pads
- * are the phone's screens for now; slices b and c lay them out for the larger screen.
+ * portrait puts the panel on top and the pads in a dock at the bottom, the rail as its tab bar. Landscape's pads are the
+ * desk (slice b, DeskPads); the panels are the phone's instrument tabs in either mode (T2 shows Advanced without pages).
+ * Portrait is still slice a's frame; slice c lays it out.
  */
 function TabletShell(p: {
   size: SizeClass;
@@ -254,14 +258,30 @@ function TabletShell(p: {
   const { ctx, advanced, panel } = p;
   const land = p.size === "landscape";
   const rail = <Rail panel={panel} setTab={p.setTab} />;
-  const pads = (
+  // Landscape (slice b, spec 9.2): the punch pads' space and the grid as large pads, the strip as its column labels,
+  // then DROP (with Morph beside it, P11) and the transport bar side by side. Portrait keeps slice a's dock for slice c.
+  const pads = land ? (
+    <section class="pads">
+      <main class="body padsbody">
+        <DeskPads ctx={ctx} />
+      </main>
+      {p.strip}
+      <div class="deck">
+        <div class="droprow">
+          <DropButton ctx={ctx} />
+          <MorphButton ctx={ctx} />
+        </div>
+        {p.transport}
+      </div>
+    </section>
+  ) : (
     <section class="pads">
       <main class="body padsbody">
         <PlayTab ctx={ctx} />
       </main>
       {p.strip}
       {p.transport}
-      {!land && rail}
+      {rail}
     </section>
   );
   const inst = (
@@ -284,7 +304,7 @@ function TabletShell(p: {
   );
   return (
     // The pads are always on screen: the Play tab's taller strip ("atplay") and, in Simple, the Now view ("now").
-    <div class={`shell tablet ${p.size} atplay${advanced ? "" : " now"}`}>
+    <div class={`shell tablet ${p.size} atplay${advanced || land ? "" : " now"}`}>
       {p.header}
       {/* One order in both orientations, so a rotation re-lays the halves without remounting them; portrait's CSS puts
           the panel above the dock. */}
@@ -425,7 +445,8 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
   const dropHeld = engine.dropShown().queued;
   const lights = beatLights(pos.playing, pos.step);
   // On the Advanced Play tab the strip is the grid's column labels: indented under its four columns.
-  const gridStrip = (tablet || tab === "play") && advanced;
+  // T1: on tablet landscape the strip is the desk grid's column labels in both modes.
+  const gridStrip = size === "landscape" || ((tablet || tab === "play") && advanced);
   const stripCols = `${gridStrip ? "var(--rowhead) " : ""}repeat(${count}, minmax(0, 1fr))`;
 
   // The pieces every layout shares (T1): the phone stacks them as spec 8.6 says; a tablet arranges them by spec 9.2 and 9.3.
@@ -443,6 +464,8 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
       <button class="btn hb" id="songs-open" aria-label={`Songs: ${song.name}`} onClick={() => setSongs(true)}>
         <span>Songs</span>
       </button>
+      {/* T1 (spec 9.2): on tablet landscape the header carries the vibe control. */}
+      {size === "landscape" && <VibeControl ctx={ctx} onOpen={() => setVibes(true)} />}
       <div class="modesw" role="radiogroup" aria-label="Mode">
         {(["simple", "advanced"] as const).map((m) => {
           const on = (m === "advanced") === advanced;
