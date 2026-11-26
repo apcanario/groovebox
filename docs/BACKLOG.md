@@ -97,7 +97,7 @@ Done (26 Nov 2026), see Done below. Its text left the queue; M1 moved into P10d.
 
 ### Bundle 7b player pass (open)
 
-Deferred to Monday 29 Nov (tokens). A fresh Opus 5.5 player plays the final build in headless Chrome at 360 x 640 and 412 x 915 and checks every Done-when line of R1, P10b, P10c and P10d and the C23, C24, C26, C27 and C29 notes; writes `docs/reviews/bundle-7b.md`, applies fixes, reruns the scripts, pushes; findings that need Pedro go to Carried. Bundle 8 (tablet) starts after it.
+Deferred to Monday 30 Nov (tokens). A fresh Opus 5.5 player plays the final build in headless Chrome at 360 x 640 and 412 x 915 and checks every Done-when line of R1, P10b, P10c and P10d and the C23, C24, C26, C27 and C29 notes; writes `docs/reviews/bundle-7b.md`, applies fixes, reruns the scripts, pushes; findings that need Pedro go to Carried. Bundle 8 (tablet) starts after it.
 
 ### P10d. Play button state and DROP and Morph position
 
