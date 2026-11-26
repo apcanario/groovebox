@@ -668,6 +668,14 @@ def judge_wind(r: dict, label: str, failures: list) -> list:
     if not (wid[0] > sec["width"] and wid[0] >= r["width"] - d_stray - WIND_WIDTH_TOL):
         bad.append(f"the drop's last bar is not as wide as the drop ({wid[0]:.3f}; the section's {sec['width']:.3f}, "
                    f"the drop's {r['width']:.3f} less at most {d_stray + WIND_WIDTH_TOL:.3f})")
+    # P10b fourth fix: and as wide as the drop at the same place in its own loop (the ninth bar's place), less the loop's
+    # own stray at a place and the section's own bar-to-bar change: Trance's drop strays 0.03 from its mean by its loop
+    # alone, so a press that narrowed the overlay at once to 0.140 passed the line above against a mean of 0.181 while its
+    # place reads 0.188.
+    at = places[WINDOW % loop]
+    if not wid[0] >= at - p_stray - WIND_WIDTH_TOL - step:
+        bad.append(f"the drop's last bar is not as wide as the drop at its place in the drop's {loop}-bar loop ({wid[0]:.3f}; "
+                   f"that place {at:.3f} less at most {p_stray + WIND_WIDTH_TOL + step:.3f})")
     if not wid[1] - sec["width"] >= WIND_NOT_FIRST * (wid[0] - sec["width"]) - stray:
         bad.append(f"the width is spent in the first bar ({wid[0]:.3f} -> {wid[1]:.3f}, the section's {sec['width']:.3f}, its own bars within {stray:.3f})")
     # The end: the two bars after, against the section's own two-bar means (the same window), unless Morph owed or
