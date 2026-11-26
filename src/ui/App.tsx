@@ -201,6 +201,9 @@ function TakeSheet({ take, onClose }: { take: NamedTake; onClose: () => void }) 
 export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHint; keeper: Keeper }) {
   const [song, setSong] = useState<Song>(() => engine.getSong());
   const [pos, setPos] = useState<Position>(() => engine.position());
+  // P10d: the Play button shows the transport as Play and Stop set it, not the heard position (a lookahead behind).
+  const [running, setRunning] = useState(() => engine.playing);
+  useEffect(() => engine.onRunning(setRunning), [engine]);
   const [pending, setPending] = useState<Pending>(() => engine.pendingShown());
   const [chosen, setChosen] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("play");
@@ -394,8 +397,8 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
       <div class="top">
         <button
           id="play"
-          class={`play${pos.playing ? " on" : ""}`}
-          aria-label={pos.playing ? "Stop" : "Play"}
+          class={`play${running ? " on" : ""}`}
+          aria-label={running ? "Stop" : "Play"}
           disabled={starting}
           onClick={() => void togglePlay()}
         >

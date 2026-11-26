@@ -217,6 +217,13 @@ export class Engine {
   private seq: Sequencer;
   private listeners = new Set<(p: Position) => void>();
   private changeListeners = new Set<() => void>();
+  private runListeners = new Set<(running: boolean) => void>();
+  /**
+   * P10d: bumped by Play and by Stop. What the scheduler's callback hands to the screen on the audio clock (the
+   * position, the DROP button's phase) is dropped when it arrives after the run that scheduled it ended: a Stop must
+   * not be followed by a position of the run it stopped.
+   */
+  private run = 0;
   /** Bumped when sections are inserted or removed: positions scheduled before then carry stale indexes. */
   private layoutGen = 0;
   private pos: Position = { playing: false, section: 0, bar: 0, step: 0 };
@@ -451,6 +458,7 @@ export class Engine {
       void this.finishTake();
     }
     this.seq.start();
+    this.run++;
     this.inFlight.clear();
     this.landed.length = 0;
     // P11: a new journey from where the song stands.
@@ -460,6 +468,7 @@ export class Engine {
     // P7: the synced LFOs start on bar 1 with the transport; the hiss and the air play while it runs.
     this.graph.startClock(at);
     if (this.rec.state === "armed") this.startTake();
+    this.running(true);
   }
 
   stop(): void {
@@ -467,6 +476,7 @@ export class Engine {
     const transport = Tone.getTransport();
     transport.stop();
     this.seq.stop();
+    this.run++;
     // P11 review E1: the journey pauses: Morph gives back the instrument it has out and the Locks it has eased, at once.
     this.morphRelease();
     const now = Tone.now();
@@ -495,6 +505,20 @@ export class Engine {
       }, RECORD_TAIL * 1000);
     }
     this.emit({ playing: false, section: this.seq.section, bar: 0, step: 0 });
+    this.running(false);
+  }
+
+  /**
+   * P10d: the transport's state as Play and Stop set it, told at once (the position follows what is heard, a
+   * lookahead later, so the Play button does not read it). Returns a function that stops listening.
+   */
+  onRunning(fn: (running: boolean) => void): () => void {
+    this.runListeners.add(fn);
+    return () => this.runListeners.delete(fn);
+  }
+
+  private running(on: boolean): void {
+    for (const fn of this.runListeners) fn(on);
   }
 
   // ---- Recording (G5) ---------------------------------------------------------------
@@ -1425,7 +1449,9 @@ export class Engine {
   private showDrop(time: number): void {
     const v = this.dropper.view();
     const heard = { phase: v.phase, index: v.length - v.barsLeft, length: v.length, barsLeft: v.barsLeft };
+    const run = this.run;
     Tone.getDraw().schedule(() => {
+      if (run !== this.run) return;
       this.dropHeard = heard;
       this.dropIntent = this.dropper.intent;
       this.changed();
@@ -2257,7 +2283,10 @@ export class Engine {
     }
     const p: Position = { playing: true, section: r.section, bar: r.bar, step: r.step };
     const gen = this.layoutGen;
+    const run = this.run;
     Tone.getDraw().schedule(() => {
+      // P10d: a position of a run already stopped would show the stopped transport as playing.
+      if (run !== this.run) return;
       this.inFlight.reach(p.bar);
       this.emit(gen === this.layoutGen ? p : { ...p, section: this.seq.section });
     }, time);

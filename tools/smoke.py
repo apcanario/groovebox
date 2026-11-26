@@ -41,7 +41,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import SMALL, simple_words, walk_frame  # noqa: E402
+from shots import SMALL, sample_play, simple_words, walk_frame, walk_play_button  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 
@@ -3107,8 +3107,8 @@ def open_app(page, failures: list) -> None:
     FIRST_SONG.append(page.evaluate(SONG))
     if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
         failures.append("the app does not start in Simple")
-    page.click("#play")
-    time.sleep(0.5)
+    # P10d: the first tap after load shows Stop from the tap on, for 2 s while it plays.
+    sample_play(page, failures, "first tap after load", True)
 
 
 def part_core(browser, page, failures: list, shot) -> None:
@@ -3220,6 +3220,9 @@ def part_core(browser, page, failures: list, shot) -> None:
     narrow_pass(page, failures)
     if not page.evaluate("window.__groovebox.playing"):
         failures.append("the transport stopped during the shell walk")
+    # P10d: later taps of Play and Stop in Simple and Advanced, and a Stop during a drop's build, each sampled.
+    walk_play_button(page, failures, "core")
+    page.click('[data-appmode="advanced"]')
 
     if shot:
         page.click('[data-tab="layer1"]')

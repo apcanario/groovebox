@@ -383,6 +383,53 @@ def _wait(page, expr: str, timeout: float) -> bool:
     return False
 
 
+# P10d: the Play button, sampled on every animation frame for `seconds` from just after a tap: what it shows (its label
+# and its lit class) and the transport's state.
+PLAY_SAMPLES = r"""(ms) => new Promise((done) => {
+  const out = [], end = performance.now() + ms;
+  const look = () => { const b = document.querySelector('#play');
+    out.push([b.getAttribute('aria-label'), b.classList.contains('on'), window.__groovebox.playing]);
+    if (performance.now() < end) requestAnimationFrame(look); else done(out); };
+  look();
+})"""
+
+
+def sample_play(page, failures: list, where: str, want: bool, seconds: float | None = None) -> None:
+    """P10d: tap the Play button and watch it for 2 s (Play) or 1 s (Stop). From the first frame the transport is in the
+    state the tap asked for (on a first tap the audio starts first), every frame must show it (Stop while it plays, Play
+    while it is stopped), and the transport must still be in that state at the end."""
+    page.click("#play")
+    got = page.evaluate(PLAY_SAMPLES, int(1000 * (seconds or (2.0 if want else 1.0))))
+    word = "Stop" if want else "Play"
+    first = next((i for i, g in enumerate(got) if g[2] == want), len(got))
+    wrong = [g for g in got[first:] if g[0] != word or g[1] != want or g[2] != want]
+    if wrong:
+        failures.append(f"{where}: after the tap the Play button showed {wrong[0][0]!r} (lit {wrong[0][1]}, transport running "
+                        f"{wrong[0][2]}) in {len(wrong)} of {len(got)} frames; it must show {word!r} throughout")
+    if not got or got[-1][2] != want:
+        failures.append(f"{where}: the transport is not {'running' if want else 'stopped'} after the tap")
+
+
+def walk_play_button(page, failures: list, label: str) -> None:
+    """P10d: in Simple and Advanced, Stop then Play sampled, then a Stop tapped during a drop's build and Play again. Leaves
+    the transport running, in Simple, on the Play tab."""
+    if not page.evaluate(f"{E}.playing"):
+        sample_play(page, failures, f"{label}: Play", True)
+    bar_s = 240.0 / page.evaluate(f"{E}.bpm")
+    for mode in ("simple", "advanced"):
+        page.click(f'[data-appmode="{mode}"]')
+        page.click('[data-tab="play"]')
+        where = f"{label} {mode}"
+        sample_play(page, failures, f"{where}: Stop", False)
+        sample_play(page, failures, f"{where}: Play", True)
+        page.click("#drop")
+        if not _wait(page, f"{E}.dropShown().phase === 'build'", bar_s * 2 + 2):
+            failures.append(f"{where}: DROP never reached its build")
+        sample_play(page, failures, f"{where}: Stop during the drop", False)
+        sample_play(page, failures, f"{where}: Play after the drop", True)
+    page.click('[data-appmode="simple"]')
+
+
 def walk_live(page, failures: list, out_dir: str | None) -> int:
     """Ambient playing, at both sizes: Morph on in Simple and Advanced Play, the Morph page with Sections off and on
     (P10c M3: its help text says what is true in each), the Drop page, and DROP in build, on and wind-down. Each screen
@@ -491,12 +538,13 @@ def main() -> int:
             while time.time() < end and not page.evaluate("!!window.__groovebox"):
                 time.sleep(0.05)
             close_picker(page)
-            page.click("#play")
-            time.sleep(0.5)
+            sample_play(page, failures, "first tap after load", True)
             page.click('[data-strip="1"]')  # Groove: every instrument on
             time.sleep(2.5)
             n = walk_frame(page, failures, out)
             n += walk_live(page, failures, out)
+            # P10d: with Ambient (Morph on) playing, every tap during a morph.
+            walk_play_button(page, failures, "Ambient, Morph on")
             failures += [f"page error: {e}" for e in errors]
             browser.close()
     finally:
