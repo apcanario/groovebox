@@ -2,7 +2,8 @@
  * Play tab (spec 8.6). Simple, "Now": the five instruments of the playing section as five lanes (spec
  * 8.12): a label block on the left (name and what it plays; a tap turns it on or off at the next bar, a
  * hold opens its tab) and the bar it plays to its right, with one playhead across all five.
- * Advanced, "Song": instruments by sections, sitting on the section strip, which is its column labels.
+ * Advanced, "Song": instruments by sections over the section strip, which is its column labels, with DROP and Morph
+ * between them at the same screen position as in Simple (P10d).
  */
 import { INSTRUMENTS, type InstrumentId } from "../../engine/song.ts";
 import type { Ctx } from "../App.tsx";
@@ -91,8 +92,6 @@ export function PlayTab({ ctx }: { ctx: Ctx }) {
   );
   return (
     <section class={`playtab ${ctx.advanced ? "song" : "nowview"}`}>
-      {/* P10 review S6: in Advanced the grid sits directly on the strip (spec 8.6), so DROP goes above the grid. */}
-      {ctx.advanced && drop}
       {ctx.advanced ? (
         <SongView ctx={ctx} />
       ) : (
@@ -101,8 +100,9 @@ export function PlayTab({ ctx }: { ctx: Ctx }) {
           <NowView ctx={ctx} />
         </>
       )}
-      {/* P10 (spec 8.9): in Simple between the instruments and the section strip, full width. */}
-      {!ctx.advanced && drop}
+      {/* P10 (spec 8.9): between the instruments and the section strip, full width. P10d (spec 8.6): in Advanced too,
+          under the grid, so DROP and Morph sit in the same place in both modes. */}
+      {drop}
     </section>
   );
 }

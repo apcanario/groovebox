@@ -248,7 +248,7 @@ The images in `docs/design/look/` are the reference for how screens look (sectio
 The strip and the transport bar are in the same place on every tab. On the Advanced Play tab the strip is indented to line up under the grid's four columns, so the strip is the grid's column labels.
 
 **One row of sections.**
-- The section strip appears once on every screen, above the transport bar. On the Play tab the grid sits directly on top of it and uses it as its column labels; there is no second row.
+- The section strip appears once on every screen, above the transport bar. On the Advanced Play tab the grid sits over it, with only DROP's row between them, and uses it as its column labels; there is no second row.
 - Tapping a section always means the same thing: play it from the next bar line. The edited section follows the playing one.
 - Editing a section that is not playing is Advanced only: hold a section and choose "Edit without playing". It then shows as Editing until it is played or released.
 - Three states, each with its own look and a word under the letter: Playing (filled, with the moving band), Next bar (hatched frame, marching and pulsing), Editing (a yellow inset line). Section 8.12 has the detail.
@@ -258,7 +258,8 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 - **Simple, "Now":** the vibe control at the top, then the five instrument lanes for the playing section (section 8.12), then the DROP button (section 8.9) with the Morph switch (section 8.11) beside it, directly above a taller section strip. Tap an instrument to turn it on or off at the next bar. Hold an instrument to open its tab.
 - P10: under 700 px of screen height the vibe control and DROP are 48 px tall and sit 2 px from the lanes, and the strip is not taller, so the five lanes keep 48 px at 360 x 640 (the one exception to the 10 px between groups of section 8.12; the body's top padding is 4 px).
 - **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam is kept in Songs.
-- **Advanced, "Song":** the instruments-by-sections grid built in G2, sitting on the strip.
+- **Advanced, "Song":** the instruments-by-sections grid built in G2, filling the tab from the header down to the DROP button and the Morph switch, which sit directly above the strip as on Simple Play (P10d, from Pedro's note).
+- **DROP and Morph keep one place** (P10d, from Pedro's note: muscle memory). On every phone size their top edge is the same on Simple and Advanced Play and on every visit to the tab: their row sits directly on the strip, the strip on the Play tab is the taller one in both modes (52 px under 700 px of height), and DROP is 48 px tall under 700 px of height in both modes. What the tab has above them (the lanes, the grid) takes the height that is left; no empty band sits above or below DROP's row.
 
 **The last jam survives a reload.** G5 built this: the song is saved automatically and reopens on launch.
 
@@ -340,7 +341,7 @@ One large button, DROP, that turns whatever section is playing into its biggest 
 - **The extra layers are an overlay.** They sit on top of the song while the drop is on and change nothing in the song document. After the wind-down, every knob is where it was. Knobs still work during a drop.
 - **The button shows where it is:** a countdown of bars during the build and the wind-down, lit steadily while the drop is on.
 - **Each vibe has its own recipe,** as data in its style file: build length and parts, the cliffhanger, the impact, which extra layers and how wide, the wind-down length. Deep techno's is restrained (hats out, filter down, kick back in, wider chords). Ambient's and Drone's are a slow bloom with no impact. Lo-fi's is a filter-down and the beat falling back in. EDM's and Trance's are the full thing.
-- **Where it is:** Simple, on the Play tab between the instruments and the section strip, full width (from P11 sharing its row with the Morph switch beside it, spec 8.6). Advanced shows the same button and adds a Drop page on the Mix tab: build length, cliffhanger, wind-down length and one Width knob.
+- **Where it is:** on the Play tab between the instruments and the section strip, full width (from P11 sharing its row with the Morph switch beside it, spec 8.6). Advanced shows the same button in the same place, between the grid and the strip, at the same screen position as on Simple (P10d, spec 8.6 "DROP and Morph keep one place"), and adds a Drop page on the Mix tab: build length, cliffhanger, wind-down length and one Width knob.
 - **Recorded as events** (on, off), so a saved jam replays it identically.
 - **Cost** (P10 review S4, 25 Nov 2026, `tools/cost.py dist 3 dropheavy`, median of 3): the drop on the heaviest scene (everything on, the six heaviest effects) measured 66.2% (64.6 to 66.4) against 61.1% before it, worst stall 17.5 ms against 12.7 ms, at most 35 overlay voices of the 48 and none over the cap; under 8.8's 71%.
 

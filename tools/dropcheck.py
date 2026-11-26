@@ -337,14 +337,20 @@ def walk_drop(page, failures: list, vibe_song: str = "deepHouse") -> None:
     if not page.locator("#drop").count():
         failures.append("P10: no DROP button on the Advanced Play tab")
     else:
-        # P10 review S6: the grid sits directly on the strip (spec 8.6); DROP is above the grid, not between them.
+        # P10d (spec 8.6, replacing P10 review S6's DROP above the grid): DROP's row sits on the strip under the grid, at
+        # the same top edge as on Simple Play.
         for vw, vh in ((360, 640), (390, 844)):
             page.set_viewport_size({"width": vw, "height": vh})
             time.sleep(0.15)
-            f = page.evaluate("""() => { const r = (s) => document.querySelector(s).getBoundingClientRect();
-              return { grid: r('.playtab .grid').bottom, gtop: r('.playtab .grid').top, strip: r('.secs').top, drop: r('#drop').bottom, h: r('#drop').height }; }""")
-            if not (0 <= f["strip"] - f["grid"] <= 12 and f["drop"] <= f["gtop"] + 0.5 and f["h"] >= 48):
-                failures.append(f"P10: on Advanced Play at {vw} x {vh} the grid is not directly on the strip with DROP above it: {f}")
+            place = """() => { const r = (s) => document.querySelector(s).getBoundingClientRect();
+              return { grid: r('.playtab .grid').bottom, strip: r('.secs').top, top: r('#drop').top, drop: r('#drop').bottom, h: r('#drop').height }; }"""
+            f = page.evaluate(place)
+            page.click('[data-appmode="simple"]')
+            time.sleep(0.15)
+            simple = page.evaluate("document.querySelector('#drop').getBoundingClientRect().top")
+            page.click('[data-appmode="advanced"]')
+            if not (0 <= f["top"] - f["grid"] <= 10.5 and abs(f["strip"] - f["drop"]) <= 0.5 and f["h"] >= 48 and abs(f["top"] - simple) <= 0.5):
+                failures.append(f"P10d: on Advanced Play at {vw} x {vh} DROP is not on the strip under the grid at Simple's place ({simple}): {f}")
         page.set_viewport_size({"width": 360, "height": 640})
     page.click('[data-tab="mix"]')
     page.click('[data-page="mix:drop"]')

@@ -330,7 +330,9 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   const stripCols = `${gridStrip ? "var(--rowhead) " : ""}repeat(${count}, minmax(0, 1fr))`;
 
   return (
-    <div class={`shell${tab === "play" && !advanced ? " now" : ""}`}>
+    // P10d: "atplay" on the Play tab in both modes (the taller strip and DROP's row under the grid or the lanes, so DROP
+    // and Morph keep one screen position); "now" on Simple's alone.
+    <div class={`shell${tab === "play" ? " atplay" : ""}${tab === "play" && !advanced ? " now" : ""}`}>
       <header class="hdr">
         <button
           class="btn hb"

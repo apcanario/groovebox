@@ -408,7 +408,8 @@ button:disabled {
   color: var(--dim);
   white-space: nowrap;
 }
-.shell.now .sec {
+/* P10d: the Play tab's strip is taller in both modes, so DROP's row sits on it at one place (spec 8.6). */
+.shell.atplay .sec {
   height: 64px;
 }
 .sec {
@@ -428,7 +429,7 @@ button:disabled {
   letter-spacing: -0.03em;
   line-height: 1;
 }
-.shell.now .sec b {
+.shell.atplay .sec b {
   font-size: 28px;
 }
 .sec span {
@@ -759,12 +760,9 @@ button:disabled {
 .still .tile .flash {
   display: none;
 }
-.playtab.song {
-  justify-content: flex-end;
-}
-/* Rows of up to 96 px that give way on a short screen, never under 48. */
+/* P10d (C23 M1): the grid fills the tab above DROP's row, so no empty band is left above it; rows never under 48. */
 .grid {
-  flex: 0 1 504px;
+  flex: 1 1 0;
   min-height: 0;
   display: grid;
   gap: var(--gap);
@@ -1993,11 +1991,6 @@ button:disabled {
   gap: var(--gap);
   margin-top: calc(var(--group) - var(--gap));
 }
-/* P10 review S6: in Advanced, DROP sits above the grid, so the grid stays directly on the strip (spec 8.6). */
-.playtab.song .droprow {
-  margin-top: 0;
-  margin-bottom: calc(var(--group) - var(--gap));
-}
 .drop {
   --c: var(--yellow);
   --hc: var(--yellow);
@@ -2219,7 +2212,7 @@ button:disabled {
  * P10: on a short phone (under 700 px of height) the Simple Play tab needs 46 px more for its five lanes of 48 px with
  * DROP added: the vibe control and DROP are 48 px tall, the strip loses its extra height, and the vibe control and
  * DROP sit 2 px from the lanes instead of 10 (the second exception to spec 8.12's 10 px between groups, after the
- * vibe picker's).
+ * vibe picker's). P10d: DROP's row and the strip are the same on Advanced Play, so DROP keeps its place in both modes.
  */
 @media (max-height: 699px) {
   .shell.now .body {
@@ -2232,17 +2225,17 @@ button:disabled {
   .shell.now .vibectl .vmain {
     min-height: 48px;
   }
-  .shell.now .droprow {
+  .shell.atplay .droprow {
     margin-top: 0;
   }
-  .shell.now .drop,
-  .shell.now .tog.morph {
+  .shell.atplay .drop,
+  .shell.atplay .tog.morph {
     height: 48px;
   }
-  .shell.now .sec {
+  .shell.atplay .sec {
     height: 52px;
   }
-  .shell.now .sec b {
+  .shell.atplay .sec b {
     font-size: 24px;
   }
 }

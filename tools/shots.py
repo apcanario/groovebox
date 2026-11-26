@@ -177,6 +177,17 @@ MORPH_SPEED_ROW = r"""() => {
 }"""
 
 
+# P10d (C23 M1): where DROP and Morph sit on the Play tab, and what is around them. The tab's content (the grid or the
+# vibe control) starts under the header, its bottom (the grid or the lanes) sits on DROP's row, and DROP's row on the strip.
+PLAY_PLACE = r"""() => {
+  const r = (s) => { const e = document.querySelector(s); return e && e.getClientRects().length ? e.getBoundingClientRect() : null; };
+  const d = r('#drop'), m = r('#morph'), hdr = r('.hdr'), secs = r('.secs');
+  const top = r('.playtab .grid') || r('.playtab .vibectl'), low = r('.playtab .grid') || r('.playtab .nowlist');
+  if (!d || !m || !hdr || !secs || !top || !low) return null;
+  return { drop: d.top, morph: m.top, dropBottom: d.bottom, hdr: hdr.bottom, first: top.top, last: low.bottom, strip: secs.top };
+}"""
+
+
 def _settle(page) -> None:
     # Two frames: the render, then the text fit. Then every CSS transition ends (a chip's or mode button's wipe
     # takes 0.14 s), so a screenshot never catches one half done and shows a stray sliver (P2 review M8).
@@ -196,6 +207,7 @@ class Walk:
         self.count = 0
         self.chips = 0
         self.frame_y: dict = {}
+        self.place: dict = {}
 
     def screen(self, size: tuple, label: str) -> None:
         _settle(self.page)
@@ -231,6 +243,27 @@ class Walk:
                 for b in self.page.evaluate(CHECK):
                     self.failures.append(f"{size[0]}x{size[1]} {label} {name} page {self.page.get_attribute(sel, 'data-page-of')}: {b}")
                 self.chips += 1
+
+    def play_place(self, size: tuple, label: str) -> None:
+        """P10d: DROP's and Morph's top edges are the same in Simple and Advanced and on every visit to the Play tab at
+        this size, and there is no empty band on the tab: its content starts under the header (the body's padding) and
+        reaches down to DROP's row (the gap between groups), and DROP's row sits on the strip."""
+        _settle(self.page)
+        where = f"{size[0]}x{size[1]} {label}"
+        f = self.page.evaluate(PLAY_PLACE)
+        if not f:
+            self.failures.append(f"{where}: no DROP and Morph on the Play tab")
+            return
+        first = self.place.setdefault(size, (f, label))
+        for k, name in (("drop", "DROP"), ("morph", "Morph")):
+            if abs(f[k] - first[0][k]) > 0.5:
+                self.failures.append(f"{where}: {name}'s top edge is at {f[k]:.1f} px, but at {first[0][k]:.1f} px on {first[1]}")
+        if f["first"] - f["hdr"] > 8.5:
+            self.failures.append(f"{where}: an empty band of {f['first'] - f['hdr']:.0f} px between the header and the Play tab's content")
+        if not 0 <= f["drop"] - f["last"] <= 10.5:
+            self.failures.append(f"{where}: {f['drop'] - f['last']:.0f} px between the grid or the lanes and DROP (0 to 10)")
+        if abs(f["strip"] - f["dropBottom"]) > 0.5:
+            self.failures.append(f"{where}: DROP's row is not on the strip ({f['strip'] - f['dropBottom']:.0f} px between them)")
 
     def frame_check(self, size: tuple, label: str) -> None:
         y = tuple(self.page.evaluate(FRAME_Y))
@@ -310,6 +343,8 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                     page.click(f'[data-mode="{tab}:{modes[tab]}"]')
                 else:
                     w.pages(size, label)
+                if tab == "play":
+                    w.play_place(size, label)
                 if mode == "simple" and tab == "chords":
                     # P4: the vibe picker borrowing chords, from the title's vibe button.
                     page.click("#chord-vibe")
@@ -329,6 +364,8 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
                     failures.append(f"{size}: the effect picker did not open")
             # The sheets: a held section, and Songs from the header.
             page.click('[data-tab="play"]')
+            # P10d: back on the Play tab after every other tab and page, DROP and Morph are where they were.
+            w.play_place(size, f"{mode}-play-after-every-tab")
             box = page.locator('[data-strip="0"]').bounding_box()
             page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
             page.mouse.down()
@@ -459,6 +496,7 @@ def walk_live(page, failures: list, out_dir: str | None) -> int:
             page.click(f'[data-appmode="{mode}"]')
             page.click('[data-tab="play"]')
             w.screen(size, f"{mode}-play-ambient-{what}")
+            w.play_place(size, f"{mode}-play-ambient-{what}")
             got = page.evaluate("(() => { const b = document.querySelector('#drop'); return b ? b.dataset.drop : null; })()")
             if drop and got != drop:
                 failures.append(f"{size[0]}x{size[1]} live walk: DROP shows {got!r} on the {mode} {what} screen, not {drop!r}")
