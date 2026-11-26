@@ -768,3 +768,19 @@ export function morphHelp(sections: boolean, bars: number): string {
   const sec = sections ? `Sections moves the jam to the next section every ${bars} bars.` : "Sections is off, so the jam stays in its section.";
   return `Sound drifts Bright and Space. Leads let a note or two change. Voicing moves pads and drones at phrase ends. Drop-outs rest an instrument for a phrase. ${sec} A control you move is left alone for 16 bars.`;
 }
+
+/**
+ * The Play button's tap (P10d review M1): it decides on the state the button shows (the engine's last Play or Stop,
+ * `running`), not on the transport, which stays stopped for 50 ms after Play. A tap on a button that reads Stop stops.
+ * `start` brings the audio up on a first tap and says whether it did.
+ */
+export async function tapPlay(
+  engine: { readonly running: boolean; play(): void; stop(): void },
+  start: () => Promise<boolean>,
+): Promise<void> {
+  if (engine.running) {
+    engine.stop();
+    return;
+  }
+  if (await start()) engine.play();
+}

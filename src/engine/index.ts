@@ -218,6 +218,7 @@ export class Engine {
   private listeners = new Set<(p: Position) => void>();
   private changeListeners = new Set<() => void>();
   private runListeners = new Set<(running: boolean) => void>();
+  private isRunning = false;
   /**
    * P10d: bumped by Play and by Stop. What the scheduler's callback hands to the screen on the audio clock (the
    * position, the DROP button's phase) is dropped when it arrives after the run that scheduled it ended: a Stop must
@@ -373,6 +374,14 @@ export class Engine {
     return this.graph !== null && Tone.getTransport().state === "started";
   }
 
+  /**
+   * P10d review M1: the last Play or Stop, as onRunning tells it. True from the Play tap on, while `playing` is still
+   * false for the transport's 50 ms start; the Play button shows this and its tap decides on it.
+   */
+  get running(): boolean {
+    return this.isRunning;
+  }
+
   /** A copy of the song as the engine holds it now (without its mix and log: see getDocument). */
   getSong(): Song {
     return cloneSong(this.seq.song);
@@ -468,7 +477,7 @@ export class Engine {
     // P7: the synced LFOs start on bar 1 with the transport; the hiss and the air play while it runs.
     this.graph.startClock(at);
     if (this.rec.state === "armed") this.startTake();
-    this.running(true);
+    this.tellRunning(true);
   }
 
   stop(): void {
@@ -505,7 +514,7 @@ export class Engine {
       }, RECORD_TAIL * 1000);
     }
     this.emit({ playing: false, section: this.seq.section, bar: 0, step: 0 });
-    this.running(false);
+    this.tellRunning(false);
   }
 
   /**
@@ -517,7 +526,8 @@ export class Engine {
     return () => this.runListeners.delete(fn);
   }
 
-  private running(on: boolean): void {
+  private tellRunning(on: boolean): void {
+    this.isRunning = on;
     for (const fn of this.runListeners) fn(on);
   }
 

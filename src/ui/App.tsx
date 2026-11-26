@@ -11,7 +11,7 @@ import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
 import { startFit } from "./fit.ts";
 import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
-import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState } from "./logic.ts";
+import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState, tapPlay } from "./logic.ts";
 import { SectionSheet, SongsSheet } from "./sheets.tsx";
 import { VibePicker } from "./vibes.tsx";
 import { loadMode, saveMode } from "./mode.ts";
@@ -202,7 +202,7 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
   const [song, setSong] = useState<Song>(() => engine.getSong());
   const [pos, setPos] = useState<Position>(() => engine.position());
   // P10d: the Play button shows the transport as Play and Stop set it, not the heard position (a lookahead behind).
-  const [running, setRunning] = useState(() => engine.playing);
+  const [running, setRunning] = useState(() => engine.running);
   useEffect(() => engine.onRunning(setRunning), [engine]);
   const [pending, setPending] = useState<Pending>(() => engine.pendingShown());
   const [chosen, setChosen] = useState<number | null>(null);
@@ -296,13 +296,7 @@ export function App({ engine, hint, keeper }: { engine: Engine; hint: LatencyHin
     }
   };
 
-  const togglePlay = async (): Promise<void> => {
-    if (engine.playing) {
-      engine.stop();
-      return;
-    }
-    if (await startAudio()) engine.play();
-  };
+  const togglePlay = (): Promise<void> => tapPlay(engine, startAudio);
 
   const bpmDrag = useVerticalDrag(song.bpm, LIMITS.bpm[0], LIMITS.bpm[1], (v) => (engine.bpm = v), 1, 400);
   const ctx: Ctx = {

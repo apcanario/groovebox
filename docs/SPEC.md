@@ -245,7 +245,7 @@ The images in `docs/design/look/` are the reference for how screens look (sectio
 4. The transport bar: play and stop, bpm, the bar counter, the four beat lights, record. The vibe is shown in the vibe control; key and mood are on the Chords tab.
 5. The tab bar.
 
-The strip and the transport bar are in the same place on every tab. On the Advanced Play tab the strip is indented to line up under the grid's four columns, so the strip is the grid's column labels.
+The transport bar is in the same place on every tab, and so is the strip's bottom edge. On the Play tab the strip is the taller one in both modes, 64 px against 52 px on every other tab (under 700 px of screen height it is 52 px on the Play tab too), so at 700 px of height and up the strip's top edge moves 12 px when leaving the Play tab; DROP and Morph keep one place (below). On the Advanced Play tab the strip is indented to line up under the grid's four columns, so the strip is the grid's column labels.
 
 **One row of sections.**
 - The section strip appears once on every screen, above the transport bar. On the Advanced Play tab the grid sits over it, with only DROP's row between them, and uses it as its column labels; there is no second row.
@@ -259,7 +259,7 @@ The strip and the transport bar are in the same place on every tab. On the Advan
 - P10: under 700 px of screen height the vibe control and DROP are 48 px tall and sit 2 px from the lanes, and the strip is not taller, so the five lanes keep 48 px at 360 x 640 (the one exception to the 10 px between groups of section 8.12; the body's top padding is 4 px).
 - **The vibe control** sits at the top of the Simple Play tab: the current vibe as one large button with an arrow button on each side. An arrow loads the previous or next vibe from the next bar line; the middle button opens the vibe picker. The replaced jam is kept in Songs.
 - **Advanced, "Song":** the instruments-by-sections grid built in G2, filling the tab from the header down to the DROP button and the Morph switch, which sit directly above the strip as on Simple Play (P10d, from Pedro's note).
-- **DROP and Morph keep one place** (P10d, from Pedro's note: muscle memory). On every phone size their top edge is the same on Simple and Advanced Play and on every visit to the tab: their row sits directly on the strip, the strip on the Play tab is the taller one in both modes (52 px under 700 px of height), and DROP is 48 px tall under 700 px of height in both modes. What the tab has above them (the lanes, the grid) takes the height that is left; no empty band sits above or below DROP's row.
+- **DROP and Morph keep one place** (P10d, from Pedro's note: muscle memory). On every phone size their top edge is the same on Simple and Advanced Play and on every visit to the tab: their row sits directly on the strip, the strip on the Play tab is the taller one in both modes (64 px; under 700 px of height 52 px, not taller), and DROP is 48 px tall under 700 px of height in both modes. What the tab has above them (the lanes, the grid) takes the height that is left; no empty band sits above or below DROP's row.
 
 **The last jam survives a reload.** G5 built this: the song is saved automatically and reopens on launch.
 

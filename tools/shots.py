@@ -434,7 +434,8 @@ PLAY_SAMPLES = r"""(ms) => new Promise((done) => {
 def sample_play(page, failures: list, where: str, want: bool, seconds: float | None = None) -> None:
     """P10d: tap the Play button and watch it for 2 s (Play) or 1 s (Stop). From the first frame the transport is in the
     state the tap asked for (on a first tap the audio starts first), every frame must show it (Stop while it plays, Play
-    while it is stopped), and the transport must still be in that state at the end."""
+    while it is stopped), and the transport must still be in that state at the end. From the first frame the button shows
+    the asked word, it must keep it (review M2)."""
     page.click("#play")
     got = page.evaluate(PLAY_SAMPLES, int(1000 * (seconds or (2.0 if want else 1.0))))
     word = "Stop" if want else "Play"
@@ -445,6 +446,17 @@ def sample_play(page, failures: list, where: str, want: bool, seconds: float | N
                         f"{wrong[0][2]}) in {len(wrong)} of {len(got)} frames; it must show {word!r} throughout")
     if not got or got[-1][2] != want:
         failures.append(f"{where}: the transport is not {'running' if want else 'stopped'} after the tap")
+    # P10d review M2: and once the button first shows the asked word, it never goes back, whatever the transport is
+    # doing (the audio starting on a first tap, the transport's 50 ms start). Before that first show, the button may
+    # still read the other word: dimmed while the audio starts on a first tap.
+    shown = next((i for i, g in enumerate(got) if g[0] == word), None)
+    if shown is None:
+        failures.append(f"{where}: after the tap the Play button never showed {word!r} in {len(got)} frames")
+    else:
+        back = [g for g in got[shown:] if g[0] != word or g[1] != want]
+        if back:
+            failures.append(f"{where}: the Play button showed {word!r}, then {back[0][0]!r} (lit {back[0][1]}) in {len(back)} "
+                            f"of {len(got) - shown} later frames; once it shows {word!r} it must keep it")
 
 
 def walk_play_button(page, failures: list, label: str) -> None:

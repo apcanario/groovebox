@@ -46,6 +46,7 @@ vi.mock("./audio.ts", () => ({ Graph: { build: async () => h.anything } }));
 
 import { Engine } from "./index.ts";
 import { vibeSong, vibeStart } from "../music/styles.ts";
+import { tapPlay } from "../ui/logic.ts";
 
 /** The scheduler's callback, `n` steps, a lookahead ahead of the clock; what it hands the screen waits in `h.draw`. */
 function steps(n: number): void {
@@ -144,6 +145,28 @@ describe("the Play button follows the transport (P10d)", () => {
       frame();
       expect(shown()).toBe(false);
       expect(heard()).toBe(false);
+    }
+  });
+
+  it("a Stop tap inside the transport's 50 ms start window stops (review M1)", async () => {
+    const { e, shown } = await engineWithButton();
+    // The transport starts at now() + 0.05: until then it reads stopped, as Tone's does.
+    const start = h.transport.start;
+    h.transport.start = () => undefined;
+    try {
+      await tapPlay(e, async () => true);
+      expect(e.playing).toBe(false);
+      expect(shown()).toBe(true);
+      expect(e.running).toBe(true);
+      // The button reads Stop; the thumb taps it.
+      await tapPlay(e, async () => true);
+      expect(shown()).toBe(false);
+      expect(e.running).toBe(false);
+      // A tap on Play again plays.
+      await tapPlay(e, async () => true);
+      expect(shown()).toBe(true);
+    } finally {
+      h.transport.start = start;
     }
   });
 });
