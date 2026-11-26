@@ -7,6 +7,7 @@ import { MORPH_THINGS, type Engine, type MorphThing } from "../engine/index.ts";
 import type { Ctx } from "./App.tsx";
 import { Dial } from "./components.tsx";
 import { Icon } from "./icons.tsx";
+import { morphHelp } from "./logic.ts";
 
 export function MorphButton({ ctx }: { ctx: Ctx }) {
   const { engine, pos } = ctx;
@@ -71,7 +72,7 @@ export function MorphPage({ engine }: { engine: Engine }) {
         <MorphSpeed engine={engine} />
         <Dial id="morphDepth" label="Depth" value={p.depth} min={0} max={1} color="var(--purple)" onChange={(v) => engine.setMorph({ depth: Math.round(v * 100) / 100 })} />
       </div>
-      <p class="note">Sound drifts Bright and Space. Leads let a note or two change. Voicing moves pads and drones at phrase ends. Drop-outs rest an instrument for a phrase. Sections move on every {p.recipe.sections} bars. A control you move is left alone for 16 bars.</p>
+      <p class="note" id="morph-help">{morphHelp(p.moves.sections, p.recipe.sections)}</p>
     </div>
   );
 }

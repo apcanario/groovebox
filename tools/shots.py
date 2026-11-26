@@ -10,6 +10,9 @@ of each into shots/ (not committed). At every screen it checks the no-scroll rul
 
 Screenshots left from an earlier run are deleted first, so shots/ holds only the current build.
 
+After the walk, the live walk (P10c M5) loads Ambient and saves, at both sizes, Morph on, the Morph page with Sections
+off and on, the Drop page and DROP in build, on and wind-down (LIVE_SCREENS); a missing one fails the run.
+
 tools/smoke.py runs the same walk (without screenshots) while the transport plays.
 
 Usage: python3 tools/shots.py [dist] [out_dir]    (builds first: npm run build)
@@ -139,6 +142,41 @@ def simple_words(page) -> list:
 FRAME_Y = """() => [Math.round(document.querySelector('.secs').getBoundingClientRect().bottom), Math.round(document.querySelector('.top').getBoundingClientRect().top)]"""
 
 
+# P10c S1 (C23): the Mix tab's page chips. Every label sits inside its chip's padding (not on the border: the CHECK
+# above allows 0.5 px past the edge, unchanged), and the whole row draws at one text size.
+MIX_CHIPS = r"""() => {
+  const bad = [];
+  const chips = [...document.querySelectorAll('.mixtab .pager button')].filter((c) => c.getClientRects().length);
+  const sizes = new Map();
+  for (const c of chips) {
+    const cs = getComputedStyle(c), r = c.getBoundingClientRect();
+    const inL = r.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+    const inR = r.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+    for (const s of c.querySelectorAll('span')) {
+      const range = document.createRange();
+      range.selectNodeContents(s);
+      const t = range.getBoundingClientRect();
+      if (!t.width) continue;
+      const word = s.textContent.trim();
+      sizes.set(word, getComputedStyle(s).fontSize);
+      if (t.left < inL || t.right > inR)
+        bad.push(`Mix chip label "${word}" is closer than its padding to the chip edge (${(t.left - inL).toFixed(1)} px left, ${(inR - t.right).toFixed(1)} px right)`);
+    }
+  }
+  if (new Set(sizes.values()).size > 1) bad.push(`Mix chips at more than one text size: ${[...sizes].map(([w, s]) => w + ' ' + s).join(', ')}`);
+  return bad;
+}"""
+
+# P10c M4 (C23): on the Simple Mix tab's Master page the Morph speed dial shares its row with another dial.
+MORPH_SPEED_ROW = r"""() => {
+  const m = document.querySelector('.mixtab [data-dial="morphSpeed"]');
+  if (!m) return ['no Morph speed dial on the Simple Mix Master page'];
+  const top = m.getBoundingClientRect().top;
+  const others = [...document.querySelectorAll('.mixtab .dial')].filter((d) => d !== m && Math.abs(d.getBoundingClientRect().top - top) < 1);
+  return others.length ? [] : ['the Morph speed dial sits alone on its row of the Simple Mix Master page'];
+}"""
+
+
 def _settle(page) -> None:
     # Two frames: the render, then the text fit. Then every CSS transition ends (a chip's or mode button's wipe
     # takes 0.14 s), so a screenshot never catches one half done and shows a stray sliver (P2 review M8).
@@ -168,6 +206,12 @@ class Walk:
             self.failures.append(f"{where}: control under 48 px: {b}")
         if label.startswith("simple"):
             for b in simple_words(self.page):
+                self.failures.append(f"{where}: {b}")
+        if "-mix" in label:
+            for b in self.page.evaluate(MIX_CHIPS):
+                self.failures.append(f"{where}: {b}")
+        if label == "simple-mix-master":
+            for b in self.page.evaluate(MORPH_SPEED_ROW):
                 self.failures.append(f"{where}: {b}")
         if self.out:
             self.page.screenshot(path=os.path.join(self.out, f"{size[0]}x{size[1]}-{label}.png"))
@@ -319,6 +363,104 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
     return w.count
 
 
+E = "window.__groovebox"
+# P10c M5 (C23): the live states the frame walk cannot reach without a vibe, each saved at both sizes. Morph on
+# (Ambient opens with it on), the Morph page with Sections off and on, and DROP in its three states.
+LIVE_DROP = ["build", "on", "wind"]
+LIVE_SCREENS = (
+    [f"{m}-play-ambient-morph-on" for m in ("simple", "advanced")]
+    + ["advanced-mix-morph-ambient-sections-off", "advanced-mix-morph-ambient-sections-on", "advanced-mix-drop-ambient"]
+    + [f"{m}-play-ambient-drop-{s}" for s in LIVE_DROP for m in ("simple", "advanced")]
+)
+
+
+def _wait(page, expr: str, timeout: float) -> bool:
+    end = time.time() + timeout
+    while time.time() < end:
+        if page.evaluate(expr):
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def walk_live(page, failures: list, out_dir: str | None) -> int:
+    """Ambient playing, at both sizes: Morph on in Simple and Advanced Play, the Morph page with Sections off and on
+    (P10c M3: its help text says what is true in each), the Drop page, and DROP in build, on and wind-down. Each screen
+    gets the frame walk's checks; a screen whose DROP state is not the one named is a failure, and so is a missing
+    screenshot. Returns the number of screens checked."""
+    w = Walk(page, failures, out_dir)
+    page.evaluate(f"(id) => {E}.loadAtBar(window.__vibeSong(id), 1)", "ambient")
+    if not _wait(page, f"{E}.getSong().style === 'ambient'", 10.0):
+        failures.append("live walk: Ambient did not load")
+        return 0
+    if not page.evaluate(f"{E}.playing"):
+        page.click("#play")
+    if not _wait(page, f"{E}.morphPlan().on", 5.0):
+        failures.append("live walk: Morph is not on in Ambient")
+    bar_s = 240.0 / page.evaluate(f"{E}.bpm")
+    # Four bars each way, so every screen of a state is taken well inside it (Ambient plays at 64 bpm: 15 s).
+    page.evaluate(f"{E}.setDrop({{build: 4, wind: 4}})")
+
+    def each_size(fn) -> None:
+        for size in SIZES:
+            page.set_viewport_size({"width": size[0], "height": size[1]})
+            time.sleep(0.2)
+            fn(size)
+
+    def play_screens(size: tuple, what: str, drop: str | None = None) -> None:
+        for mode in ("simple", "advanced"):
+            page.click(f'[data-appmode="{mode}"]')
+            page.click('[data-tab="play"]')
+            w.screen(size, f"{mode}-play-ambient-{what}")
+            got = page.evaluate("(() => { const b = document.querySelector('#drop'); return b ? b.dataset.drop : null; })()")
+            if drop and got != drop:
+                failures.append(f"{size[0]}x{size[1]} live walk: DROP shows {got!r} on the {mode} {what} screen, not {drop!r}")
+            if what == "morph-on" and page.evaluate("(() => { const m = document.querySelector('#morph'); return m ? m.dataset.morph : null; })()") != "on":
+                failures.append(f"{size[0]}x{size[1]} live walk: Morph does not show on, on the {mode} Play tab")
+
+    def mix_screens(size: tuple) -> None:
+        page.click('[data-appmode="advanced"]')
+        page.click('[data-tab="mix"]')
+        page.click('[data-page="mix:morph"]')
+        was = page.evaluate(f"{E}.morphPlan().moves.sections")
+        for on in (False, True):
+            if page.evaluate(f"{E}.morphPlan().moves.sections") != on:
+                page.click('[data-morphthing="sections"]')
+            w.screen(size, f"advanced-mix-morph-ambient-sections-{'on' if on else 'off'}")
+            text = page.evaluate("(document.querySelector('#morph-help') || {}).textContent || ''")
+            bars = page.evaluate(f"{E}.morphPlan().recipe.sections")
+            claims = f"every {bars} bars" in text
+            if claims != on:
+                failures.append(f"{size[0]}x{size[1]} live walk: with Sections {'on' if on else 'off'} the Morph help says: {text!r}")
+        if page.evaluate(f"{E}.morphPlan().moves.sections") != was:
+            page.click('[data-morphthing="sections"]')
+        page.click('[data-page="mix:drop"]')
+        w.screen(size, "advanced-mix-drop-ambient")
+
+    each_size(lambda s: play_screens(s, "morph-on"))
+    each_size(mix_screens)
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    for state, press in (("build", True), ("on", False), ("wind", True)):
+        if press:
+            page.click("#drop")
+        if not _wait(page, f"{E}.dropShown().phase === {state!r}", bar_s * 6 + 2):
+            failures.append(f"live walk: DROP never reached {state!r} (it shows {page.evaluate(f'{E}.dropShown().phase')!r})")
+            continue
+        each_size(lambda s, st=state: play_screens(s, f"drop-{st}", st))
+    _wait(page, f"{E}.dropShown().phase === 'off'", bar_s * 6 + 2)
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    page.set_viewport_size({"width": 390, "height": 844})
+    if out_dir:
+        for size in SIZES:
+            for label in LIVE_SCREENS:
+                f = f"{size[0]}x{size[1]}-{label}.png"
+                if not os.path.exists(os.path.join(out_dir, f)):
+                    failures.append(f"live walk: no screenshot {f}")
+    return w.count
+
+
 def main() -> int:
     from playwright.sync_api import sync_playwright
 
@@ -354,6 +496,7 @@ def main() -> int:
             page.click('[data-strip="1"]')  # Groove: every instrument on
             time.sleep(2.5)
             n = walk_frame(page, failures, out)
+            n += walk_live(page, failures, out)
             failures += [f"page error: {e}" for e in errors]
             browser.close()
     finally:

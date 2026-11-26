@@ -1958,6 +1958,22 @@ button:disabled {
   width: 15px;
   height: 15px;
 }
+/* P10c S1 (C23): the Advanced Mix tab's six page chips (Master, Levels, Space, Audio, Drop, Morph) set the icon over
+   the word, as seven chips do, at one size for the whole row, so every word sits inside the chip's padding at 360 px
+   wide (54 px chips) and up. */
+.mixtab .pager.six button {
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12px;
+}
+.mixtab .pager.six button .ic {
+  width: 15px;
+  height: 15px;
+}
+/* P10c M4 (C23): Simple's Master page, Tone, Pump, Grit and Morph speed, two by two, so Morph speed never sits alone. */
+.mixtab .dials.n4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .fxrow.one {
   grid-template-columns: minmax(0, 1fr);
 }

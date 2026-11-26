@@ -145,7 +145,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
       <MasterMeter engine={engine} />
       <Pager id="mix" pages={pages} page={page} onPage={setPage} />
       {page === "master" && (
-        <div class="dials n3">
+        <div class={`dials ${ctx.advanced ? "n3" : "n4"}`}>
           <Dial id="sweep" label={ctx.advanced ? "Filter" : "Tone"} value={mix.sweep} min={-1} max={1} bipolar display={ctx.advanced ? sweepLabel(mix.sweep) : simpleSweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
           <Dial id="pump" label="Pump" value={mix.pump} min={0} max={0.95} display={String(Math.round(mix.pump * 100))} color="var(--teal)" onChange={set("pump")} />
           <Dial id="saturation" label={ctx.advanced ? "Saturate" : "Grit"} value={mix.saturation} min={0} max={1} color="var(--coral)" onChange={set("saturation")} />

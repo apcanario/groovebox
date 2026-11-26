@@ -20,6 +20,7 @@ import {
   editedSection,
   editWithoutPlaying,
   fitSize,
+  morphHelp,
   shownPage,
   withFilterPage,
   fraction,
@@ -389,5 +390,23 @@ describe("P10 review S9: the DROP button and the strip's After drop", () => {
     expect(stripState(1, { ...s, afterDrop: true }).sub).toBe("After drop");
     expect(stripState(1, { ...s, afterDrop: false }).sub).toBe("Next bar");
     expect(stripState(1, { ...s, afterDrop: true }).isNext).toBe(true);
+  });
+});
+
+describe("P10c M3: the Morph page's help text follows the Sections switch", () => {
+  it("off: says the jam stays in its section and names no interval", () => {
+    const t = morphHelp(false, 32);
+    expect(t).toContain("Sections is off, so the jam stays in its section.");
+    expect(t).not.toMatch(/every \d+ bars/);
+    expect(t).not.toContain("32");
+  });
+  it("on: says the section moves on every 16 or 32 bars, as the vibe sets", () => {
+    expect(morphHelp(true, 32)).toContain("Sections moves the jam to the next section every 32 bars.");
+    expect(morphHelp(true, 16)).toContain("every 16 bars.");
+    expect(morphHelp(true, 16)).not.toContain("is off");
+  });
+  it("the other switches read the same either way", () => {
+    const strip = (t: string): string => t.replace(/Sections[^.]*\./, "");
+    expect(strip(morphHelp(true, 16))).toBe(strip(morphHelp(false, 16)));
   });
 });

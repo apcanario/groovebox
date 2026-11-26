@@ -759,3 +759,12 @@ export function dropLabel(v: DropLook, playing: boolean): string {
       return `Drop: winding down, ${bars(v.barsLeft)} left`;
   }
 }
+
+/**
+ * The Morph page's help text (spec 8.11; P10c M3, C23): what each switch moves, true for the Sections switch as it
+ * stands. Off, the section stays put; on, it moves on every `bars` bars (the vibe's 16 or 32).
+ */
+export function morphHelp(sections: boolean, bars: number): string {
+  const sec = sections ? `Sections moves the jam to the next section every ${bars} bars.` : "Sections is off, so the jam stays in its section.";
+  return `Sound drifts Bright and Space. Leads let a note or two change. Voicing moves pads and drones at phrase ends. Drop-outs rest an instrument for a phrase. ${sec} A control you move is left alone for 16 bars.`;
+}
