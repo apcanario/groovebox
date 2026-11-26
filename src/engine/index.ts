@@ -10,7 +10,7 @@ import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
 import { DiffWatch, EnergyWatch, JumpWatch, type Energy, type Jumps } from "./continuity.ts";
-import { DropConductor, checkDropSettings, dropLevels as recipeLevels, type WindBar, followFallback, followRef, followStep, refSettleBars, trackBound, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
+import { DropConductor, checkDropSettings, dropLevels as recipeLevels, type WindBar, followRef, followStep, refSettleBars, trackBound, loopBeats, resolveDrop, rollHits, type DropBar, type DropIntent, type DropPhase, type DropRecipe, type DropSettings } from "../music/drop.ts";
 import { COMP_TOP, type OverlayGroup } from "./drop.ts";
 import { LEAD_SHAPES as SHAPES, LEAD_STYLES as STYLES } from "../music/lead.ts";
 import { InFlight, type Pending } from "./queue.ts";
@@ -1209,11 +1209,6 @@ export class Engine {
   }
 
   /**
-   * For the smoke test: the follower's gain, its reference, voices sounding, the most at once, notes over the cap; and
-   * (P10b) the last wind-down's schedule (audio time of its first bar line, bar seconds, per-bar targets) and the voices
-   * it held back.
-   */
-  /**
    * C27, for the smoke test: the loop (in bars) the level follower keys the playing section's beats by (`loopBeats`),
    * so the check compares the drop's bars with the section's bars at the same places of it.
    */
@@ -1222,6 +1217,11 @@ export class Engine {
     return loopBeats((sec?.chords ?? []).map((c) => c.bars)) / 4;
   }
 
+  /**
+   * For the smoke test: the follower's gain, its reference, voices sounding, the most at once, notes over the cap; and
+   * (P10b) the last wind-down's schedule (audio time of its first bar line, bar seconds, per-bar targets) and the voices
+   * it held back.
+   */
   dropInfo(): { comp: number; ref: number; measured: number; steady: number; followed: number; live: number; most: number; dropped: number; thinned: number; wind: { at: number; bar: number; steps: WindBar[] } | null; follower: boolean; mix: { lp: number; hp: number; pump: number } } | null {
     const g = this.graph;
     if (!g) return null;
@@ -1520,10 +1520,9 @@ export class Engine {
     if (this.dropHand || !this.graph || !(this.dropRef > 0)) return;
     if (phase === "on") this.dropOnBeats++;
     const settling = !(phase === "on" && this.dropFollowed >= FOLLOW_BEATS);
-    // P10 fix: each beat against the same place of the section's loop; while a punchy drop settles, a place not heard
-    // before the build is read against the section's last bar before it; a bloom, and any drop once settled, moves
-    // the gain only on heard places (C27, `followFallback`).
-    const ref = followRef(this.dropRefs, key, followFallback(!!this.dropRec?.bloom, settling, this.dropLast));
+    // P10 fix: each beat against the same place of the section's loop; while settling, a place not heard before the
+    // build is read against the section's last bar before it; once settled, only heard places move the gain.
+    const ref = followRef(this.dropRefs, key, settling ? this.dropLast : 0);
     if (ref === null) return;
     const c = Math.max(0.05, this.graph.drop.compValue);
     this.dropWindow.push({ e: e.energy, c, ref });

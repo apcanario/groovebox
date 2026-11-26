@@ -214,5 +214,51 @@ class DropGroups(unittest.TestCase):
         self.assertEqual(dropcheck.drop_group(vibes, None), vibes)
 
 
+class DropLevel(unittest.TestCase):
+    """C27: the drop's loudness on a loop longer than the 8-bar window (Drone's two 8-bar chords) is judged against
+    the section's bars at the same places, and still fails a drop that is really off."""
+
+    @staticmethod
+    def reading(level_db: float) -> dict:
+        return {"energy": 10 ** (level_db / 10)}
+
+    def setUp(self):
+        import dropcheck as dc
+        self.dc = dc
+        # The section: bars 0 to 7 (the window) on the first chord at -11 dB, the second chord at -13 dB; read after the
+        # drop on bars 24 to 31. The drop, as one_drop reads it: bars 11 to 18, places 11 to 15 of the second chord, then
+        # 0 to 2 of the first.
+        level = lambda at: -11.0 if at % 16 < 8 else -13.0  # noqa: E731
+        self.window = [(at, self.reading(level(at))) for at in range(0, 8)]
+        self.late = [(at, self.reading(level(at))) for at in range(24, 32)]
+        self.drop_at = list(range(11, 19))
+        self.level = level
+        self.n = {"energy": sum(b["energy"] for _, b in self.window) / 8}
+
+    def drop(self, off_db: float) -> list:
+        return [self.reading(self.level(at) + off_db) for at in self.drop_at]
+
+    def test_a_drop_at_the_section_level_reads_zero(self):
+        loud, per_bar = self.dc.drop_level(self.drop(0.0), self.drop_at, self.late + self.window, 16, self.n)
+        self.assertAlmostEqual(loud, 0.0, places=6)
+        self.assertEqual([round(x, 6) for x in per_bar], [0.0] * 8)
+        # Against the window's mean (the check before C27) the same drop read 1.1 dB low, past LOUD_DB.
+        old, _ = self.dc.drop_level(self.drop(0.0), self.drop_at, self.window, 8, self.n)
+        self.assertLess(old, -self.dc.LOUD_DB)
+
+    def test_a_drop_really_off_is_still_caught(self):
+        for off in (-2.0, 1.5):
+            loud, per_bar = self.dc.drop_level(self.drop(off), self.drop_at, self.late + self.window, 16, self.n)
+            self.assertAlmostEqual(loud, off, places=6)
+            self.assertGreater(abs(loud), self.dc.LOUD_DB)
+            self.assertTrue(all(abs(x - off) < 1e-6 for x in per_bar))
+
+    def test_an_8_bar_loop_is_judged_against_the_window_as_before(self):
+        bars = [self.reading(-11.5)] * 8
+        loud, per_bar = self.dc.drop_level(bars, list(range(12, 20)), self.window, 8, {"energy": 10 ** -1.1})
+        self.assertAlmostEqual(loud, -0.5, places=6)
+        self.assertTrue(all(abs(x + 0.5) < 1e-6 for x in per_bar))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

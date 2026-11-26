@@ -416,6 +416,21 @@ def peak_db(x: float) -> float:
     return 20 * math.log10(max(x, 1e-9))
 
 
+def drop_level(bars: list, drop_at: list, sec: list, loop: int, n: dict) -> tuple:
+    """The drop's loudness against the section (dB) and each drop bar's. `bars` the drop's bar readings and `drop_at`
+    their bar numbers; `sec` the section's (bar number, reading) pairs, the window last (it wins a place read twice); `n` the window's mean. A loop
+    no longer than the window: against the window's mean, as always. A longer one (C27): each drop bar against the
+    section's bar at the same place of the loop (the window's mean where none was read), and the drop's mean against
+    the mean of those same bars."""
+    energy = sum(b["energy"] for b in bars) / len(bars)
+    if loop <= WINDOW:
+        return 10 * math.log10(max(energy, 1e-12)) - db(n), [db(b) - db(n) for b in bars]
+    by_place = {at % loop: b for at, b in sec}
+    refs = [by_place.get(at % loop, n) for at in drop_at]
+    ref_energy = sum(r["energy"] for r in refs) / len(refs)
+    return 10 * math.log10(max(energy, 1e-12)) - 10 * math.log10(max(ref_energy, 1e-12)), [db(b) - db(r) for b, r in zip(bars, refs)]
+
+
 def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     """One vibe's drop measured: the section's four bars, the build, the impact's bar, each of four drop bars, the
     wind-down and two bars after it. Returns the figures, or None when the drop did not come on."""
@@ -533,17 +548,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     width = sum(b["width"] for b in bars) / len(bars)
     # Each drop bar against the section's level; the section's own bars spread round it too (a generative lead or
     # break varies bar to bar), so a drop bar may stray BAR_DB beyond the section's own largest stray.
-    if loop > WINDOW:
-        # C27: each drop bar against the section's bar at the same place of the loop (the section's mean where a bar
-        # was missed); the loudness is the drop's mean against the mean of those same bars.
-        by_place = {at % loop: b for at, b in late + list(zip(sec_at, sec_bars))}
-        refs = [by_place.get(at % loop, n) for at in drop_at]
-        ref_energy = sum(r["energy"] for r in refs) / len(refs)
-        loud = 10 * math.log10(max(energy, 1e-12)) - 10 * math.log10(max(ref_energy, 1e-12))
-        per_bar = [db(b) - db(r) for b, r in zip(bars, refs)]
-    else:
-        loud = 10 * math.log10(max(energy, 1e-12)) - db(n)
-        per_bar = [db(b) - db(n) for b in bars]
+    loud, per_bar = drop_level(bars, drop_at, late + list(zip(sec_at, sec_bars)), loop, n)
     spread = max(abs(db(b) - db(n)) for b in sec_bars)
     peaks = {"section": n["peak"], "build": p_build["peak"], "impact": p_imp["peak"], "drop": max(b["peak"] for b in bars),
              "wind": p_wind["peak"], "after": p_after["peak"]}
