@@ -2409,6 +2409,7 @@ button:disabled {
   position: absolute;
   inset: 10px 8px;
   z-index: 1;
+  overflow: hidden;
   pointer-events: none;
 }
 .padnotes .n {
