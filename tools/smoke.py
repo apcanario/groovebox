@@ -19,6 +19,8 @@ drop within 1 dB of its section, measurably wider, the master never clipping (pa
 P11: Morph (tools/morphcheck.py): its switch beside DROP, the Speed dial and the Morph page; Morph off moving nothing;
 ten minutes of Ambient never repeating a 16-bar stretch and never leaving the key, its journey the seeded one; a hand
 holding a dial for 16 bars; a drop holding Morph.
+T1: the layout follows the screen (phone, tablet portrait, tablet landscape) live, and a rotation while playing leaves
+the transport running with no gap in the level and nothing changed in the engine.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
@@ -3111,6 +3113,97 @@ def open_app(page, failures: list) -> None:
     sample_play(page, failures, "first tap after load", True)
 
 
+# T1 (spec 9.1): the sizes a rotation walks through, with the layout each must show.
+ROTATE_SIZES = [
+    ((800, 1280), "portrait"),
+    ((1280, 800), "landscape"),
+    ((1024, 768), "landscape"),
+    ((768, 1024), "portrait"),
+    ((360, 640), "phone"),
+    ((412, 915), "phone"),
+    ((1280, 800), "landscape"),
+    ((390, 844), "phone"),
+]
+
+ROTATE_READ = """() => {
+  const e = window.__groovebox, p = e.position(), sh = document.querySelector('.shell');
+  return { size: document.documentElement.dataset.size, shown: window.__size.get(), cls: sh ? sh.className : '',
+           running: e.running, playing: p.playing, bar: p.bar, step: p.step, attacks: e.attacks(), level: e.level(),
+           panes: document.querySelectorAll('.shell .pads, .shell .inst').length, play: document.querySelectorAll('#play').length };
+}"""
+
+
+def walk_rotate(page, failures: list) -> None:
+    """T1 (spec 9.1): the layout follows the screen live (phone, tablet portrait, tablet landscape), in both modes, and a
+    rotation mid-jam never touches the engine: the transport keeps running and counting, notes keep starting, the level
+    never drops out, the song and its landed switches are unchanged and the engine reports no change. The size can be
+    forced (window.__size) for smoke and screenshots. Leaves the phone at 390 x 844 on the mode and tab it found."""
+    if not page.evaluate("window.__groovebox.playing"):
+        failures.append("T1 rotate: the transport is not running before the rotation")
+        return
+    tab0 = page.evaluate("document.querySelector('.tabs .tab.on')?.dataset.tab || 'play'")
+    mode0 = "advanced" if page.get_attribute('[data-appmode="advanced"]', "aria-checked") == "true" else "simple"
+    base = []
+    for _ in range(10):
+        time.sleep(0.1)
+        v = page.evaluate("window.__groovebox.level()")
+        if v is not None and v > -200:
+            base.append(v)
+    floor = max(-80.0, (min(base) if base else -60.0) - 20.0)
+    song0 = page.evaluate(SONG)
+    landed0 = page.evaluate("window.__groovebox.landed.length")
+    page.evaluate("window.__t1chg = 0; window.__t1off = window.__groovebox.onChange(() => window.__t1chg++)")
+    low = []
+    last = page.evaluate(ROTATE_READ)
+    for mode in ("advanced", "simple"):
+        page.click(f'[data-appmode="{mode}"]')
+        for (w, h), want in ROTATE_SIZES:
+            page.set_viewport_size({"width": w, "height": h})
+            where = f"T1 rotate ({mode}) to {w} x {h}"
+            if not wait_for(page, f"document.documentElement.dataset.size === {want!r}", 1.0):
+                failures.append(f"{where}: layout {page.evaluate('document.documentElement.dataset.size')!r}, expected {want}")
+            end = time.time() + 0.5
+            while time.time() < end:
+                v = page.evaluate("window.__groovebox.level()")
+                if v is None or v < floor:
+                    low.append(f"{where}: {v}")
+                time.sleep(0.05)
+            r = page.evaluate(ROTATE_READ)
+            tablet = want != "phone"
+            if r["shown"] != want or (("tablet" in r["cls"].split()) != tablet) or (tablet and want not in r["cls"].split()):
+                failures.append(f"{where}: shell {r['cls']!r}, size {r['shown']!r}")
+            if r["panes"] != (2 if tablet else 0) or r["play"] != 1:
+                failures.append(f"{where}: {r['panes']} tablet halves and {r['play']} Play buttons")
+            if not (r["running"] and r["playing"]):
+                failures.append(f"{where}: the transport stopped")
+            if (r["bar"], r["step"]) == (last["bar"], last["step"]):
+                failures.append(f"{where}: the position did not advance ({last['bar']}.{last['step']} to {r['bar']}.{r['step']})")
+            if r["attacks"] <= last["attacks"]:
+                failures.append(f"{where}: no note started across the rotation")
+            if page.evaluate("document.documentElement.scrollHeight > innerHeight + 0.5 || document.documentElement.scrollWidth > innerWidth + 0.5"):
+                failures.append(f"{where}: the page scrolls")
+            last = r
+    if low:
+        failures.append(f"T1 rotate: the level dropped under {floor:.1f} dB during a rotation: {low[:4]}")
+    if page.evaluate("window.__t1chg"):
+        failures.append(f"T1 rotate: the engine reported {page.evaluate('window.__t1chg')} changes during the rotations")
+    page.evaluate("window.__t1off()")
+    if page.evaluate(SONG) != song0:
+        failures.append("T1 rotate: the song changed during the rotations")
+    if page.evaluate("window.__groovebox.landed.length") != landed0:
+        failures.append("T1 rotate: a switch landed during the rotations")
+    # The debug hook: a forced size holds whatever the screen, and null follows the screen again.
+    page.evaluate("window.__size.force('landscape')")
+    if "landscape" not in (page.get_attribute(".shell", "class") or "").split():
+        failures.append("T1 rotate: __size.force('landscape') did not show the landscape layout")
+    page.evaluate("window.__size.force(null)")
+    if page.evaluate("document.documentElement.dataset.size") != "phone" or "tablet" in (page.get_attribute(".shell", "class") or ""):
+        failures.append("T1 rotate: __size.force(null) did not return to the phone layout at 390 x 844")
+    page.click(f'[data-appmode="{mode0}"]')
+    page.click(f'[data-tab="{tab0}"]')
+    print(f"rotation: {len(ROTATE_SIZES)} sizes in both modes while playing, level floor {floor:.1f} dB, transport running")
+
+
 def part_core(browser, page, failures: list, shot) -> None:
     # Sound and switching, then the screens, as one span of the single run (its walks build on one another's state):
     # the C4 and P5 layer levels, the Now view, the P1b look, P2's modes, a section and three toggles landing on the
@@ -3220,6 +3313,7 @@ def part_core(browser, page, failures: list, shot) -> None:
     narrow_pass(page, failures)
     if not page.evaluate("window.__groovebox.playing"):
         failures.append("the transport stopped during the shell walk")
+    walk_rotate(page, failures)
     # P10d: later taps of Play and Stop in Simple and Advanced, and a Stop during a drop's build, each sampled.
     walk_play_button(page, failures, "core")
     page.click('[data-appmode="advanced"]')
