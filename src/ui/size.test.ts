@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import sizeSource from "./size.ts?raw";
 import { parseForced, sizeClass, SizeWatch, tabletPanel } from "./size.ts";
 
 describe("size class (spec 9.1)", () => {
@@ -87,5 +88,12 @@ describe("SizeWatch", () => {
 
   it("starts from a forced class", () => {
     expect(watch([{ w: 390, h: 844 }], "portrait").current).toBe("portrait");
+  });
+});
+
+describe("a rotation never touches the engine", () => {
+  it("the size layer imports nothing but itself: no engine, no Tone.js", () => {
+    expect(sizeSource).not.toMatch(/^import /m);
+    expect(sizeSource).not.toMatch(/from ["'][^"']*(engine|tone)/i);
   });
 });
