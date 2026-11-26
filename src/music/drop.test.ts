@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DROP, DropConductor, checkDropRecipe, followRef, followStep, loopBeats, refSettleBars, trackBound, resolveDrop, rollHits, type DropBar } from "./drop.ts";
+import { DEFAULT_DROP, DropConductor, checkDropRecipe, followFallback, followRef, followStep, loopBeats, refSettleBars, trackBound, resolveDrop, rollHits, type DropBar } from "./drop.ts";
 import { STYLES, STYLE_IDS, vibeSong } from "./styles.ts";
 import { defaultSong, validateSong } from "../engine/song.ts";
 
@@ -178,6 +178,58 @@ describe("P10 review: the level follower's steps and loop", () => {
     }
     expect(followed).toBe(8);
     expect(Math.abs(20 * Math.log10(c))).toBeLessThan(0.3);
+  });
+  it("C27: a bloom on a 64-beat loop of which 32 beats were heard, with a quiet last bar, stays at the section's level", () => {
+    // Drone's case, as the smoke measured it: two 8-bar chords (64 beats at 4 beats a bar). Only the first chord was
+    // heard before the build, its last bar 1.7 dB quiet (the next chord swelling in); the second chord swells in from
+    // -2 dB over three bars and sits 0.5 dB under the first. The bloom's layers add 0.4 dB. A 2-bar build, then the
+    // drop: six bars on the second chord, then the first.
+    const db = (x: number): number => Math.pow(10, x / 10);
+    const sectionAt = (b: number): number => {
+      const p = ((b % 64) + 64) % 64;
+      if (p < 28) return 1;
+      if (p < 32) return db(-1.7);
+      return db(-0.5 - 1.5 * Math.max(0, 1 - (p - 32) / 12));
+    };
+    const layers = db(0.4);
+    const heard = new Map<number, number>();
+    for (let b = 0; b < 32; b++) heard.set(b, sectionAt(b));
+    const last = [28, 29, 30, 31].reduce((a, b) => a + sectionAt(b), 0) / 4;
+    // The engine's follower (src/engine/index.ts dropFollow) through a bloom's 2-bar build and 16 bars of drop.
+    let c = 1;
+    let followed = 0;
+    let settled = 1;
+    const window: { e: number; c: number; ref: number }[] = [];
+    const off: number[] = [];
+    for (let b = 32; b < 32 + 40; b++) {
+      const drop = b >= 40;
+      const e = sectionAt(b) * layers * c * c;
+      if (drop) off.push(10 * Math.log10(e / sectionAt(b)));
+      const settling = !(drop && followed >= 8);
+      const ref = followRef(heard, b % 64, followFallback(true, settling, last));
+      if (ref === null) continue;
+      window.push({ e, c, ref });
+      if (window.length > 4) window.shift();
+      const ratio = window.reduce((a, w) => a + w.e / (w.c * w.c * w.ref), 0) / window.length;
+      const aim = 1 / Math.sqrt(ratio);
+      if (!settling) {
+        c = followStep(c, trackBound(aim, settled, 3), 0.25, 0.3, 1.25);
+        continue;
+      }
+      c = followStep(c, aim, 0.5, 0.3, 1.25);
+      if (drop) followed++;
+      if (drop && followed >= 8) settled = c;
+    }
+    // Each drop beat against the section at the same place: within 1 dB (the smoke's LOUD_DB) and their mean too.
+    const mean = off.reduce((a, b) => a + b, 0) / off.length;
+    expect(Math.abs(mean)).toBeLessThan(0.5);
+    // Back on the heard chord it settles: the last bar's beats within 0.3 dB of the section.
+    expect(Math.max(...off.slice(-4).map(Math.abs))).toBeLessThan(0.3);
+    expect(Math.max(...off.map(Math.abs))).toBeLessThan(1);
+    // A punchy drop still reads a place not heard against the last bar while it settles, and nothing once settled.
+    expect(followFallback(false, true, last)).toBe(last);
+    expect(followFallback(false, false, last)).toBe(0);
+    expect(followFallback(true, true, last)).toBe(0);
   });
   it("P10 fix: once settled, the follower tracks within 3 dB of where it settled", () => {
     const k = Math.pow(10, 3 / 20);
