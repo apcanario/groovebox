@@ -436,7 +436,7 @@ export function Pager<K extends string>({
   id: string;
 }) {
   return (
-    <div class={`seg pager${pages.length > 6 ? " many" : pages.length === 6 ? " six" : ""}`} style={{ gridTemplateColumns: `repeat(${pages.length}, minmax(0, 1fr))` }}>
+    <div class={`seg pager${pages.length > 6 ? " many" : pages.length === 6 ? " six" : pages.length === 5 ? " five" : ""}`} style={{ gridTemplateColumns: `repeat(${pages.length}, minmax(0, 1fr))` }}>
       {pages.map(([k, label]) => (
         <button key={k} class={k === page ? "on" : ""} data-page={`${id}:${k}`} aria-pressed={k === page} onClick={() => onPage(k)}>
           <PageIcon label={label} />

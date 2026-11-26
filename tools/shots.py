@@ -142,6 +142,26 @@ def simple_words(page) -> list:
 FRAME_Y = """() => [Math.round(document.querySelector('.secs').getBoundingClientRect().bottom), Math.round(document.querySelector('.top').getBoundingClientRect().top)]"""
 
 
+# Bundle 7b player (C26): on every tab, every page chip's label sits inside the chip's padding (the CHECK allows 0.5 px
+# past the edge, unchanged); the Mix tab's row also at one text size (MIX_CHIPS below).
+PAGE_CHIPS = r"""() => {
+  const bad = [];
+  for (const c of [...document.querySelectorAll('.pager button')].filter((c) => c.getClientRects().length)) {
+    const cs = getComputedStyle(c), r = c.getBoundingClientRect();
+    const inL = r.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+    const inR = r.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+    for (const s of c.querySelectorAll('span')) {
+      const range = document.createRange();
+      range.selectNodeContents(s);
+      const t = range.getBoundingClientRect();
+      if (t.width && (t.left < inL || t.right > inR))
+        bad.push(`page chip "${s.textContent.trim()}" is closer than its padding to the chip edge (${(t.left - inL).toFixed(1)} px left, ${(inR - t.right).toFixed(1)} px right)`);
+    }
+  }
+  return bad;
+}"""
+
+
 # P10c S1 (C23): the Mix tab's page chips. Every label sits inside its chip's padding (not on the border: the CHECK
 # above allows 0.5 px past the edge, unchanged), and the whole row draws at one text size.
 MIX_CHIPS = r"""() => {
@@ -219,6 +239,8 @@ class Walk:
         if label.startswith("simple"):
             for b in simple_words(self.page):
                 self.failures.append(f"{where}: {b}")
+        for b in self.page.evaluate(PAGE_CHIPS):
+            self.failures.append(f"{where}: {b}")
         if "-mix" in label:
             for b in self.page.evaluate(MIX_CHIPS):
                 self.failures.append(f"{where}: {b}")
@@ -369,7 +391,9 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
             box = page.locator('[data-strip="0"]').bounding_box()
             page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
             page.mouse.down()
-            time.sleep(0.7)
+            # C26 (bundle 7b player): hold until the sheet opens (the long-press timer is 500 ms), at most 3 s, rather
+            # than a fixed 0.7 s, which a busy machine's late timer could beat (failed once at 412 x 915).
+            _wait(page, "!!document.querySelector('#section-close')", 3.0)
             page.mouse.up()
             if page.locator("#section-close").count():
                 w.screen(size, f"{mode}-section-sheet")

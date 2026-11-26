@@ -26,7 +26,7 @@ Every sound is synthesized in the app. There are no samples, no accounts and no 
 
 ## What it does today
 
-Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c and P10d, 22 to 26 Nov 2026):
+Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, R1, P10b, P10c and P10d and the bundle 7b player pass, 22 to 26 Nov 2026):
 
 - **Morph (P11):** a Morph switch beside DROP on the Play tab, a Morph speed dial on the Simple Mix tab and a Morph page in Advanced Mix. With it on, a seeded plan slowly drifts Bright and Space, eases Lock, moves pad and drone voicing at the end of a phrase (a new Voicing dial on the Pad page) and takes one instrument out for a phrase and gives it back, all within limits each vibe sets. Ambient and Drone have it on by default; the other vibes start with it off. Moves are logged like a hand's. A hand on a control holds it for 16 bars; a drop holds all of Morph and Morph gives back anything it had out when it stops. Section moves are built but off. Measured in ten minutes of Ambient: no note out of key, the same seed gives the same journey, no 16-bar stretch repeats counting every value Morph moves; by the notes alone 12 stretches repeat. Whether it is good to coast on is for the ear.
 - **The Drop (P10):** a DROP button on the Play tab in both modes, with the same button and a Drop page (build length, cliffhanger, wind-down, Width) on the Advanced Mix tab. A press builds on the bar lines, hangs (a gap, a held chord or nothing), then lands wider with extra layers on top of the section, and stays on until the second press, which winds down over two or four bars (easing the extra layers, level, width and voices down a bar at a time, row P10b) into the same section or the one you tapped during the drop. A press during the build cancels it; a press during the wind-down does nothing. The extra layers are an overlay that never touches the song, with its own cap of 48 voices; the tempo never changes. Each of the 24 vibes has its own recipe in its style file. A level follower keeps the drop within about 1 dB of the section it came from. Measured: wider by at least 1.23 times in all 24, highest peak -0.7 dBFS. Whether it goes BAM is for the ear.
@@ -62,7 +62,7 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 
 ## Where it is going
 
-**Next, bundle 7b:** the bundle player pass (deferred to Monday), then bundle 8 (tablet). R1, P10b, P10c and P10d are Done: DROP and Morph keep one place in Simple and Advanced, and the Play button shows the engine's real state. Known failure: in idm, EDM and Electro the music's own level sometimes steps 2 to 4 dB for about nine bars (C24), so smoke parts drop-5 and drop-6 can fail intermittently; it may be the same wave and sub phase bug P10d fixed for Ambient and Drone (C27), to recheck.
+**Next, bundle 8: tablet** (rows T1 to T3, below). Bundle 7b is done: R1, P10b, P10c, P10d and its player pass. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix is planned after the APK, by Pedro's decision.
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 

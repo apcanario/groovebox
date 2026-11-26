@@ -1959,14 +1959,28 @@ button:disabled {
 /* P10c S1 (C23): the Advanced Mix tab's six page chips (Master, Levels, Space, Audio, Drop, Morph) set the icon over
    the word, as seven chips do, at one size for the whole row, so every word sits inside the chip's padding at 360 px
    wide (54 px chips) and up. */
-.mixtab .pager.six button {
+/* Bundle 7b player (C26): every six-chip page row (Advanced Drums, Layer pages, a Lead's pages) the same, and the
+   five-chip rows on a phone under 400 px wide (66 px chips: Bass, Layer Arp, Pad and Drone), so no word runs to the
+   chip's edge. */
+.pager.six button {
   flex-direction: column;
   gap: 1px;
   font-size: 12px;
 }
-.mixtab .pager.six button .ic {
+.pager.six button .ic {
   width: 15px;
   height: 15px;
+}
+@media (max-width: 399px) {
+  .pager.five button {
+    flex-direction: column;
+    gap: 1px;
+    font-size: 12px;
+  }
+  .pager.five button .ic {
+    width: 15px;
+    height: 15px;
+  }
 }
 /* P10c M4 (C23): Simple's Master page, Tone, Pump, Grit and Morph speed, two by two, so Morph speed never sits alone. */
 .mixtab .dials.n4 {
