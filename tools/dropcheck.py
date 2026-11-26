@@ -9,7 +9,8 @@ drop_vibes: every vibe loaded mid-jam, its drop played (a two-bar build set on t
 loudness (K-weighted, P10 review S7) and stereo width measured on the master output over eight whole bars of the section
 before and eight whole bars of the drop (after the impact's bar): within 1 dB, each of those bars within 1.5 dB past the
 section's own largest bar-to-bar stray, and wider. A section whose loop is longer than eight bars (Ambient's and Drone's
-16) is read over its whole loop and each drop bar is compared with the section's bar at the same place (C27). The master's largest sample over the section, build, impact, drop, wind-down and two bars after stays under
+16) is read on after the drop until each drop bar's place in the loop has been heard, and each drop bar is compared with
+the section's bar at the same place (C27). The master's largest sample over the section, build, impact, drop, wind-down and two bars after stays under
 -0.5 dBFS, also at Width 1, Hold and Saturation 0.6 (P10 review S1, S3). On Drone the drop's bar lines do not dip
 (P10 review S8).
 """
@@ -424,16 +425,8 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     # section's and the drop's own, as for any sound that moves by itself) are read bar by bar too.
     page.evaluate(f"{E}.dropLayers()")
     page.evaluate(f"{E}.jumps('master')")
-    # C27: a section whose loop is longer than the window (Ambient's and Drone's 16 bars of slow chords that differ in
-    # level and swell in) has its drop's bars on other places of the loop than the window's: the bars before the window
-    # are read too, so the section is heard over its whole loop, and the drop's loudness is judged against the
-    # section's bars at the same places (the window itself, below, is read as before).
+    # C27: the section's loop, in bars (see the end: a loop longer than the window is read over the drop's places).
     loop = int(round(page.evaluate(f"{E}.dropLoopBars()")))
-    early = []
-    for _ in range(max(0, loop - WINDOW)):
-        b = next_bar(page)
-        early.append((b, page.evaluate(f"{E}.stereo()")))
-    page.evaluate(f"{E}.jumps('master')")
     sec_bars = []
     jumps = []
     sec_out = []  # P10b review M3: whether Morph had an instrument out, and (E3) each instrument's level, bar by bar
@@ -520,6 +513,22 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
              "phase_after": shown(page)["phase"], "plan": plan, "jump_ref": max(jumps) if jumps else 0.0,
              "out": any(sec_out) or any(after_out), "moved": len(set(moves)) > 1, "sec_inst": sec_inst, "after_inst": after_inst,
              "controls": controls, "sec_at": sec_at, "drop_at": drop_at, "drop_layers": drop_layers}
+    # C27: a section whose loop is longer than the window (Ambient's and Drone's 16 bars of slow chords that differ in
+    # level and swell in) has most of its drop's bars on places of the loop the window did not read. After everything
+    # above (so every other check reads the bars it always read), the section is read on until each of the drop's
+    # places has been heard, at most one loop more; the drop's loudness is judged against the section's bars at the
+    # same places.
+    late = []
+    if loop > WINDOW:
+        have = {at % loop for at in sec_at}
+        next_bar(page)
+        page.evaluate(f"{E}.stereo()")  # each reading from here holds one whole bar
+        for _ in range(loop):
+            if all(at % loop in have for at in drop_at):
+                break
+            b = next_bar(page)
+            late.append((b, page.evaluate(f"{E}.stereo()")))
+            have.add(b % loop)
     energy = sum(b["energy"] for b in bars) / len(bars)
     width = sum(b["width"] for b in bars) / len(bars)
     # Each drop bar against the section's level; the section's own bars spread round it too (a generative lead or
@@ -527,7 +536,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     if loop > WINDOW:
         # C27: each drop bar against the section's bar at the same place of the loop (the section's mean where a bar
         # was missed); the loudness is the drop's mean against the mean of those same bars.
-        by_place = {at % loop: b for at, b in early + list(zip(sec_at, sec_bars))}
+        by_place = {at % loop: b for at, b in late + list(zip(sec_at, sec_bars))}
         refs = [by_place.get(at % loop, n) for at in drop_at]
         ref_energy = sum(r["energy"] for r in refs) / len(refs)
         loud = 10 * math.log10(max(energy, 1e-12)) - 10 * math.log10(max(ref_energy, 1e-12))
@@ -539,7 +548,7 @@ def one_drop(page, v: dict, failures: list, label: str) -> dict | None:
     peaks = {"section": n["peak"], "build": p_build["peak"], "impact": p_imp["peak"], "drop": max(b["peak"] for b in bars),
              "wind": p_wind["peak"], "after": p_after["peak"]}
     top = max(peaks, key=peaks.get)
-    return {"n": n, "loud": loud, "per_bar": per_bar, "loop": loop, "early_bars": [b for _, b in early], "spread": spread, "wider": width / max(n["width"], 1e-6), "width": width,
+    return {"n": n, "loud": loud, "per_bar": per_bar, "loop": loop, "late_bars": [b for _, b in late], "spread": spread, "wider": width / max(n["width"], 1e-6), "width": width,
             "peak": peaks[top], "peak_at": top, "info": info, "beats": beats, "sec_bars": sec_bars, "drop_bars": bars, "wind": winds}
 
 
