@@ -3,6 +3,7 @@ import { render } from "preact";
 import { BASS_PRESETS, DRUM_PRESETS, EFFECT_DEFS, Engine, MACROS, SYNTH_PRESETS, type LatencyHint } from "./engine/index.ts";
 import { STYLES, STYLE_IDS, vibeSong, vibeStart } from "./music/styles.ts";
 import { App } from "./ui/App.tsx";
+import { startSizeWatch, type SizeClass } from "./ui/size.ts";
 import { openIdb } from "./store/idb.ts";
 import { Keeper } from "./store/keeper.ts";
 import { Library, MemoryKv, type Kv } from "./store/library.ts";
@@ -40,7 +41,9 @@ async function boot(): Promise<void> {
   keeper.scratch = !!opened.fresh;
   keeper.start();
   // The vibe picker opens the app (spec 8.2); "Continue last jam" shows unless this is a first launch's new song.
-  render(<App engine={engine} hint={hint} keeper={keeper} />, document.querySelector<HTMLDivElement>("#app")!);
+  // T1 (spec 9.1): the layout follows the screen's size live; `?size=` or `__size.force` holds one for smoke and shots.
+  const sizes = startSizeWatch();
+  render(<App engine={engine} hint={hint} keeper={keeper} sizes={sizes} />, document.querySelector<HTMLDivElement>("#app")!);
   // Exposed for automated smoke tests.
   const w = window as unknown as {
     __groovebox: Engine;
@@ -51,7 +54,10 @@ async function boot(): Promise<void> {
     __fx: { defs: typeof EFFECT_DEFS };
     __vibeSong: typeof vibeSong;
     __morphDry: (song: unknown, section: number, bars: number) => unknown;
+    __size: { get: () => SizeClass; force: (c: SizeClass | null) => void };
   };
+  // T1: the size class shown, and a way to force one (null follows the screen again).
+  w.__size = { get: () => sizes.current, force: (c) => sizes.force(c) };
   // P3: every vibe and every beat and rhythm that exists, so the smoke test loops whatever is there.
   w.__vibes = STYLE_IDS.map((id) => ({ id, name: STYLES[id].name, bpm: STYLES[id].bpm, start: vibeStart(id) }));
   w.__data = { beats: DRUM_PRESETS, bass: BASS_PRESETS, synth: SYNTH_PRESETS };

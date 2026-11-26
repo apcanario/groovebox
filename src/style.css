@@ -2253,3 +2253,56 @@ button:disabled {
     font-size: 24px;
   }
 }
+
+/*
+ * T1 (spec 9.1 to 9.3): the tablet frame. The root's data-size and the shell's "tablet" class come from src/ui/size.ts;
+ * the phone frame above is untouched. Landscape: the header over two halves, the pads on the left (the Play tab, the
+ * strip, the transport) and one instrument on the right (the rail of seven, its panel). Portrait: the panel on top and
+ * the pads in a dock at the bottom, the rail as its tab bar. Nothing scrolls. Slices b and c fill the halves.
+ */
+.shell.tablet {
+  max-width: none;
+}
+.tablet .desk {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+}
+.tablet .pads,
+.tablet .inst {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tablet.landscape .desk {
+  flex-direction: row;
+  gap: var(--group);
+}
+.tablet.landscape .inst {
+  padding-top: 8px;
+}
+.tablet.portrait .desk {
+  flex-direction: column;
+}
+.tablet.portrait .inst {
+  order: 0;
+}
+.tablet.portrait .pads {
+  order: 1;
+  border-top: 1px solid var(--line);
+}
+.rail {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(var(--hit), 1fr));
+  gap: var(--gap);
+  background: var(--card);
+}
+.tablet.landscape .rail {
+  margin: 0 var(--pad);
+}
+.tablet.portrait .rail {
+  padding-bottom: env(safe-area-inset-bottom);
+}
