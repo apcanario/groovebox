@@ -26,6 +26,17 @@ export interface AttackClock {
 /** Smallest gap between two starts of one source, in seconds: 0.1 ms, well over Tone's 1e-6 comparison epsilon. */
 export const MIN_GAP = 1e-4;
 
+/**
+ * C27: how far past the current time a late attack starts, in seconds. An attack whose time has passed (a main thread
+ * that stalled, a vibe loading) used to start at the current time, which the audio thread has already rendered past:
+ * each oscillator it starts then begins on whatever render quantum picks its start up, so the bass's wave and its sub
+ * (two oscillators at one pitch, started by one attack) began a few ms apart and stayed out of phase for as long as
+ * they ran, legato over notes and over vibes on the same wave: the sub cancelled the wave by 2 to 10 dB (Ambient,
+ * Drone and Trap a few dB quieter for minutes; the "quiet section" of drop-6). Started this far ahead, every source an
+ * attack starts gets the same sample-accurate start. Longer than a phone's output buffer, shorter than Tone's look-ahead.
+ */
+export const LATE_LEAD = 0.05;
+
 export class AttackQueue {
   private waiting: { time: number; source: string; run: (t: number) => void }[] = [];
   /** The last start time handed to each source. */
@@ -69,10 +80,11 @@ export class AttackQueue {
     }
   }
 
-  /** Run one attack at its time, moved up to the current time and past the source's last start. */
+  /** Run one attack at its time, moved up past the current time (by LATE_LEAD) and past the source's last start. */
   private start(time: number, source: string, run: (t: number) => void): void {
     const prev = this.last.get(source);
-    let t = Math.max(time, this.clock.currentTime?.() ?? -Infinity);
+    const cur = this.clock.currentTime?.();
+    let t = cur === undefined || time >= cur + LATE_LEAD ? time : cur + LATE_LEAD;
     if (prev !== undefined && t < prev + MIN_GAP) t = prev + MIN_GAP;
     this.last.set(source, t);
     run(t);

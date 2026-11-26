@@ -1,6 +1,6 @@
 /** Attacks start in audio-time order, however slow a tick's timeouts are (the P9 smoke's hat page error). */
 import { describe, expect, it } from "vitest";
-import { AttackQueue, MIN_GAP, freshSetNeeded } from "./attacks.ts";
+import { AttackQueue, LATE_LEAD, MIN_GAP, freshSetNeeded } from "./attacks.ts";
 
 /**
  * Tone's context, as far as attacks see it: now() is the audio time plus a lookahead; on each tick the timeouts due
@@ -149,6 +149,27 @@ describe("strictly increasing start times per source (C18)", () => {
     q.at(0.05, (t) => kick.start(t), "kick");
     expect(hat.starts).toEqual([0.05, 0.05 + MIN_GAP]);
     expect(kick.starts).toEqual([0.05]);
+  });
+
+  it("C27: a late attack starts LATE_LEAD past the current time, so the bass's wave and sub start on one sample", () => {
+    // The audio thread renders ahead of the current time the main thread reads: a start at the current time lands on
+    // whichever render quantum picks it up, one oscillator's on one, the next one's on a later one. The bass's wave
+    // and sub, at one pitch, then ran out of phase (the sub cancelling the wave by 2 to 10 dB) as long as they ran.
+    const tone = new FakeTone([]);
+    const q = new AttackQueue({ now: () => tone.now(), setTimeout: (fn, s) => tone.setTimeout(fn, s), currentTime: () => tone.current });
+    const wave = new Source(tone);
+    const sub = new Source(tone);
+    q.at(0.15, (t) => {
+      wave.start(t);
+      tone.current += 0.003; // the audio thread moves on by a render quantum between the two starts
+      sub.start(t);
+    });
+    tone.tick(0.2, 0); // the tick that runs it comes late: current 0.2, the attack was due at 0.15
+    expect(wave.starts[0]).toBeCloseTo(0.2 + LATE_LEAD, 9);
+    expect(sub.starts[0]).toBe(wave.starts[0]);
+    // An attack still ahead of the current time by more than the lead keeps its own time.
+    q.at(0.3, (t) => wave.start(t)); // due now (within the look-ahead), 0.1 s ahead of the current time
+    expect(wave.starts[1]).toBe(0.3);
   });
 
   it("an attack on time keeps its own time (nothing moves without need)", () => {
