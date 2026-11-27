@@ -56,6 +56,7 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 - **An XY pad on every instrument** for filter cutoff and resonance, and delay and reverb sends into one shared delay and one shared reverb.
 - **Mix tab:** a one-knob filter sweep over the whole mix, sidechain pump on the kick, saturation, a level per instrument, reverb tail, air and the lo-fi switch, and a master meter; in Advanced also a Drop page and a Morph page, and in Simple the Morph speed dial.
 - **The screen stays awake while playing.**
+- **Android APK:** the same app in a Capacitor shell, built by GitHub Actions on each push to `main` and put on the prerelease `latest` (`docs/INSTALL.md`). Portrait only on phones, free rotation on tablets (600 px or more on the short side), works offline, no service and no background audio: the jam stops when the app goes to the background. Save and Share of a take use a native hand-off in the APK. It is a debug APK; the build has not yet been seen to run (see Status).
 - **Songs:** jams are saved on the phone automatically and the last one reopens on launch. A Songs sheet, opened from the header, opens, renames, creates and deletes them.
 - **Record:** the record button arms with Play or starts a take at once, shows the elapsed time, and logs every knob move, mute and section switch with the song.
 - **MP3 export:** a take is encoded while you play (160 kbps) and saved or shared from the phone. A ten-minute take was measured with memory flat.
@@ -65,11 +66,11 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 
 ## Where it is going
 
-**Next, bundle 9: the APK** (row G6). Bundle 8, the tablet bundle (T1 layouts, T2 Advanced without pages, T3 punch pads), is done. Bundle 7b is done: R1, P10b, P10c, P10d and its player pass. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix is planned after the APK, by Pedro's decision.
+**Next, bundle 10: retouch** (row G7), which runs on Pedro's notes from playing the app. Bundles 7b, 8 (tablet) and 9 (the APK) are done. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix comes after the APK, by Pedro's decision, so it is now due.
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
-**Install** (row G6): an Android APK built by GitHub Actions. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
+**Install:** `docs/INSTALL.md`. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
 
 ## What it will not do
 
@@ -84,7 +85,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 | Row | What | State |
 |---|---|---|
 | G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d, T1, T2, T3 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph, the tablet layouts, Advanced without pages, punch pads, movement and many fingers | Done |
-| G6 | APK | Planned |
+| G6 | APK: Capacitor shell, workflow that builds a debug APK to the release `latest`, `docs/INSTALL.md` | Done in the repo; Gradle, the workflow and a device were not run in the build chat, so the first APK is proven only when the workflow runs on `main` |
 | G7 | Retouch from Pedro's notes | Always open |
 
 `docs/BACKLOG.md` is the live version of this table.
