@@ -792,6 +792,10 @@ export class Bass extends Instrument {
     startTogether([...runOscillators(this.monos.live!.synth), ...runOscillators(this.subs.live!.synth)], {
       currentTime: () => Tone.getContext().currentTime,
     });
+    // F0 slice b: the sub's pitch is the wave's own frequency signal, so a note's pitch (and its glide) reaches both at
+    // one audio time; set by the sub's own attack, a stalled main thread left the sub on the last pitch for the stall's
+    // length and the two running oscillators out of phase from then on (tools/basscheck.py stall).
+    (this.monos.live!.synth as unknown as Tone.Synth).frequency.connect(this.subs.live!.synth.frequency);
     if (w === "noise") (this.breath ??= new Breath(this.channel.input, this.playing)).setOn(true);
     else this.breath?.setOn(false, this.env.release);
     this.breath?.shape(this.env);
@@ -827,15 +831,15 @@ export class Bass extends Instrument {
       const live = this.monos.live!.synth;
       const sub = this.subs.live!.synth;
       live.triggerAttackRelease(hz, dur, time, vel);
-      sub.triggerAttackRelease(hz, dur, time, vel);
+      // The sub's pitch follows the wave's (setWave); its note opens and closes only its envelope.
+      sub.envelope.triggerAttackRelease(dur, time, vel);
       this.breath?.play(hz * 2, time, dur, vel * 0.6);
       const g = glideSeconds(this.glide, dur);
       if (g > 0.003 && this.lastHz !== null && this.lastHz !== hz) {
-        for (const s of [live, sub]) {
-          s.frequency.cancelScheduledValues(time);
-          s.frequency.setValueAtTime(this.lastHz, time);
-          s.frequency.exponentialRampToValueAtTime(hz, time + g);
-        }
+        // The wave's frequency drives the sub's too (setWave).
+        live.frequency.cancelScheduledValues(time);
+        live.frequency.setValueAtTime(this.lastHz, time);
+        live.frequency.exponentialRampToValueAtTime(hz, time + g);
       }
       this.lastHz = hz;
       this.channel.triggerEnv(time, dur, { attack: 0.004, decay: this.env.decay * 0.8, release: 0.1 });
