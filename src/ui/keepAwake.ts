@@ -15,12 +15,12 @@ export interface NativeBridge {
 
 export const KEEP_AWAKE_PLUGIN = "KeepAwake";
 
-/** The injected bridge, or null in a browser. */
-export function nativeBridge(scope: unknown = globalThis): NativeBridge | null {
+/** The injected bridge with `plugin` registered (KeepAwake by default), or null in a browser. */
+export function nativeBridge(scope: unknown = globalThis, plugin: string = KEEP_AWAKE_PLUGIN): NativeBridge | null {
   const cap = (scope as { Capacitor?: NativeBridge } | null | undefined)?.Capacitor;
   if (!cap || typeof cap.nativePromise !== "function") return null;
   if (typeof cap.isNativePlatform === "function" && !cap.isNativePlatform()) return null;
-  if (typeof cap.isPluginAvailable === "function" && !cap.isPluginAvailable(KEEP_AWAKE_PLUGIN)) return null;
+  if (typeof cap.isPluginAvailable === "function" && !cap.isPluginAvailable(plugin)) return null;
   return cap;
 }
 
@@ -36,4 +36,16 @@ export function setNativeKeepAwake(on: boolean, bridge: NativeBridge | null = na
     return false;
   }
   return true;
+}
+
+/**
+ * What useWakeLock (App.tsx) does natively for one value of "playing" (G6 review M5): send it to the shell at once,
+ * and on cleanup (the next value, or unmount) let the screen sleep if this run had asked to keep it on. Returns the
+ * cleanup.
+ */
+export function holdNativeKeepAwake(on: boolean, bridge: NativeBridge | null = nativeBridge()): () => void {
+  const native = setNativeKeepAwake(on, bridge);
+  return () => {
+    if (native && on) setNativeKeepAwake(false, bridge);
+  };
 }

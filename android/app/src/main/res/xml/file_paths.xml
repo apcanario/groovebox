@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- G6 review M3: the provider shares only the staged takes (TakePlugin, cacheDir/takes/), nothing else. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <cache-path name="takes" path="takes/" />
 </paths>

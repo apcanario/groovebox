@@ -10,8 +10,9 @@ import { Engine, LIMITS, type LaneBar, type LatencyHint, type Pending, type Posi
 import type { Keeper } from "../store/keeper.ts";
 import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
 import { startFit } from "./fit.ts";
-import { setNativeKeepAwake } from "./keepAwake.ts";
+import { holdNativeKeepAwake } from "./keepAwake.ts";
 import { stopInBackground } from "./background.ts";
+import { nativeSave, nativeShare, takeBridge } from "./takeOut.ts";
 import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState, tapPlay } from "./logic.ts";
@@ -112,7 +113,7 @@ function useWakeLock(on: boolean): void {
   const lock = useRef<WakeLockSentinel | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const native = setNativeKeepAwake(on);
+    const releaseNative = holdNativeKeepAwake(on);
     const take = async (): Promise<void> => {
       try {
         if (!("wakeLock" in navigator) || lock.current) return;
@@ -137,7 +138,7 @@ function useWakeLock(on: boolean): void {
     }
     return () => {
       cancelled = true;
-      if (native && on) setNativeKeepAwake(false);
+      releaseNative();
       document.removeEventListener("visibilitychange", onVis);
       const l = lock.current;
       lock.current = null;
@@ -161,15 +162,33 @@ function useRecordInfo(engine: Engine): RecordInfo {
 
 type NamedTake = Take & { name: string };
 
-/** A finished take: save it to the phone or share it. */
+/**
+ * A finished take: save it to the phone or share it. In the APK both go through the native TakePlugin (G6 review E1,
+ * takeOut.ts) and the message is the plugin's answer; in a browser the download link and the Web Share API.
+ */
 function TakeSheet({ take, onClose }: { take: NamedTake; onClose: () => void }) {
   // Built once per take: App re-renders on every position change (G5 review M4).
-  const { file, canShare } = useMemo(() => {
+  const { file, canShare, bridge } = useMemo(() => {
     const f = new File([take.file], take.name, { type: "audio/mpeg" });
-    return { file: f, canShare: typeof navigator.canShare === "function" && navigator.canShare({ files: [f] }) };
+    const b = takeBridge();
+    return { file: f, bridge: b, canShare: b !== null || (typeof navigator.canShare === "function" && navigator.canShare({ files: [f] })) };
   }, [take]);
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const native = async (run: () => Promise<string>, working: string): Promise<void> => {
+    setBusy(true);
+    setMsg(working);
+    try {
+      setMsg(await run());
+    } finally {
+      setBusy(false);
+    }
+  };
   const save = (): void => {
+    if (bridge) {
+      void native(() => nativeSave(bridge, file, take.name), "Saving…");
+      return;
+    }
     const url = URL.createObjectURL(file);
     const a = document.createElement("a");
     a.href = url;
@@ -181,6 +200,7 @@ function TakeSheet({ take, onClose }: { take: NamedTake; onClose: () => void }) 
     setMsg("Saved to Downloads.");
   };
   const share = async (): Promise<void> => {
+    if (bridge) return native(() => nativeShare(bridge, file, take.name), "Opening share…");
     try {
       await navigator.share({ files: [file], title: take.name });
     } catch {
@@ -194,10 +214,10 @@ function TakeSheet({ take, onClose }: { take: NamedTake; onClose: () => void }) 
         {take.name} · {clockLabel(take.seconds)} · {sizeLabel(take.bytes)} MP3
       </p>
       <div class="menu">
-        <button class="btn" id="take-save" onClick={save}>
+        <button class="btn" id="take-save" disabled={busy} onClick={save}>
           Save MP3
         </button>
-        <button class="btn" id="take-share" disabled={!canShare} onClick={() => void share()}>
+        <button class="btn" id="take-share" disabled={!canShare || busy} onClick={() => void share()}>
           Share
         </button>
         <button class="btn" id="take-close" onClick={onClose}>

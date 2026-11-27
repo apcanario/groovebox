@@ -464,6 +464,8 @@ export class Engine {
 
   play(): void {
     if (!this.graph || this.playing) return;
+    // G6 review S2: a context put to sleep in the background wakes with Play, even if no return event came.
+    this.wake();
     // P11 review E1: anything Morph still owes is given back before a new journey starts (Stop gives it back already).
     this.morphRelease();
     // Play during the Stop tail: close the old take now, so the new run is not recorded into it (G5 review M3).
@@ -552,6 +554,30 @@ export class Engine {
     } else if (st === "armed") this.rec.state = "off";
     else if (st === "recording") void this.finishTake();
     this.changed();
+  }
+
+  // ---- Background (G6 review S2) -------------------------------------------------------
+
+  /**
+   * Suspends the AudioContext while the app is in the background, so the audio thread stops rendering silence.
+   * Only when stopped and with no take still closing (Stop's tail must be recorded): returns false then, and the
+   * caller tries again once the take has closed. True when the context is asleep, or there is none to put to sleep.
+   * Changes nothing that is heard: Stop has already silenced everything.
+   */
+  sleep(): boolean {
+    if (!this.graph) return true;
+    if (this.isRunning || this.playing) return false;
+    if (this.rec.state === "recording" || this.rec.state === "finishing") return false;
+    const raw = Tone.getContext().rawContext as unknown as Partial<AudioContext>;
+    if (raw.state === "running" && typeof raw.suspend === "function") void raw.suspend().catch(() => undefined);
+    return true;
+  }
+
+  /** Resumes a context put to sleep (the app is back, or Play is tapped). Does nothing to a running context. */
+  wake(): void {
+    if (!this.graph) return;
+    const raw = Tone.getContext().rawContext as unknown as Partial<AudioContext>;
+    if (raw.state === "suspended" && typeof raw.resume === "function") void raw.resume().catch(() => undefined);
   }
 
   recordInfo(): RecordInfo {

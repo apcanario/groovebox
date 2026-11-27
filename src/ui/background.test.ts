@@ -23,7 +23,20 @@ const h = vi.hoisted(() => {
     },
     scheduleRepeat: () => 0,
   };
-  const ctx = { currentTime: 0, sampleRate: 48000, rawContext: {}, latencyHint: "balanced" };
+  // G6 review S2: the raw context's state, suspend and resume, as the engine's sleep and wake use them.
+  const raw = {
+    state: "running" as "running" | "suspended",
+    calls: [] as string[],
+    async suspend() {
+      this.calls.push("suspend");
+      this.state = "suspended";
+    },
+    async resume() {
+      this.calls.push("resume");
+      this.state = "running";
+    },
+  };
+  const ctx = { currentTime: 0, sampleRate: 48000, rawContext: raw, latencyHint: "balanced" };
   const recorders: { stops: number; resolve: (t: unknown) => void }[] = [];
   return { anything, transport, ctx, recorders };
 });
@@ -104,6 +117,8 @@ beforeEach(() => {
   h.transport.state = "stopped";
   h.ctx.currentTime = 0;
   h.recorders.length = 0;
+  h.ctx.rawContext.state = "running";
+  h.ctx.rawContext.calls.length = 0;
   vi.useRealTimers();
 });
 
@@ -193,11 +208,90 @@ describe("stop in the background (G6, spec section 2)", () => {
     expect(web.count()).toBe(0);
     const app = page();
     const off = stopInBackground(fake, app, true);
-    expect(app.count()).toBe(2);
+    expect(app.count()).toBe(3);
     off();
     expect(app.count()).toBe(0);
     app.fire("pause");
     expect(calls).toEqual([]);
+  });
+
+  it("suspends the audio once stopped in the background and resumes it on return (G6 review S2)", async () => {
+    const e = await ready();
+    const raw = h.ctx.rawContext;
+    const doc = page();
+    stopInBackground(e, doc, true);
+    e.play();
+    doc.fire("pause");
+    expect(e.running).toBe(false);
+    expect(raw.calls).toEqual(["suspend"]);
+    expect(raw.state).toBe("suspended");
+    // The hidden page that follows the pause changes nothing more.
+    doc.hide();
+    expect(raw.calls).toEqual(["suspend"]);
+    // Back: Capacitor's resume event (or the page turning visible) wakes the audio; nothing plays.
+    doc.fire("resume");
+    expect(raw.calls).toEqual(["suspend", "resume"]);
+    expect(raw.state).toBe("running");
+    expect(e.running).toBe(false);
+    doc.show();
+    expect(raw.calls).toEqual(["suspend", "resume"]);
+    // The page turning hidden on its own (no pause event) sleeps too; Play wakes it even with no return event.
+    doc.hide();
+    expect(raw.state).toBe("suspended");
+    e.play();
+    expect(raw.state).toBe("running");
+    expect(e.running).toBe(true);
+  });
+
+  it("a take's tail keeps the audio awake until the take has closed, then it sleeps", async () => {
+    vi.useFakeTimers();
+    const e = await ready();
+    const raw = h.ctx.rawContext;
+    const doc = page();
+    stopInBackground(e, doc, true);
+    e.play();
+    e.record();
+    doc.fire("pause");
+    expect(e.recordInfo().state).toBe("finishing");
+    expect(raw.calls).toEqual([]);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(raw.calls).toEqual([]);
+    h.recorders[0].resolve({ file: {} as File, bytes: 10, seconds: 2, sampleRate: 48000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(e.recordInfo().state).toBe("off");
+    expect(raw.calls).toEqual(["suspend"]);
+    // Later engine changes do not suspend again.
+    e.record();
+    e.record();
+    expect(raw.calls).toEqual(["suspend"]);
+  });
+
+  it("back before the take closed: the audio is not put to sleep afterwards", async () => {
+    vi.useFakeTimers();
+    const e = await ready();
+    const raw = h.ctx.rawContext;
+    const doc = page();
+    stopInBackground(e, doc, true);
+    e.play();
+    e.record();
+    doc.fire("pause");
+    doc.fire("resume");
+    await vi.advanceTimersByTimeAsync(2000);
+    h.recorders[0].resolve({ file: {} as File, bytes: 10, seconds: 2, sampleRate: 48000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(e.recordInfo().state).toBe("off");
+    expect(raw.calls).toEqual([]);
+  });
+
+  it("sleep and wake leave a playing engine, or one never started, alone", async () => {
+    const fresh = new Engine();
+    expect(fresh.sleep()).toBe(true);
+    fresh.wake();
+    const e = await ready();
+    e.play();
+    expect(e.sleep()).toBe(false);
+    e.wake();
+    expect(h.ctx.rawContext.calls).toEqual([]);
   });
 
   it("imports nothing: no Capacitor, no Tone, no engine", () => {
