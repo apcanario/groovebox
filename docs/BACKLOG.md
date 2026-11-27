@@ -9,7 +9,7 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | 6 | P7, P9, P8 (Done) | New sounds, effects, all 24 vibes |
 | 7 | P10 (Done), P11 (Done) | The Drop, Morph |
 | 7b | R1, P10b, P10c, P10d, player pass (Done) | A leaner build cycle, the drop's wind-down (C21), the bundle 7 player findings (C23), two live-build bugs from Pedro (play button, DROP and Morph position) |
-| 8 | T1, T2, T3 | Tablet layouts, punch pads |
+| 8 | T1 (Done), T2, T3 | Tablet layouts, punch pads |
 | 9 | G6 | The APK (parked by Pedro until after the tablet bundle, 24 Nov 2026) |
 | 10 | G7 | Retouch from notes |
 
@@ -38,6 +38,7 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 
 - **C28. P10d carried** (26 Nov 2026, `docs/reviews/P10d.md`): Tone's Draw drops callbacks later than 0.25 s, so a position update can be skipped on a slow phone; the vibe pick in `src/ui/vibes.tsx:40` still checks `engine.playing` (harmless); on a first tap the button dims for about a second while audio starts (intended). Pedro's exact symptom (Play after a tap while the music plays) did not reproduce on the old build in 12 headless scenarios; what reproduced was Play shown for 6 to 7 frames after a first tap and Stop stuck after a Stop, both fixed. Check by hand on the phone.
 - **C30. Bundle 7b player** (26 Nov 2026, `docs/reviews/bundle-7b.md`). For your veto: every six-chip page row (Advanced Drums, a Lead's pages, the layer pages at 412 px) and the five-chip rows under 400 px of width (Bass, Layer Arp, Pad and Drone) now set the icon over the word at 12 px, as the Mix row does, so no label runs to the chip's edge (C26, checked by `PAGE_CHIPS` in `tools/shots.py`). Listen: Ambient's first chord of its 16-bar loop measures 2 dB under the next three (the same in every load, -18.7 to -15.6 dB), Drone steps down 1.2 dB at its chord change; no dropout, click or bass cancellation was measured in either. The rubber vibes' peaks sit 0.0 to 0.2 dB higher since C27's fix (top -0.66 dBFS, limit -0.5; the C29 one-offs did not come back in 48 probe drops and two full smokes). C26, C27 and C29 are closed.
+- **C31. T1 carried and choices for your veto** (27 Nov 2026, `docs/reviews/T1.md`): the layout is chosen by fit (the dock from 960 px tall and taller than wide, the desk from 800 px wide; a screen under 600 px on its short side is a phone, so a phone held sideways stays a phone); the desk's pad grid shows in Simple too, every pad tappable, which goes past spec 8.6's Advanced-only rule for editing a section that is not playing; the portrait rail is seven tabs with no Play tab, because the pads are always on screen; DROP with Morph sits over the transport under 960 px wide (spec 9.2 edited); tablets under 800 px wide and under 960 px tall (700 x 700, say) still get the portrait dock, which does not fit (spec 9.1 names it); Simple Mix keeps four pages on a tablet without the height; every Advanced panel still has its pages until T2; the 56 px band for the punch pads is empty until T3; the pad pulse from per-instrument meters (spec 9.5) is T3's; the core smoke part now takes about 20 minutes (the tablet walk over 10 sizes); the reviewer's phone DOM comparison against 88b7227 was made before the fixes and not repeated, the phone smoke checks pass.
 
 ## By hand (Pedro)
 
@@ -107,14 +108,7 @@ Spec section 9 is the brief. Read it in full, with section 8.12, before any row 
 
 ### T1. Three layouts and the docked pads
 
-- Spec 9.1 to 9.3: the phone, tablet portrait and tablet landscape layouts chosen by screen size; rotation mid-jam with no gap in the audio.
-- Landscape: the pads half (grid as large pads, each row labelled with its instrument and what it plays, the playing section's pads showing their notes; strip as column labels; DROP and transport) and the instrument half (rail of seven, panel under it). Space is left above the grid for the punch pads of T3.
-- Portrait: instrument panel on top, the dock at the bottom.
-- Simple panels on both tablet layouts.
-- The APK of G6: phones stay locked to portrait, tablets rotate.
-- Smoke test at 800 x 1280, 1280 x 800, 1024 x 768 and 768 x 1024, both modes: nothing scrolls, nothing is cut off, text fits its tile, and a rotation while playing leaves the transport running.
-
-**Done when:** all four sizes pass in both modes; the phone layout is unchanged (the phone smoke checks still pass); the pads and one instrument can be used without changing screen; `check` and `smoke` pass.
+Done (27 Nov 2026), see Done below. Its text left the queue.
 
 ### T2. Advanced without pages
 
@@ -202,3 +196,4 @@ Kept here so no row disappears without a record.
 - **P10c. Bundle 7 player findings** (26 Nov 2026). Built, reviewed (pass: 0 errors, 0 should-fix, 0 minor), pushed. S1 (six Advanced Mix chips one size, icon over the word, inside the padding), M3 (Morph help text true for Sections on and off), M4 (Simple Master dials two by two), M5 (`tools/shots.py` walk of 22 live screens: Morph on, the Drop page, the three DROP states) done, each with a check that fails on the old layout. M1 moved to P10d (closing the band by growing the grid would move DROP up). M2 kept (the spec wins). Report in `docs/reviews/P10c.md`.
 - **P10d. Play button state and DROP and Morph position** (26 Nov 2026). Built, reviewed (pass: 0 errors, 0 should-fix, 3 minor, all applied), pushed. The button reads the engine's run state, told at once by Play and Stop, and a run counter drops stale Draw callbacks; a tap decides on what the button shows, and a Stop tap in the first 50 ms is no longer lost (`tapPlay`, five tests, `sample_play` and `walk_play_button` in `tools/shots.py`). DROP and Morph keep one place in Simple and Advanced: Advanced's DROP row sits under the grid, the grid fills the tab, the Play strip is 64 px (52 px under 700 px of height), and the band above DROP (C23 M1) is closed (spec 8.6 and 8.9, `PLAY_PLACE` check). Pushed with drop-6 red on drone and EDM (C27, C24). Report in `docs/reviews/P10d.md`.
 - **Bundle 7b player pass** (26 Nov 2026). Every Done-when line of R1, P10b, P10c and P10d true on the final build. 1 error (C24's remaining cause, measured, carried for Pedro's decision), 2 should-fix (page chips on every tab inside their padding, README), 4 minor (the section hold waits for its sheet; three recorded). C24 probed before and after `42d9aad` (8 of 24 runs failing a level line before, 1 of 24 after), C29 not reproduced. C26, C27 and C29 closed, C24 updated, C30 carried. Report in `docs/reviews/bundle-7b.md`. Bundle 7b is done.
+- **T1. Three layouts and the docked pads** (27 Nov 2026). Built in three slices, reviewed (fix: 2 errors, 2 should-fix, 5 minor, all applied; the errors were a shots check that failed on Ambient sections that start no note, and the panel cut off at 600 x 960), pushed. Report in `docs/reviews/T1.md`. Size classes in `src/ui/size.ts` (phone, tablet portrait dock, tablet landscape desk, by fit), the labelled pad grid with notes in `src/ui/tabs/DeskPads.tsx`, rotation with no engine call, four-size and edge-size walks in smoke core and `tools/shots.py`. Choices in C31.

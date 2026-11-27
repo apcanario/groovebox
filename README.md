@@ -59,17 +59,18 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 - **Songs:** jams are saved on the phone automatically and the last one reopens on launch. A Songs sheet, opened from the header, opens, renames, creates and deletes them.
 - **Record:** the record button arms with Play or starts a take at once, shows the elapsed time, and logs every knob move, mute and section switch with the song.
 - **MP3 export:** a take is encoded while you play (160 kbps) and saved or shared from the phone. A ten-minute take was measured with memory flat.
+- **Tablet layouts:** the layout follows the screen. On a wide tablet the pads (a large labelled grid showing the playing section's notes, the strip as column labels, DROP and Morph, the transport) and one instrument panel share the screen; on a tall tablet the panel sits on top and the pads dock at the bottom. Rotating while you play does not touch the audio. A phone keeps its layout.
 
 ## Where it is going
 
-**Next, bundle 8: tablet** (rows T1 to T3, below). Bundle 7b is done: R1, P10b, P10c, P10d and its player pass. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix is planned after the APK, by Pedro's decision.
+**Next, bundle 8: tablet**, rows T2 and T3 (T1, the three layouts, is done). Bundle 7b is done: R1, P10b, P10c, P10d and its player pass. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix is planned after the APK, by Pedro's decision.
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 **Install** (row G6): an Android APK built by GitHub Actions. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
 
-**Phase 3: tablet** (rows T1 to T3)
-- Layouts for tablet portrait and landscape. In landscape the pads and one instrument share the screen, and Advanced shows every knob of an instrument at once.
+**Phase 3: tablet** (rows T2 and T3)
+- Advanced shows every knob of an instrument at once on a tablet, without pages (T2).
 - **Punch pads:** Cut, Filter, Stutter, Echo, Wash and Riser, momentary effects that land in time.
 - Pads that pulse with the music, dials that show their movement, and several controls usable at once.
 
@@ -84,9 +85,9 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph | Done |
+| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d, T1 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph, the tablet layouts | Done |
 | G6 | APK | Planned |
-| T1 to T3 | Phase 3: tablet, punch pads | Planned |
+| T2, T3 | Advanced without pages, punch pads, movement, many fingers | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
 
 `docs/BACKLOG.md` is the live version of this table.
