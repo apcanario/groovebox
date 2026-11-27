@@ -32,6 +32,8 @@
  * line as transforms and its reading as text. It is a reading, not a movement, so it is drawn when still as well (as
  * it was before it moved here). This is the only animation loop in the app (a test reads every UI source for others).
  *
+ * T3 review S3: the moving values are written at most every MOTION_MS (about 30 a second) and only those that changed.
+ *
  * T3 review M7: the containers are looked up again only when the values change or every METER_MS (for one that
  * appeared), and held still the fader meters and the ghosts are cleared once and then left alone, so a still frame
  * between two steps does nearly nothing.
@@ -42,7 +44,7 @@
  * keeps its first start, so its ghost jumps back to where that start puts it.
  */
 import { FILTER_SWEEP_BEATS, INSTRUMENTS, type Engine, type InstrumentId, type LaneBar } from "../engine/index.ts";
-import { flashLevel, lfoPull, masterMeterLook, meterScale, METER_MS, playhead, pulseLevel, punchSweep, sweepGhost } from "./logic.ts";
+import { flashLevel, lfoPull, masterMeterLook, meterScale, METER_MS, MOTION_MS, playhead, pulseLevel, punchSweep, sweepGhost } from "./logic.ts";
 
 const KEY = "groovebox.motion";
 
@@ -157,6 +159,10 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
   let targets: HTMLElement[] = [];
   let meterAt = -Infinity;
   let moversAt = -Infinity;
+  let wroteAt = -Infinity;
+  let fullAt = -Infinity;
+  /** What each property was last written as, so a frame writes only what changed (T3 review S3). */
+  let written: string[] = [];
   /** Held still, the fader meters and the ghosts have been cleared since it went still. */
   let stillDone = false;
   const pulses = INSTRUMENTS.map(() => 0);
@@ -173,6 +179,8 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
       stillDone = false;
     }
     const playing = last.playing && engine.playing;
+    // T3 review S3: at most about 30 writes a second; a frame between them does nothing.
+    if (now - wroteAt < MOTION_MS - 4 && now - meterAt < METER_MS) return;
     if (now - meterAt >= METER_MS) {
       meterAt = now;
       for (const m of root.querySelectorAll<HTMLElement>(".meter[data-master]")) drawMaster(m, engine.level(), engine.peak(), masterKey);
@@ -205,18 +213,23 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
     const movers = root.querySelectorAll<HTMLElement>(MOVERS);
     const same = movers.length === targets.length && targets.every((t, i) => t === movers[i]);
     if (key === prev && same) return;
+    wroteAt = now;
     prev = key;
-    if (!same) targets = [...movers];
+    // Every value is written again 15 times a second, in case a render replaced a container's inline style.
+    if (!same || now - fullAt >= METER_MS) {
+      targets = [...movers];
+      written = [];
+      fullAt = now;
+    }
     const p = p16.toFixed(3);
     const bar = playing ? (p16 / 16).toFixed(4) : "0";
     const beat = playing && !still ? ((p16 % 4) / 4).toFixed(3) : "0";
-    for (const t of targets) {
-      const s = t.style;
-      s.setProperty("--p16", p);
-      s.setProperty("--p", bar);
-      s.setProperty("--beat", beat);
-      INSTRUMENTS.forEach((id, i) => s.setProperty(`--f-${id}`, flashes[i].toFixed(2)));
-      INSTRUMENTS.forEach((id, i) => s.setProperty(`--m-${id}`, pulses[i].toFixed(2)));
+    const names = ["--p16", "--p", "--beat", ...INSTRUMENTS.map((id) => `--f-${id}`), ...INSTRUMENTS.map((id) => `--m-${id}`)];
+    const values = [p, bar, beat, ...flashes.map((f) => f.toFixed(2)), ...pulses.map((m) => m.toFixed(2))];
+    for (let i = 0; i < names.length; i++) {
+      if (written[i] === values[i]) continue;
+      written[i] = values[i];
+      for (const t of targets) t.style.setProperty(names[i], values[i]);
     }
     root.classList.toggle("running", playing);
   };

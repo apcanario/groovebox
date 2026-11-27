@@ -403,6 +403,13 @@ export function faderDrag(v0: number, y0: number, y: number, height: number): nu
 /** T2 review S2: how often the fader meters are drawn (about 15 times a second), from the one motion loop. */
 export const METER_MS = 66;
 
+/**
+ * T3 review S3: the motion loop writes the moving values at most about 30 times a second (the screen still runs its
+ * frames; the CSS draws from the last values). Measured at the desk, motion on cost the audio thread a few points of
+ * load over motion off when the values were written on every frame (docs/reviews/T3-measure.md).
+ */
+export const MOTION_MS = 32;
+
 /** A fader meter's scale for an instrument's level in dB: 0 while the screen is held still (spec 8.12). */
 export function meterScale(db: number, still: boolean): number {
   return still ? 0 : Math.round(meterFraction(db) * 1000) / 1000;
