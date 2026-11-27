@@ -13,6 +13,8 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# basscheck.py's smoke check (walk_bass_run, in drop-5) is reached through smoke.py; the file is not listed, since its
+# hand-run commands (levels, probe) record failures on purpose outside any part.
 FILES = ["smoke.py", "dropcheck.py", "morphcheck.py"]
 
 

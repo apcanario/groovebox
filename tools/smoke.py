@@ -58,6 +58,7 @@ from mp3check import mp3_info  # noqa: E402
 from shots import SMALL, sample_play, simple_words, walk_fingers, walk_frame, walk_play_button, walk_punch, walk_tablet  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
+from basscheck import walk_bass_run  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -3403,6 +3404,9 @@ def part_drop_4(browser, page, failures: list, shot) -> None:
 
 
 def part_drop_5(browser, page, failures: list, shot) -> None:
+    # F0 review S1, S2, E1, M1 (tools/basscheck.py): the main thread stalled in bass note starts, for the vibe's square,
+    # FM and noise; the old wave set never disposed under its sub; no voice set's start given up.
+    walk_bass_run(page, failures)
     drop_vibes(page, failures, 5)
 
 
