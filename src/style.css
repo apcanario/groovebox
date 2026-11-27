@@ -2438,7 +2438,7 @@ button:disabled {
   flex: 1 1 0;
   min-width: 0;
   margin: 0;
-  grid-template-columns: minmax(0, 1fr) 72px;
+  grid-template-columns: minmax(0, 1fr) clamp(80px, 8vw, 104px);
 }
 .deck .drop,
 .deck .tog.morph {
