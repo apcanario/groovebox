@@ -41,6 +41,7 @@ import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, t
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
 import { AttackQueue, freshSetNeeded } from "./attacks.ts";
+import { gateOnly, startTogether, type GatedSynth, type RunSource } from "./bassRun.ts";
 import { DropOverlay } from "./drop.ts";
 import { PunchRack } from "./punch.ts";
 import { nativeParam, patchOscillatorEnd, type OscillatorProto } from "./oscPatch.ts";
@@ -720,11 +721,22 @@ function rampFm(voices: readonly unknown[], ratio: number, index: number, at?: n
   }
 }
 
+/**
+ * F0 (C24): a bass voice's oscillators, each synth made to gate only its envelope (bassRun.ts): the Synth's own, or an
+ * FM voice's carrier and modulator.
+ */
+function runOscillators(m: Mono): RunSource[] {
+  const fm = m as unknown as { _carrier?: Tone.Synth; _modulator?: Tone.Synth };
+  const synths = fm._carrier && fm._modulator ? [fm._carrier, fm._modulator] : [m];
+  for (const s of synths) gateOnly(s as unknown as GatedSynth);
+  return synths.map((s) => s.oscillator as unknown as RunSource);
+}
+
 export class Bass extends Instrument {
   private monos: VoiceSets<Mono>;
   /**
-   * The sub sine, one per voice set (P10 fix): it is swapped with the wave's voices, so the two start together on the
-   * next note. A sine wave and its sub sound the same pitch: a sub left running from the last voice set (a note held
+   * The sub sine, one per voice set (P10 fix): it is swapped with the wave's voices, and since F0 (C24) the two run
+   * from the swap, started together once while silent (bassRun.ts), so a stalled note start cannot shift one. A sine wave and its sub sound the same pitch: a sub left running from the last voice set (a note held
    * over a vibe's bar line) sat at any phase against the new voice, and cancelled it by up to 20 dB until both stopped.
    */
   private subs: VoiceSets<Tone.Synth>;
@@ -776,6 +788,10 @@ export class Bass extends Instrument {
         } as unknown as Partial<Tone.FMSynthOptions>) as unknown as Mono;
       return new Tone.Synth({ oscillator: { type: w === "noise" ? "sine" : w }, envelope: this.env } as Partial<Tone.SynthOptions>) as unknown as Mono;
     }, at);
+    // F0 (C24): the new set's wave and sub run from now, started together while the set is silent; notes only gate them.
+    startTogether([...runOscillators(this.monos.live!.synth), ...runOscillators(this.subs.live!.synth)], {
+      currentTime: () => Tone.getContext().currentTime,
+    });
     if (w === "noise") (this.breath ??= new Breath(this.channel.input, this.playing)).setOn(true);
     else this.breath?.setOn(false, this.env.release);
     this.breath?.shape(this.env);
