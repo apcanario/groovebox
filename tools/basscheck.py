@@ -144,8 +144,13 @@ STALL_RUN = """async ([stalls, fft, floor, timeoutS]) => {
       return true;
     }
   });`;
-  const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
-  await ctx.rawContext.audioWorklet.addModule(url);  // Tone's own loader takes one module per context (continuity.ts)
+  // Loaded once per context (a second registerProcessor of one name throws): the smoke runs the stall once per wave.
+  const raw = ctx.rawContext;
+  if (!raw.__bassCorr) {
+    const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+    raw.__bassCorr = raw.audioWorklet.addModule(url);  // Tone's own loader takes one module per context (continuity.ts)
+  }
+  await raw.__bassCorr;
   const node = ctx.createAudioWorkletNode('bass-corr', { numberOfInputs: 2, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
   live.gain.connect(node, 0, 0); sub.gain.connect(node, 0, 1);
   const wins = [];
