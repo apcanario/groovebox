@@ -118,6 +118,9 @@ export class FakeContext {
   createBiquadFilter() {
     return Object.assign(new FakeNode(), { type: "lowpass", frequency: new FakeParam(this, 350), Q: new FakeParam(this, 1) });
   }
+  createStereoPanner() {
+    return Object.assign(new FakeNode(), { pan: new FakeParam(this, 0) });
+  }
   createConvolver() {
     return Object.assign(new FakeNode(), { buffer: null as unknown });
   }

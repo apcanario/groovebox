@@ -4,7 +4,8 @@
  *
  * A pad is a pointer target, not a click: pressed when the first finger lands, let go when the last lifts or its pointer
  * is cancelled (pointer capture keeps a finger that slides off on its pad until it lifts), any number at once (spec 9.6).
- * Pads that leave the screen (a page change, a rotation) are let go. Stopped, a press does nothing: the engine ignores
+ * Pads that leave the screen (a page change, a rotation) are let go, and so is every held pad when the app goes to the
+ * background. Stopped, a press does nothing: the engine ignores
  * it and the pad stays dark. The look comes from the engine on every render (each step) and on each touch: hatched
  * while waiting for its start line, filled while in, with a white inset line while a finger holds it.
  */
@@ -54,13 +55,23 @@ export function PunchPads({ ctx, band = false }: { ctx: Ctx; band?: boolean }) {
   const { engine } = ctx;
   const fingers = useRef(new PadPointers<PunchPad>());
   const [, touched] = useState(0);
-  // Pads leaving the screen with a finger on them are let go, so none stays held.
-  useEffect(
-    () => () => {
+  // Pads leaving the screen with a finger on them are let go, so none stays held; so are they when the app goes to the
+  // background (T3 review M9: a browser that sends no pointercancel then would leave Cut held).
+  useEffect(() => {
+    const letGo = (): void => {
       for (const pad of fingers.current.clear()) engine.punch(pad, false);
-    },
-    [engine],
-  );
+    };
+    const hidden = (): void => {
+      if (document.visibilityState !== "hidden") return;
+      letGo();
+      touched((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      document.removeEventListener("visibilitychange", hidden);
+      letGo();
+    };
+  }, [engine]);
   const states = engine.punchState();
   const now = states.some((s) => s.start !== null) ? engine.audioNow() : 0;
   const press = (pad: PunchPad, e: PointerEvent): void => {

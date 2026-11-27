@@ -1488,21 +1488,30 @@ button:disabled {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+/* T3 review S2: drawn by the motion loop (src/ui/motion.ts) as transforms only: the fill scaled from the left, the
+   peak line (the left edge of a box as wide as the meter) moved along it. */
 .meter .fill {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
+  width: 100%;
   background: var(--teal);
   opacity: 0.55;
+  transform-origin: left;
+  transform: scaleX(0);
   pointer-events: none;
 }
 .meter .pk {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: var(--coral);
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border-left: 2px solid var(--coral);
+  transform: translateX(0);
+  pointer-events: none;
 }
 .meter span,
 .meter b {

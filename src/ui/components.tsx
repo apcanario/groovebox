@@ -494,13 +494,17 @@ export function Pager<K extends string>({
 }
 
 /** A horizontal level meter: `fill` 0..1, `peak` 0..1 marked as a line. */
-export function Meter({ fill, peak, text }: { fill: number; peak: number; text: string }) {
+/**
+ * The master meter. Its fill, peak line and reading are drawn by the one motion loop (`src/ui/motion.ts`, T3 review S2)
+ * through `data-master`: the component sets none of them, so a render never undoes a frame's drawing.
+ */
+export function Meter() {
   return (
-    <div class="meter" id="meter" aria-label={`Master level ${text}`}>
-      <div class="fill" style={{ width: `${fill * 100}%` }} />
-      <div class="pk" style={{ left: `${peak * 100}%` }} />
+    <div class="meter" id="meter" data-master="" aria-label="Master level">
+      <div class="fill" />
+      <div class="pk" />
       <span>Master</span>
-      <b>{text}</b>
+      <b>–</b>
     </div>
   );
 }

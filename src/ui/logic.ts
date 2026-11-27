@@ -408,6 +408,16 @@ export function meterScale(db: number, still: boolean): number {
   return still ? 0 : Math.round(meterFraction(db) * 1000) / 1000;
 }
 
+/**
+ * T3 review S2: what the master meter shows, drawn by the one motion loop: its fill and peak line as transforms (0..1 of
+ * the meter), and the peak in dB as text ("–" with no signal). A reading, so it is drawn whether or not motion is on.
+ */
+export function masterMeterLook(rms: number, peak: number): { fill: string; pk: string; text: string } {
+  const f = Math.round(meterFraction(rms) * 1000) / 1000;
+  const k = Math.round(meterFraction(peak) * 1000) / 10;
+  return { fill: `scaleX(${f})`, pk: `translateX(${k}%)`, text: Number.isFinite(peak) ? `${peak.toFixed(1)} dB` : "–" };
+}
+
 /** Meter fill 0..1 for a level in dB: -60 dB empty, 0 dB full. */
 export function meterFraction(db: number): number {
   if (!Number.isFinite(db)) return 0;

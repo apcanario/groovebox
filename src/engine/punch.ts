@@ -8,7 +8,8 @@
  *   sum -> echo send -> delay (dotted eighth, fed back) -> output
  *   sum -> wash send -> reverb (a seeded noise tail) -> output
  *   riser (seeded noise through a band-pass) -> output
- *   Cut works on the drums' and the bass's own input gains (given), so their sends' tails ring on.
+ *   Cut works on the drums' and the bass's own input gains (given), so their sends' tails ring on, and on the Drop's
+ *   own drums, the bass's upper layer and the build's roll (T3 review S1).
  *
  * No Tone here: only the AudioContext, so the unit tests drive it with a fake context on a fake clock.
  */

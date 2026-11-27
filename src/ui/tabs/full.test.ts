@@ -35,12 +35,53 @@ describe("the Mix panel's faders on the desk (T2, spec 9.2)", () => {
     expect(meterScale(-30, false)).toBe(0.5);
     expect(meterScale(-Infinity, false)).toBe(0);
     expect(meterScale(-30, true)).toBe(0);
-    // No second animation loop: the Mix tab draws no meter of its own beyond the master meter's.
+    // No second animation loop: the Mix tab draws no meter of its own, the master meter's included (T3 review S2).
     const mix: string = mixSrc;
-    expect(mix.match(/requestAnimationFrame\(/g)?.length ?? 0).toBeLessThanOrEqual(2);
-    expect(mix).not.toMatch(/instrumentLevel/);
+    expect(mix.match(/requestAnimationFrame\(/g)?.length ?? 0).toBe(0);
+    expect(mix).not.toMatch(/instrumentLevel|engine\.level\(|engine\.peak\(/);
     const motion: string = motionSrc;
     expect(motion).toMatch(/\.fmeter\[data-meter\]/);
+    expect(motion).toMatch(/\.meter\[data-master\]/);
+  });
+});
+
+/**
+ * T3 review S2 (spec 9.5: "One animation loop drives all of it"): every source file of the app, read as text. The motion
+ * loop is the only repeating frame or timer: `requestAnimationFrame` is called in `src/ui/motion.ts` (the loop and its
+ * first frame) and otherwise only as a one-shot frame with an inline callback (App's song revision, fit's batch); the
+ * one interval is the record clock's in App. A second loop anywhere makes this fail.
+ */
+describe("one animation loop in the whole app (T3 review S2)", () => {
+  const sources = import.meta.glob("/src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+  const app = Object.entries(sources).filter(([f]) => !/\.test\.tsx?$/.test(f) && !f.includes("/fixtures/"));
+
+  it("reads the app's sources", () => {
+    expect(app.length).toBeGreaterThan(20);
+    expect(app.some(([f]) => f.endsWith("/ui/motion.ts"))).toBe(true);
+  });
+
+  it("calls requestAnimationFrame only in the motion loop, or once with an inline callback", () => {
+    const one = new Set(["/src/ui/App.tsx", "/src/ui/fit.ts"]);
+    for (const [f, src] of app) {
+      const raf = src.match(/requestAnimationFrame\(/g)?.length ?? 0;
+      if (f === "/src/ui/motion.ts") {
+        expect(raf, f).toBe(2);
+        continue;
+      }
+      if (!one.has(f)) {
+        expect(raf, f).toBe(0);
+        continue;
+      }
+      expect(raf, f).toBe(1);
+      // A one-shot: an inline arrow callback that does not request another frame.
+      const at = src.indexOf("requestAnimationFrame(");
+      expect(src.slice(at, at + 40), f).toMatch(/^requestAnimationFrame\(\(\) => \{/);
+    }
+  });
+
+  it("has one interval, the record clock's", () => {
+    const intervals = app.flatMap(([f, src]) => (src.match(/setInterval\(/g) ?? []).map(() => f));
+    expect(intervals).toEqual(["/src/ui/App.tsx"]);
   });
 });
 

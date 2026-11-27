@@ -182,6 +182,13 @@ export class DropOverlay {
   private impactBus: GainNode;
   private holdBus: BiquadFilterNode;
   private fxBus: GainNode;
+  /**
+   * T3 review S1 (spec 9.4: Cut silences drums and bass): the overlay's own drums, the bass's upper layer and the build's
+   * roll each pass one gain the Cut pad holds at 0 (`cutGains`). The riser, the impact and the other layers do not.
+   */
+  private drumCut: GainNode;
+  private bassCut: GainNode;
+  private rollBus: GainNode;
   private verb: GainNode;
   private leadIn: GainNode;
   private groups: Record<OverlayGroup, Pair>;
@@ -246,6 +253,8 @@ export class DropOverlay {
     // The build's riser and roll go to the drum bus (not ducked by the kick).
     this.fxBus = c.createGain();
     Tone.connect(this.fxBus, dest.drums);
+    this.rollBus = c.createGain();
+    this.rollBus.connect(this.fxBus);
     // The reverb grows: the instruments' own sound sent once more into the shared reverb, 0 outside a build.
     this.verb = c.createGain();
     this.verb.gain.value = 0;
@@ -254,10 +263,13 @@ export class DropOverlay {
     Tone.connect(duck, dest.duck);
     const drums = c.createGain();
     Tone.connect(drums, dest.drums);
+    this.drumCut = drums;
+    this.bassCut = c.createGain();
+    this.bassCut.connect(duck);
     this.groups = {
       synth: new Pair(duck, { type: "lowpass", hz: 5000, q: 0.5 }),
       // The bass's wide upper layer, filtered: the centre stays as it was.
-      bass: new Pair(duck, { type: "bandpass", hz: 900, q: 0.6 }),
+      bass: new Pair(this.bassCut, { type: "bandpass", hz: 900, q: 0.6 }),
       drums: new Pair(drums),
       leads: new Pair(duck, { type: "lowpass", hz: 7000, q: 0.5 }),
     };
@@ -272,6 +284,11 @@ export class DropOverlay {
     const ch = this.noise.getChannelData(0);
     const r = createRng(0x5eed);
     for (let i = 0; i < ch.length; i++) ch[i] = r.next() * 2 - 1;
+  }
+
+  /** The gains the Cut punch pad holds at 0: the overlay's drums, the bass's upper layer and the build's roll (T3 review S1). */
+  cutGains(): AudioParam[] {
+    return [this.drumCut.gain, this.bassCut.gain, this.rollBus.gain];
   }
 
   /** Every instrument's own sound also goes to the build's reverb send. */
@@ -358,8 +375,8 @@ export class DropOverlay {
   roll(t: number, sixteenth: number, hits: { at: number; vel: number }[]): void {
     hits.forEach((h, i) => {
       const at = t + h.at * sixteenth;
-      this.noiseHit(at, 0.09, 0.22 * h.vel, "bandpass", 1900, 0.9, this.fxBus, i % 2 === 0 ? -0.25 : 0.25);
-      this.tone(at, 190, 140, 0.06, 0.12 * h.vel, this.fxBus);
+      this.noiseHit(at, 0.09, 0.22 * h.vel, "bandpass", 1900, 0.9, this.rollBus, i % 2 === 0 ? -0.25 : 0.25);
+      this.tone(at, 190, 140, 0.06, 0.12 * h.vel, this.rollBus);
     });
   }
 

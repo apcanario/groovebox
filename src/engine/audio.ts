@@ -1339,7 +1339,12 @@ export class Graph {
       if (tr.state !== "started") return null;
       const at = ctx.currentTime;
       return { at, beats: tr.getTicksAtTime(at) / tr.PPQ, bpm: tr.bpm.value };
-    }, [nativeParam(this.instruments.drums.channel.input.gain), nativeParam(this.instruments.bass.channel.input.gain)]);
+    }, [
+      nativeParam(this.instruments.drums.channel.input.gain),
+      nativeParam(this.instruments.bass.channel.input.gain),
+      // T3 review S1: the Drop's own drums, the bass's upper layer and the build's roll go silent with them.
+      ...drop.cutGains(),
+    ]);
     Tone.connect(drop.output, this.punch.input);
     Tone.connect(this.punch.output, p7.lofi.input);
   }

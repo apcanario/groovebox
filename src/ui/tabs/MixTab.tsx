@@ -7,32 +7,12 @@ import { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, INSTRUMENTS, MIX_RANGES, mixValue
 import type { Ctx } from "../App.tsx";
 import { Dial, Fader, GroupLabel, Meter, Pager } from "../components.tsx";
 import { MIX_SHAPES, probeProps, useFull, type Full } from "./full.ts";
-import { knobPos, knobValue, meterFraction, secondsText, shownPage, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
+import { knobPos, knobValue, secondsText, shownPage, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Icon } from "../icons.tsx";
 import { MorphPage, MorphSpeed } from "../morph.tsx";
 import { PunchPads } from "../punch.tsx";
-
-/** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
-function MasterMeter({ engine }: { engine: Engine }) {
-  const [m, setM] = useState({ rms: -Infinity, peak: -Infinity });
-  useEffect(() => {
-    let raf = 0;
-    let last = 0;
-    const loop = (t: number): void => {
-      if (t - last > 66) {
-        last = t;
-        setM({ rms: engine.level(), peak: engine.peak() });
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [engine]);
-  const text = Number.isFinite(m.peak) ? `${m.peak.toFixed(1)} dB` : "–";
-  return <Meter fill={meterFraction(m.rms)} peak={meterFraction(m.peak)} text={text} />;
-}
 
 /** The app's own motion switch (spec 8.12): off, nothing moves and every state reads by fill and hatching. */
 function MotionSwitch({ brief = false }: { brief?: boolean }) {
@@ -210,7 +190,7 @@ function WholeMix({ ctx, f }: { ctx: Ctx; f: Full }) {
   const [armed, choose] = useBuffer(ctx);
   return (
     <section ref={f.ref} {...probeProps(f)} class="mixtab whole" data-whole="mix">
-      <MasterMeter engine={engine} />
+      <Meter />
       <div class="cols">
         <div class="col">
           <div class="grp" data-grp="master">
@@ -311,7 +291,7 @@ function PagedMix({ ctx, sref, chosenPage, setPage }: { ctx: Ctx; sref: { curren
   const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
   return (
     <section ref={sref} class={`mixtab${together ? " together" : ""}`}>
-      <MasterMeter engine={engine} />
+      <Meter />
       <Pager id="mix" pages={pages} page={page} onPage={setPage} />
       {page === "master" && (
         <div class={`dials ${ctx.advanced ? "n3" : "n4"}`}>

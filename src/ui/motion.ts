@@ -27,9 +27,22 @@
  * - The playing step of the step rows and the drum grid is the `.now` cell, set on render with each step from the
  *   engine's position (a state, so it stays right when still).
  * The browser runs no frame while the tab is hidden, and under load it drops frames: nothing here schedules sound.
+ *
+ * T3 review S2: the master meter (`.meter[data-master]`) is drawn here too, with the fader meters: its fill and peak
+ * line as transforms and its reading as text. It is a reading, not a movement, so it is drawn when still as well (as
+ * it was before it moved here). This is the only animation loop in the app (a test reads every UI source for others).
+ *
+ * T3 review M7: the containers are looked up again only when the values change or every METER_MS (for one that
+ * appeared), and held still the fader meters and the ghosts are cleared once and then left alone, so a still frame
+ * between two steps does nearly nothing.
+ *
+ * T3 review M8, approximations (display only): the LFO ghost's phase is taken from the bar the screen shows plus the
+ * playhead, not read from the engine's LFO; the Filter pad's ghost moves linearly in time over the sweep while the
+ * filter falls exponentially in Hz toward FILTER_FLOOR (280 Hz, not the Filter dial's lowest point); a pad pressed again
+ * keeps its first start, so its ghost jumps back to where that start puts it.
  */
 import { FILTER_SWEEP_BEATS, INSTRUMENTS, type Engine, type InstrumentId, type LaneBar } from "../engine/index.ts";
-import { flashLevel, lfoPull, meterScale, METER_MS, playhead, pulseLevel, punchSweep, sweepGhost } from "./logic.ts";
+import { flashLevel, lfoPull, masterMeterLook, meterScale, METER_MS, playhead, pulseLevel, punchSweep, sweepGhost } from "./logic.ts";
 
 const KEY = "groovebox.motion";
 
@@ -112,6 +125,25 @@ function moveGhosts(engine: Engine, dials: HTMLElement[], key: WeakMap<HTMLEleme
   }
 }
 
+/** One draw of the master meter: only what changed is written (T3 review S2). */
+function drawMaster(m: HTMLElement, rms: number, peak: number, key: WeakMap<HTMLElement, string>): void {
+  const look = masterMeterLook(rms, peak);
+  const k = `${look.fill}|${look.pk}|${look.text}`;
+  if (key.get(m) === k) return;
+  key.set(m, k);
+  const fill = m.querySelector<HTMLElement>(".fill");
+  const pk = m.querySelector<HTMLElement>(".pk");
+  const b = m.querySelector("b");
+  if (fill && fill.style.transform !== look.fill) fill.style.transform = look.fill;
+  if (pk && pk.style.transform !== look.pk) pk.style.transform = look.pk;
+  // The text node Preact made is kept (its data changed), so a render of the same "–" never undoes the reading.
+  const node = b?.firstChild;
+  if (node && node.nodeType === 3) {
+    if (node.nodeValue !== look.text) node.nodeValue = look.text;
+  } else if (b && b.textContent !== look.text) b.textContent = look.text;
+  m.setAttribute("aria-label", `Master level ${look.text}`);
+}
+
 /** Start the loop. Returns a function that stops it. */
 export function startMotion(engine: Engine, root: HTMLElement = document.documentElement): () => void {
   const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -124,9 +156,13 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
   let prev = "";
   let targets: HTMLElement[] = [];
   let meterAt = -Infinity;
+  let moversAt = -Infinity;
+  /** Held still, the fader meters and the ghosts have been cleared since it went still. */
+  let stillDone = false;
   const pulses = INSTRUMENTS.map(() => 0);
   let ghosts: HTMLElement[] = [];
   const ghostKey = new WeakMap<HTMLElement, string>();
+  const masterKey = new WeakMap<HTMLElement, string>();
   const frame = (now: number): void => {
     raf = requestAnimationFrame(frame);
     const still = !wanted() || !!reduce?.matches;
@@ -134,21 +170,26 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
       root.classList.toggle("still", still);
       wasStill = still;
       meterAt = -Infinity;
+      stillDone = false;
     }
     const playing = last.playing && engine.playing;
     if (now - meterAt >= METER_MS) {
       meterAt = now;
-      for (const m of root.querySelectorAll<HTMLElement>(".fmeter[data-meter]")) {
-        const v = `scaleY(${meterScale(engine.instrumentLevel(m.dataset.meter as InstrumentId), still)})`;
-        if (m.style.transform !== v) m.style.transform = v;
-      }
+      for (const m of root.querySelectorAll<HTMLElement>(".meter[data-master]")) drawMaster(m, engine.level(), engine.peak(), masterKey);
+      if (!still || !stillDone) {
+        for (const m of root.querySelectorAll<HTMLElement>(".fmeter[data-meter]")) {
+          const v = `scaleY(${meterScale(engine.instrumentLevel(m.dataset.meter as InstrumentId), still)})`;
+          if (m.style.transform !== v) m.style.transform = v;
+        }
+        ghosts = [...root.querySelectorAll<HTMLElement>(GHOSTS)];
+      } else ghosts = [];
       INSTRUMENTS.forEach((id, i) => (pulses[i] = pulseLevel(playing ? engine.instrumentLevel(id) : -Infinity, still)));
-      ghosts = [...root.querySelectorAll<HTMLElement>(GHOSTS)];
     }
     const stepMs = 60000 / engine.bpm / 4;
     const p16 = playing ? playhead(last.step, now - last.at, stepMs, still) : -1;
     const shown = lanes && lanes.bar === last.bar ? lanes : null;
     if (ghosts.length) moveGhosts(engine, ghosts, ghostKey, playing && !still, last.bar * 4 + Math.max(0, p16) / 4);
+    if (still) stillDone = true;
     const parts = [p16.toFixed(3), ...pulses.map((m) => m.toFixed(2))];
     const flashes: number[] = [];
     for (const id of INSTRUMENTS) {
@@ -156,10 +197,13 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
       flashes.push(f);
       parts.push(f.toFixed(2));
     }
+    const key = parts.join(",");
+    // Nothing changed: the containers are looked up again only now and then, for one that appeared since.
+    if (key === prev && now - moversAt < METER_MS) return;
     // A container that appeared since the last frame gets the values even when they have not changed.
+    moversAt = now;
     const movers = root.querySelectorAll<HTMLElement>(MOVERS);
     const same = movers.length === targets.length && targets.every((t, i) => t === movers[i]);
-    const key = parts.join(",");
     if (key === prev && same) return;
     prev = key;
     if (!same) targets = [...movers];

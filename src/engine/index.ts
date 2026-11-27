@@ -635,7 +635,8 @@ export class Engine {
     // P10 review S2: a hand on the controls while the drop sounds stops the level follower where it is.
     // P11: Morph's own moves are not a hand: they hold neither the follower nor Morph.
     if (!this.morphing) {
-      if (op !== "drop" && this.doubling()) this.dropHand = true;
+      // T3 review M4: a punch pad is no hand on the mix: it leaves the follower going (Cut pauses its readings instead).
+      if (op !== "drop" && op !== "punch" && this.doubling()) this.dropHand = true;
       this.markHand(op, args);
     }
     const w = this.rec.writer;
@@ -1548,6 +1549,8 @@ export class Engine {
     if (this.dropPlan.phase === "wind" || this.dropPlan.phase === "off") return;
     if (this.dropSkip > 0) return void this.dropSkip--;
     if (this.dropHand || !this.graph || !(this.dropRef > 0)) return;
+    // T3 review M4: the follower hears the channels after Cut: while Cut is in (or ending) its readings are no measure.
+    if (this.graph.punch.active("cut")) return;
     if (phase === "on") this.dropOnBeats++;
     const settling = !(phase === "on" && this.dropFollowed >= FOLLOW_BEATS);
     // P10 fix: each beat against the same place of the section's loop; while settling, a place not heard before the

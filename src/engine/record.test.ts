@@ -82,6 +82,7 @@ beforeEach(() => {
   h.ctx.currentTime = 0;
   h.recorders.length = 0;
   h.tap.fail = false;
+  h.transport.ticks = 0;
   vi.useRealTimers();
 });
 
@@ -165,6 +166,33 @@ describe("record state machine", () => {
     h.recorders[0].settle.resolve(take);
     await flush();
     expect(e.getLog()?.events.map((x) => x.op)).toEqual(["setMix"]);
+  });
+
+  it("logs a punch pad's press and release, each replaying as engine.punch(pad, down) (T3 review M5)", async () => {
+    const e = await ready();
+    e.play();
+    e.record();
+    h.transport.ticks = 192 * 3;
+    e.punch("cut", true);
+    h.transport.ticks = 192 * 5;
+    e.punch("cut", false);
+    e.punch("echo", true);
+    e.record();
+    h.recorders[0].settle.resolve(take);
+    await flush();
+    const ev = e.getLog()?.events ?? [];
+    expect(ev.map((x) => [x.op, x.a])).toEqual([
+      ["punch", ["cut", true]],
+      ["punch", ["cut", false]],
+      ["punch", ["echo", true]],
+    ]);
+    expect(ev[1].b).toBeGreaterThan(ev[0].b);
+    // A replay calls the same method with the same arguments.
+    const calls: unknown[][] = [];
+    const replay = { punch: (...a: unknown[]) => void calls.push(a) } as unknown as Record<string, (...a: unknown[]) => void>;
+    for (const x of ev) replay[x.op](...(x.a as unknown[]));
+    expect(calls).toEqual([["cut", true], ["cut", false], ["echo", true]]);
+    expect(typeof (e as unknown as Record<string, unknown>).punch).toBe("function");
   });
 
   it("a capture processor that fails to load is reported, not silent (M8)", async () => {
