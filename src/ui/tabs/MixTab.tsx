@@ -6,7 +6,7 @@ import { useEffect, useState } from "preact/hooks";
 import { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, INSTRUMENTS, MIX_RANGES, mixValue, type Engine, type LatencyHint, type MixKey } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { Dial, Fader, GroupLabel, Meter, Pager } from "../components.tsx";
-import { useFull } from "./full.ts";
+import { MIX_SHAPES, probeProps, useFull, type Full } from "./full.ts";
 import { knobPos, knobValue, meterFraction, secondsText, shownPage, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
@@ -34,7 +34,7 @@ function MasterMeter({ engine }: { engine: Engine }) {
 }
 
 /** The app's own motion switch (spec 8.12): off, nothing moves and every state reads by fill and hatching. */
-function MotionSwitch() {
+function MotionSwitch({ brief = false }: { brief?: boolean }) {
   const [wanted, setWanted] = useState(motionWanted);
   useEffect(() => onMotionPref(() => setWanted(motionWanted())), []);
   // The phone's reduce-motion setting holds everything still whatever the switch says: show Still (P1b review M10).
@@ -57,8 +57,15 @@ function MotionSwitch() {
           </button>
         ))}
       </div>
-      {system && <p class="note" id="motion-system">The phone's setting is on.</p>}
-      <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>
+      {/* T2 review S1: the whole Mix has one line here, whatever the phone's setting, so its height never changes. */}
+      {brief ? (
+        <p class="note" id={system ? "motion-system" : undefined}>{system ? "The phone's setting is on." : "Still stops every movement on screen."}</p>
+      ) : (
+        <>
+          {system && <p class="note" id="motion-system">The phone's setting is on.</p>}
+          <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>
+        </>
+      )}
     </>
   );
 }
@@ -135,8 +142,10 @@ const DECAY = { label: "Tail", seconds: MIX_RANGES.reverbDecay };
 
 export function MixTab({ ctx }: { ctx: Ctx }) {
   // T2 (spec 9.2): Advanced Mix on the desk shows every page at once where it fits; Simple keeps its own.
-  const [full, ref] = useFull(ctx, "mix", ctx.advanced);
-  return full ? <WholeMix ctx={ctx} sref={ref} /> : <PagedMix ctx={ctx} sref={ref} />;
+  const f = useFull(ctx, "mix", MIX_SHAPES, ctx.advanced);
+  // The page chosen is kept here, above the whole/paged switch (T2 review M2).
+  const [chosen, setPage] = useState<MixPage>("master");
+  return f.full ? <WholeMix ctx={f.view} f={f} /> : <PagedMix ctx={ctx} sref={f.ref} chosenPage={chosen} setPage={setPage} />;
 }
 
 /**
@@ -212,12 +221,12 @@ function useInstrumentMeters(engine: Engine): Record<string, number> {
  * the Drop and Morph settings. T2 slice c: the help notes of the Audio, Motion and Morph pages
  * are shown, as on the pages (the Space page's is left to the pages: the faders need its height over the dock).
  */
-function WholeMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
+function WholeMix({ ctx, f }: { ctx: Ctx; f: Full }) {
   const { engine, pos } = ctx;
   const [armed, choose] = useBuffer(ctx);
   const meters = useInstrumentMeters(engine);
   return (
-    <section ref={sref} class="mixtab whole" data-whole="mix">
+    <section ref={f.ref} {...probeProps(f)} class="mixtab whole" data-whole="mix">
       <MasterMeter engine={engine} />
       <div class="cols">
         <div class="col">
@@ -237,7 +246,7 @@ function WholeMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null
             <p class="note" data-audio-state>{pos.playing ? STOP_NOTE : armed ? AGAIN_NOTE : "\u00a0"}</p>
           </div>
           <div class="grp" data-grp="motion">
-            <MotionSwitch />
+            <MotionSwitch brief />
           </div>
           <div class="grp levels" data-grp="levels">
             <GroupLabel thing="Levels" />
@@ -308,10 +317,9 @@ function SpaceDials({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function PagedMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
+function PagedMix({ ctx, sref, chosenPage, setPage }: { ctx: Ctx; sref: { current: HTMLElement | null }; chosenPage: MixPage; setPage: (p: MixPage) => void }) {
   const { engine, pos } = ctx;
   const [armed, choose] = useBuffer(ctx);
-  const [chosenPage, setPage] = useState<MixPage>("master");
   const together = !ctx.advanced && ctx.tablet && ctx.roomy;
   const pages = ctx.advanced ? ADVANCED_PAGES : together ? TABLET_SIMPLE_PAGES : MIX_PAGES;
   const page = shownPage(pages, chosenPage);

@@ -28,7 +28,7 @@ import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, DRUM_EXTRAS, VOICE_KNOBS, drumKnob, p
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 import { FxPage, FxSlots } from "./fx.tsx";
-import { useFull } from "./full.ts";
+import { instShapes, probeProps, useFull, type Full } from "./full.ts";
 
 const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open", perc: "Perc", shaker: "Shaker" };
 
@@ -283,10 +283,12 @@ function basePages(inst: InstrumentId): PageDef<InstPage>[] {
 }
 
 export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
-  // T2 (spec 9.2): Drums, Bass and Synth on the desk show every page at once where they fit.
-  const [full, ref] = useFull(ctx, inst);
-  if (!full) return <PagedInstrument ctx={ctx} inst={inst} sref={ref} />;
-  return inst === "drums" ? <WholeDrums ctx={ctx} sref={ref} /> : <WholeInstrument ctx={ctx} inst={inst} sref={ref} />;
+  // T2 (spec 9.2): Drums, Bass and Synth on the desk show every page at once where they fit, decided by size (full.ts).
+  const f = useFull(ctx, inst, instShapes(inst));
+  // The page chosen is kept here, above the whole/paged switch, so a rotation that crosses it keeps it (T2 review M2).
+  const [chosen, setPage] = useState<InstPage>(inst === "drums" ? "beat" : "rhythm");
+  if (!f.full) return <PagedInstrument ctx={ctx} inst={inst} sref={f.ref} chosen={chosen} setPage={setPage} />;
+  return inst === "drums" ? <WholeDrums ctx={f.view} f={f} /> : <WholeInstrument ctx={f.view} inst={inst} f={f} />;
 }
 
 function Rhythms({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
@@ -324,11 +326,11 @@ function Rhythms({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
  * columns: the patch (Sound, both effect slots, the sends) and what it plays and how (the rhythm picker, Mod with the
  * wave, over the XY pad, bottom right in thumb reach, spec 9.1). Where the panel is narrow the columns stack.
  */
-function WholeInstrument({ ctx, inst, sref }: { ctx: Ctx; inst: InstrumentId; sref: { current: HTMLElement | null } }) {
+function WholeInstrument({ ctx, inst, f }: { ctx: Ctx; inst: InstrumentId; f: Full }) {
   const knobPages = KNOB_PAGES[inst] ?? [];
   const patch = ctx.song.patches[inst];
   return (
-    <section ref={sref} class="insttab whole" data-whole={inst} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
+    <section ref={f.ref} {...probeProps(f)} class="insttab whole" data-whole={inst} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
       <div class="headrow wholehead">
         <HeadName ctx={ctx} inst={inst} />
         <Lane id={inst} lanes={ctx.lanes} playhead />
@@ -406,10 +408,10 @@ function SoundButton({ ctx }: { ctx: Ctx }) {
 /**
  * T2 (spec 9.2): Drums whole, on the desk. Every voice's 16 steps as one grid, each voice two rows of eight (a half
  * bar each: 16 cells of 48 px do not fit across the panel), with the voice's level and decay beside its two rows; the
- * beat over the grid; the name and switch, the sound, Reset, the kick's pitch and drive, the perc's pitch and swing,
+ * beat over the grid; the name and switch, the Drums lane (spec 8.12, T2 review M1), the sound, Reset, the kick's pitch and drive, the perc's pitch and swing,
  * both effect slots, the sends and the XY pad (lowest, in thumb reach) in the column on the right.
  */
-function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
+function WholeDrums({ ctx, f }: { ctx: Ctx; f: Full }) {
   const { engine, song, edit } = ctx;
   const section = song.sections[edit];
   const drums = section.drums;
@@ -418,7 +420,7 @@ function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | nu
   const patch = song.patches.drums;
   const half = SEQ_STEPS_16 / 2;
   return (
-    <section ref={sref} class="insttab whole drumwhole" data-whole="drums" style={{ "--c": INST_COLOR.drums, "--chip": INST_COLOR.drums }}>
+    <section ref={f.ref} {...probeProps(f)} class="insttab whole drumwhole" data-whole="drums" style={{ "--c": INST_COLOR.drums, "--chip": INST_COLOR.drums }}>
       <div class="dleft">
         <PagedChips
           name="preset"
@@ -429,8 +431,9 @@ function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | nu
           onPick={(p) => engine.setDrumPreset(edit, p)}
         />
         <div class="dgrid">
-          {DRUM_VOICES.map((v) =>
-            [0, 1].map((h) => (
+          {DRUM_VOICES.map((v, n) => (
+            <div class={`dvoice${n % 2 ? " alt" : ""}`} key={v} data-voice-pair={v}>
+            {[0, 1].map((h) => (
               <div class="drow" key={`${v}${h}`} data-voice-row={`${v}:${h}`}>
                 {Array.from({ length: half }, (_, i) => {
                   const k = h * half + i;
@@ -451,8 +454,9 @@ function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | nu
                 })}
                 <VoiceDial ctx={ctx} k={drumKnob(VOICE_KNOBS[v][h])} name={h === 0 ? VOICE_NAME[v] : "Decay"} />
               </div>
-            )),
-          )}
+            ))}
+            </div>
+          ))}
         </div>
       </div>
       <div class="dright">
@@ -460,6 +464,7 @@ function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | nu
           <HeadName ctx={ctx} inst="drums" />
           <InstToggle ctx={ctx} inst="drums" />
         </div>
+        <Lane id="drums" lanes={ctx.lanes} playhead />
         <div class="dpick">
           <SoundButton ctx={ctx} />
           <button
@@ -486,9 +491,8 @@ function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | nu
   );
 }
 
-function PagedInstrument({ ctx, inst, sref }: { ctx: Ctx; inst: InstrumentId; sref: { current: HTMLElement | null } }) {
+function PagedInstrument({ ctx, inst, sref, chosen, setPage }: { ctx: Ctx; inst: InstrumentId; sref: { current: HTMLElement | null }; chosen: InstPage; setPage: (p: InstPage) => void }) {
   const { roomy } = ctx;
-  const [chosen, setPage] = useState<InstPage>(inst === "drums" ? "beat" : "rhythm");
   const pages = withFilterPage(basePages(inst), roomy);
   const page = shownPage(pages, chosen);
   const knobPages = KNOB_PAGES[inst] ?? [];

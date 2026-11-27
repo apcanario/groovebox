@@ -7,7 +7,7 @@ import { useEffect, useState } from "preact/hooks";
 import { MOODS, MOOD_TABLE, NOTE_NAMES, degreeChords } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
 import { GroupLabel, Pager } from "../components.tsx";
-import { useFull } from "./full.ts";
+import { CHORD_SHAPES, probeProps, useFull } from "./full.ts";
 import {
   MAX_CHORDS,
   addChord,
@@ -26,17 +26,22 @@ type ChordPage = "chords" | "key";
 
 export function ChordsTab({ ctx }: { ctx: Ctx }) {
   // T2 (spec 9.2): Advanced Chords on the desk shows the editor and the progression library side by side where they fit.
-  const [full, ref] = useFull(ctx, "chords", ctx.advanced);
+  const f = useFull(ctx, "chords", CHORD_SHAPES, ctx.advanced);
+  // The page chosen is kept here, above the whole/paged switch (T2 review M2).
+  // A switch to Advanced opens on the Chords page, as when the editor mounted anew there.
+  const [kept, keep] = useState<{ adv: boolean; page: ChordPage }>({ adv: ctx.advanced, page: "chords" });
+  const page = kept.adv === ctx.advanced ? kept.page : "chords";
+  const setPage = (p: ChordPage): void => keep({ adv: ctx.advanced, page: p });
   if (!ctx.advanced) return <SimpleChords ctx={ctx} />;
-  if (!full) return <ChordEditor ctx={ctx} sref={ref} />;
+  if (!f.full) return <ChordEditor ctx={ctx} sref={f.ref} page={page} setPage={setPage} />;
   return (
-    <section ref={ref} class="chordtab whole" data-whole="chords">
+    <section ref={f.ref} {...probeProps(f)} class="chordtab whole" data-whole="chords">
       <div class="cols">
         <div class="col">
-          <ChordEditor ctx={ctx} whole />
+          <ChordEditor ctx={f.view} whole page={page} setPage={setPage} />
         </div>
         <div class="col">
-          <SimpleChords ctx={ctx} title="Library" />
+          <SimpleChords ctx={f.view} title="Library" />
         </div>
       </div>
     </section>
@@ -46,11 +51,10 @@ export function ChordsTab({ ctx }: { ctx: Ctx }) {
 /**
  * The G2 degree editor (Advanced, spec 8.4). Whole (T2, on the desk): the Key page over the Chords page, no page chips.
  */
-function ChordEditor({ ctx, sref, whole = false }: { ctx: Ctx; sref?: { current: HTMLElement | null }; whole?: boolean }) {
+function ChordEditor({ ctx, sref, whole = false, page, setPage }: { ctx: Ctx; sref?: { current: HTMLElement | null }; whole?: boolean; page: ChordPage; setPage: (p: ChordPage) => void }) {
   const { engine, song, edit } = ctx;
   const section = song.sections[edit];
   const [sel, setSel] = useState<number | null>(null);
-  const [page, setPage] = useState<ChordPage>("chords");
   // A different section, or a shorter sequence, clears the selection.
   useEffect(() => setSel(null), [edit]);
   useEffect(() => {

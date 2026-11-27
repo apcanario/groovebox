@@ -38,7 +38,7 @@ import { Lane } from "../lanes.tsx";
 import { SeedButtons, SoundPicker } from "./SimpleTab.tsx";
 import { LeadDials, LeadStyles, leadStyleOf, type LeadPage } from "./lead.tsx";
 import { FxPage, FxSlots } from "./fx.tsx";
-import { useFull } from "./full.ts";
+import { layerShapes, probeProps, useFull, type Full } from "./full.ts";
 import { SendBar } from "../components.tsx";
 
 function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
@@ -248,12 +248,12 @@ export function ModeRow({ ctx, id, toggle }: { ctx: Ctx; id: LayerInstrument; to
  * XY pad and sends get a Filter page.
  */
 export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
-  const layer = ctx.song.sections[ctx.edit][id];
-  const lead = layer.mode === "generative";
-  const pulse = lead && leadStyleOf(ctx, id) === "pulse";
-  // T2 (spec 9.2): on the desk every page at once where it fits; the shape is what changes the panel's content.
-  const [full, ref] = useFull(ctx, `${id}:${layer.mode}:${pulse ? "pulse" : ""}`);
-  return full ? <WholeLayer ctx={ctx} id={id} sref={ref} /> : <PagedLayer ctx={ctx} id={id} sref={ref} />;
+  // T2 (spec 9.2): on the desk every page at once where it fits in every mode and lead style, decided by size
+  // (full.ts), so a section change never switches the panel between whole and paged (T2 review E2, M5).
+  const f = useFull(ctx, id, layerShapes(id));
+  // The page chosen is kept here, above the whole/paged switch (T2 review M2).
+  const [chosen, setPage] = useState<LayerPage>("notes");
+  return f.full ? <WholeLayer ctx={f.view} id={id} f={f} /> : <PagedLayer ctx={ctx} id={id} sref={f.ref} chosen={chosen} setPage={setPage} />;
 }
 
 /**
@@ -264,7 +264,7 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
  * put the sends over the XY pad, where their column has the room, so the patch column fits the shorter panel over the
  * dock (800 x 1280); a lead's dials fill its right column, so its sends stay with the patch. Where the panel is narrow the columns stack.
  */
-function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { current: HTMLElement | null } }) {
+function WholeLayer({ ctx, id, f }: { ctx: Ctx; id: LayerInstrument; f: Full }) {
   const { edit } = ctx;
   const layer = ctx.song.sections[edit][id];
   const lead = layer.mode === "generative";
@@ -278,7 +278,8 @@ function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { 
   );
   return (
     <section
-      ref={sref}
+      ref={f.ref}
+      {...probeProps(f)}
       class={`insttab layertab adv whole${lead ? " lead" : ""}`}
       data-whole={id}
       style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}
@@ -338,9 +339,8 @@ function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { 
   );
 }
 
-function PagedLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { current: HTMLElement | null } }) {
+function PagedLayer({ ctx, id, sref, chosen, setPage }: { ctx: Ctx; id: LayerInstrument; sref: { current: HTMLElement | null }; chosen: LayerPage; setPage: (p: LayerPage) => void }) {
   const { edit, roomy } = ctx;
-  const [chosen, setPage] = useState<LayerPage>("notes");
   const layer = ctx.song.sections[edit][id];
   const lead = layer.mode === "generative";
   const pulse = lead && leadStyleOf(ctx, id) === "pulse";
