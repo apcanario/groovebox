@@ -2668,9 +2668,13 @@ button:disabled {
 .whole .dial label {
   margin-top: 1px;
 }
-/* T2 review S1: a lead with Pulse on the desk keeps FIT_SLACK to spare with 62 px dial rows. */
-.tablet.landscape .layertab.whole .grp .dials {
+/* T2 review S1: a lead with Pulse on the desk keeps FIT_SLACK to spare: its Notes, Feel and Pulse dials in 62 px rows,
+   both effect slots' in 60 px (the Sound dials keep 64 px, so a value such as "2000" fits its ring). */
+.tablet.landscape .layertab.whole.lead .playcol .grp .dials {
   grid-auto-rows: 62px;
+}
+.tablet.landscape .layertab.whole .fxboth .dials {
+  grid-auto-rows: 60px;
 }
 /* Bass and Synth have the height to spare: their dials are taller, so every value reads (".004" fits its ring). */
 .insttab.whole:not(.layertab) .grp .dials {
