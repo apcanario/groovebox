@@ -32,8 +32,17 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      # The Android SDK (ANDROID_HOME) is preinstalled on ubuntu-latest; Gradle fetches platform 36 if missing.
-      - uses: android-actions/setup-android@v3
+      # The Android SDK is preinstalled on ubuntu-latest (ANDROID_HOME=/usr/local/lib/android/sdk). No setup-android:
+      # its v3 asks sdkmanager for the removed package `tools` and fails (run 46046532163). `yes` stops on SIGPIPE once
+      # the prompts end, so only the licence pipe carries `|| true`. Then install what android/ needs: compileSdk 36
+      # (android/variables.gradle) and build-tools 35.0.0 (the default of AGP 8.13, android/build.gradle; no
+      # buildToolsVersion is set). Already-installed packages are a no-op.
+      - name: Android SDK licences and packages
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;35.0.0" "platform-tools"
       - run: npm ci
       - run: npm run build:android
       - name: assembleDebug

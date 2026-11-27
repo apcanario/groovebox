@@ -122,6 +122,10 @@ class ReleaseCheck(unittest.TestCase):
         edit(self.root, FILES[3], "</application>", '<service android:name=".Player" /></application>')
         self.assertIn("<service>", self.found())
 
+    def test_setup_android_fails(self):
+        edit(self.root, FILES[0], "      - run: npm ci", "      - uses: android-actions/setup-android@v3\n      - run: npm ci")
+        self.assertIn("setup-android", self.found())
+
     def test_cancel_in_progress_fails(self):
         edit(self.root, FILES[0], "cancel-in-progress: false", "cancel-in-progress: true")
         self.assertIn("cancel-in-progress", self.found())

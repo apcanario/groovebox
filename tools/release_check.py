@@ -9,6 +9,7 @@ Fails (exit 1, one line per problem) if:
 - vite.config.ts no longer builds with base "./" (Pages and the APK both load from a relative base);
 - android/app/src/main/AndroidManifest.xml asks for a foreground service, a wake lock or background audio
   (spec section 2), or declares a <service>;
+- apk.yml uses android-actions/setup-android (run 46046532163: it fails on the runner's SDK; the preinstalled one is used);
 - apk.yml cancels a run in progress (it could stop between deleting and recreating the release, G6 review M1);
 - any *.keystore or *.jks other than android/app/debug.keystore is in the repo, that file is missing, or
   android/app/build.gradle has a release signing config or does not sign debug with that file (G6 review E2: one
@@ -88,6 +89,8 @@ def apk_problems(path: str) -> list:
     uses = [str(s.get("uses", "")) for s in _steps(doc)]
     if not any(u.startswith("actions/setup-java@") for u in uses):
         p.append("apk.yml: no setup-java step")
+    if any(u.startswith("android-actions/setup-android@") for u in uses):
+        p.append("apk.yml: uses setup-android (its v3 asks for the removed sdkmanager package tools; use the runner's SDK)")
     rel = re.search(r"gh release create\s+latest\b(.*)", runs, re.S)
     soft = [s for s in _steps(doc) if str(s.get("uses", "")).startswith("softprops/action-gh-release@")]
     if rel:
