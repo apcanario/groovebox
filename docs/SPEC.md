@@ -479,8 +479,10 @@ Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad con
 | Layout | When | Orientation |
 |---|---|---|
 | Phone | under 600 px wide | portrait only |
-| Tablet portrait | 600 px wide or more, taller than wide | free |
-| Tablet landscape | 900 px wide or more, wider than tall | free |
+| Tablet portrait | 600 px wide or more, taller than wide, 960 px tall or more | free |
+| Tablet landscape | 800 px wide or more, where tablet portrait does not fit (wider than tall, square, or under 960 px tall) | free |
+
+- A tablet that fits neither (under 800 px wide and under 960 px tall) gets tablet portrait.
 
 - **Rotating mid-jam** changes the layout with no gap in the audio and nothing lost.
 - **Extra space shows more at once.** It is not used to make the phone layout bigger.
@@ -491,7 +493,7 @@ Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad con
 
 Two halves, both always on screen.
 
-- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument and what it is playing, the pads of the playing section showing their notes; then the section strip as the grid's column labels; then the DROP button and the transport bar side by side.
+- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument and what it is playing, the pads of the playing section showing their notes; then the section strip as the grid's column labels; then the DROP button and the transport bar side by side (under 960 px wide, where they do not fit side by side, DROP with Morph sits directly over the transport bar).
 - **Right: one instrument.** A rail of seven buttons (Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix) and the chosen one's panel under it.
 - **Advanced panels show everything at once, with no pages:**
   - Layers: mode and lead style, the phrase row, the Notes and Feel groups of six knobs side by side, the XY pad and the Sound group.

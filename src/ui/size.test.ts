@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import sizeSource from "./size.ts?raw";
-import { parseForced, sizeClass, SizeWatch, tabletPanel } from "./size.ts";
+import { parseForced, ROOMY_PORTRAIT_PX, ROOMY_PX, roomyFor, sizeClass, SizeWatch, tabletPanel } from "./size.ts";
 
 describe("size class (spec 9.1)", () => {
   it("chooses the layout at the sizes T1 names", () => {
@@ -16,9 +16,19 @@ describe("size class (spec 9.1)", () => {
   it("holds the table's edges", () => {
     expect(sizeClass(599, 1000)).toBe("phone");
     expect(sizeClass(600, 1000)).toBe("portrait");
-    expect(sizeClass(899, 600)).toBe("portrait");
-    expect(sizeClass(900, 600)).toBe("landscape");
-    expect(sizeClass(800, 800)).toBe("portrait");
+    expect(sizeClass(600, 960)).toBe("portrait");
+    expect(sizeClass(799, 600)).toBe("portrait");
+    expect(sizeClass(800, 600)).toBe("landscape");
+    expect(sizeClass(960, 600)).toBe("landscape");
+  });
+
+  it("gives the desk to a tablet the dock does not fit (T1 review S1)", () => {
+    expect(sizeClass(900, 900)).toBe("landscape");
+    expect(sizeClass(880, 620)).toBe("landscape");
+    expect(sizeClass(800, 800)).toBe("landscape");
+    expect(sizeClass(820, 940)).toBe("landscape");
+    expect(sizeClass(884, 1104)).toBe("portrait");
+    expect(sizeClass(700, 940)).toBe("portrait");
   });
 
   it("keeps a phone turned sideways a phone", () => {
@@ -44,6 +54,19 @@ describe("size class (spec 9.1)", () => {
     expect(tabletPanel("play", "bass")).toBe("bass");
     expect(tabletPanel("mix", "bass")).toBe("mix");
     expect(tabletPanel("layer2", "chords")).toBe("layer2");
+  });
+});
+
+describe("roomy panels (T1 review M5)", () => {
+  it("pages the XY pad and the sends on tablet portrait under 640 px of body, elsewhere under 560 px", () => {
+    expect(ROOMY_PORTRAIT_PX).toBe(640);
+    expect(ROOMY_PX).toBe(560);
+    // 800 x 1280: the panel has about 575 px, so the XY pad and the sends get their page.
+    expect(roomyFor("portrait", 575)).toBe(false);
+    expect(roomyFor("portrait", 640)).toBe(true);
+    expect(roomyFor("landscape", 575)).toBe(true);
+    expect(roomyFor("phone", 559)).toBe(false);
+    expect(roomyFor("phone", 560)).toBe(true);
   });
 });
 
@@ -91,8 +114,8 @@ describe("SizeWatch", () => {
   });
 });
 
-describe("a rotation never touches the engine", () => {
-  it("the size layer imports nothing but itself: no engine, no Tone.js", () => {
+describe("the size layer imports nothing", () => {
+  it("no import at all: no engine, no Tone.js", () => {
     expect(sizeSource).not.toMatch(/^import /m);
     expect(sizeSource).not.toMatch(/from ["'][^"']*(engine|tone)/i);
   });

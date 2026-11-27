@@ -77,6 +77,8 @@ const MIX_PAGES: PageDef<MixPage>[] = [
 ];
 /** P10 (spec 8.9): Advanced adds the Drop page; P11 (spec 8.11) the Morph page. */
 const ADVANCED_PAGES: PageDef<MixPage>[] = [...MIX_PAGES, ["drop", "Drop"], ["morph", "Morph"]];
+/** T1 review M4 (spec 9.2): Simple on a tablet with the height shows Master and Levels together on one page. */
+const TABLET_SIMPLE_PAGES: PageDef<MixPage>[] = MIX_PAGES.filter(([k]) => k !== "levels");
 
 const CLIFF_NAME = { gap: "Gap", hold: "Hold", none: "None" } as const;
 
@@ -135,7 +137,8 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
     else setArmed(h);
   };
   const [chosenPage, setPage] = useState<MixPage>("master");
-  const pages = ctx.advanced ? ADVANCED_PAGES : MIX_PAGES;
+  const together = !ctx.advanced && ctx.tablet && ctx.roomy;
+  const pages = ctx.advanced ? ADVANCED_PAGES : together ? TABLET_SIMPLE_PAGES : MIX_PAGES;
   const page = shownPage(pages, chosenPage);
   const mix = engine.getMix();
   const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
@@ -153,7 +156,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
           {!ctx.advanced && <MorphSpeed engine={engine} label="Morph speed" />}
         </div>
       )}
-      {page === "levels" && (
+      {(page === "levels" || (together && page === "master")) && (
         <div class="dials n5">
           {INSTRUMENTS.map((id) => (
             <Dial

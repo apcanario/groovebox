@@ -4,9 +4,11 @@
  * engine (nothing here or in its listeners calls the engine). Display only.
  *
  * Reading of spec 9.1's table: a screen under 600 px on its short side is a phone in either orientation (a phone turned
- * sideways in a browser stays a phone; the APK locks phones to portrait). A tablet is landscape when it is 900 px wide or
- * more and wider than tall; any other tablet (taller than wide, square, or wider than tall but under 900 px wide) is
- * portrait, whose dock layout fits a narrower screen.
+ * sideways in a browser stays a phone; the APK locks phones to portrait). A tablet taller than wide is portrait when it
+ * is 960 px tall or more, the least height that holds the header, a panel of the phone's height and the dock. Any other
+ * tablet (wider than tall, square, or taller than wide but under 960 px tall) gets the desk from 800 px wide, the least
+ * width that holds the rail of seven beside the pads; a tablet that fits neither (under 800 px wide and under 960 px
+ * tall) is portrait.
  */
 export type SizeClass = "phone" | "portrait" | "landscape";
 
@@ -14,14 +16,17 @@ export const SIZE_CLASSES: readonly SizeClass[] = ["phone", "portrait", "landsca
 
 /** Spec 9.1: under this width (the short side) the phone layout. */
 export const TABLET_MIN_PX = 600;
-/** Spec 9.1: from this width, and wider than tall, the tablet landscape layout. */
-export const LANDSCAPE_MIN_PX = 900;
+/** Spec 9.1: from this height, and taller than wide, the tablet portrait layout (the dock). */
+export const PORTRAIT_MIN_H_PX = 960;
+/** Spec 9.1: from this width the tablet landscape layout (the desk) when the dock does not fit. */
+export const LANDSCAPE_MIN_PX = 800;
 
 /** The layout for a screen of `w` x `h` CSS px. */
 export function sizeClass(w: number, h: number): SizeClass {
   if (!(w > 0 && h > 0)) return "phone";
   if (Math.min(w, h) < TABLET_MIN_PX) return "phone";
-  if (w > h && w >= LANDSCAPE_MIN_PX) return "landscape";
+  if (h > w && h >= PORTRAIT_MIN_H_PX) return "portrait";
+  if (w >= LANDSCAPE_MIN_PX) return "landscape";
   return "portrait";
 }
 
@@ -29,6 +34,19 @@ export function sizeClass(w: number, h: number): SizeClass {
 export function parseForced(search: string): SizeClass | null {
   const v = new URLSearchParams(search).get("size");
   return SIZE_CLASSES.includes(v as SizeClass) ? (v as SizeClass) : null;
+}
+
+/** Tab body height (CSS px) from which the XY pad and sends sit under every page (moved from App.tsx for its test). */
+export const ROOMY_PX = 560;
+/**
+ * T1 slice c: on tablet portrait the panel is wide, so its dials and pads are taller than a phone's; the XY pad and the
+ * sends sit under every page only from this body height (at 800 x 1280 the panel has about 575 px and pages them).
+ */
+export const ROOMY_PORTRAIT_PX = 640;
+
+/** Whether a tab body of `height` CSS px shows the XY pad and the sends under every page, for the layout shown. */
+export function roomyFor(layout: SizeClass, height: number): boolean {
+  return height >= (layout === "portrait" ? ROOMY_PORTRAIT_PX : ROOMY_PX);
 }
 
 /** The tabs the tablet rail and dock pick from (spec 9.2: Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix). */

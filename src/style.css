@@ -2282,6 +2282,12 @@ button:disabled {
 }
 .tablet.landscape .inst {
   padding-top: 8px;
+  /* T1 review M1: the instrument half keeps the 8 px the pads half has under its deck; the 4 px it costs come from
+     the gap under the rail (the rail's own bottom edge marks the panel's top). */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+.tablet.landscape .inst .body {
+  padding-top: 4px;
 }
 .tablet.portrait .desk {
   flex-direction: column;
@@ -2491,7 +2497,7 @@ button:disabled {
   grid-auto-rows: 84px;
 }
 .tablet.portrait .roomy .dials.macros {
-  grid-auto-rows: 104px;
+  grid-auto-rows: 120px;
 }
 /* Simple Chords over the dock: the four cards two by two, as on a phone of 640 to 759 px (the panel is that short). */
 .tablet.portrait .cards {
@@ -2507,4 +2513,77 @@ button:disabled {
 .tablet.portrait .card .blocks {
   align-self: stretch;
   height: auto;
+}
+
+/*
+ * T1 review M2: a lane label of the dock waiting for the next bar keeps its words inside the 5 px hatched frame at
+ * rows of 48 px (19 px name, 2 px gap, 12 px "Next bar", 1.1 line height: 6 px clear above and below).
+ */
+.dock .nowlist .tile {
+  gap: 2px;
+}
+.dock .nowlist .tile > span {
+  line-height: 1.1;
+}
+
+/*
+ * T1 review E2 (spec 9.1): a portrait tablet under 1000 px tall (600 x 960, the table's edge) keeps a panel of the
+ * phone's height (356 px at 360 x 640): the dock's parts take the phone's short sizes (punch space and DROP 48 px, the
+ * strip's tiles 52 px, DROP on the lanes, the rail 56 px) and the panel the phone's compact form (macro dials 72 px,
+ * the Beat page's lane 32 px).
+ */
+@media (max-height: 999.98px) {
+  .tablet.portrait {
+    --punch: 48px;
+  }
+  .shell.tablet.portrait .sec {
+    height: 52px;
+  }
+  .shell.tablet.portrait .sec b {
+    font-size: 24px;
+  }
+  .tablet.portrait .dock .droprow {
+    margin-top: 0;
+  }
+  .tablet.portrait .dock .drop,
+  .tablet.portrait .dock .tog.morph {
+    height: 48px;
+  }
+  .tablet.portrait .rail .tab {
+    min-height: 56px;
+  }
+  .tablet.portrait .dials.macros,
+  .tablet.portrait .layertab.simple.lead .dials.macros {
+    grid-auto-rows: 72px;
+  }
+  .tablet.portrait .insttab:has(.drumseq) > .lane {
+    height: 32px;
+  }
+}
+
+/* T1 review E2: under 700 px wide the header's vibe control drops "All 24 vibes", so the vibe's name keeps its size. */
+@media (max-width: 699.98px) {
+  .tablet .hdr .vibectl .vmain:not(.pending) > span {
+    display: none;
+  }
+}
+
+/*
+ * T1 review S1 (spec 9.1, 9.2): the desk under 960 px wide (800 x 600 to 959 px, and square tablets). The instrument
+ * half keeps the rail of seven at 48 px a button; the pads half has no room for DROP with Morph beside the transport
+ * bar, so DROP with Morph sits over it.
+ */
+@media (max-width: 959.98px) {
+  .tablet.landscape .inst {
+    flex: 0 0 max(42%, 380px);
+  }
+  .tablet.landscape .deck {
+    flex-direction: column;
+  }
+}
+
+/* T1 review M4 (spec 9.2): Simple's four macro dials at a large size on the desk with the height (portrait: above). */
+.tablet.landscape .roomy .dials.macros {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 120px;
 }

@@ -17,7 +17,7 @@ import { SectionSheet, SongsSheet } from "./sheets.tsx";
 import { VibeControl, VibePicker } from "./vibes.tsx";
 import { loadMode, saveMode } from "./mode.ts";
 import { TABS, TAB_COLOR, TAB_NAME, TabIcon, type Tab } from "./theme.tsx";
-import { PANEL_TABS, tabletPanel, type PanelTab, type SizeClass, type SizeWatch } from "./size.ts";
+import { PANEL_TABS, roomyFor, tabletPanel, type PanelTab, type SizeClass, type SizeWatch } from "./size.ts";
 import { PlayTab } from "./tabs/PlayTab.tsx";
 import { DeskPads } from "./tabs/DeskPads.tsx";
 import { DropButton } from "./drop.tsx";
@@ -50,19 +50,13 @@ export interface Ctx {
    * not, instrument tabs give them a page of their own, so nothing scrolls.
    */
   roomy: boolean;
+  /** A tablet layout (spec 9.1): display only. */
+  tablet: boolean;
   /** Start the audio (from a tap); false when it failed (the error is shown). */
   startAudio: () => Promise<boolean>;
   /** Open the vibe picker. */
   openVibes: () => void;
 }
-
-/** Tab body height (CSS px) from which the XY pad and sends sit under every page. */
-export const ROOMY_PX = 560;
-/**
- * T1 slice c: on tablet portrait the panel is wide, so its dials and pads are taller than a phone's; the XY pad and the
- * sends sit under every page only from this body height (at 800 x 1280 the panel has about 575 px and pages them).
- */
-export const ROOMY_PORTRAIT_PX = 640;
 
 /** Watches the tab body's height. */
 function useRoomy(ref: { current: HTMLElement | null }, layout: SizeClass): boolean {
@@ -70,8 +64,7 @@ function useRoomy(ref: { current: HTMLElement | null }, layout: SizeClass): bool
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const min = layout === "portrait" ? ROOMY_PORTRAIT_PX : ROOMY_PX;
-    const read = (): void => setRoomy(el.clientHeight >= min);
+    const read = (): void => setRoomy(roomyFor(layout, el.clientHeight));
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
@@ -449,6 +442,7 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
     keeper,
     advanced,
     roomy,
+    tablet,
     startAudio,
     openVibes: () => setVibes(true),
   };

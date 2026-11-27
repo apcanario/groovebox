@@ -596,8 +596,9 @@ TABLET_SCREENS = {
 }
 
 # The desk's own layout: five labelled rows by every section, the punch pads' space above the grid, the strip under the
-# grid's columns as their labels, DROP and the transport bar side by side under the strip, the playing column's pads
-# drawing their notes, both halves on screen side by side and nothing under the bottom edge.
+# grid's columns as their labels, DROP and the transport bar side by side under the strip (under 960 px wide, DROP with
+# Morph over the transport bar), the playing column's pads drawing their notes, both halves on screen side by side and
+# nothing under the bottom edge.
 DESK = r"""() => {
   const bad = [];
   const q = (s) => document.querySelector(s), r = (el) => el.getBoundingClientRect();
@@ -619,7 +620,10 @@ DESK = r"""() => {
     const a = r(t), b = r(c);
     if (Math.abs(a.left - b.left) > 1 || Math.abs(a.right - b.right) > 1) bad.push(`section ${i}'s strip tile is not under its column`);
   }
-  if (Math.abs(d.top - pl.top) > 1 || d.right > pl.left + 0.5) bad.push('DROP and the transport bar are not side by side');
+  // Under 960 px wide (T1 review S1) DROP with Morph sits directly over the transport bar; from 960 px, beside it.
+  if (innerWidth < 960) {
+    if (d.bottom > pl.top + 0.5 || pl.top - d.bottom > 12) bad.push('DROP with Morph is not directly over the transport bar');
+  } else if (Math.abs(d.top - pl.top) > 1 || d.right > pl.left + 0.5) bad.push('DROP and the transport bar are not side by side');
   if (d.top < st.bottom - 0.5) bad.push('DROP is not under the strip');
   if (!(ph.right <= ih.left + 0.5 && Math.abs(ph.top - ih.top) < 1)) bad.push('the pads and the instrument are not side by side');
   if (r(rail).bottom > ih.top + 80 + 0.5) bad.push('the rail is not on top of the instrument half');

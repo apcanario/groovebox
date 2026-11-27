@@ -58,7 +58,7 @@ describe("desk layout rules", () => {
     expect(deskSource).not.toMatch(/from ["'][^"']*tone/i);
     expect(deskSource).not.toMatch(/Math\.random/);
   });
-  it("landscape lays out the desk; portrait keeps its own frame", () => {
+  it("App.tsx picks the desk's pads for landscape (a match on its source)", () => {
     expect(appSource).toMatch(/const pads = land \?/);
     expect(appSource).toMatch(/<DeskPads ctx=\{ctx\} \/>/);
   });
