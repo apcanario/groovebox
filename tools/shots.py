@@ -686,8 +686,8 @@ DOCK = r"""() => {
 
 
 # T2 (spec 9.2): on the desk at 1280 x 800 these Advanced panels show every page at once: no page chips, the panel whole.
-# Slice b adds Drums, Mix and Chords.
-PAGELESS = {"bass", "synth", "layer1", "layer2"}
+# Slice b: Drums (every voice by 16 steps as one grid), Mix (faders with meters) and Chords (editor beside the library).
+PAGELESS = {"chords", "drums", "bass", "synth", "layer1", "layer2", "mix"}
 PAGELESS_AT = (1280, 800)
 WHOLE = r"""(panel) => {
   const chips = [...document.querySelectorAll('.shell .inst .body [data-page]')].filter((c) => c.getClientRects().length);
