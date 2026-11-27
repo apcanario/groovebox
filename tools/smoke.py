@@ -30,6 +30,9 @@ clear of its readout (shots.XY_CLEAR).
 T3 slice b: the six punch pads (shots.PUNCH) on the phone's Punch page of the Mix tab and in the band over the tablet
 pads, present, 48 px, on screen and not overlapping; a finger on Cut holds it, sliding onto Filter keeps Cut and leaves
 Filter, the lift lets go (shots.walk_punch); stopped, a press does nothing.
+T3 slice c: many fingers through real touch points (shots.walk_fingers): two dials, an XY pad with a pad, three pads,
+each ending with its own value; the pads' pulse and the Filter dial's ghost with motion on, neither with it off. The cost
+part measures the worst main-thread stall and the audio load at the desk with motion on and off (walk_motion_cost).
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
@@ -52,7 +55,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import SMALL, sample_play, simple_words, walk_frame, walk_play_button, walk_punch, walk_tablet  # noqa: E402
+from shots import SMALL, sample_play, simple_words, walk_fingers, walk_frame, walk_play_button, walk_punch, walk_tablet  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 
@@ -3334,6 +3337,9 @@ def part_core(browser, page, failures: list, shot) -> None:
         failures.append("the transport stopped during the tablet walk")
     # T3 slice b: the punch pads on the phone's Mix page and both tablet layouts, a finger held, slid off and lifted.
     walk_punch(page, failures, True)
+    # T3 slice c (spec 9.5, 9.6): two dials, an XY pad and a pad, three pads, each its own finger; the pads' pulse and
+    # a moved dial's ghost with motion on and off.
+    walk_fingers(page, failures)
     # P10d: later taps of Play and Stop in Simple and Advanced, and a Stop during a drop's build, each sampled.
     walk_play_button(page, failures, "core")
     page.click('[data-appmode="advanced"]')
@@ -3409,10 +3415,62 @@ def part_morph(browser, page, failures: list, shot) -> None:
     walk_morph(page, failures)
 
 
+# T3 slice c (spec 9.5): the page's own thread while the trace runs: the longest gap between animation frames and the
+# longest task the browser reports (PerformanceObserver longtask, 50 ms and over).
+STALL_START = """() => {
+  const s = { worst: 0, longest: 0, frames: 0, run: true, last: performance.now() };
+  window.__stall = s;
+  try {
+    s.obs = new PerformanceObserver((l) => { for (const e of l.getEntries()) s.longest = Math.max(s.longest, e.duration); });
+    s.obs.observe({ type: 'longtask', buffered: false });
+  } catch (e) { s.longest = -1; }
+  const tick = () => { const n = performance.now(); s.worst = Math.max(s.worst, n - s.last); s.last = n; s.frames++; if (s.run) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}"""
+STALL_READ = """() => { const s = window.__stall; s.run = false; if (s.obs) s.obs.disconnect(); return { worst: s.worst, longest: s.longest, frames: s.frames }; }"""
+
+
+def walk_motion_cost(browser, page, failures: list) -> dict:
+    """T3 slice c: at the desk (1280 x 800, Advanced, the whole Mix beside the pads: meters, pulses, the ghost dials),
+    everything on and playing, the audio load (measure_cost, six seconds of the webaudio trace) and the worst stall of
+    the page's thread over the same six seconds, with motion on and then off (the Mix switch). Reported, not judged:
+    figures in docs/reviews/T3-measure.md."""
+    page.set_viewport_size({"width": 1280, "height": 800})
+    wait_for(page, "document.documentElement.dataset.size === 'landscape'", 2.0)
+    page.click('[data-appmode="advanced"]')
+    page.click('[data-tab="mix"]')
+    page.evaluate("(s) => window.__groovebox.loadSong(s)", FIRST_SONG[0])
+    if not page.evaluate("window.__groovebox.playing"):
+        page.click("#play")
+    page.evaluate("window.__groovebox.switchSection(1)")
+    wait_for(page, "window.__groovebox.position().section === 1", 4.0)
+    res = {}
+    for on in (True, False):
+        page.click(f'[data-motion="{"on" if on else "off"}"]')
+        label = f"motion {'on' if on else 'off'}"
+        page.evaluate(STALL_START)
+        out = measure_cost(browser, page, f"desk, everything on, {label}", True)
+        st = page.evaluate(STALL_READ)
+        out.update(stall_ms=st["worst"], longtask_ms=st["longest"], frames=st["frames"])
+        print(f"cost T3 {label}: worst main-thread stall {st['worst']:.1f} ms between frames ({st['frames']} frames), "
+              f"longest task {st['longest']:.1f} ms; audio load {out.get('load', float('nan')):.1f}%, worst render {out.get('worst_ms', float('nan')):.2f} ms")
+        if out.get("worst_ms") is None or st["frames"] < 2:
+            failures.append(f"cost T3 {label}: nothing measured ({out['callbacks']} render callbacks, {st['frames']} frames)")
+        res[label] = out
+    page.click('[data-motion="on"]')
+    page.click("#play")
+    page.click('[data-appmode="simple"]')
+    page.set_viewport_size({"width": 390, "height": 844})
+    wait_for(page, "document.documentElement.dataset.size === 'phone'", 2.0)
+    return res
+
+
 def part_cost(browser, page, failures: list, shot) -> None:
     # The P9 worklet load with the transport stopped, then P7's and P9's cost with everything on.
     walk_fx_load(browser, page, failures)
     walk_cost(browser, page, failures)
+    # T3: the cost of the movement, on and off, at the desk.
+    walk_motion_cost(browser, page, failures)
 
 
 def setup_vibes(page) -> None:

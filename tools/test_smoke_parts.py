@@ -78,11 +78,12 @@ class PartFingerprints(unittest.TestCase):
             self.assertNotIn(n, gone)
 
     def test_tab_the_part_opens_clears_it(self):
-        # The Mix tab: drop-1 opens its Drop and Audio pages, morph its Master and Morph pages; the vibe groups do not.
+        # The Mix tab: drop-1 opens its Drop and Audio pages, morph its Master and Morph pages, cost (T3) the whole Mix
+        # at the desk for the motion measure; the vibe groups do not.
         gone = self.changed(os.path.join("src", "ui", "tabs", "MixTab.tsx"))
-        for n in ["core", "drop-1", "morph"]:
+        for n in ["core", "drop-1", "morph", "cost"]:
             self.assertIn(n, gone)
-        for n in DROPS[1:] + ["additions", "cost"]:
+        for n in DROPS[1:] + ["additions"]:
             self.assertNotIn(n, gone)
         # The Layer tab's file is imported by the Simple Synth tab, which morph opens; the drop never opens it.
         gone = self.changed(os.path.join("src", "ui", "tabs", "LayerTab.tsx"))

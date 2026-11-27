@@ -909,6 +909,195 @@ def walk_punch(page, failures: list, playing: bool) -> None:
     print(f"punch walk ({mode}): {len(PUNCH_SIZES)} sizes")
 
 
+class Fingers:
+    """T3 slice c (spec 9.6): real touches through Chrome's DevTools (Input.dispatchTouchEvent), each finger its own id,
+    so the page sees touch pointers with distinct pointerIds, as a phone sends them. `down`, `move` and `up` change one
+    finger and send every finger still down."""
+
+    def __init__(self, page):
+        self.cdp = page.context.new_cdp_session(page)
+        self.at: dict = {}
+
+    def _send(self, typ: str) -> None:
+        pts = [{"x": x, "y": y, "id": i} for i, (x, y) in self.at.items()]
+        self.cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd" if not pts else typ, "touchPoints": pts})
+
+    def down(self, i: int, x: float, y: float) -> None:
+        self.at[i] = (x, y)
+        self._send("touchStart")
+
+    def move(self, i: int, x: float, y: float) -> None:
+        self.at[i] = (x, y)
+        self._send("touchMove")
+
+    def up(self, i: int) -> None:
+        # Chrome lifts the points a touchEnd names; the others stay down.
+        x, y = self.at.pop(i)
+        self.cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": [{"x": x, "y": y, "id": i}]})
+
+    def lift_all(self) -> None:
+        self.at.clear()
+        self._send("touchEnd")
+
+
+def _mid(page, sel: str):
+    loc = page.locator(sel)
+    if not loc.count():
+        return None
+    b = loc.first.bounding_box()
+    return (b["x"] + b["width"] / 2, b["y"] + b["height"] / 2) if b else None
+
+
+PULSE = """() => [...document.querySelectorAll('.deskgrid .cell.live.on .pulse')].map((p) => {
+  const s = getComputedStyle(p);
+  return s.display === 'none' ? -1 : Number(s.opacity);
+})"""
+
+
+def walk_fingers(page, failures: list) -> None:
+    """T3 slice c (spec 9.5, 9.6), the transport playing. Many fingers: on the phone's Mix master page two dials turned
+    at once, each by its own finger, end with their own values; at the desk an XY pad moved while a finger holds Cut, and
+    three pads (Cut, Filter, Riser) held at once, one lifted while the others stay held. Movement: at the desk the pads
+    of the playing section pulse (from their meters) and a held Filter pad moves the Mix Filter dial's ghost pointer;
+    with motion off (the Mix switch) neither shows and the root is still. Leaves the phone at 390 x 844 in Simple on the
+    Play tab, motion on."""
+    if not page.evaluate(f"{E}.playing"):
+        failures.append("fingers walk: the transport is not playing")
+        return
+    held = f"((p) => {E}.punchState().find((s) => s.pad === p).held)"
+    t = Fingers(page)
+    # Two dials at once (phone, Mix, master page).
+    page.set_viewport_size({"width": 390, "height": 844})
+    _wait(page, "document.documentElement.dataset.size === 'phone'", 2.0)
+    page.click('[data-appmode="advanced"]')
+    page.click('[data-tab="mix"]')
+    page.click('[data-page="mix:master"]')
+    _settle(page)
+    a, b = _mid(page, '[data-dial="sweep"]'), _mid(page, '[data-dial="pump"]')
+    if not a or not b:
+        failures.append("fingers: no Filter or Pump dial on the Mix master page")
+    else:
+        page.evaluate(f"{E}.setMix('sweep', 0); {E}.setMix('pump', 0.5)")
+        time.sleep(0.2)
+        t.down(1, *a)
+        t.down(2, *b)
+        for k in range(1, 11):
+            t.at[1] = (a[0], a[1] - 5 * k)
+            t.move(2, b[0], b[1] + 5 * k)
+            time.sleep(0.02)
+        t.up(1)
+        t.move(2, b[0], b[1] + 60)
+        t.lift_all()
+        time.sleep(0.3)
+        mix = page.evaluate("""() => Object.fromEntries(['sweep', 'pump'].map((k) =>
+          [k, Number(document.querySelector(`[data-dial="${k}"]`).getAttribute('aria-valuenow'))]))""")
+        if not mix["sweep"] > 0.15:
+            failures.append(f"fingers: the Filter dial turned up by one finger while another turned Pump reads {mix['sweep']:.2f} (wanted above 0.15)")
+        if not mix["pump"] < 0.35:
+            failures.append(f"fingers: the Pump dial turned down by one finger while another turned Filter reads {mix['pump']:.2f} (wanted below 0.35)")
+        page.evaluate(f"{E}.setMix('sweep', 0); {E}.setMix('pump', 0.5)")
+    page.click('[data-page="mix:master"]')
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    # The desk: an XY pad and a pad together, then three pads.
+    page.set_viewport_size({"width": 1280, "height": 800})
+    if not _wait(page, "document.documentElement.dataset.size === 'landscape'", 2.0):
+        failures.append("fingers: 1280x800 is not the desk")
+    page.click('[data-tab="bass"]')
+    _settle(page)
+    xy, cut = _mid(page, '.xy[data-xy="bass"]'), _mid(page, '.punchpads [data-punch="cut"]')
+    if not xy or not cut:
+        failures.append("fingers: no Bass XY pad or Cut pad at the desk")
+    else:
+        box = page.locator('.xy[data-xy="bass"]').first.bounding_box()
+        t.down(2, *cut)
+        t.down(1, box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5)
+        for k in range(1, 9):
+            t.move(1, box["x"] + box["width"] * (0.5 + 0.035 * k), box["y"] + box["height"] * (0.5 + 0.035 * k))
+            time.sleep(0.02)
+        time.sleep(0.1)
+        p = page.evaluate(f"{E}.getSong().patches.bass")
+        if abs(p["cutoff"] - 0.78) > 0.06 or abs(p["resonance"] - 0.22) > 0.06:
+            failures.append(f"fingers: the XY pad moved while a finger held Cut reads {p['cutoff']:.2f} {p['resonance']:.2f} (wanted 0.78 0.22)")
+        if not page.evaluate(f"{held}('cut') && !!document.querySelector('.punchpads [data-punch=cut].held')"):
+            failures.append("fingers: Cut let go while another finger moved the XY pad")
+        t.up(1)
+        time.sleep(0.1)
+        if not page.evaluate(f"{held}('cut')"):
+            failures.append("fingers: lifting the XY finger let Cut go")
+        t.lift_all()
+        if not _wait(page, f"!{held}('cut')", 0.5):
+            failures.append("fingers: lifting the last finger did not let Cut go")
+    three = ["cut", "filter", "riser"]
+    pts = [_mid(page, f'.punchpads [data-punch="{q}"]') for q in three]
+    if not all(pts):
+        failures.append("fingers: Cut, Filter or Riser missing from the desk's band")
+    else:
+        for i, pt in enumerate(pts):
+            t.down(i + 1, *pt)
+        time.sleep(0.15)
+        st = page.evaluate(f"[{', '.join(f'{held}({q!r})' for q in three)}]")
+        lit = page.locator(".punchpads .held").count()
+        if st != [True, True, True] or lit != 3:
+            failures.append(f"fingers: three fingers on Cut, Filter and Riser hold {st} with {lit} pads lit (wanted all three)")
+        t.up(2)
+        time.sleep(0.15)
+        st = page.evaluate(f"[{', '.join(f'{held}({q!r})' for q in three)}]")
+        if st != [True, False, True]:
+            failures.append(f"fingers: lifting the finger on Filter left {st} held (wanted Cut and Riser only)")
+        t.lift_all()
+        if not _wait(page, f"{E}.punchState().every((s) => !s.held)", 0.5):
+            failures.append("fingers: lifting every finger left a pad held")
+    # Movement: the pads pulse, the Filter dial's ghost follows the Filter pad; motion off, neither.
+    page.click('[data-appmode="advanced"]')
+    page.click('[data-tab="mix"]')
+    _settle(page)
+    for on in (True, False):
+        if not on:
+            page.click('[data-motion="off"]')
+            time.sleep(0.3)
+        seen = []
+        for _ in range(20):
+            seen += page.evaluate(PULSE)
+            time.sleep(0.05)
+        f = _mid(page, '.punchpads [data-punch="filter"]')
+        ghost = []
+        if f and page.locator('.dial[data-dial="sweep"]').count():
+            t.down(1, *f)
+            for _ in range(15):
+                ghost.append(page.evaluate("""() => { const d = document.querySelector('.dial[data-dial="sweep"]');
+                  return [d.hasAttribute('data-moved'), getComputedStyle(d.querySelector('.ghost')).display !== 'none'
+                    && Number(getComputedStyle(d.querySelector('.ghost')).opacity) > 0]; }"""))
+                time.sleep(0.05)
+            t.lift_all()
+        else:
+            failures.append("fingers: no Filter pad and Mix Filter dial together at the desk")
+        still = page.evaluate("document.documentElement.classList.contains('still')")
+        if on:
+            if not seen or max(seen) <= 0:
+                failures.append(f"motion on: no pad of the playing section pulsed ({len(seen)} pads read)")
+            if not any(g[0] and g[1] for g in ghost):
+                failures.append("motion on: a held Filter pad never showed on the Mix Filter dial")
+            if still:
+                failures.append("motion on: the root is still")
+        else:
+            if any(v > 0 for v in seen):
+                failures.append("motion off: a pad still pulses")
+            if any(g[1] for g in ghost):
+                failures.append("motion off: the Filter dial's ghost still shows")
+            if not still:
+                failures.append("motion off: the root is not still")
+    page.click('[data-motion="on"]')
+    bar_s = 240.0 / page.evaluate(f"{E}.bpm")
+    if not _wait(page, f"{E}.punchState().every((s) => s.start === null || (s.end !== null && s.end <= {E}.audioNow()))", bar_s * 2 + 1):
+        failures.append("fingers: a punch pad never ended")
+    page.click('[data-appmode="simple"]')
+    page.set_viewport_size({"width": 390, "height": 844})
+    _wait(page, "document.documentElement.dataset.size === 'phone'", 2.0)
+    page.click('[data-tab="play"]')
+    print("fingers walk: two dials, XY pad with a pad, three pads; pulse and ghost with motion on and off")
+
+
 def tablet_layout(page, orient: str) -> list:
     """The layout checks of the tablet layout shown: the desk (landscape) or the dock (portrait), and T3's punch pads
     in the band over its pads."""
@@ -1168,6 +1357,8 @@ def main() -> int:
             n += walk_tablet(page, failures, out)
             # T3 slice b: the punch pads pressed while playing, then while stopped.
             walk_punch(page, failures, True)
+            # T3 slice c: many fingers, and the movement on and off.
+            walk_fingers(page, failures)
             page.click("#play")
             _wait(page, f"!{E}.playing", 3.0)
             walk_punch(page, failures, False)
