@@ -10,9 +10,12 @@ on:
 permissions:
   contents: write
 
+# Not cancelled in progress (G6 review M1): a cancel between `gh release delete` and `create` would leave no release.
+# A newer push waits; GitHub drops any older run still waiting. The APK's versionCode is GITHUB_RUN_NUMBER
+# (android/app/build.gradle) and it is signed with the committed debug key android/app/debug.keystore (E2).
 concurrency:
   group: apk
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   apk:

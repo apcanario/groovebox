@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+import groovy.json.JsonSlurper
+
+// G6 review S3: versionCode rises with every CI build (GITHUB_RUN_NUMBER); a local build is 1. versionName is
+// package.json's version, plus the run number on CI, so the installer shows an update and Settings shows the build.
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer
+def webVersion = new JsonSlurper().parse(file("../../package.json")).version
+def buildName = System.getenv("GITHUB_RUN_NUMBER") ? "${webVersion}+${runNumber}" : "${webVersion}+local"
+
 android {
     namespace = "com.apcanario.groovebox"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +15,8 @@ android {
         applicationId "com.apcanario.groovebox"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode runNumber
+        versionName buildName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,7 +24,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // G6 review E2: one fixed debug key, committed (android/app/debug.keystore), so every CI build carries the same
+    // signature and installs over the last one (a fresh runner would otherwise make a new ~/.android/debug.keystore).
+    // It is Android's standard public debug key (alias androiddebugkey, passwords "android"), not a secret, and must
+    // never sign a Play release: there is no release signingConfig here (tools/release_check.py fails on one).
+    signingConfigs {
+        debug {
+            storeFile file("debug.keystore")
+            storeType "pkcs12"
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

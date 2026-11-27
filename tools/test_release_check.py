@@ -16,6 +16,8 @@ FILES = [
     ".github/workflows/pages.yml",
     "vite.config.ts",
     "android/app/src/main/AndroidManifest.xml",
+    "android/app/build.gradle",
+    "android/app/debug.keystore",
 ]
 
 
@@ -119,6 +121,42 @@ class ReleaseCheck(unittest.TestCase):
     def test_service_element_fails(self):
         edit(self.root, FILES[3], "</application>", '<service android:name=".Player" /></application>')
         self.assertIn("<service>", self.found())
+
+    def test_cancel_in_progress_fails(self):
+        edit(self.root, FILES[0], "cancel-in-progress: false", "cancel-in-progress: true")
+        self.assertIn("cancel-in-progress", self.found())
+
+    def test_other_keystore_fails(self):
+        for rel in ("android/app/release.keystore", "android/upload.jks", "keys/debug.keystore"):
+            path = os.path.join(self.root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            shutil.copy(os.path.join(ROOT, FILES[5]), path)
+        found = self.found()
+        for rel in ("android/app/release.keystore", "android/upload.jks", "keys/debug.keystore"):
+            self.assertIn(f"{rel}: a keystore other than", found)
+
+    def test_debug_keystore_missing_fails(self):
+        os.remove(os.path.join(self.root, FILES[5]))
+        self.assertIn("debug.keystore: missing", self.found())
+
+    def test_release_signing_config_fails(self):
+        edit(
+            self.root,
+            FILES[4],
+            "    signingConfigs {\n",
+            '    signingConfigs {\n        release {\n            storeFile file("release.jks")\n        }\n',
+        )
+        self.assertIn("a signing config other than debug", self.found())
+
+    def test_release_build_type_signed_fails(self):
+        edit(self.root, FILES[4], "        release {\n", "        release {\n            signingConfig signingConfigs.debug\n")
+        self.assertIn("release build type has a signing config", self.found())
+
+    def test_debug_not_signed_with_fixed_key_fails(self):
+        edit(self.root, FILES[4], "            signingConfig signingConfigs.debug\n", "")
+        self.assertIn("debug build type is not signed", self.found())
+        edit(self.root, FILES[4], 'file("debug.keystore")', 'file(System.getenv("KS"))')
+        self.assertIn("does not use debug.keystore", self.found())
 
 
 if __name__ == "__main__":

@@ -8,7 +8,11 @@ Fails (exit 1, one line per problem) if:
   workflows share a concurrency group;
 - vite.config.ts no longer builds with base "./" (Pages and the APK both load from a relative base);
 - android/app/src/main/AndroidManifest.xml asks for a foreground service, a wake lock or background audio
-  (spec section 2), or declares a <service>.
+  (spec section 2), or declares a <service>;
+- apk.yml cancels a run in progress (it could stop between deleting and recreating the release, G6 review M1);
+- any *.keystore or *.jks other than android/app/debug.keystore is in the repo, that file is missing, or
+  android/app/build.gradle has a release signing config or does not sign debug with that file (G6 review E2: one
+  fixed, public-by-design debug key so updates install over; never a release key).
 
 Run: python3 tools/release_check.py [repo root]
 """
@@ -17,6 +21,9 @@ import re
 import sys
 
 import yaml
+
+DEBUG_KEYSTORE = "android/app/debug.keystore"
+SKIP_DIRS = {".git", "node_modules", "build", ".gradle", "dist", "dist-single"}
 
 FORBIDDEN_PERMISSIONS = ("FOREGROUND_SERVICE", "WAKE_LOCK", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS")
 
@@ -99,6 +106,9 @@ def apk_problems(path: str) -> list:
             p.append("apk.yml: release latest is not marked prerelease")
     else:
         p.append("apk.yml: no release named latest")
+    conc = doc.get("concurrency")
+    if isinstance(conc, dict) and conc.get("cancel-in-progress") is True:
+        p.append("apk.yml: cancel-in-progress is true (a cancelled run can leave no release latest)")
     if "groovebox-debug.apk" not in runs and not soft:
         p.append("apk.yml: the APK is never named groovebox-debug.apk")
     return p
@@ -148,6 +158,54 @@ def manifest_problems(path: str) -> list:
     return p
 
 
+def _block(text: str, name: str):
+    """The body of the first `name { ... }` block in a Gradle file, or None."""
+    m = re.search(r"\b" + re.escape(name) + r"\s*\{", text)
+    if not m:
+        return None
+    depth, i = 1, m.end()
+    while i < len(text) and depth:
+        depth += {"{": 1, "}": -1}.get(text[i], 0)
+        i += 1
+    return text[m.end() : i - 1]
+
+
+def _strip_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def keystore_problems(root: str) -> list:
+    p = []
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for f in files:
+            if f.endswith((".keystore", ".jks")):
+                rel = os.path.relpath(os.path.join(dirpath, f), root).replace(os.sep, "/")
+                if rel != DEBUG_KEYSTORE:
+                    p.append(f"{rel}: a keystore other than {DEBUG_KEYSTORE} (only the public debug key is committed)")
+    if not os.path.exists(os.path.join(root, DEBUG_KEYSTORE)):
+        p.append(f"{DEBUG_KEYSTORE}: missing (each runner would sign with a new key; updates would not install over)")
+    gradle = os.path.join(root, "android", "app", "build.gradle")
+    if not os.path.exists(gradle):
+        return p + ["android/app/build.gradle: missing"]
+    with open(gradle) as fh:
+        text = _strip_comments(fh.read())
+    configs = _block(text, "signingConfigs") or ""
+    names = re.findall(r"(?m)^\s*(\w+)\s*\{", configs)
+    if any(n != "debug" for n in names) or re.search(r"\b(create|register)\s*\(", configs):
+        p.append("build.gradle: a signing config other than debug (no release key in this repo)")
+    debug_cfg = _block(configs, "debug") or ""
+    if not re.search(r"""storeFile\s*(=\s*)?file\(\s*["']debug\.keystore["']\s*\)""", debug_cfg):
+        p.append("build.gradle: the debug signing config does not use debug.keystore")
+    types = _block(text, "buildTypes") or ""
+    if not re.search(r"signingConfig\s*(=\s*)?signingConfigs\.debug\b", _block(types, "debug") or ""):
+        p.append("build.gradle: the debug build type is not signed with signingConfigs.debug")
+    if "signingConfig" in (_block(types, "release") or ""):
+        p.append("build.gradle: the release build type has a signing config (the debug key must never sign a release)")
+    return p
+
+
 def problems(root: str) -> list:
     wf = os.path.join(root, ".github", "workflows")
     apk = os.path.join(wf, "apk.yml")
@@ -156,6 +214,7 @@ def problems(root: str) -> list:
         + pages_problems(os.path.join(wf, "pages.yml"), apk)
         + base_problems(os.path.join(root, "vite.config.ts"))
         + manifest_problems(os.path.join(root, "android", "app", "src", "main", "AndroidManifest.xml"))
+        + keystore_problems(root)
     )
 
 
@@ -165,7 +224,7 @@ def main() -> int:
     for line in found:
         print(line)
     if not found:
-        print("release check: apk.yml, pages.yml, vite base and the manifest are as G6 needs")
+        print("release check: apk.yml, pages.yml, vite base, the manifest and the signing are as G6 needs")
     return 1 if found else 0
 
 
