@@ -61,18 +61,15 @@ Built and live on the link above (rows G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7
 - **MP3 export:** a take is encoded while you play (160 kbps) and saved or shared from the phone. A ten-minute take was measured with memory flat.
 - **Tablet layouts:** the layout follows the screen. On a wide tablet the pads (a large labelled grid showing the playing section's notes, the strip as column labels, DROP and Morph, the transport) and one instrument panel share the screen; on a tall tablet the panel sits on top and the pads dock at the bottom. Rotating while you play does not touch the audio. A phone keeps its layout.
 - **Advanced without pages:** where a panel measurably fits the screen, Advanced shows every control at once: all seven panels on a wide tablet, Chords and Mix at 1024 x 768, Chords, Bass, Synth and Mix on a tall tablet. Elsewhere the pages stay. Which one is decided by screen size only, so a panel never changes while you play.
+- **Punch pads:** six momentary effects, Cut, Filter (Sweep in Simple), Stutter, Echo, Wash and Riser, that land on the beat, bar or sixteenth they are built for, several at once. A Punch page of the Mix tab on the phone; on a tablet a row beside DROP. Pads pulse with their instrument, the Filter sweep shows on its dial, and the movement can be turned off with Still. Two or three fingers at once work on dials, the XY pad and the pads.
 
 ## Where it is going
 
-**Next, bundle 8: tablet**, row T3 (T1, the three layouts, and T2, Advanced without pages, are done). Bundle 7b is done: R1, P10b, P10c, P10d and its player pass. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix is planned after the APK, by Pedro's decision.
+**Next, bundle 9: the APK** (row G6). Bundle 8, the tablet bundle (T1 layouts, T2 Advanced without pages, T3 punch pads), is done. Bundle 7b is done: R1, P10b, P10c, P10d and its player pass. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix is planned after the APK, by Pedro's decision.
 
 The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 
 **Install** (row G6): an Android APK built by GitHub Actions. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
-
-**Phase 3: tablet** (row T3)
-- **Punch pads:** Cut, Filter, Stutter, Echo, Wash and Riser, momentary effects that land in time.
-- Pads that pulse with the music, dials that show their movement, and several controls usable at once.
 
 ## What it will not do
 
@@ -81,13 +78,13 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 - **No finger drumming.** The sequencer plays every note; you shape what it plays.
 - **No accounts, cloud or sync.**
 
+
 ## Status
 
 | Row | What | State |
 |---|---|---|
-| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d, T1, T2 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph, the tablet layouts, Advanced without pages | Done |
+| G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d, T1, T2, T3 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph, the tablet layouts, Advanced without pages, punch pads, movement and many fingers | Done |
 | G6 | APK | Planned |
-| T3 | Punch pads, movement, many fingers | Planned |
 | G7 | Retouch from Pedro's notes | Always open |
 
 `docs/BACKLOG.md` is the live version of this table.
