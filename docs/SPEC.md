@@ -487,13 +487,14 @@ Settled on 23 Nov 2026. On a tablet the app should feel like a synth and pad con
 - **Rotating mid-jam** changes the layout with no gap in the audio and nothing lost.
 - **Extra space shows more at once.** It is not used to make the phone layout bigger.
 - **Nothing scrolls on a tablet in either mode,** the saved-jams list excepted. Advanced uses pages only where a panel cannot fit at 1024 x 768.
+- Whether an Advanced panel is whole or paged depends on the screen size alone, never on what the jam holds (a chord added, a layer's mode, the section shown), so it never changes in the middle of a jam.
 - The text-fit rule and the thumb-reach order of section 8.6 apply. On a tablet held in two hands the bottom corners are the thumb zones: sections and transport bottom left, the XY pad bottom right in landscape.
 
 ### 9.2 Tablet landscape: the desk
 
 Two halves, both always on screen.
 
-- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument and what it is playing, the pads of the playing section showing their notes; then the section strip as the grid's column labels; then the DROP button and the transport bar side by side (under 960 px wide, where they do not fit side by side, DROP with Morph sits directly over the transport bar).
+- **Left: the pads.** The punch pads on top; under them the instruments-by-sections grid as large pads, each row labelled with the instrument and what it is playing, the pads of the playing section showing their notes; then the section strip as the grid's column labels; then the DROP button and the transport bar side by side (under 960 px wide, where they do not fit side by side, DROP with Morph sits directly over the transport bar; so it does in Advanced from 1000 to 1199 px wide, where the instrument half takes 53 % so that more panels fit whole).
 - **Right: one instrument.** A rail of seven buttons (Chords, Drums, Bass, Synth, Layer 1, Layer 2, Mix) and the chosen one's panel under it.
 - **Advanced panels show everything at once, with no pages:**
   - Layers: mode and lead style, the phrase row, the Notes and Feel groups of six knobs side by side, the XY pad and the Sound group.

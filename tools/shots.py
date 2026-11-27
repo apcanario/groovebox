@@ -152,6 +152,50 @@ SIMPLE_TEXT = r"""() => {
 }"""
 
 
+# T2 review S3: the controls a tab body shows, one key each: the first data attribute that names the control
+# (name=value), else its id. A fader and a Levels dial are the same control (fader=level:x is dial=level:x); a picker
+# paged behind More counts once by its name; the phone's sequencer view (its voice, its view and its eight-step cells)
+# is a view of the sixteen-step grid the whole Drums shows, the drum sound picker sits behind its Sound button, and the
+# phone's slot chips (which slot its FX page shows) are the whole panel's two slots.
+CONTROL_KEYS = r"""() => {
+  const body = document.querySelector('.shell .inst .body') || document.querySelector('.shell > .body');
+  if (!body) return [];
+  const skip = new Set(['value', 'pageOf', 'grp', 'shown', 'meter', 'page']);
+  const paged = new Set([...body.querySelectorAll('[data-more]')].map((e) => e.dataset.more));
+  const drums = !!body.querySelector('[data-whole="drums"], [data-page="drums:beat"]');
+  const out = new Set();
+  for (const el of body.querySelectorAll('button, a, input, [role=slider], [role=switch], [role=group]')) {
+    if (!el.getClientRects().length || el.closest('.pager')) continue;
+    const k = Object.keys(el.dataset).find((n) => !skip.has(n));
+    let key = k ? `${k}=${el.dataset[k]}` : el.id ? `#${el.id}` : null;
+    if (!key) continue;
+    if (k === 'fader') key = `dial=${el.dataset[k]}`;
+    if (k === 'seq') key = 'seq=*';
+    if (k && paged.has(k)) key = `${k}=*`;
+    if (k === 'step' || k === 'voice' || k === 'seqview') key = 'drum sequencer';
+    if (k === 'step16') key = 'drum sequencer';
+    // The phone's slot chips choose which effect slot its FX page shows; the whole panel shows both slots' pickers.
+    if (k === 'fxslot') key = `fxpick=${el.dataset[k]}`;
+    if (drums && (key === '#drums-sound' || k === 'patch' || key === 'more=patch')) key = 'drum sound';
+    out.add(key);
+  }
+  return [...out].sort();
+}"""
+
+# Keys of the Advanced phone panels (412 x 915), by tab, or tab:mode for a layer, gathered by the frame walk.
+PHONE_KEYS: dict = {}
+
+
+def panel_group(label: str):
+    """The panel an Advanced frame-walk label shows: 'drums', or 'layer1:arp' for a layer in a mode; None otherwise."""
+    parts = label.split("-")
+    if len(parts) < 2 or parts[0] != "advanced" or parts[1] not in ("chords", "drums", "bass", "synth", "layer1", "layer2", "mix"):
+        return None
+    if parts[1] in ("layer1", "layer2"):
+        return f"{parts[1]}:{parts[2]}" if len(parts) > 2 else None
+    return parts[1]
+
+
 def simple_words(page) -> list:
     """What on the screen Simple must not show: Advanced words, and chord tiles numbered as degrees."""
     got = page.evaluate(SIMPLE_TEXT)
@@ -249,6 +293,8 @@ class Walk:
         self.chips = 0
         self.frame_y: dict = {}
         self.place: dict = {}
+        # T2 review S3: the frame walk gathers the phone's Advanced panel controls (PHONE_KEYS).
+        self.collect = False
 
     def screen(self, size: tuple, label: str) -> None:
         _settle(self.page)
@@ -270,6 +316,8 @@ class Walk:
         if label == "simple-mix-master":
             for b in self.page.evaluate(MORPH_SPEED_ROW):
                 self.failures.append(f"{where}: {b}")
+        if self.collect and size == (412, 915) and (g := panel_group(label)):
+            PHONE_KEYS.setdefault(g, set()).update(self.page.evaluate(CONTROL_KEYS))
         if self.out:
             self.page.screenshot(path=os.path.join(self.out, f"{size[0]}x{size[1]}-{label}.png"))
         self.count += 1
@@ -355,6 +403,7 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
     widest names the app accepts (spec 8.6: user text fits too). Leaves the app in Simple on the Play tab at 390 x 844,
     with every layer back in the mode it had. Returns the number of screens checked."""
     w = Walk(page, failures, out_dir)
+    w.collect = True
     sec = page.evaluate("window.__groovebox.position().section")
     # The longest names the app accepts, in wide letters: the engine cuts "W" * 64 to its own maximum, so
     # every section and the song carry the widest name they can (restored at the end).
@@ -707,12 +756,15 @@ DOCK = r"""() => {
 
 
 # T2 (spec 9.2, 9.3): the Advanced panels that show every page at once, by tablet size: no page chips, the panel whole.
-# On the desk at 1280 x 800 every panel of the rail (slices a and b). Slice c: on the dock at 800 x 1280 the panel has
-# 776 x 566 px over the pads, and these fit it whole; a lead (its Notes, Feel and Pulse dials over the XY pad) and Drums
-# (twelve rows of 48 px steps) do not, and keep their pages. A layer is named alone (every mode) or as layer:mode.
+# On the desk at 1280 x 800 every panel of the rail (slices a and b). T2 review E1: at 1024 x 768 the panel has 513 x 628
+# px (the instrument half 53 % from 1000 px), and Chords and Mix fit it whole; the rest keep their pages (docs/reviews/T2.md,
+# Fixer notes, with the measured need). Slice c: on the dock at 800 x 1280 the panel has 776 x 566 px over the pads, and
+# these fit it whole; Drums (twelve rows of 48 px steps) does not, nor a layer, which is whole or paged by size alone in
+# every mode (T2 review E2, M5), and a lead does not fit. A layer is named alone (every mode) or as layer:mode.
 PAGELESS = {
     (1280, 800): {"chords", "drums", "bass", "synth", "layer1", "layer2", "mix"},
-    (800, 1280): {"chords", "bass", "synth", "mix"} | {f"{lid}:{m}" for lid in ("layer1", "layer2") for m in ("arp", "pad", "drone")},
+    (1024, 768): {"chords", "mix"},
+    (800, 1280): {"chords", "bass", "synth", "mix"},
 }
 
 
@@ -725,10 +777,22 @@ def pageless(size: tuple, t: str, m: str | None = None) -> bool:
 WHOLE = r"""(panel) => {
   const chips = [...document.querySelectorAll('.shell .inst .body [data-page]')].filter((c) => c.getClientRects().length);
   const bad = [];
-  if (chips.length) bad.push(`the Advanced ${panel} panel still has pages (${chips.map((c) => c.dataset.page).join(', ')})`);
+  const fit = document.querySelector('.shell .inst .body')?.dataset.fit ?? '';
+  if (chips.length) bad.push(`the Advanced ${panel} panel still has pages (${chips.map((c) => c.dataset.page).join(', ')}; ${fit})`);
   else if (!document.querySelector(`.shell .inst [data-whole="${panel}"]`)) bad.push(`the Advanced ${panel} panel is not shown whole`);
+  // T2 review S1: the part that takes the height left (the XY pad, the fader tracks) keeps 8 px over its floor.
+  for (const [sel, floor] of [['.xy', 96], ['.ftrack', 48]]) {
+    for (const el of document.querySelectorAll(`.shell .inst [data-whole="${panel}"] ${sel}`)) {
+      const h = el.getBoundingClientRect().height;
+      if (h < floor + 8 - 0.5) bad.push(`the whole ${panel} panel's ${sel.slice(1)} is ${h.toFixed(0)} px, under ${floor + 8} (its floor and 8 px to spare)`);
+    }
+  }
   return bad;
 }"""
+
+
+# T2 review E2: whether the instrument panel shown is whole or paged.
+SHAPE = "() => document.querySelector('.shell .inst .body [data-whole]') ? 'whole' : 'paged'"
 
 
 # What must hold while a pad and a panel's dial are used (T1 review S2): the panel shown, the layout, the panel's dials.
@@ -815,8 +879,9 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
     portrait, the dock), in both modes, with every panel of the rail (each layer in each mode) and every page, a pad (or,
     on Simple portrait, an instrument's lane) waiting for the next bar and a section queued. Each screen gets the frame walk's
     checks (nothing scrolls, nothing cut off, text fits, no control under 48 px) and the layout's own; a missing
-    screenshot fails. T2: an Advanced panel that PAGELESS names for the size (1280 x 800, 800 x 1280) and that still shows
-    page chips fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
+    screenshot fails. T2: an Advanced panel that PAGELESS names for the size (1280 x 800, 1024 x 768, 800 x 1280) and that
+    still shows page chips fails, as does one whose XY pad or fader tracks keep less than 8 px over their floor, or that
+    lacks a control of its phone pages (T2 review S1, S3). Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
     (the panel and the layout held), the transport running and the level up throughout.
     The smoke's core part runs it without screenshots. Leaves the phone at 390 x 844 in Simple, on the Play tab."""
     w = Walk(page, failures, out_dir)
@@ -842,6 +907,7 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
         if not _wait(page, f"document.documentElement.dataset.size === {orient!r}", 2.0):
             failures.append(f"{size[0]}x{size[1]}: not the {orient} layout")
             continue
+        whole_keys: dict = {}
         for mode in ("simple", "advanced"):
             page.click(f'[data-appmode="{mode}"]')
             adv = mode == "advanced"
@@ -852,13 +918,29 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                     _settle(page)
                     for b in page.evaluate(WHOLE, t):
                         failures.append(f"{size[0]}x{size[1]} {label}: {b}")
+                    whole_keys.setdefault(f"{t}:{m}" if m else t, set()).update(page.evaluate(CONTROL_KEYS))
 
             for t in PANELS:
                 page.click(f'.rail [data-tab="{t}"]')
                 label = f"{mode}-{orient}-{t}"
+                if adv and t == "chords":
+                    # T2 review E2: whole or paged does not follow the chord count (1 chord, then 8, then as it was).
+                    _settle(page)
+                    shape0 = page.evaluate(SHAPE)
+                    ed = page.evaluate(f"(() => {{ const e = document.querySelector('.secs [data-strip].edit'); return e ? +e.dataset.strip : {E}.position().section; }})()")
+                    seq0 = page.evaluate(f"{E}.getSong().sections[{ed}].chords")
+                    for n in (1, 8):
+                        page.evaluate(f"(n) => {E}.setChords({ed}, Array.from({{length: n}}, (_, i) => ({{degree: i % 7, bars: 1}})))", n)
+                        _settle(page)
+                        if page.evaluate(SHAPE) != shape0:
+                            failures.append(f"{size[0]}x{size[1]} {label}: with {n} chords the panel turned {page.evaluate(SHAPE)} (it was {shape0})")
+                    page.evaluate(f"(c) => {E}.setChords({ed}, c)", seq0)
                 if t in ("layer1", "layer2"):
+                    shapes = set()
                     for m in LAYER_MODES:
                         page.click(f'[data-mode="{t}:{m}"]')
+                        _settle(page)
+                        shapes.add(page.evaluate(SHAPE))
                         no_pages(t, f"{label}-{m}", m)
                         w.pages(size, f"{label}-{m}")
                         if m == "generative" and adv and pageless(size, t, m):
@@ -871,6 +953,9 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                                     w.pages(size, f"{label}-{m}-{other}")
                             page.click(f'[data-leadstyle="{style}"]')
                     page.click(f'[data-mode="{t}:{modes[t]}"]')
+                    # T2 review E2, M5: a layer is whole or paged by size alone, the same in every mode.
+                    if adv and len(shapes) > 1:
+                        failures.append(f"{size[0]}x{size[1]} {label}: the layer is whole in some modes and paged in others")
                 else:
                     no_pages(t, label)
                     w.pages(size, label)
@@ -903,6 +988,15 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                 layout(size, orient, f"{mode}-{orient}-section-next-bar")
                 if not _wait(page, f"{E}.position().section === {nxt}", bar_s * 2 + 1):
                     failures.append(f"{size[0]}x{size[1]} {mode}: the queued section never played")
+        # T2 review S3: every control of the phone's Advanced panel (all its pages, at 412 x 915) is in the whole panel.
+        for g, got in whole_keys.items():
+            want = PHONE_KEYS.get(g)
+            if not want:
+                failures.append(f"{size[0]}x{size[1]}: no phone panel {g} to compare the whole one with")
+                continue
+            missing = sorted(want - got)
+            if missing:
+                failures.append(f"{size[0]}x{size[1]}: the whole {g} panel lacks controls of its phone pages: {', '.join(missing)}")
         # Pads and one instrument without changing screen, in both modes.
         for mode in ("advanced", "simple"):
             page.click(f'[data-appmode="{mode}"]')
