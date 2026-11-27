@@ -21,7 +21,7 @@ ten minutes of Ambient never repeating a 16-bar stretch and never leaving the ke
 holding a dial for 16 bars; a drop holding Morph.
 T1: the layout follows the screen (phone, tablet portrait, tablet landscape) live, and a rotation while playing leaves
 the transport running with no gap in the level and nothing changed in the engine. The tablet walk of tools/shots.py
-(walk_tablet) checks the four tablet sizes in both modes: nothing scrolls or is cut off, text fits, no control under
+(walk_tablet) checks the six tablet sizes (the row's four, 600 x 960 and 880 x 620) in both modes: nothing scrolls or is cut off, text fits, no control under
 48 px, the desk's and the dock's layouts, and the pads and a panel used without changing screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
@@ -3124,6 +3124,9 @@ ROTATE_SIZES = [
     ((360, 640), "phone"),
     ((412, 915), "phone"),
     ((1280, 800), "landscape"),
+    # T1 review E2 and S1: the dock at its least height, a square tablet on the desk.
+    ((600, 960), "portrait"),
+    ((900, 900), "landscape"),
     ((390, 844), "phone"),
 ]
 
@@ -3316,10 +3319,10 @@ def part_core(browser, page, failures: list, shot) -> None:
     if not page.evaluate("window.__groovebox.playing"):
         failures.append("the transport stopped during the shell walk")
     walk_rotate(page, failures)
-    # T1: the four tablet sizes in both modes, every panel and page, each with the frame checks and its layout's own
+    # T1: the six tablet sizes in both modes, every panel and page, each with the frame checks and its layout's own
     # (the desk in landscape, the dock in portrait), and a pad and a panel's dial used without changing screen.
     n = walk_tablet(page, failures, None)
-    print(f"tablet walk: {n} screens at 1280 x 800, 1024 x 768, 800 x 1280 and 768 x 1024, both modes")
+    print(f"tablet walk: {n} screens at 1280 x 800, 1024 x 768, 880 x 620, 800 x 1280, 768 x 1024 and 600 x 960, both modes")
     if not page.evaluate("window.__groovebox.playing"):
         failures.append("the transport stopped during the tablet walk")
     # P10d: later taps of Play and Stop in Simple and Advanced, and a Stop during a drop's build, each sampled.

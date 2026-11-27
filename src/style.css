@@ -2570,15 +2570,25 @@ button:disabled {
 
 /*
  * T1 review S1 (spec 9.1, 9.2): the desk under 960 px wide (800 x 600 to 959 px, and square tablets). The instrument
- * half keeps the rail of seven at 48 px a button; the pads half has no room for DROP with Morph beside the transport
- * bar, so DROP with Morph sits over it.
+ * half keeps room for the rail of seven and its page chips (460 px, leaving the pads at least 410 px); the pads half
+ * has no room for DROP with Morph beside the transport bar, so DROP with Morph sits over it.
  */
 @media (max-width: 959.98px) {
   .tablet.landscape .inst {
-    flex: 0 0 max(42%, 380px);
+    flex: 0 0 max(42%, min(460px, calc(100% - 410px)));
   }
   .tablet.landscape .deck {
     flex-direction: column;
+  }
+  /* The instrument half is a phone's width: five page chips take the phone's narrow form (icon over word). */
+  .tablet.landscape .pager.five button {
+    flex-direction: column;
+    gap: 1px;
+    font-size: 12px;
+  }
+  .tablet.landscape .pager.five button .ic {
+    width: 15px;
+    height: 15px;
   }
 }
 

@@ -13,8 +13,8 @@ Screenshots left from an earlier run are deleted first, so shots/ holds only the
 After the walk, the live walk (P10c M5) loads Ambient and saves, at both sizes, Morph on, the Morph page with Sections
 off and on, the Drop page and DROP in build, on and wind-down (LIVE_SCREENS); a missing one fails the run.
 
-T1: the tablet walk (walk_tablet) saves the four tablet sizes in both modes: the desk at 1280 x 800 and 1024 x 768 and
-the dock at 800 x 1280 and 768 x 1024, every rail panel and page, with the same checks and the layout's own (DESK,
+T1: the tablet walk (walk_tablet) saves six tablet sizes in both modes: the desk at 1280 x 800, 1024 x 768 and 880 x 620
+and the dock at 800 x 1280, 768 x 1024 and 600 x 960, every rail panel and page, with the same checks and the layout's own (DESK,
 DOCK); the smoke's core part runs it too, without screenshots.
 
 tools/smoke.py runs the same walk (without screenshots) while the transport plays.
@@ -588,6 +588,9 @@ def walk_live(page, failures: list, out_dir: str | None) -> int:
 
 # T1 (spec 9.1 to 9.3): the four tablet sizes of the row, each with the layout it must show, in both modes.
 TABLET_SIZES = [((1280, 800), "landscape"), ((1024, 768), "landscape"), ((800, 1280), "portrait"), ((768, 1024), "portrait")]
+# T1 review E2 and S1: the table's edge (a 7-inch tablet, the dock at its least height) and a narrow wide tablet (the desk
+# with DROP over the transport bar), walked the same way.
+TABLET_SIZES += [((600, 960), "portrait"), ((880, 620), "landscape")]
 PANELS = ["chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
 TABLET_SCREENS = {
     o: [f"{m}-{o}-{t}" for m in ("simple", "advanced") for t in ("chords", "drums", "mix")]
@@ -682,17 +685,92 @@ DOCK = r"""() => {
 }"""
 
 
+# What must hold while a pad and a panel's dial are used (T1 review S2): the panel shown, the layout, the panel's dials.
+SCREEN_HELD = """() => ({ panel: document.querySelector('.shell .inst')?.dataset.panel ?? null,
+  size: document.documentElement.dataset.size, dial: !!document.querySelector('.shell .inst .body .dial') })"""
+
+
 def tablet_layout(page, orient: str) -> list:
     """The layout checks of the tablet layout shown: the desk (landscape) or the dock (portrait)."""
     return page.evaluate(DESK if orient == "landscape" else DOCK)
 
 
+def beside(page, failures: list, where: str, pad_for) -> None:
+    """T1: the pads and one instrument used without changing screen, at the size and mode shown, with the Drums panel
+    open: a pad (pad_for(section) is its selector) queues and is put back, and a drag on the panel's dial moves the song;
+    the panel and the layout stay (T1 review S2), and the pads keep playing: the transport runs and moves on and the
+    level stays up throughout (T1 review E1)."""
+    screen0 = page.evaluate(SCREEN_HELD)
+
+    def held(when: str, dial: bool) -> None:
+        now = page.evaluate(SCREEN_HELD)
+        if (now["panel"], now["size"]) != (screen0["panel"], screen0["size"]):
+            failures.append(f"{where}: {when} changed the screen (panel {screen0['panel']} to {now['panel']}, layout {screen0['size']} to {now['size']})")
+        if dial and not now["dial"]:
+            failures.append(f"{where}: {when} closed the panel's dials")
+
+    # The pads keep playing (T1 review E1), judged by the transport and the level, not by new notes: a slow
+    # vibe's section (Ambient's A and D: a held synth and a drone) starts no note for 16 s. The level floor is
+    # walk_rotate's: 20 dB under the quietest reading of the second before, never under -80 dB.
+    base = []
+    for _ in range(10):
+        time.sleep(0.1)
+        v = page.evaluate(f"{E}.level()")
+        if v is not None and v > -200:
+            base.append(v)
+    floor = max(-80.0, (min(base) if base else -60.0) - 20.0)
+    p0 = page.evaluate(f"{E}.position()")
+    sec = page.evaluate(f"{E}.schedulerSection()")
+    sel = pad_for(sec)
+    page.click(sel)
+    if not page.locator(f"{sel}.pending").count():
+        failures.append(f"{where}: a pad tap beside an open panel did not queue")
+    held("a pad tap", False)
+    page.click(sel)
+    # Advanced Drums opens on its step grid: the Kit page has dials.
+    if page.locator('.inst [data-page="drums:kit"]').count():
+        page.click('.inst [data-page="drums:kit"]')
+    dial = page.locator(".inst .body .dial").first
+    if not dial.count():
+        failures.append(f"{where}: the Drums panel shows no dial beside the pads")
+    else:
+        song0 = page.evaluate(f"JSON.stringify({E}.getSong())")
+        b = dial.bounding_box()
+        moved = False
+        # Up, then down: a dial at its top or bottom moves the other way.
+        for dy in (-40, 40):
+            page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
+            page.mouse.down()
+            page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2 + dy, steps=4)
+            page.mouse.up()
+            moved = moved or page.evaluate(f"JSON.stringify({E}.getSong())") != song0
+        if not moved:
+            failures.append(f"{where}: a drag on the panel's dial changed nothing")
+        held("a drag on the panel's dial", True)
+    low = []
+    end = time.time() + 0.5
+    while time.time() < end:
+        v = page.evaluate(f"{E}.level()")
+        if v is None or v < floor:
+            low.append(v)
+        time.sleep(0.05)
+    p1 = page.evaluate(f"{E}.position()")
+    running = page.evaluate(f"{E}.running")
+    if not (running and p1["playing"]) or (p1["bar"], p1["step"]) == (p0["bar"], p0["step"]):
+        failures.append(f"{where}: the pads stopped while the panel was used (transport at {p0['bar']}.{p0['step']} then {p1['bar']}.{p1['step']}, running {running})")
+    if low:
+        failures.append(f"{where}: the level dropped under {floor:.1f} dB while the panel was used: {low[:4]}")
+    if not page.locator(".dock .nowlist, .deskgrid").count():
+        failures.append(f"{where}: the pads left the screen while the panel was used")
+
+
 def walk_tablet(page, failures: list, out_dir: str | None) -> int:
-    """T1: the four tablet sizes (1280 x 800 and 1024 x 768 landscape, the desk; 800 x 1280 and 768 x 1024 portrait, the
-    dock), in both modes, with every panel of the rail (each layer in each mode) and every page, a pad (or, on Simple
-    portrait, an instrument's lane) waiting for the next bar and a section queued. Each screen gets the frame walk's
+    """T1: the tablet sizes (1280 x 800, 1024 x 768 and 880 x 620 landscape, the desk; 800 x 1280, 768 x 1024 and 600 x 960
+    portrait, the dock), in both modes, with every panel of the rail (each layer in each mode) and every page, a pad (or,
+    on Simple portrait, an instrument's lane) waiting for the next bar and a section queued. Each screen gets the frame walk's
     checks (nothing scrolls, nothing cut off, text fits, no control under 48 px) and the layout's own; a missing
-    screenshot fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen.
+    screenshot fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
+    (the panel and the layout held), the transport running and the level up throughout.
     The smoke's core part runs it without screenshots. Leaves the phone at 390 x 844 in Simple, on the Play tab."""
     w = Walk(page, failures, out_dir)
     sec = page.evaluate(f"{E}.position().section")
@@ -758,41 +836,11 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                 layout(size, orient, f"{mode}-{orient}-section-next-bar")
                 if not _wait(page, f"{E}.position().section === {nxt}", bar_s * 2 + 1):
                     failures.append(f"{size[0]}x{size[1]} {mode}: the queued section never played")
-        # Pads and one instrument without changing screen: a pad queues and the pads keep playing beside an open panel,
-        # whose control moves the song.
+        # Pads and one instrument without changing screen, in both modes.
         for mode in ("advanced", "simple"):
             page.click(f'[data-appmode="{mode}"]')
             page.click('.rail [data-tab="drums"]')
-            where = f"{size[0]}x{size[1]} {mode} {orient}"
-            sec = page.evaluate(f"{E}.schedulerSection()")
-            sel = pad_sel(orient, mode, sec, "bass")
-            before = page.evaluate(f"{E}.attacks()")
-            page.click(sel)
-            if not page.locator(f"{sel}.pending").count():
-                failures.append(f"{where}: a pad tap beside an open panel did not queue")
-            page.click(sel)
-            # Advanced Drums opens on its step grid: the Kit page has dials.
-            if page.locator('.inst [data-page="drums:kit"]').count():
-                page.click('.inst [data-page="drums:kit"]')
-            dial = page.locator(".inst .body .dial").first
-            if not dial.count():
-                failures.append(f"{where}: the Drums panel shows no dial beside the pads")
-            else:
-                song0 = page.evaluate(f"JSON.stringify({E}.getSong())")
-                b = dial.bounding_box()
-                moved = False
-                # Up, then down: a dial at its top or bottom moves the other way.
-                for dy in (-40, 40):
-                    page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
-                    page.mouse.down()
-                    page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2 + dy, steps=4)
-                    page.mouse.up()
-                    moved = moved or page.evaluate(f"JSON.stringify({E}.getSong())") != song0
-                if not moved:
-                    failures.append(f"{where}: a drag on the panel's dial changed nothing")
-            # A slow vibe (Ambient's long tones) may start nothing for a beat or two: up to two bars.
-            if not _wait(page, f"{E}.attacks() > {before}", bar_s * 2 + 1) or not page.locator(".dock .nowlist, .deskgrid").count():
-                failures.append(f"{where}: the pads stopped or left the screen while the panel was used")
+            beside(page, failures, f"{size[0]}x{size[1]} {mode} {orient}", lambda s, o=orient, m=mode: pad_sel(o, m, s, "bass"))
             settle_toggles()
     page.click('[data-appmode="simple"]')
     page.set_viewport_size({"width": 390, "height": 844})
@@ -804,7 +852,7 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                 f = f"{size[0]}x{size[1]}-{label}.png"
                 if not os.path.exists(os.path.join(out_dir, f)):
                     failures.append(f"tablet walk: no screenshot {f}")
-    print(f"tablet walk: {w.count} screens at four sizes in both modes")
+    print(f"tablet walk: {w.count} screens at {len(TABLET_SIZES)} sizes in both modes")
     return w.count
 
 
@@ -845,7 +893,7 @@ def main() -> int:
             n += walk_live(page, failures, out)
             # P10d: with Ambient (Morph on) playing, every tap during a morph.
             walk_play_button(page, failures, "Ambient, Morph on")
-            # T1: the four tablet sizes, last (the walks above are the phone's).
+            # T1: the tablet sizes, last (the walks above are the phone's).
             n += walk_tablet(page, failures, out)
             failures += [f"page error: {e}" for e in errors]
             browser.close()
