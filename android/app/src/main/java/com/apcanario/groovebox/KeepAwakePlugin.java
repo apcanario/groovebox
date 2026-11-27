@@ -8,7 +8,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
- * Keeps the screen on while the jam plays (spec section 2), driven from src/platform/keepAwake.ts:
+ * Keeps the screen on while the jam plays (spec section 2), driven from src/ui/keepAwake.ts:
  * Capacitor.nativePromise("KeepAwake", "set", { on }). FLAG_KEEP_SCREEN_ON needs no permission and
  * lasts only while the activity is visible, so nothing plays on with the screen off by this path.
  */

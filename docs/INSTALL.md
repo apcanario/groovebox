@@ -17,9 +17,7 @@ Download `groovebox-debug.apk` on the phone.
 
 ## Update
 
-Download the new `groovebox-debug.apk` and install it over the old one. Do not uninstall first: songs stay with an update and are deleted with an uninstall. Every build is signed with the same key (`android/app/debug.keystore`, committed) and carries a higher version number (the workflow's run number), so Android takes it as an update of the same app.
-
-Once only: an APK built before the fixed key (any download from before this change) has a different signature, so the first fixed APK will not install over it ("App not installed"). Uninstall that early one, then install; from then on every update installs over.
+Download the new `groovebox-debug.apk` and install it over the old one. Do not uninstall first: songs stay with an update and are deleted with an uninstall (the app opts out of Android backup, so a reinstall does not bring them back). Every build is signed with the same key (`android/app/debug.keystore`, committed) and carries a higher version number (the workflow's run number), so Android takes it as an update of the same app.
 
 The key is Android's standard debug key, public by design (alias `androiddebugkey`, passwords `android`). It is not a secret and is good only for this debug build: it must never sign a Play Store release, which needs its own private key kept out of the repo.
 

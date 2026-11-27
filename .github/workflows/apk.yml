@@ -63,4 +63,4 @@ jobs:
             --title latest \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --notes "Debug APK built from ${GITHUB_SHA}. Install: docs/INSTALL.md."
+            --notes "Debug APK built from ${GITHUB_SHA}. Install: https://github.com/apcanario/groovebox/blob/main/docs/INSTALL.md"
