@@ -1,7 +1,7 @@
 /** Pure UI logic: no DOM, no audio. Unit-tested in logic.test.ts. */
 import type { ChordStep, InstrumentId, NumericPatchKey, Patch, Song } from "../engine/song.ts";
 import { PATCHES, patchFor, resolvePatch } from "../music/styles.ts";
-import { FM_RATIOS, LFO_RATE_LABEL, driftPeriod, fmRatio, lfoRateIndex } from "../music/sound.ts";
+import { FM_RATIOS, LFO_RATE_LABEL, driftPeriod, fmRatio, lfoBeats, lfoRateIndex } from "../music/sound.ts";
 import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
 import { LEAD_SHAPES, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle } from "../music/lead.ts";
 import { leadKnobs } from "../music/leadKit.ts";
@@ -869,4 +869,39 @@ export class PadPointers<P extends string> {
     this.by.clear();
     return pads;
   }
+}
+
+// ---- T3 (spec 9.5): it moves with the music ----------------------------------------------
+
+/** How strongly a pad of the playing section pulses (0..1) for its instrument's level in dB, in twentieths: from -42 dB
+ *  (nothing) to -6 dB (full). 0 while the screen is held still. */
+export function pulseLevel(db: number, still: boolean): number {
+  if (still || !Number.isFinite(db)) return 0;
+  return Math.round(Math.max(0, Math.min(1, (db + 42) / 36)) * 20) / 20;
+}
+
+/**
+ * The synced filter LFO's pull on its dial (0..depth): a cosine with its top (filter open) on every multiple of its
+ * length from bar 1, as the engine starts it (audio.ts syncStart), at its bottom the full depth. `beats` since bar 1.
+ */
+export function lfoPull(beats: number, rate: number, depth: number): number {
+  if (!(depth > 0) || beats < 0) return 0;
+  const len = lfoBeats(rate);
+  return depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * ((beats / len) % 1)));
+}
+
+/**
+ * How far (0..1) the Filter punch pad has swept the master filter down at audio time `now`: from its start line over
+ * `sweepBeats` beats, held there until its end line, 0 when out. `beatSec` is one beat in seconds.
+ */
+export function punchSweep(s: { start: number | null; end: number | null } | undefined, now: number, beatSec: number, sweepBeats: number): number {
+  if (!s || s.start === null || now < s.start || (s.end !== null && now >= s.end) || beatSec <= 0) return 0;
+  return Math.max(0, Math.min(1, (now - s.start) / (sweepBeats * beatSec)));
+}
+
+/** Where the Filter dial's ghost pointer sits (0..1 of the dial) while the pad sweeps: from the dial's value toward its
+ *  low-pass end. */
+export function sweepGhost(value: number, sweep: number): number {
+  const f = Math.max(0, Math.min(1, (value + 1) / 2));
+  return f * (1 - sweep);
 }

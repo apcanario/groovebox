@@ -39,11 +39,12 @@ export function useVerticalDrag(
         onChange(v);
       }
     },
-    onPointerUp() {
-      drag.current = null;
+    // T3 (spec 9.6): only this dial's own finger ends its drag.
+    onPointerUp(e) {
+      if (drag.current?.id === e.pointerId) drag.current = null;
     },
-    onPointerCancel() {
-      drag.current = null;
+    onPointerCancel(e) {
+      if (drag.current?.id === e.pointerId) drag.current = null;
     },
   };
 }
@@ -161,6 +162,8 @@ export function Dial({ label, value, min, max, step = 0, display, color, onChang
           <path d={tick(end, R - 5, R + 5)} class="pointer" />
         </svg>
         <div class="val">{text}</div>
+        {/* T3 (spec 9.5): where a punch pad or the filter LFO moves this dial now; shown by the motion loop only. */}
+        <i class="ghost" aria-hidden="true" />
       </div>
       <label>{name ?? label}</label>
     </div>
@@ -204,8 +207,8 @@ export function XYPad({ x, y, onChange, xLabel, yLabel, readout, id }: XYPadProp
       onPointerMove={(e: PE) => {
         if (active.current === e.pointerId) move(e);
       }}
-      onPointerUp={() => (active.current = null)}
-      onPointerCancel={() => (active.current = null)}
+      onPointerUp={(e: PE) => active.current === e.pointerId && (active.current = null)}
+      onPointerCancel={(e: PE) => active.current === e.pointerId && (active.current = null)}
     >
       <svg class="dots" aria-hidden="true">
         <defs>

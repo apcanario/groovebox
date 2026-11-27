@@ -87,13 +87,14 @@ function DeskGrid({ ctx }: { ctx: Ctx }) {
               <button
                 key={`${id}${i}`}
                 class={`cell pad${v.on ? " on" : " off"}${v.pending ? " pending" : ""}${v.live ? " live" : ""}${v.next ? " nextcol" : ""}`}
-                style={{ "--c": INST_COLOR[id] }}
+                style={{ "--c": INST_COLOR[id], "--m": `var(--m-${id})` }}
                 data-cell={`${i}:${id}`}
                 data-live={v.live ? "" : undefined}
                 aria-pressed={v.on}
                 aria-label={padLabel(INST_NAME[id], sectionLetter(i), v)}
                 onClick={() => engine.toggleInstrument(i, id)}
               >
+                {v.live && v.on && <i class="pulse" aria-hidden="true" />}
                 {v.notes && <PadNotes id={id} lanes={lanes} />}
               </button>
             );

@@ -1143,6 +1143,24 @@ button:disabled {
   fill: none;
   stroke-linecap: butt;
 }
+/* T3 (spec 9.5): the ghost pointer of a dial moved by a punch pad or the filter LFO (--mv its place, --mo shown). */
+.dial .ghost {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46%;
+  height: 3px;
+  margin-top: -1.5px;
+  box-sizing: border-box;
+  border-right: 9px solid var(--text);
+  transform-origin: 0 50%;
+  transform: rotate(calc(135deg + 270deg * var(--mv, 0)));
+  opacity: calc(var(--mo, 0) * 0.7);
+  pointer-events: none;
+}
+.still .dial .ghost {
+  display: none;
+}
 .dial .track,
 .dial .arc {
   stroke-width: 8;
@@ -2414,6 +2432,17 @@ button:disabled {
 .deskgrid .cell.nextcol:not(.pending) {
   outline: 2px solid var(--teal);
   outline-offset: -2px;
+}
+/* T3 (spec 9.5): a pad of the playing section pulses with its instrument's level meter (--m, from the motion loop). */
+.deskgrid .cell .pulse {
+  position: absolute;
+  inset: 0;
+  background: var(--text);
+  opacity: calc(var(--m, 0) * 0.32);
+  pointer-events: none;
+}
+.still .deskgrid .cell .pulse {
+  display: none;
 }
 /* The bar's notes inside a pad of the playing section, with the playhead through them (spec 8.12). */
 .padnotes {

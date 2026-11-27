@@ -23,7 +23,7 @@ const R = 0.005;
 /** Filter: the cutoff when open and the floor it sweeps down to, and how many beats the sweep takes. */
 export const FILTER_OPEN = 20000;
 export const FILTER_FLOOR = 280;
-const FILTER_SWEEP_BEATS = 2;
+export const FILTER_SWEEP_BEATS = 2;
 /** Filter: the opening ramp before its line. */
 const FILTER_OPEN_RAMP = 0.02;
 /** Echo: a dotted eighth, fed back. */

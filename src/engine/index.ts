@@ -87,6 +87,7 @@ export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, windSteps, type WindBar, type Win
 export type { Energy } from "./continuity.ts";
 export { PUNCH_PADS, PUNCH_RULES, type PunchPad, type PunchRule } from "../music/punch.ts";
 export type { PunchState } from "./punch.ts";
+export { FILTER_SWEEP_BEATS } from "./punch.ts";
 export { HANDS_BARS, MORPH_THINGS, VOICING_STEPS, voicingShift, type MorphPlan, type MorphSettings, type MorphThing } from "../music/morph.ts";
 
 /** P11: one move Morph made, for the smoke test and the tests: the journey's bar and the engine call it made. */

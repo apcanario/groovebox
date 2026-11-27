@@ -335,6 +335,7 @@ describe("layer tab (G4)", () => {
 });
 
 import { clockLabel, sizeLabel } from "./logic.ts";
+import { lfoPull, pulseLevel, punchSweep, sweepGhost } from "./logic.ts";
 describe("record labels (G5)", () => {
   it("shows elapsed time as m:ss, then h:mm:ss", () => {
     expect(clockLabel(0)).toBe("0:00");
@@ -408,5 +409,34 @@ describe("P10c M3: the Morph page's help text follows the Sections switch", () =
   it("the other switches read the same either way", () => {
     const strip = (t: string): string => t.replace(/Sections[^.]*\./, "");
     expect(strip(morphHelp(true, 16))).toBe(strip(morphHelp(false, 16)));
+  });
+});
+
+describe("T3 motion (spec 9.5)", () => {
+  it("a pad's pulse follows its instrument's meter and is 0 when still or silent", () => {
+    expect(pulseLevel(-Infinity, false)).toBe(0);
+    expect(pulseLevel(-60, false)).toBe(0);
+    expect(pulseLevel(-6, false)).toBe(1);
+    expect(pulseLevel(-24, false)).toBe(0.5);
+    expect(pulseLevel(-6, true)).toBe(0);
+    expect(pulseLevel(-12, false)).toBeGreaterThan(pulseLevel(-30, false));
+  });
+  it("the LFO's pull is open on its cycle's top from bar 1 and the full depth at its bottom", () => {
+    const rate = 4 / 7; // index 4 of 8: one beat a cycle
+    expect(lfoPull(0, rate, 0.7)).toBeCloseTo(0);
+    expect(lfoPull(0.5, rate, 0.7)).toBeCloseTo(0.7);
+    expect(lfoPull(3, rate, 0.7)).toBeCloseTo(0);
+    expect(lfoPull(0.5, rate, 0)).toBe(0);
+  });
+  it("the Filter pad's sweep runs from its start line over its beats, holds, and is 0 when out", () => {
+    const s = { start: 10, end: null };
+    expect(punchSweep(undefined, 11, 0.5, 2)).toBe(0);
+    expect(punchSweep(s, 9.9, 0.5, 2)).toBe(0);
+    expect(punchSweep(s, 10.5, 0.5, 2)).toBeCloseTo(0.5);
+    expect(punchSweep(s, 20, 0.5, 2)).toBe(1);
+    expect(punchSweep({ start: 10, end: 12 }, 12, 0.5, 2)).toBe(0);
+    expect(sweepGhost(0, 0)).toBeCloseTo(0.5);
+    expect(sweepGhost(0, 1)).toBe(0);
+    expect(sweepGhost(1, 0.5)).toBeCloseTo(0.5);
   });
 });
