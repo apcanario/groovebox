@@ -2609,3 +2609,119 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: 120px;
 }
+
+/*
+ * T2 (spec 9.2): Advanced without pages on the desk. From 1200 px wide the instrument half takes 53 % in Advanced (towards
+ * the landscape reference image), the pads 47 %, which still hold DROP beside the transport bar. A panel shown whole ("whole", src/ui/tabs/full.ts) has no page chips: its top rows, then two
+ * columns, the patch on the left (Sound, Mod, both effect slots, the sends) and what it plays on the right over the XY
+ * pad, which takes the height left (bottom right, spec 9.1). Under 620 px of panel width the columns stack.
+ */
+@media (min-width: 1200px) {
+  .tablet.landscape.adv .pads {
+    flex: 47 1 0;
+  }
+  .tablet.landscape.adv .inst {
+    flex: 53 1 0;
+  }
+}
+.insttab.whole {
+  container-type: inline-size;
+}
+.whole > .cols {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  gap: var(--group);
+  margin-top: calc(var(--group) - var(--gap));
+}
+.whole .col {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--group);
+}
+.whole .grp {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.whole .grp .dials {
+  flex: none;
+  grid-auto-rows: 64px;
+}
+.whole .dial {
+  min-height: 0;
+  padding: 4px 4px 3px;
+}
+/* A 64 px dial gives its ring every pixel it can, so values like "0.40" fit inside it. */
+.whole .dial label {
+  margin-top: 1px;
+}
+/* Bass and Synth have the height to spare: their dials are taller, so every value reads (".004" fits its ring). */
+.insttab.whole:not(.layertab) .grp .dials {
+  grid-auto-rows: 84px;
+}
+.whole .xy {
+  flex: 1 1 0;
+  min-height: 96px;
+}
+.whole .glabel {
+  margin-top: 0;
+}
+/* The name, the lane and the switch in one row. */
+.headrow.wholehead > .lane {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--hit);
+}
+.headrow.wholehead .head {
+  flex: none;
+}
+/* Both effect slots: one under the other in a column, side by side where the columns stack. */
+.fxboth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--gap);
+}
+.fxslot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-width: 0;
+}
+.whole .fxboth .dials .tog.fxbtn,
+.whole .fxboth .btn.fxpick {
+  min-height: 0;
+}
+@container (max-width: 619.98px) {
+  .whole > .cols {
+    flex-direction: column;
+  }
+  .whole .col {
+    display: contents;
+  }
+  .whole .playcol .grp {
+    order: 1;
+  }
+  .whole [data-grp="sound"] {
+    order: 2;
+  }
+  .whole [data-grp="mod"] {
+    order: 3;
+  }
+  .whole [data-grp="fx"] {
+    order: 4;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--group);
+  }
+  .whole .xy {
+    order: 5;
+  }
+  .whole [data-grp="sends"] {
+    order: 6;
+    margin-top: calc(var(--gap) - var(--group));
+  }
+}

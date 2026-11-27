@@ -27,7 +27,8 @@ import { SoundPicker } from "./SimpleTab.tsx";
 import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
-import { FxPage } from "./fx.tsx";
+import { FxPage, FxSlots } from "./fx.tsx";
+import { useFull } from "./full.ts";
 
 const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open", perc: "Perc", shaker: "Shaker" };
 
@@ -58,23 +59,32 @@ function Knobs({ ctx, inst, knobs, children }: { ctx: Ctx; inst: InstrumentId; k
   );
 }
 
-/** The filter XY pad and the two sends: the lowest controls of every instrument tab. */
-export function FilterPanel({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
+/** The filter XY pad alone (T2: on the desk the sends sit with the effects). */
+export function FilterXY({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const { engine } = ctx;
   const patch = ctx.song.patches[inst];
   const hz = engine.cutoffHz(inst, patch.cutoff);
   const readout = `${hz === null ? `${Math.round(patch.cutoff * 100)}%` : hzLabel(hz)} · ${Math.round(patch.resonance * 100)}%`;
   return (
+    <XYPad
+      id={inst}
+      x={patch.cutoff}
+      y={patch.resonance}
+      xLabel="Cutoff"
+      yLabel="Resonance"
+      readout={readout}
+      onChange={(x, y) => engine.setParams(inst, { cutoff: x, resonance: y })}
+    />
+  );
+}
+
+/** The filter XY pad and the two sends: the lowest controls of every instrument tab. */
+export function FilterPanel({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
+  const { engine } = ctx;
+  const patch = ctx.song.patches[inst];
+  return (
     <>
-      <XYPad
-        id={inst}
-        x={patch.cutoff}
-        y={patch.resonance}
-        xLabel="Cutoff"
-        yLabel="Resonance"
-        readout={readout}
-        onChange={(x, y) => engine.setParams(inst, { cutoff: x, resonance: y })}
-      />
+      <FilterXY ctx={ctx} inst={inst} />
       <div class="sends">
         <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => engine.setParam(inst, "delay", v)} />
         <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => engine.setParam(inst, "reverb", v)} />
@@ -105,11 +115,20 @@ export function InstToggle({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
  * (the Advanced Layer tab puts Back and New idea there and its switch in the mode row, as docs/design/look/).
  */
 export function HeadRow({ ctx, inst, children }: { ctx: Ctx; inst: InstrumentId; children?: ComponentChildren }) {
+  return (
+    <div class="headrow">
+      <HeadName ctx={ctx} inst={inst} />
+      {children ?? <InstToggle ctx={ctx} inst={inst} />}
+    </div>
+  );
+}
+
+/** The instrument's name and the edited section, or what its switch will do at the next bar. */
+export function HeadName({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
   const { song, edit, pending } = ctx;
   const on = song.sections[edit].on[inst];
   const queued = pending.toggles.some((t) => t.section === edit && t.instrument === inst);
   return (
-    <div class="headrow">
       <h1 class="head">
         <em style={{ color: INST_COLOR[inst] }}>
           <InstName id={inst} />
@@ -118,8 +137,6 @@ export function HeadRow({ ctx, inst, children }: { ctx: Ctx; inst: InstrumentId;
           {sectionLetter(edit)} · {queued ? (on ? "off at the next bar" : "on at the next bar") : song.sections[edit].name}
         </span>
       </h1>
-      {children ?? <InstToggle ctx={ctx} inst={inst} />}
-    </div>
   );
 }
 
@@ -266,14 +283,91 @@ function basePages(inst: InstrumentId): PageDef<InstPage>[] {
 }
 
 export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
-  const { engine, edit, roomy } = ctx;
+  // T2 (spec 9.2): Bass and Synth on the desk show every page at once where they fit. Drums keeps its pages (slice b).
+  const [full, ref] = useFull(inst === "drums" ? { ...ctx, desk: false } : ctx, inst);
+  return full ? <WholeInstrument ctx={ctx} inst={inst} sref={ref} /> : <PagedInstrument ctx={ctx} inst={inst} sref={ref} />;
+}
+
+function Rhythms({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
+  const { engine, edit } = ctx;
   const section = ctx.song.sections[edit];
+  return (
+    <>
+      <GroupLabel thing="Rhythm" />
+      {inst === "bass" && (
+        <PagedChips
+          name="rhythm"
+          what="rhythms"
+          options={BASS_PRESETS}
+          value={section.bass.rhythm}
+          label={(p) => presetName("bass", p)}
+          onPick={(p) => engine.setBassRhythm(edit, p)}
+        />
+      )}
+      {inst === "synth" && (
+        <PagedChips
+          name="rhythm"
+          what="rhythms"
+          options={SYNTH_PRESETS}
+          value={section.synth.rhythm}
+          label={(p) => presetName("synth", p)}
+          onPick={(p) => engine.setSynthRhythm(edit, p)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * T2 (spec 9.2): Bass or Synth whole, on the desk. The name, the lane and the on/off switch in one row; then two
+ * columns: the patch (Sound, both effect slots, the sends) and what it plays and how (the rhythm picker, Mod with the
+ * wave, over the XY pad, bottom right in thumb reach, spec 9.1). Where the panel is narrow the columns stack.
+ */
+function WholeInstrument({ ctx, inst, sref }: { ctx: Ctx; inst: InstrumentId; sref: { current: HTMLElement | null } }) {
+  const knobPages = KNOB_PAGES[inst] ?? [];
+  const patch = ctx.song.patches[inst];
+  return (
+    <section ref={sref} class="insttab whole" data-whole={inst} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
+      <div class="headrow wholehead">
+        <HeadName ctx={ctx} inst={inst} />
+        <Lane id={inst} lanes={ctx.lanes} playhead />
+        <InstToggle ctx={ctx} inst={inst} />
+      </div>
+      <div class="cols">
+        <div class="col patchcol">
+          <div class="grp" data-grp="sound">
+            <SoundPicker ctx={ctx} inst={inst} />
+            <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />
+          </div>
+          <FxSlots ctx={ctx} inst={inst} />
+          <div class="sends" data-grp="sends">
+            <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => ctx.engine.setParam(inst, "delay", v)} />
+            <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => ctx.engine.setParam(inst, "reverb", v)} />
+          </div>
+        </div>
+        <div class="col playcol">
+          <div class="grp" data-grp="pattern">
+            <Rhythms ctx={ctx} inst={inst} />
+          </div>
+          <div class="grp" data-grp="mod">
+            <Waves ctx={ctx} inst={inst} />
+            <Knobs ctx={ctx} inst={inst} knobs={MOD_KNOBS} />
+          </div>
+          <FilterXY ctx={ctx} inst={inst} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PagedInstrument({ ctx, inst, sref }: { ctx: Ctx; inst: InstrumentId; sref: { current: HTMLElement | null } }) {
+  const { roomy } = ctx;
   const [chosen, setPage] = useState<InstPage>(inst === "drums" ? "beat" : "rhythm");
   const pages = withFilterPage(basePages(inst), roomy);
   const page = shownPage(pages, chosen);
   const knobPages = KNOB_PAGES[inst] ?? [];
   return (
-    <section class={`insttab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
+    <section ref={sref} class={`insttab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
       <HeadRow ctx={ctx} inst={inst} />
       <Lane id={inst} lanes={ctx.lanes} playhead />
       <Pager id={inst} pages={pages} page={page} onPage={setPage} />
@@ -288,27 +382,7 @@ export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
               <SwingDial ctx={ctx} />
             </Knobs>
           )}
-          {page === "rhythm" && <GroupLabel thing="Rhythm" />}
-          {page === "rhythm" && inst === "bass" && (
-            <PagedChips
-              name="rhythm"
-              what="rhythms"
-              options={BASS_PRESETS}
-              value={section.bass.rhythm}
-              label={(p) => presetName("bass", p)}
-              onPick={(p) => engine.setBassRhythm(edit, p)}
-            />
-          )}
-          {page === "rhythm" && inst === "synth" && (
-            <PagedChips
-              name="rhythm"
-              what="rhythms"
-              options={SYNTH_PRESETS}
-              value={section.synth.rhythm}
-              label={(p) => presetName("synth", p)}
-              onPick={(p) => engine.setSynthRhythm(edit, p)}
-            />
-          )}
+          {page === "rhythm" && <Rhythms ctx={ctx} inst={inst} />}
           {page === "rhythm" && <Waves ctx={ctx} inst={inst} />}
           {page === "sound" && <SoundPicker ctx={ctx} inst={inst} />}
           {page === "sound" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}

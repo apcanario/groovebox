@@ -32,12 +32,14 @@ import {
   type PageDef,
 } from "../logic.ts";
 import { INST_COLOR } from "../theme.tsx";
-import { FilterPanel, HeadRow, InstToggle } from "./InstrumentTab.tsx";
+import { FilterPanel, FilterXY, HeadRow, InstToggle } from "./InstrumentTab.tsx";
 import { Icon } from "../icons.tsx";
 import { Lane } from "../lanes.tsx";
 import { SeedButtons, SoundPicker } from "./SimpleTab.tsx";
 import { LeadDials, LeadStyles, leadStyleOf, type LeadPage } from "./lead.tsx";
-import { FxPage } from "./fx.tsx";
+import { FxPage, FxSlots } from "./fx.tsx";
+import { useFull } from "./full.ts";
+import { SendBar } from "../components.tsx";
 
 function Arp({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   const { engine, song, edit } = ctx;
@@ -182,8 +184,8 @@ function Mod({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
 }
 
 /** The patch dials shared by every mode: wave, envelope, drive. */
-function Sound({ ctx, id, mode }: { ctx: Ctx; id: LayerInstrument; mode: string }) {
-  const { roomy } = ctx;
+function Sound({ ctx, id, mode, whole = false }: { ctx: Ctx; id: LayerInstrument; mode: string; whole?: boolean }) {
+  const roomy = ctx.roomy && !whole;
   const { engine, song } = ctx;
   const patch = song.patches[id];
   return (
@@ -246,6 +248,91 @@ export function ModeRow({ ctx, id, toggle }: { ctx: Ctx; id: LayerInstrument; to
  * XY pad and sends get a Filter page.
  */
 export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
+  const layer = ctx.song.sections[ctx.edit][id];
+  const lead = layer.mode === "generative";
+  const pulse = lead && leadStyleOf(ctx, id) === "pulse";
+  // T2 (spec 9.2): on the desk every page at once where it fits; the shape is what changes the panel's content.
+  const [full, ref] = useFull(ctx, `${id}:${layer.mode}:${pulse ? "pulse" : ""}`);
+  return full ? <WholeLayer ctx={ctx} id={id} sref={ref} /> : <PagedLayer ctx={ctx} id={id} sref={ref} />;
+}
+
+/**
+ * T2 (spec 9.2): a layer whole, on the desk. The mode switch with the on/off switch, in Lead the style selector, the
+ * lane with Back and New idea; then two columns: the patch (Sound, Mod with the wave, both effect slots, the sends) and
+ * what it plays (Lead: Notes, Feel and Pulse's own dials; Arp: direction, rate, octaves and gate; Pad and Drone: their
+ * dials) over the XY pad, bottom right in thumb reach (spec 9.1). Where the panel is narrow the columns stack.
+ */
+function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { current: HTMLElement | null } }) {
+  const { edit } = ctx;
+  const layer = ctx.song.sections[edit][id];
+  const lead = layer.mode === "generative";
+  const pulse = lead && leadStyleOf(ctx, id) === "pulse";
+  const patch = ctx.song.patches[id];
+  return (
+    <section
+      ref={sref}
+      class={`insttab layertab adv whole${lead ? " lead" : ""}`}
+      data-whole={id}
+      style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}
+    >
+      <ModeRow ctx={ctx} id={id} toggle />
+      {lead && <LeadStyles ctx={ctx} id={id} />}
+      <div class="lanerow">
+        <Lane id={id} lanes={ctx.lanes} playhead section={edit} />
+        <SeedButtons ctx={ctx} id={id} />
+      </div>
+      <div class="cols">
+        <div class="col patchcol">
+          <div class="grp" data-grp="sound">
+            <Sound ctx={ctx} id={id} mode={layer.mode} whole />
+          </div>
+          <div class="grp" data-grp="mod">
+            <Mod ctx={ctx} id={id} />
+          </div>
+          <FxSlots ctx={ctx} inst={id} />
+          <div class="sends" data-grp="sends">
+            <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => ctx.engine.setParam(id, "delay", v)} />
+            <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => ctx.engine.setParam(id, "reverb", v)} />
+          </div>
+        </div>
+        <div class="col playcol">
+          {lead && (
+            <>
+              <div class="grp" data-grp="notes">
+                <GroupLabel thing="Notes" />
+                <LeadDials ctx={ctx} id={id} page="notes" />
+              </div>
+              <div class="grp" data-grp="feel">
+                <GroupLabel thing="Feel" />
+                <LeadDials ctx={ctx} id={id} page="feel" />
+              </div>
+              {pulse && (
+                <div class="grp" data-grp="pulse">
+                  <GroupLabel thing="Pulse" />
+                  <LeadDials ctx={ctx} id={id} page="pulse" />
+                </div>
+              )}
+            </>
+          )}
+          {layer.mode === "arp" && (
+            <div class="grp" data-grp="pattern">
+              <Arp ctx={ctx} id={id} />
+            </div>
+          )}
+          {(layer.mode === "pad" || layer.mode === "drone") && (
+            <div class="grp" data-grp="pattern">
+              {layer.mode === "pad" && <GroupLabel thing="Pad" />}
+              <Pad ctx={ctx} id={id} />
+            </div>
+          )}
+          <FilterXY ctx={ctx} inst={id} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PagedLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { current: HTMLElement | null } }) {
   const { edit, roomy } = ctx;
   const [chosen, setPage] = useState<LayerPage>("notes");
   const layer = ctx.song.sections[edit][id];
@@ -262,7 +349,7 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
   // The chosen page while it exists; the first page of the mode otherwise (Notes stays chosen across modes).
   const page = shownPage(pages, chosen === "pattern" && lead ? "notes" : (chosen === "notes" || chosen === "feel" || chosen === "pulse") && !lead ? "pattern" : chosen);
   return (
-    <section class={`insttab layertab adv${roomy ? " roomy" : ""}${lead ? " lead" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}>
+    <section ref={sref} class={`insttab layertab adv${roomy ? " roomy" : ""}${lead ? " lead" : ""}`} style={{ "--c": INST_COLOR[id], "--chip": INST_COLOR[id] }}>
       {roomy && (
         <HeadRow ctx={ctx} inst={id}>
           <div class="seedpair">
