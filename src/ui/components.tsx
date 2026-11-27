@@ -2,7 +2,7 @@
 import type { ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { Icon, iconThing, type IconThing } from "./icons.tsx";
-import { chipPage, dragValue, fraction } from "./logic.ts";
+import { chipPage, dragValue, faderValue, fraction } from "./logic.ts";
 
 
 type PE = PointerEvent & { currentTarget: HTMLElement };
@@ -265,6 +265,50 @@ export function SendBar({ label, value, color, onChange, id }: SendBarProps) {
       <div class="fill" style={{ width: `${value * 100}%`, background: color }} />
       <span>{label}</span>
       <b>{Math.round(value * 100)}</b>
+    </div>
+  );
+}
+
+// ---- Fader ------------------------------------------------------------------------------
+
+/**
+ * T2 (spec 9.2): a vertical level fader with its live meter, for the Mix panel on the desk. Touch or drag anywhere on the
+ * track to set it (top is full); the meter beside the fill shows what the instrument plays now (0..1, from the caller).
+ * The value sits at the top, the name at the bottom.
+ */
+export function Fader({ label, name, value, meter, color, onChange, id }: { label: string; name?: ComponentChildren; value: number; meter: number; color: string; onChange: (v: number) => void; id: string }) {
+  const active = useRef<number | null>(null);
+  const set = (e: PE): void => {
+    const r = e.currentTarget.getBoundingClientRect();
+    onChange(faderValue(e.clientY, r.top, r.height));
+  };
+  return (
+    <div class="fader">
+      <b class="fval">{Math.round(value * 100)}</b>
+      <div
+        class="ftrack"
+        role="slider"
+        aria-label={label}
+        aria-orientation="vertical"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(value * 100)}
+        data-fader={id}
+        onPointerDown={(e: PE) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          active.current = e.pointerId;
+          set(e);
+        }}
+        onPointerMove={(e: PE) => {
+          if (active.current === e.pointerId) set(e);
+        }}
+        onPointerUp={() => (active.current = null)}
+        onPointerCancel={() => (active.current = null)}
+      >
+        <div class="ffill" style={{ height: `${value * 100}%`, background: color }} />
+        <div class="fmeter" data-meter={id} style={{ transform: `scaleY(${meter})` }} />
+      </div>
+      <span class="fname">{name ?? label}</span>
     </div>
   );
 }

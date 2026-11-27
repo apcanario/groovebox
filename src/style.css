@@ -2725,3 +2725,96 @@ button:disabled {
     margin-top: calc(var(--gap) - var(--group));
   }
 }
+
+/*
+ * T2 slice b (spec 9.2): the Mix panel whole on the desk. The master meter on top; the master, the space and a fader
+ * with its live meter per instrument on the left (the faders lowest, taking the height left); Drop, Morph and Audio
+ * on the right.
+ */
+.mixtab.whole .grp.levels {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.mixtab.whole .dials {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.mixtab.whole .droppage,
+.mixtab.whole .morphpage {
+  flex: none;
+}
+.mixtab.whole .droplow {
+  flex: none;
+}
+.mixtab.whole .droplow .dial {
+  min-height: 0;
+}
+.faders {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.fader {
+  min-width: var(--hit);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  background: var(--card);
+  border-radius: var(--r);
+}
+.fader .fval {
+  flex: none;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.fader .ftrack {
+  flex: 1 1 0;
+  min-height: var(--hit);
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: #2c2c34;
+  touch-action: none;
+}
+.fader .ffill {
+  position: absolute;
+  left: 0;
+  right: 10px;
+  bottom: 0;
+  pointer-events: none;
+}
+/* The live meter: a thin bar on the track's right edge, scaled from the bottom (a transform only, spec 8.12). */
+.fader .fmeter {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 7px;
+  background: var(--text);
+  opacity: 0.8;
+  transform-origin: bottom;
+  pointer-events: none;
+}
+.fader .fname {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+/* Under this width the two columns cannot hold their controls at 48 px: the panel overflows and takes its pages (useFull). */
+.mixtab.whole {
+  min-width: 600px;
+}

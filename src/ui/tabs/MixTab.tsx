@@ -5,7 +5,8 @@
 import { useEffect, useState } from "preact/hooks";
 import { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, INSTRUMENTS, MIX_RANGES, mixValue, type Engine, type LatencyHint, type MixKey } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Dial, GroupLabel, Meter, Pager } from "../components.tsx";
+import { Dial, Fader, GroupLabel, Meter, Pager } from "../components.tsx";
+import { useFull } from "./full.ts";
 import { knobPos, knobValue, meterFraction, secondsText, shownPage, simpleSweepLabel, sweepLabel, type PageDef } from "../logic.ts";
 import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
@@ -33,7 +34,7 @@ function MasterMeter({ engine }: { engine: Engine }) {
 }
 
 /** The app's own motion switch (spec 8.12): off, nothing moves and every state reads by fill and hatching. */
-function MotionSwitch() {
+function MotionSwitch({ brief = false }: { brief?: boolean }) {
   const [wanted, setWanted] = useState(motionWanted);
   useEffect(() => onMotionPref(() => setWanted(motionWanted())), []);
   // The phone's reduce-motion setting holds everything still whatever the switch says: show Still (P1b review M10).
@@ -57,7 +58,7 @@ function MotionSwitch() {
         ))}
       </div>
       {system && <p class="note" id="motion-system">The phone's setting is on.</p>}
-      <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>
+      {!brief && <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>}
     </>
   );
 }
@@ -127,24 +128,184 @@ function DropPage({ engine }: { engine: Engine }) {
 const DECAY = { label: "Tail", seconds: MIX_RANGES.reverbDecay };
 
 export function MixTab({ ctx }: { ctx: Ctx }) {
-  const { engine, hint, pos } = ctx;
-  // Changing the buffer reloads the page; the song is saved first and reopens (G5). Refused while
-  // playing, and asks for a second tap when stopped.
+  // T2 (spec 9.2): Advanced Mix on the desk shows every page at once where it fits; Simple keeps its own.
+  const [full, ref] = useFull(ctx.advanced ? ctx : { ...ctx, desk: false }, "mix");
+  return full ? <WholeMix ctx={ctx} sref={ref} /> : <PagedMix ctx={ctx} sref={ref} />;
+}
+
+/**
+ * Changing the buffer reloads the page; the song is saved first and reopens (G5). Refused while playing, and asks for
+ * a second tap when stopped.
+ */
+function useBuffer(ctx: Ctx): [LatencyHint | null, (h: LatencyHint) => void] {
   const [armed, setArmed] = useState<LatencyHint | null>(null);
   const choose = (h: LatencyHint): void => {
-    if (h === hint) return;
+    if (h === ctx.hint) return;
     if (armed === h) void ctx.keeper.flush().then(() => (location.href = `?hint=${h}`));
     else setArmed(h);
   };
+  return [armed, choose];
+}
+
+function Buffers({ ctx, armed, choose }: { ctx: Ctx; armed: LatencyHint | null; choose: (h: LatencyHint) => void }) {
+  const { hint, pos } = ctx;
+  return (
+    <div class="seg">
+      {BUFFERS.map(([h, name]) => (
+        <button
+          key={h}
+          class={`${hint === h ? "on" : ""}${armed === h ? " armed" : ""}`}
+          data-hint={h}
+          aria-pressed={hint === h}
+          disabled={pos.playing && hint !== h}
+          onClick={() => choose(h)}
+        >
+          {armed === h && !pos.playing ? "Tap again" : name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The master's three dials (Advanced names). */
+function MasterDials({ ctx }: { ctx: Ctx }) {
+  const { engine } = ctx;
+  const mix = engine.getMix();
+  const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
+  return (
+    <div class="dials n3">
+      <Dial id="sweep" label="Filter" value={mix.sweep} min={-1} max={1} bipolar display={sweepLabel(mix.sweep)} color="var(--orange)" onChange={set("sweep")} />
+      <Dial id="pump" label="Pump" value={mix.pump} min={0} max={0.95} display={String(Math.round(mix.pump * 100))} color="var(--teal)" onChange={set("pump")} />
+      <Dial id="saturation" label="Saturate" value={mix.saturation} min={0} max={1} color="var(--coral)" onChange={set("saturation")} />
+    </div>
+  );
+}
+
+/** Reads every instrument's own level about 15 times a second while the whole Mix is open. Display only. */
+function useInstrumentMeters(engine: Engine): Record<string, number> {
+  const [m, setM] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const loop = (t: number): void => {
+      if (t - last > 66) {
+        last = t;
+        setM(Object.fromEntries(INSTRUMENTS.map((id) => [id, meterFraction(engine.instrumentLevel(id))])));
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [engine]);
+  return m;
+}
+
+/**
+ * T2 (spec 9.2): the Mix panel whole, on the desk. The master meter on top; then two columns: the master and the space
+ * over a fader with its live meter per instrument (lowest, in thumb reach), and the Drop, Morph and Audio settings.
+ */
+function WholeMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
+  const { engine, pos } = ctx;
+  const [armed, choose] = useBuffer(ctx);
+  const meters = useInstrumentMeters(engine);
+  return (
+    <section ref={sref} class="mixtab whole" data-whole="mix">
+      <MasterMeter engine={engine} />
+      <div class="cols">
+        <div class="col">
+          <div class="grp" data-grp="master">
+            <GroupLabel thing="Master" />
+            <MasterDials ctx={ctx} />
+          </div>
+          <div class="grp" data-grp="space">
+            <GroupLabel thing="Space" />
+            <SpaceDials ctx={ctx} />
+          </div>
+          <div class="grp levels" data-grp="levels">
+            <GroupLabel thing="Levels" />
+            <div class="faders">
+              {INSTRUMENTS.map((id) => (
+                <Fader
+                  key={id}
+                  id={`level:${id}`}
+                  label={INST_NAME[id]}
+                  name={<InstName id={id} />}
+                  value={ctx.song.patches[id].level}
+                  meter={meters[id] ?? 0}
+                  color={INST_COLOR[id]}
+                  onChange={(v) => engine.setParam(id, "level", v)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="grp" data-grp="drop">
+            <DropPage engine={engine} />
+          </div>
+          <div class="grp" data-grp="morph">
+            <GroupLabel thing="Morph" />
+            <MorphPage engine={engine} brief />
+          </div>
+          <div class="grp" data-grp="audio">
+            <GroupLabel thing="Audio" split={pos.playing ? "Stop to change" : armed ? "Tap again to reload" : undefined} />
+            <Buffers ctx={ctx} armed={armed} choose={choose} />
+            <MotionSwitch brief />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Tail, Air and the lo-fi master (the Space page). */
+function SpaceDials({ ctx }: { ctx: Ctx }) {
+  const { engine } = ctx;
+  const mix = engine.getMix();
+  const lofi = mixValue(mix, "lofi") > 0;
+  return (
+    <div class="dials n2">
+      <Dial
+        id="reverbDecay"
+        label="Tail s"
+        value={knobPos(DECAY, mixValue(mix, "reverbDecay"))}
+        min={0}
+        max={1}
+        display={secondsText(mixValue(mix, "reverbDecay"))}
+        color="var(--teal)"
+        onChange={(p) => engine.setMix("reverbDecay", knobValue(DECAY, p))}
+      />
+      <Dial id="air" label="Air" value={mixValue(mix, "air")} min={0} max={1} color="var(--blue)" onChange={(v) => engine.setMix("air", v)} />
+      {/* P9 (spec 8.8): the lo-fi master as one on/off, a tile beside the dials (review M8: no group label over a
+          button that names itself, and no empty band above it). */}
+      <button
+        class={`tog fxbtn${lofi ? " on" : " off"}`}
+        style={{ "--c": "var(--coral)" }}
+        role="switch"
+        aria-checked={lofi}
+        aria-label={`Lo-fi ${lofi ? "on" : "off"}`}
+        id="lofi"
+        data-lofi={lofi ? "on" : "off"}
+        onClick={() => engine.setMix("lofi", lofi ? 0 : 1)}
+      >
+        <Icon thing="Master" />
+        <span>Lo-fi</span>
+      </button>
+    </div>
+  );
+}
+
+function PagedMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
+  const { engine, pos } = ctx;
+  const [armed, choose] = useBuffer(ctx);
   const [chosenPage, setPage] = useState<MixPage>("master");
   const together = !ctx.advanced && ctx.tablet && ctx.roomy;
   const pages = ctx.advanced ? ADVANCED_PAGES : together ? TABLET_SIMPLE_PAGES : MIX_PAGES;
   const page = shownPage(pages, chosenPage);
   const mix = engine.getMix();
   const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
-  const lofi = mixValue(mix, "lofi") > 0;
   return (
-    <section class={`mixtab${together ? " together" : ""}`}>
+    <section ref={sref} class={`mixtab${together ? " together" : ""}`}>
       <MasterMeter engine={engine} />
       <Pager id="mix" pages={pages} page={page} onPage={setPage} />
       {page === "master" && (
@@ -175,34 +336,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
       )}
       {page === "space" && (
         <>
-          <div class="dials n2">
-            <Dial
-              id="reverbDecay"
-              label="Tail s"
-              value={knobPos(DECAY, mixValue(mix, "reverbDecay"))}
-              min={0}
-              max={1}
-              display={secondsText(mixValue(mix, "reverbDecay"))}
-              color="var(--teal)"
-              onChange={(p) => engine.setMix("reverbDecay", knobValue(DECAY, p))}
-            />
-            <Dial id="air" label="Air" value={mixValue(mix, "air")} min={0} max={1} color="var(--blue)" onChange={set("air")} />
-            {/* P9 (spec 8.8): the lo-fi master as one on/off, a tile beside the dials (review M8: no group label over a
-                button that names itself, and no empty band above it). */}
-            <button
-              class={`tog fxbtn${lofi ? " on" : " off"}`}
-              style={{ "--c": "var(--coral)" }}
-              role="switch"
-              aria-checked={lofi}
-              aria-label={`Lo-fi ${lofi ? "on" : "off"}`}
-              id="lofi"
-              data-lofi={lofi ? "on" : "off"}
-              onClick={() => engine.setMix("lofi", lofi ? 0 : 1)}
-            >
-              <Icon thing="Master" />
-              <span>Lo-fi</span>
-            </button>
-          </div>
+          <SpaceDials ctx={ctx} />
           <p class="note">Tail is how long the reverb rings. Air is a soft breath of noise. Lo-fi wobbles, crunches and hisses.</p>
         </>
       )}
@@ -210,20 +344,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
       {page === "morph" && <MorphPage engine={engine} />}
       {page === "audio" && (
         <>
-          <div class="seg">
-            {BUFFERS.map(([h, name]) => (
-              <button
-                key={h}
-                class={`${hint === h ? "on" : ""}${armed === h ? " armed" : ""}`}
-                data-hint={h}
-                aria-pressed={hint === h}
-                disabled={pos.playing && hint !== h}
-                onClick={() => choose(h)}
-              >
-                {armed === h && !pos.playing ? "Tap again" : name}
-              </button>
-            ))}
-          </div>
+          <Buffers ctx={ctx} armed={armed} choose={choose} />
           <p class="note">If it crackles, try Safe. The page reloads; the song is kept.</p>
           {pos.playing && <p class="note">Stop to change it.</p>}
           {armed && !pos.playing && <p class="note">Tap again to reload.</p>}

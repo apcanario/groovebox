@@ -391,6 +391,15 @@ export function simpleSweepLabel(v: number): string {
   return `${v < 0 ? "Dark" : "Thin"} ${n}`;
 }
 
+/**
+ * T2 (spec 9.2): a vertical fader's value for a touch at `y` on a track from `top`, `height` tall: 1 at the top, 0 at
+ * the bottom, in hundredths, clamped.
+ */
+export function faderValue(y: number, top: number, height: number): number {
+  if (!(height > 0)) return 0;
+  return Math.round(Math.max(0, Math.min(1, 1 - (y - top) / height)) * 100) / 100;
+}
+
 /** Meter fill 0..1 for a level in dB: -60 dB empty, 0 dB full. */
 export function meterFraction(db: number): number {
   if (!Number.isFinite(db)) return 0;
