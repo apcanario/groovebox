@@ -38,6 +38,12 @@ export const RUN_MARGIN = 0.006;
 export const RUN_TRIES = 8;
 
 /**
+ * F0 review M1: how many sets `startTogether` kept after `RUN_TRIES` without the margin left, so their starts may have
+ * reached the audio thread apart. Read by the smoke test, which requires 0.
+ */
+export const bassRunStats = { giveUps: 0 };
+
+/**
  * Start `sources` together at one audio time and return it. The time is read once, every start is made, then the clock
  * is read again: if less than `RUN_MARGIN` is left (the main thread stalled while Tone built the native nodes), the
  * starts may not all have reached the audio thread in time, so every source is stopped and started again, later.
@@ -47,7 +53,11 @@ export function startTogether(sources: readonly RunSource[], clock: RunClock): n
   for (let tries = 1; ; tries++) {
     for (const s of sources) s.start(t);
     const cur = clock.currentTime();
-    if (cur + RUN_MARGIN <= t || tries >= RUN_TRIES) return t;
+    if (cur + RUN_MARGIN <= t) return t;
+    if (tries >= RUN_TRIES) {
+      bassRunStats.giveUps++;
+      return t;
+    }
     const stopAt = Math.max(cur, t) + MIN_GAP;
     for (const s of sources) s.stop(stopAt);
     t = Math.max(clock.currentTime() + RUN_LEAD, stopAt + MIN_GAP);
@@ -68,4 +78,17 @@ export interface GatedSynth {
 export function gateOnly(s: GatedSynth): void {
   s._triggerEnvelopeAttack = (time, velocity) => void s.envelope.triggerAttack(time, velocity);
   s._triggerEnvelopeRelease = (time) => void s.envelope.triggerRelease(time);
+}
+
+/** Below this envelope level a voice is taken as silent (the level `Bass` retires a voice set at). */
+export const SILENT = 1e-4;
+
+/**
+ * F0 review E1: whether a previous voice set may be retired. The sub's pitch is its wave's frequency signal, so the wave
+ * and the sub retire as one pair, only once every envelope of the pair is silent: a wave disposed under a sounding sub
+ * (Sustain 0 silences the wave while the sub's sustain is at least 0.6) took the sub's frequency to 0 Hz and left it on
+ * a DC level for its whole release.
+ */
+export function pairSilent(levels: readonly number[]): boolean {
+  return levels.every((l) => l < SILENT);
 }

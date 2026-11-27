@@ -41,7 +41,7 @@ import { MIX_DEFAULTS, MIX_RANGES, PATCH_KEYS, type InstrumentId, type MixKey, t
 import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.ts";
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
 import { AttackQueue, freshSetNeeded } from "./attacks.ts";
-import { gateOnly, startTogether, type GatedSynth, type RunSource } from "./bassRun.ts";
+import { gateOnly, pairSilent, startTogether, type GatedSynth, type RunSource } from "./bassRun.ts";
 import { DropOverlay } from "./drop.ts";
 import { PunchRack } from "./punch.ts";
 import { nativeParam, patchOscillatorEnd, type OscillatorProto } from "./oscPatch.ts";
@@ -725,9 +725,13 @@ function rampFm(voices: readonly unknown[], ratio: number, index: number, at?: n
  * F0 (C24): a bass voice's oscillators, each synth made to gate only its envelope (bassRun.ts): the Synth's own, or an
  * FM voice's carrier and modulator.
  */
-function runOscillators(m: Mono): RunSource[] {
+function runOscillators(m: Mono, isFm: boolean): RunSource[] {
   const fm = m as unknown as { _carrier?: Tone.Synth; _modulator?: Tone.Synth };
-  const synths = fm._carrier && fm._modulator ? [fm._carrier, fm._modulator] : [m];
+  // F0 review S2: Tone's FMSynth keeps its two voices in private fields. Without them the carrier's envelope alone would
+  // be gated and the modulator would never sound, so a renamed field throws here (the smoke's page-error check).
+  if (isFm && !(fm._carrier?.oscillator && fm._modulator?.oscillator))
+    throw new Error("F0: Tone's FMSynth has no _carrier and _modulator; the FM bass cannot run its oscillators");
+  const synths = isFm ? [fm._carrier!, fm._modulator!] : [m];
   for (const s of synths) gateOnly(s as unknown as GatedSynth);
   return synths.map((s) => s.oscillator as unknown as RunSource);
 }
@@ -736,8 +740,10 @@ export class Bass extends Instrument {
   private monos: VoiceSets<Mono>;
   /**
    * The sub sine, one per voice set (P10 fix): it is swapped with the wave's voices, and since F0 (C24) the two run
-   * from the swap, started together once while silent (bassRun.ts), so a stalled note start cannot shift one. A sine wave and its sub sound the same pitch: a sub left running from the last voice set (a note held
-   * over a vibe's bar line) sat at any phase against the new voice, and cancelled it by up to 20 dB until both stopped.
+   * from the swap, started together once while silent (bassRun.ts), so a stalled note start cannot shift one. A sine
+   * wave and its sub sound the same pitch: a sub left running from the last voice set (a note held over a vibe's bar
+   * line) sat at any phase against the new voice, and cancelled it by up to 20 dB until both stopped. The previous wave
+   * set and its sub retire together (retireOld).
    */
   private subs: VoiceSets<Tone.Synth>;
   private subEnv = { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.08 };
@@ -789,7 +795,7 @@ export class Bass extends Instrument {
       return new Tone.Synth({ oscillator: { type: w === "noise" ? "sine" : w }, envelope: this.env } as Partial<Tone.SynthOptions>) as unknown as Mono;
     }, at);
     // F0 (C24): the new set's wave and sub run from now, started together while the set is silent; notes only gate them.
-    startTogether([...runOscillators(this.monos.live!.synth), ...runOscillators(this.subs.live!.synth)], {
+    startTogether([...runOscillators(this.monos.live!.synth, w === "fm"), ...runOscillators(this.subs.live!.synth, false)], {
       currentTime: () => Tone.getContext().currentTime,
     });
     // F0 slice b: the sub's pitch is the wave's own frequency signal, so a note's pitch (and its glide) reaches both at
@@ -826,8 +832,7 @@ export class Bass extends Instrument {
       // A mono bass: the next note ends one still held by the previous voice set.
       this.monos.old?.synth.triggerRelease(time);
       this.subs.old?.synth.triggerRelease(time);
-      this.monos.retireIf((m) => m.getLevelAtTime(Tone.now()) < 1e-4);
-      this.subs.retireIf((m) => m.getLevelAtTime(Tone.now()) < 1e-4);
+      this.retireOld();
       const live = this.monos.live!.synth;
       const sub = this.subs.live!.synth;
       live.triggerAttackRelease(hz, dur, time, vel);
@@ -851,6 +856,26 @@ export class Bass extends Instrument {
     this.subs.each((m) => m.triggerRelease(time));
     this.breath?.release(time);
     this.lastHz = null;
+    // F0 review M3: once the release has rung out, the previous pair stops running, so one set runs while idle.
+    if (this.monos.old || this.subs.old) {
+      const ctx = Tone.getContext();
+      const wait = Math.max(0, time - ctx.now()) + Math.max(this.env.release, this.subEnv.release) + 0.1;
+      ctx.setTimeout(() => this.retireOld(), wait);
+    }
+  }
+
+  /**
+   * F0 review E1: retire the previous wave set and its sub as one pair, once both are silent (bassRun.ts pairSilent).
+   * The sub's pitch is the wave's frequency signal, so the wave is never disposed while its sub still sounds.
+   */
+  private retireOld(): void {
+    const now = Tone.now();
+    const levels: number[] = [];
+    if (this.monos.old) levels.push(this.monos.old.synth.getLevelAtTime(now));
+    if (this.subs.old) levels.push(this.subs.old.synth.getLevelAtTime(now));
+    if (!pairSilent(levels)) return;
+    this.monos.retireIf(() => true);
+    this.subs.retireIf(() => true);
   }
 }
 

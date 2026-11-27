@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { LATE_LEAD } from "./attacks.ts";
-import { RUN_LEAD, RUN_MARGIN, RUN_TRIES, gateOnly, startTogether, type GatedSynth, type RunSource } from "./bassRun.ts";
+import {
+  RUN_LEAD,
+  RUN_MARGIN,
+  RUN_TRIES,
+  SILENT,
+  bassRunStats,
+  gateOnly,
+  pairSilent,
+  startTogether,
+  type GatedSynth,
+  type RunSource,
+} from "./bassRun.ts";
 
 /** A clock whose time moves on by `stall` seconds at each start a source receives (a main thread building nodes). */
 function rig(n: number, stalls: number[]) {
@@ -58,11 +69,21 @@ describe("F0: the bass's oscillators start together once", () => {
     for (const e of retry) expect(e.at + RUN_MARGIN).toBeLessThanOrEqual(t);
   });
 
-  it("gives up after RUN_TRIES on a thread that stalls at every start, still at one time", () => {
+  it("gives up after RUN_TRIES on a thread that stalls at every start, still at one time, and counts it (review M1)", () => {
+    const before = bassRunStats.giveUps;
     const r = rig(2, Array(100).fill(0.1));
     const t = startTogether(r.sources, r.clock);
     expect(r.log.filter((e) => e.op === "start")).toHaveLength(2 * RUN_TRIES);
     expect(lastStarts(r.log, 2)).toEqual([t, t]);
+    expect(bassRunStats.giveUps).toBe(before + 1);
+  });
+
+  it("counts no give-up when the starts are kept, or kept after a retry", () => {
+    const before = bassRunStats.giveUps;
+    startTogether(rig(2, []).sources, rig(2, []).clock);
+    const r = rig(2, [0.02, 0.04]);
+    startTogether(r.sources, r.clock);
+    expect(bassRunStats.giveUps).toBe(before);
   });
 
   it("start times of one source strictly increase, and each restart comes after its stop", () => {
@@ -97,5 +118,16 @@ describe("F0: a note only gates the bass's envelopes", () => {
     s._triggerEnvelopeRelease(2.5);
     s._triggerEnvelopeAttack(2.6, 1);
     expect(s.calls).toEqual(["attack 2 0.8", "release 2.5", "attack 2.6 1"]);
+  });
+});
+
+describe("F0 review E1: the previous wave set and its sub retire as one pair", () => {
+  it("retires only when every voice of the pair is silent", () => {
+    expect(pairSilent([0, 0])).toBe(true);
+    expect(pairSilent([SILENT / 2, 0])).toBe(true);
+    // Sustain 0: the wave silent after its decay, the sub still at 0.23 in its release (the review's measure)
+    expect(pairSilent([0, 0.23])).toBe(false);
+    expect(pairSilent([0.23, 0])).toBe(false);
+    expect(pairSilent([SILENT, 0])).toBe(false);
   });
 });

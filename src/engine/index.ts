@@ -6,6 +6,7 @@
 import * as Tone from "tone";
 import { Graph, oscProbe } from "./audio.ts";
 import { oscPatchStats } from "./oscPatch.ts";
+import { bassRunStats } from "./bassRun.ts";
 import { Lfo, modsDebug } from "./mods.ts";
 import { LogWriter, type LogOp } from "./eventlog.ts";
 import { prepareTap, Recorder, type Take } from "./recorder.ts";
@@ -2155,6 +2156,11 @@ export class Engine {
   /** P8 review S1: the oscillator patch's disconnects and the throws it counted, for the smoke test. */
   oscPatchStats(): { throws: number; disconnects: number } {
     return { ...oscPatchStats };
+  }
+
+  /** F0 review M1: the bass voice sets whose oscillators `startTogether` gave up starting together, for the smoke test. */
+  bassRunStats(): { giveUps: number } {
+    return { ...bassRunStats };
   }
 
   /** The lead's shapes and styles in their order, so the test tools read them instead of copying them (P6 review M6). */
