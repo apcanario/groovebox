@@ -12,6 +12,7 @@ import { padLabel, padView, rowPlays } from "../desk.ts";
 import { Playhead } from "../lanes.tsx";
 import { laneRects, sectionLetter } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
+import { NowView } from "./PlayTab.tsx";
 
 /** The bar's notes inside a pad: the lane's drawing (laneRects) without its card, so the pad's own state shows. */
 function PadNotes({ id, lanes }: { id: InstrumentId; lanes: LaneBar }) {
@@ -51,7 +52,21 @@ function RowHead({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   );
 }
 
-export function DeskPads({ ctx }: { ctx: Ctx }) {
+/**
+ * `lanes`: tablet portrait in Simple (T1 slice c, spec 9.3) shows the five instrument lanes of the phone's Now view under
+ * the punch pads' space instead of the grid.
+ */
+export function DeskPads({ ctx, lanes = false }: { ctx: Ctx; lanes?: boolean }) {
+  return (
+    <section class={`deskpads${lanes ? " docklanes" : ""}`}>
+      {/* T3 puts the six punch pads here (spec 9.2 and 9.3: on top of the pads). */}
+      <div class="punchslot" data-punch-slot aria-hidden="true" />
+      {lanes ? <NowView ctx={ctx} /> : <DeskGrid ctx={ctx} />}
+    </section>
+  );
+}
+
+function DeskGrid({ ctx }: { ctx: Ctx }) {
   const { engine, song, pending, playing, lanes, pos } = ctx;
   const cols = song.sections.length;
   const input = {
@@ -62,9 +77,6 @@ export function DeskPads({ ctx }: { ctx: Ctx }) {
     running: pos.playing,
   };
   return (
-    <section class="deskpads">
-      {/* T3 puts the six punch pads here (spec 9.2: on top of the pads half). */}
-      <div class="punchslot" data-punch-slot aria-hidden="true" />
       <div class="grid deskgrid" style={{ gridTemplateColumns: `var(--rowhead) repeat(${cols}, minmax(0, 1fr))` }}>
         {INSTRUMENTS.map((id) => [
           <RowHead key={id} ctx={ctx} id={id} />,
@@ -87,6 +99,5 @@ export function DeskPads({ ctx }: { ctx: Ctx }) {
           }),
         ])}
       </div>
-    </section>
   );
 }

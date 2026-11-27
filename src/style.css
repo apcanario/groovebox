@@ -2323,18 +2323,19 @@ button:disabled {
 .tablet.landscape .inst {
   flex: 42 1 0;
 }
-.tablet.landscape .hdr {
+/* Both tablet layouts (slice c): the header carries the vibe control. */
+.tablet .hdr {
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.6fr) minmax(0, 2.6fr) minmax(0, 1.6fr);
 }
-.tablet.landscape .hdr .vibectl {
+.tablet .hdr .vibectl {
   margin: 0 0 0 8px;
   min-width: 0;
 }
-.tablet.landscape .hdr .vibectl .varrow,
-.tablet.landscape .hdr .vibectl .vmain {
+.tablet .hdr .vibectl .varrow,
+.tablet .hdr .vibectl .vmain {
   min-height: var(--hit);
 }
-.tablet.landscape .hdr .vibectl .vmain b {
+.tablet .hdr .vibectl .vmain b {
   font-size: 19px;
 }
 .deskpads {
@@ -2456,4 +2457,54 @@ button:disabled {
 }
 .deck .play {
   width: 56px;
+}
+
+/*
+ * T1 slice c (spec 9.3): tablet portrait. The header (with the vibe control) over the chosen instrument's panel, which
+ * takes the height the dock leaves; the dock at the bottom sizes to its content: the punch pads' space (T3), the five
+ * lanes (Simple) or the labelled pad grid (Advanced) in rows of 48 to 64 px, DROP with Morph, the strip (the grid's
+ * column labels in Advanced), the transport bar and the rail of seven as the tab bar.
+ */
+.tablet.portrait {
+  --rowhead: clamp(124px, 17vw, 160px);
+  --punch: 56px;
+  --dockrow: clamp(48px, 4.7vh, 64px);
+}
+.tablet.portrait .pads.dock {
+  flex: none;
+}
+.tablet.portrait .inst {
+  flex: 1 1 0;
+}
+.dock .padsbody,
+.dock .deskpads {
+  flex: none;
+}
+.dock .deskgrid,
+.dock .nowlist {
+  flex: none;
+  grid-template-rows: repeat(5, var(--dockrow));
+}
+/* The panel is wide and short over the dock: the four macro dials in one row (the portrait reference image). */
+.tablet.portrait .dials.macros {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 84px;
+}
+.tablet.portrait .roomy .dials.macros {
+  grid-auto-rows: 104px;
+}
+/* Simple Chords over the dock: the four cards two by two, as on a phone of 640 to 759 px (the panel is that short). */
+.tablet.portrait .cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(var(--hit), 1fr));
+}
+.tablet.portrait .tile.card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "name word" "blocks blocks";
+  padding: 10px 12px 10px 14px;
+}
+.tablet.portrait .card .blocks {
+  align-self: stretch;
+  height: auto;
 }

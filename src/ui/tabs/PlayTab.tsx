@@ -41,7 +41,8 @@ function NowTile({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
   );
 }
 
-function NowView({ ctx }: { ctx: Ctx }) {
+/** The five lanes (spec 8.12); also the tablet portrait dock's in Simple (spec 9.3, T1 slice c). */
+export function NowView({ ctx }: { ctx: Ctx }) {
   return (
     <div class="nowlist">
       {INSTRUMENTS.map((id) => [<NowTile key={id} ctx={ctx} id={id} />, <Lane key={`${id}-lane`} id={id} lanes={ctx.lanes} />])}

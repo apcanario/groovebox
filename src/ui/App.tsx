@@ -58,6 +58,11 @@ export interface Ctx {
 
 /** Tab body height (CSS px) from which the XY pad and sends sit under every page. */
 export const ROOMY_PX = 560;
+/**
+ * T1 slice c: on tablet portrait the panel is wide, so its dials and pads are taller than a phone's; the XY pad and the
+ * sends sit under every page only from this body height (at 800 x 1280 the panel has about 575 px and pages them).
+ */
+export const ROOMY_PORTRAIT_PX = 640;
 
 /** Watches the tab body's height. */
 function useRoomy(ref: { current: HTMLElement | null }, layout: SizeClass): boolean {
@@ -65,7 +70,8 @@ function useRoomy(ref: { current: HTMLElement | null }, layout: SizeClass): bool
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const read = (): void => setRoomy(el.clientHeight >= ROOMY_PX);
+    const min = layout === "portrait" ? ROOMY_PORTRAIT_PX : ROOMY_PX;
+    const read = (): void => setRoomy(el.clientHeight >= min);
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
@@ -239,8 +245,8 @@ function Rail({ panel, setTab }: { panel: PanelTab; setTab: (t: Tab) => void }) 
  * The tablet frame (T1 slice a, spec 9.1 to 9.3): the pads (the Play tab, the section strip, the transport) and one
  * instrument (the rail and the chosen panel) both on screen. Landscape puts them side by side, the pads on the left;
  * portrait puts the panel on top and the pads in a dock at the bottom, the rail as its tab bar. Landscape's pads are the
- * desk (slice b, DeskPads); the panels are the phone's instrument tabs in either mode (T2 shows Advanced without pages).
- * Portrait is still slice a's frame; slice c lays it out.
+ * desk (slice b, DeskPads); portrait's dock (slice c) is the same pads with the lanes in Simple; the panels are the
+ * phone's instrument tabs in either mode (T2 shows Advanced without pages).
  */
 function TabletShell(p: {
   size: SizeClass;
@@ -259,7 +265,15 @@ function TabletShell(p: {
   const land = p.size === "landscape";
   const rail = <Rail panel={panel} setTab={p.setTab} />;
   // Landscape (slice b, spec 9.2): the punch pads' space and the grid as large pads, the strip as its column labels,
-  // then DROP (with Morph beside it, P11) and the transport bar side by side. Portrait keeps slice a's dock for slice c.
+  // then DROP (with Morph beside it, P11) and the transport bar side by side. Portrait (slice c, spec 9.3): the dock, top
+  // to bottom: the punch pads' space, the five lanes (Simple) or the grid (Advanced), DROP with Morph, the strip, the
+  // transport bar and the rail as its tab bar.
+  const drop = (
+    <div class="droprow">
+      <DropButton ctx={ctx} />
+      <MorphButton ctx={ctx} />
+    </div>
+  );
   const pads = land ? (
     <section class="pads">
       <main class="body padsbody">
@@ -267,17 +281,15 @@ function TabletShell(p: {
       </main>
       {p.strip}
       <div class="deck">
-        <div class="droprow">
-          <DropButton ctx={ctx} />
-          <MorphButton ctx={ctx} />
-        </div>
+        {drop}
         {p.transport}
       </div>
     </section>
   ) : (
-    <section class="pads">
+    <section class="pads dock">
       <main class="body padsbody">
-        <PlayTab ctx={ctx} />
+        <DeskPads ctx={ctx} lanes={!advanced} />
+        {drop}
       </main>
       {p.strip}
       {p.transport}
@@ -464,8 +476,8 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
       <button class="btn hb" id="songs-open" aria-label={`Songs: ${song.name}`} onClick={() => setSongs(true)}>
         <span>Songs</span>
       </button>
-      {/* T1 (spec 9.2): on tablet landscape the header carries the vibe control. */}
-      {size === "landscape" && <VibeControl ctx={ctx} onOpen={() => setVibes(true)} />}
+      {/* T1 (spec 9.2, and the portrait reference image): on a tablet the header carries the vibe control. */}
+      {tablet && <VibeControl ctx={ctx} onOpen={() => setVibes(true)} />}
       <div class="modesw" role="radiogroup" aria-label="Mode">
         {(["simple", "advanced"] as const).map((m) => {
           const on = (m === "advanced") === advanced;
