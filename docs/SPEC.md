@@ -436,6 +436,7 @@ A hardware faceplate, flat, in the existing colours. One loud idea, everything e
 | Beat, Kick · Clap, Hats, Rhythm, Key, Master, Levels, Audio | apps, radio_button_checked, grain, timeline, key, speaker, equalizer, headphones |
 | Wave, Sequencer, Motion, Direction, Rate, Octaves | waves, view_week, motion_blur, swap_vert, speed, height |
 | Pulse | timeline |
+| Punch | apps |
 | Kit, Steps, Mod, Space | adjust, view_week, speed, water |
 | Phaser, Flanger, Fuzz, Crush, Tremolo, Pan | cyclone, flight, local_fire_department, texture, earthquake, swap_horiz |
 | Gate, Ring, Vowel, Shifter | fence, notifications, record_voice_over, moving |

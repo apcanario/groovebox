@@ -823,3 +823,50 @@ export async function tapPlay(
   }
   if (await start()) engine.play();
 }
+
+// ---- Punch pads (T3 slice b, spec 9.4) ----------------------------------------------
+
+/** What a punch pad shows: off, waiting for its start line (hatched), in (filled), or in with its end line scheduled. */
+export type PunchLook = "off" | "pending" | "on" | "ending";
+
+/** A punch pad's look from the engine's state (`Engine.punchState`) at audio time `now` (`Engine.audioNow`). */
+export function punchLook(s: { held: boolean; start: number | null; end: number | null }, now: number): PunchLook {
+  if (s.start === null) return "off";
+  if (s.end !== null && s.end <= now) return "off";
+  if (s.start > now) return "pending";
+  return s.end !== null && !s.held ? "ending" : "on";
+}
+
+/**
+ * The fingers on the punch pads (spec 9.6): any number of pointers, on any pads. A pad is pressed when its first
+ * pointer lands and let go when its last one lifts or is cancelled, so two fingers on one pad, or one finger sliding
+ * off, never let it go early or twice.
+ */
+export class PadPointers<P extends string> {
+  private by = new Map<number, P>();
+  /** A pointer landed on `pad`: true when it is the pad's first (press it). */
+  down(pad: P, id: number): boolean {
+    if (this.by.get(id) === pad) return false;
+    const was = this.held(pad);
+    this.up(id);
+    this.by.set(id, pad);
+    return !was;
+  }
+  /** A pointer lifted or was cancelled: the pad it held when that was the pad's last pointer (let it go), else null. */
+  up(id: number): P | null {
+    const pad = this.by.get(id);
+    if (pad === undefined) return null;
+    this.by.delete(id);
+    return this.held(pad) ? null : pad;
+  }
+  held(pad: P): boolean {
+    for (const p of this.by.values()) if (p === pad) return true;
+    return false;
+  }
+  /** Every pad still held, each once, and forget them all (the pads left the screen). */
+  clear(): P[] {
+    const pads = [...new Set(this.by.values())];
+    this.by.clear();
+    return pads;
+  }
+}

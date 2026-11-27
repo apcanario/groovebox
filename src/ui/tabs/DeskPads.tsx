@@ -13,6 +13,7 @@ import { Playhead } from "../lanes.tsx";
 import { laneRects, sectionLetter } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { NowView } from "./PlayTab.tsx";
+import { PunchPads } from "../punch.tsx";
 
 /** The bar's notes inside a pad: the lane's drawing (laneRects) without its card, so the pad's own state shows. */
 function PadNotes({ id, lanes }: { id: InstrumentId; lanes: LaneBar }) {
@@ -59,8 +60,8 @@ function RowHead({ ctx, id }: { ctx: Ctx; id: InstrumentId }) {
 export function DeskPads({ ctx, lanes = false }: { ctx: Ctx; lanes?: boolean }) {
   return (
     <section class={`deskpads${lanes ? " docklanes" : ""}`}>
-      {/* T3 puts the six punch pads here (spec 9.2 and 9.3: on top of the pads). */}
-      <div class="punchslot" data-punch-slot aria-hidden="true" />
+      {/* T3 (spec 9.2 and 9.3): the six punch pads on top of the pads. */}
+      <PunchPads ctx={ctx} band />
       {lanes ? <NowView ctx={ctx} /> : <DeskGrid ctx={ctx} />}
     </section>
   );

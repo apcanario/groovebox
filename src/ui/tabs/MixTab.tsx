@@ -12,6 +12,7 @@ import { motionWanted, onMotionPref, setMotionOn } from "../motion.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Icon } from "../icons.tsx";
 import { MorphPage, MorphSpeed } from "../morph.tsx";
+import { PunchPads } from "../punch.tsx";
 
 /** Reads the engine's meter about 15 times a second while the tab is open. Display only: nothing is scheduled from here. */
 function MasterMeter({ engine }: { engine: Engine }) {
@@ -82,7 +83,7 @@ const BUFFERS = [
   ["playback", "Safe"],
 ] as const;
 
-type MixPage = "master" | "levels" | "space" | "audio" | "drop" | "morph";
+type MixPage = "master" | "punch" | "levels" | "space" | "audio" | "drop" | "morph";
 const MIX_PAGES: PageDef<MixPage>[] = [
   ["master", "Master"],
   ["levels", "Levels"],
@@ -93,6 +94,8 @@ const MIX_PAGES: PageDef<MixPage>[] = [
 const ADVANCED_PAGES: PageDef<MixPage>[] = [...MIX_PAGES, ["drop", "Drop"], ["morph", "Morph"]];
 /** T1 review M4 (spec 9.2): Simple on a tablet with the height shows Master and Levels together on one page. */
 const TABLET_SIMPLE_PAGES: PageDef<MixPage>[] = MIX_PAGES.filter(([k]) => k !== "levels");
+/** T3 (spec 9.4): on a phone the punch pads are a page of the Mix tab, after Master; a tablet has them over the pads. */
+const withPunch = (pages: PageDef<MixPage>[]): PageDef<MixPage>[] => [pages[0], ["punch", "Punch"], ...pages.slice(1)];
 
 const CLIFF_NAME = { gap: "Gap", hold: "Hold", none: "None" } as const;
 
@@ -301,7 +304,8 @@ function PagedMix({ ctx, sref, chosenPage, setPage }: { ctx: Ctx; sref: { curren
   const { engine, pos } = ctx;
   const [armed, choose] = useBuffer(ctx);
   const together = !ctx.advanced && ctx.tablet && ctx.roomy;
-  const pages = ctx.advanced ? ADVANCED_PAGES : together ? TABLET_SIMPLE_PAGES : MIX_PAGES;
+  const base = ctx.advanced ? ADVANCED_PAGES : together ? TABLET_SIMPLE_PAGES : MIX_PAGES;
+  const pages = ctx.tablet ? base : withPunch(base);
   const page = shownPage(pages, chosenPage);
   const mix = engine.getMix();
   const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
@@ -335,6 +339,7 @@ function PagedMix({ ctx, sref, chosenPage, setPage }: { ctx: Ctx; sref: { curren
           ))}
         </div>
       )}
+      {page === "punch" && <PunchPads ctx={ctx} />}
       {page === "space" && (
         <>
           <SpaceDials ctx={ctx} />

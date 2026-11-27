@@ -45,6 +45,8 @@ export const ICON_FOR = {
   Echo: "repeat",
   Wash: "water",
   Riser: "trending_up",
+  // T3: the Mix tab's Punch page on a phone (the six punch pads), a grid of pads from the set already shipped.
+  Punch: "apps",
   Chorus: "blur_on",
   // P9: the other effects (spec 8.8), each beside its name on the effect buttons; Echo and Chorus are above.
   Phaser: "cyclone",

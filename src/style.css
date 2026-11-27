@@ -2354,7 +2354,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
 }
-/* Kept clear for the punch pads of T3. */
+/* T3 (spec 9.4): the six punch pads, one row on top of the tablet pads. */
 .punchslot {
   flex: none;
   height: var(--punch);
@@ -3048,4 +3048,58 @@ button:disabled {
   .mixtab.whole .fname .ic {
     display: none;
   }
+}
+
+/*
+ * T3 slice b (spec 9.4, 8.12): the punch pads. A tile each, its icon beside its word: dark with a 4 px edge of its colour
+ * when off, the hatched frame while it waits for its start line, filled in its colour while in, a white inset line while
+ * a finger holds it. The tablet band is one row of six; the phone's Punch page on the Mix tab two rows of three.
+ */
+.punchpads {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--hit), 112px);
+  gap: var(--gap);
+  flex: 1 1 0;
+  min-height: 0;
+  align-content: start;
+}
+.punchpads.punchslot {
+  grid-template-columns: repeat(6, minmax(var(--hit), 1fr));
+  grid-auto-rows: 1fr;
+  align-content: stretch;
+}
+.tog.punchpad {
+  min-width: 0;
+  height: auto;
+  min-height: var(--hit);
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 15px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.tog.punchpad b {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tog.punchpad.held {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+.tog.punchpad.off.held:not(.pending) {
+  box-shadow: inset 4px 0 0 var(--c), inset 0 0 0 2px var(--text);
+}
+.punchslot .tog.punchpad {
+  font-size: 13.5px;
+  gap: 3px;
+  padding: 0 4px;
+}
+.punchslot .tog.punchpad .ic {
+  width: 16px;
+  height: 16px;
 }
