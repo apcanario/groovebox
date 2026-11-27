@@ -3430,11 +3430,23 @@ STALL_START = """() => {
 STALL_READ = """() => { const s = window.__stall; s.run = false; if (s.obs) s.obs.disconnect(); return { worst: s.worst, longest: s.longest, frames: s.frames }; }"""
 
 
+# T3 review S3: the order of the motion cost's runs, alternating which comes first, so drift over the run (the container
+# warming, a background task) falls on both sides alike: four runs each way.
+MOTION_ORDER = (True, False, False, True, True, False, False, True)
+
+
+def _median(xs: list) -> float:
+    v = sorted(xs)
+    n = len(v)
+    return float("nan") if not n else (v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2)
+
+
 def walk_motion_cost(browser, page, failures: list) -> dict:
-    """T3 slice c: at the desk (1280 x 800, Advanced, the whole Mix beside the pads: meters, pulses, the ghost dials),
-    everything on and playing, the audio load (measure_cost, six seconds of the webaudio trace) and the worst stall of
-    the page's thread over six seconds of its own, untraced, with motion on and then off (the Mix switch). Reported, not judged:
-    figures in docs/reviews/T3-measure.md."""
+    """T3 slice c, review S3: at the desk (1280 x 800, Advanced, the whole Mix beside the pads: meters, pulses, the ghost
+    dials), everything on and playing, the audio load (measure_cost, six seconds of the webaudio trace) and the worst
+    stall of the page's thread over six seconds of its own, untraced, with motion on and off (the Mix switch), four runs
+    each way in MOTION_ORDER. Prints every run, then the median, the best and the worst of each way. Reported, not
+    judged: figures in docs/reviews/T3-measure.md."""
     page.set_viewport_size({"width": 1280, "height": 800})
     wait_for(page, "document.documentElement.dataset.size === 'landscape'", 2.0)
     page.click('[data-appmode="advanced"]')
@@ -3444,21 +3456,35 @@ def walk_motion_cost(browser, page, failures: list) -> dict:
         page.click("#play")
     page.evaluate("window.__groovebox.switchSection(1)")
     wait_for(page, "window.__groovebox.position().section === 1", 4.0)
-    res = {}
-    for on in (True, False):
+    runs: dict = {"motion on": [], "motion off": []}
+    for i, on in enumerate(MOTION_ORDER):
         page.click(f'[data-motion="{"on" if on else "off"}"]')
         label = f"motion {'on' if on else 'off'}"
-        out = measure_cost(browser, page, f"desk, everything on, {label}", True)
+        time.sleep(0.5)
+        out = measure_cost(browser, page, f"desk, everything on, {label}, run {i + 1}", True)
         # The stall over six seconds of its own, without the trace (starting and stopping a trace stalls the page).
         page.evaluate(STALL_START)
         time.sleep(6.0)
         st = page.evaluate(STALL_READ)
         out.update(stall_ms=st["worst"], longtask_ms=st["longest"], frames=st["frames"])
-        print(f"cost T3 {label}: worst main-thread stall {st['worst']:.1f} ms between frames ({st['frames']} frames), "
+        print(f"cost T3 run {i + 1} {label}: worst main-thread stall {st['worst']:.1f} ms between frames ({st['frames']} frames), "
               f"longest task {st['longest']:.1f} ms; audio load {out.get('load', float('nan')):.1f}%, worst render {out.get('worst_ms', float('nan')):.2f} ms")
         if out.get("worst_ms") is None or st["frames"] < 2:
-            failures.append(f"cost T3 {label}: nothing measured ({out['callbacks']} render callbacks, {st['frames']} frames)")
-        res[label] = out
+            failures.append(f"cost T3 {label} run {i + 1}: nothing measured ({out['callbacks']} render callbacks, {st['frames']} frames)")
+        runs[label].append(out)
+    res = {}
+    for label, outs in runs.items():
+        summary = {}
+        for k in ("load", "worst_ms", "stall_ms", "longtask_ms", "frames"):
+            xs = [o[k] for o in outs if o.get(k) is not None]
+            summary[k] = {"median": _median(xs), "min": min(xs) if xs else float("nan"), "max": max(xs) if xs else float("nan")}
+        print(f"cost T3 {label}, {len(outs)} runs (median, best..worst): "
+              f"audio load {summary['load']['median']:.1f}% ({summary['load']['min']:.1f}..{summary['load']['max']:.1f}); "
+              f"worst render {summary['worst_ms']['median']:.2f} ms ({summary['worst_ms']['min']:.2f}..{summary['worst_ms']['max']:.2f}); "
+              f"stall {summary['stall_ms']['median']:.1f} ms ({summary['stall_ms']['min']:.1f}..{summary['stall_ms']['max']:.1f}); "
+              f"longest task {summary['longtask_ms']['median']:.1f} ms (..{summary['longtask_ms']['max']:.1f}); "
+              f"frames {summary['frames']['median']:.0f} ({summary['frames']['min']:.0f}..{summary['frames']['max']:.0f})")
+        res[label] = {"runs": outs, "summary": summary}
     page.click('[data-motion="on"]')
     page.click("#play")
     page.click('[data-appmode="simple"]')

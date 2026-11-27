@@ -2036,6 +2036,11 @@ export class Engine {
     return { now, beats: this.fxBeats(now), bpm: Tone.getTransport().bpm.value };
   }
 
+  /** For the smoke test (T3 review M6): the transport's beats at audio time `t` (0 while stopped). */
+  beatsAt(t: number): number {
+    return this.fxBeats(t);
+  }
+
   private fxBeats(t: number): number {
     const tr = Tone.getTransport();
     return tr.state === "started" ? tr.getTicksAtTime(t) / tr.PPQ : 0;

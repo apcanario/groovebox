@@ -897,6 +897,39 @@ def walk_punch(page, failures: list, playing: bool) -> None:
         page.mouse.up()
         if not _wait(page, f"!{state}('cut').held && !document.querySelector('.punchpads .held')", 0.5):
             failures.append(f"{where}: lifting the finger did not let Cut go")
+        if playing:
+            # T3 review M6: Cut's end is a bar line of the transport and of what is heard: the transport's beats there
+            # are a whole bar, and the bar the engine reports turns over on it (its last steps just before, its first just
+            # after).
+            grid = page.evaluate(
+                f"""async () => {{ const e = {E}; const end = e.punchState().find((s) => s.pad === 'cut').end;
+                  if (end === null) return null; const beats = e.beatsAt(end);
+                  const until = (t) => new Promise((r) => {{ const k = () => e.audioNow() >= t ? r() : setTimeout(k, 5); k(); }});
+                  await until(end - 0.12); const before = e.position();
+                  await until(end + 0.12); const after = e.position();
+                  return {{ beats, before, after }}; }}"""
+            )
+            if grid is None:
+                failures.append(f"{where}: Cut let go has no end line")
+            else:
+                off = grid["beats"] / 4 - round(grid["beats"] / 4)
+                if abs(off) > 1e-3:
+                    failures.append(f"{where}: Cut ended at transport beat {grid['beats']:.4f}, not on a bar line")
+                pb, pa = grid["before"], grid["after"]
+                if pa["step"] > 3 or pb["step"] < 12:
+                    failures.append(f"{where}: the bar heard does not change on Cut's end line (before {pb}, after {pa})")
+            # T3 review M9: a pad held when the app goes to the background is let go.
+            page.mouse.move(a["x"] + a["width"] / 2, a["y"] + a["height"] / 2)
+            page.mouse.down()
+            if not _wait(page, f"{state}('cut').held", 0.5):
+                failures.append(f"{where}: a finger on Cut did not hold it (second press)")
+            page.evaluate(
+                "() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });"
+                " document.dispatchEvent(new Event('visibilitychange')); delete document.visibilityState; }"
+            )
+            if not _wait(page, f"!{state}('cut').held && !document.querySelector('.punchpads .held')", 0.5):
+                failures.append(f"{where}: Cut stayed held with the app in the background")
+            page.mouse.up()
         # Cut returns on the next bar line after release: wait until every pad is out.
         bar_s = 240.0 / page.evaluate(f"{E}.bpm")
         if not _wait(page, f"{E}.punchState().every((s) => s.start === null || (s.end !== null && s.end <= {E}.audioNow()))", bar_s * 2 + 1):
