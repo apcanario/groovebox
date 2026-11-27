@@ -196,25 +196,6 @@ function MasterDials({ ctx }: { ctx: Ctx }) {
   );
 }
 
-/** Reads every instrument's own level about 15 times a second while the whole Mix is open. Display only. */
-function useInstrumentMeters(engine: Engine): Record<string, number> {
-  const [m, setM] = useState<Record<string, number>>({});
-  useEffect(() => {
-    let raf = 0;
-    let last = 0;
-    const loop = (t: number): void => {
-      if (t - last > 66) {
-        last = t;
-        setM(Object.fromEntries(INSTRUMENTS.map((id) => [id, meterFraction(engine.instrumentLevel(id))])));
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [engine]);
-  return m;
-}
-
 /**
  * T2 (spec 9.2): the Mix panel whole, on a tablet. The master meter on top; then two columns: the master, the space,
  * the audio buffer and the motion switch over a fader with its live meter per instrument (lowest, in thumb reach); and
@@ -224,7 +205,6 @@ function useInstrumentMeters(engine: Engine): Record<string, number> {
 function WholeMix({ ctx, f }: { ctx: Ctx; f: Full }) {
   const { engine, pos } = ctx;
   const [armed, choose] = useBuffer(ctx);
-  const meters = useInstrumentMeters(engine);
   return (
     <section ref={f.ref} {...probeProps(f)} class="mixtab whole" data-whole="mix">
       <MasterMeter engine={engine} />
@@ -258,7 +238,7 @@ function WholeMix({ ctx, f }: { ctx: Ctx; f: Full }) {
                   label={INST_NAME[id]}
                   name={<InstName id={id} />}
                   value={ctx.song.patches[id].level}
-                  meter={meters[id] ?? 0}
+                  meter={id}
                   color={INST_COLOR[id]}
                   onChange={(v) => engine.setParam(id, "level", v)}
                 />

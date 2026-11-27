@@ -392,12 +392,20 @@ export function simpleSweepLabel(v: number): string {
 }
 
 /**
- * T2 (spec 9.2): a vertical fader's value for a touch at `y` on a track from `top`, `height` tall: 1 at the top, 0 at
- * the bottom, in hundredths, clamped.
+ * T2 review M3 (spec 9.2): a vertical fader moved by a drag, never by where the finger lands: the value it had when the
+ * touch began (`v0`, at `y0`) plus the drag up the track, a full track for the full range, in hundredths, clamped.
  */
-export function faderValue(y: number, top: number, height: number): number {
-  if (!(height > 0)) return 0;
-  return Math.round(Math.max(0, Math.min(1, 1 - (y - top) / height)) * 100) / 100;
+export function faderDrag(v0: number, y0: number, y: number, height: number): number {
+  if (!(height > 0)) return v0;
+  return Math.round(Math.max(0, Math.min(1, v0 + (y0 - y) / height)) * 100) / 100;
+}
+
+/** T2 review S2: how often the fader meters are drawn (about 15 times a second), from the one motion loop. */
+export const METER_MS = 66;
+
+/** A fader meter's scale for an instrument's level in dB: 0 while the screen is held still (spec 8.12). */
+export function meterScale(db: number, still: boolean): number {
+  return still ? 0 : Math.round(meterFraction(db) * 1000) / 1000;
 }
 
 /** Meter fill 0..1 for a level in dB: -60 dB empty, 0 dB full. */

@@ -2611,17 +2611,25 @@ button:disabled {
 }
 
 /*
- * T2 (spec 9.2): Advanced without pages on the desk. From 1200 px wide the instrument half takes 53 % in Advanced (towards
- * the landscape reference image), the pads 47 %, which still hold DROP beside the transport bar. A panel shown whole ("whole", src/ui/tabs/full.ts) has no page chips: its top rows, then two
+ * T2 (spec 9.2): Advanced without pages on the desk. From 1000 px wide the instrument half takes 53 % in Advanced (towards
+ * the landscape reference image), the pads 47 % (T2 review E1: from 1200 px until then). A panel shown whole ("whole", src/ui/tabs/full.ts) has no page chips: its top rows, then two
  * columns, the patch on the left (Sound, Mod, both effect slots, the sends) and what it plays on the right over the XY
  * pad, which takes the height left (bottom right, spec 9.1). Under 620 px of panel width the columns stack.
  */
-@media (min-width: 1200px) {
+@media (min-width: 1000px) {
   .tablet.landscape.adv .pads {
     flex: 47 1 0;
   }
   .tablet.landscape.adv .inst {
     flex: 53 1 0;
+  }
+}
+/* T2 review E1: from 1000 px (not 1200 px) wide, so the whole Mix and Chords fit at 1024 x 768; under 1200 px the pads
+   half (about 475 px) has no room for DROP with Morph beside the transport bar, so in Advanced it sits over it, as
+   under 960 px (spec 9.2). */
+@media (min-width: 1000px) and (max-width: 1199.98px) {
+  .tablet.landscape.adv .deck {
+    flex-direction: column;
   }
 }
 .insttab.whole {
@@ -2705,10 +2713,10 @@ button:disabled {
   min-height: 0;
 }
 @container (max-width: 619.98px) {
-  .whole > .cols {
+  .insttab.whole > .cols {
     flex-direction: column;
   }
-  .whole .col {
+  .insttab.whole .col {
     display: contents;
   }
   .whole .playcol .grp {
@@ -2808,6 +2816,8 @@ button:disabled {
   background: var(--text);
   opacity: 0.8;
   transform-origin: bottom;
+  /* Empty until the motion loop draws it (src/ui/motion.ts). */
+  transform: scaleY(0);
   pointer-events: none;
 }
 .fader .fname {
@@ -3010,4 +3020,27 @@ button:disabled {
    a panel is whole only where it fits with that to spare. */
 .body > section[data-probe] {
   margin-bottom: 8px;
+}
+
+/*
+ * T2 review E1: the whole Mix and Chords measured, not floored. From 1000 px wide the Advanced desk gives the instrument
+ * half 53 % (above), 513 px of panel at 1024 x 768: there the two columns are about 250 px each, so the faders drop
+ * their side padding (each track 48 px or more) and the twelve keys sit four to a row.
+ */
+.mixtab.whole,
+.chordtab.whole {
+  container-type: inline-size;
+}
+@container (max-width: 599.98px) {
+  .mixtab.whole .fader {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .chordtab.whole .row6 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* A 48 px fader has room for its instrument's name, not its icon beside it. */
+  .mixtab.whole .fname .ic {
+    display: none;
+  }
 }

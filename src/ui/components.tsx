@@ -2,7 +2,7 @@
 import type { ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { Icon, iconThing, type IconThing } from "./icons.tsx";
-import { chipPage, dragValue, faderValue, fraction } from "./logic.ts";
+import { chipPage, dragValue, faderDrag, fraction } from "./logic.ts";
 
 
 type PE = PointerEvent & { currentTarget: HTMLElement };
@@ -272,16 +272,13 @@ export function SendBar({ label, value, color, onChange, id }: SendBarProps) {
 // ---- Fader ------------------------------------------------------------------------------
 
 /**
- * T2 (spec 9.2): a vertical level fader with its live meter, for the Mix panel on the desk. Touch or drag anywhere on the
- * track to set it (top is full); the meter beside the fill shows what the instrument plays now (0..1, from the caller).
+ * T2 (spec 9.2): a vertical level fader with its live meter, for the Mix panel on the desk. A drag moves it from where
+ * it was (up is louder; a touch alone changes nothing, T2 review M3). The meter beside the fill shows what the
+ * instrument `meter` plays now; the motion loop draws it (src/ui/motion.ts), not this component (T2 review S2).
  * The value sits at the top, the name at the bottom.
  */
-export function Fader({ label, name, value, meter, color, onChange, id }: { label: string; name?: ComponentChildren; value: number; meter: number; color: string; onChange: (v: number) => void; id: string }) {
-  const active = useRef<number | null>(null);
-  const set = (e: PE): void => {
-    const r = e.currentTarget.getBoundingClientRect();
-    onChange(faderValue(e.clientY, r.top, r.height));
-  };
+export function Fader({ label, name, value, meter, color, onChange, id }: { label: string; name?: ComponentChildren; value: number; meter: string; color: string; onChange: (v: number) => void; id: string }) {
+  const drag = useRef<{ pointer: number; y0: number; v0: number } | null>(null);
   return (
     <div class="fader">
       <b class="fval">{Math.round(value * 100)}</b>
@@ -296,17 +293,19 @@ export function Fader({ label, name, value, meter, color, onChange, id }: { labe
         data-fader={id}
         onPointerDown={(e: PE) => {
           e.currentTarget.setPointerCapture(e.pointerId);
-          active.current = e.pointerId;
-          set(e);
+          drag.current = { pointer: e.pointerId, y0: e.clientY, v0: value };
         }}
         onPointerMove={(e: PE) => {
-          if (active.current === e.pointerId) set(e);
+          const d = drag.current;
+          if (!d || d.pointer !== e.pointerId) return;
+          const v = faderDrag(d.v0, d.y0, e.clientY, e.currentTarget.getBoundingClientRect().height);
+          if (v !== value) onChange(v);
         }}
-        onPointerUp={() => (active.current = null)}
-        onPointerCancel={() => (active.current = null)}
+        onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
       >
         <div class="ffill" style={{ height: `${value * 100}%`, background: color }} />
-        <div class="fmeter" data-meter={id} style={{ transform: `scaleY(${meter})` }} />
+        <div class="fmeter" data-meter={meter} />
       </div>
       <span class="fname">{name ?? label}</span>
     </div>

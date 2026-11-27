@@ -642,8 +642,10 @@ DESK = r"""() => {
     const a = r(t), b = r(c);
     if (Math.abs(a.left - b.left) > 1 || Math.abs(a.right - b.right) > 1) bad.push(`section ${i}'s strip tile is not under its column`);
   }
-  // Under 960 px wide (T1 review S1) DROP with Morph sits directly over the transport bar; from 960 px, beside it.
-  if (innerWidth < 960) {
+  // Under 960 px wide (T1 review S1) DROP with Morph sits directly over the transport bar; from 960 px, beside it. T2
+  // review E1: in Advanced from 1000 px the instrument half is 53 %, and under 1200 px DROP sits over the bar there too.
+  const adv = !!document.querySelector('.tablet.adv');
+  if (innerWidth < 960 || (adv && innerWidth >= 1000 && innerWidth < 1200)) {
     if (d.bottom > pl.top + 0.5 || pl.top - d.bottom > 12) bad.push('DROP with Morph is not directly over the transport bar');
   } else if (Math.abs(d.top - pl.top) > 1 || d.right > pl.left + 0.5) bad.push('DROP and the transport bar are not side by side');
   if (d.top < st.bottom - 0.5) bad.push('DROP is not under the strip');

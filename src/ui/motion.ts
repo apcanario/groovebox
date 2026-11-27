@@ -13,9 +13,12 @@
  *
  * With the system's reduce-motion setting, or the switch on the Mix tab, the root gets the class `still`:
  * the playhead jumps from step to step and nothing else moves.
+ *
+ * T2 review S2: the same loop draws the whole Mix's fader meters (`.fmeter[data-meter]`, an instrument id each) about
+ * 15 times a second, a transform each and nothing else; held still they stay empty.
  */
-import { INSTRUMENTS, type Engine, type LaneBar } from "../engine/index.ts";
-import { flashLevel, playhead } from "./logic.ts";
+import { INSTRUMENTS, type Engine, type InstrumentId, type LaneBar } from "../engine/index.ts";
+import { flashLevel, meterScale, METER_MS, playhead } from "./logic.ts";
 
 const KEY = "groovebox.motion";
 
@@ -79,12 +82,21 @@ export function startMotion(engine: Engine, root: HTMLElement = document.documen
   let wasStill: boolean | null = null;
   let prev = "";
   let targets: HTMLElement[] = [];
+  let meterAt = -Infinity;
   const frame = (now: number): void => {
     raf = requestAnimationFrame(frame);
     const still = !wanted() || !!reduce?.matches;
     if (still !== wasStill) {
       root.classList.toggle("still", still);
       wasStill = still;
+      meterAt = -Infinity;
+    }
+    if (now - meterAt >= METER_MS) {
+      meterAt = now;
+      for (const m of root.querySelectorAll<HTMLElement>(".fmeter[data-meter]")) {
+        const v = `scaleY(${meterScale(engine.instrumentLevel(m.dataset.meter as InstrumentId), still)})`;
+        if (m.style.transform !== v) m.style.transform = v;
+      }
     }
     const playing = last.playing && engine.playing;
     const stepMs = 60000 / engine.bpm / 4;
