@@ -27,6 +27,9 @@ T2: the Advanced panels of shots.PAGELESS show whole, with no page chips: at 128
 (Chords, Drums, Bass, Synth, Layer 1 and 2 in every mode, a lead with and without Pulse, and Mix); at 800 x 1280 (slice
 c, the dock) Chords, Bass, Synth, Mix and each layer in Arp, Pad and Drone. On every screen an XY pad's axis names stay
 clear of its readout (shots.XY_CLEAR).
+T3 slice b: the six punch pads (shots.PUNCH) on the phone's Punch page of the Mix tab and in the band over the tablet
+pads, present, 48 px, on screen and not overlapping; a finger on Cut holds it, sliding onto Filter keeps Cut and leaves
+Filter, the lift lets go (shots.walk_punch); stopped, a press does nothing.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
@@ -49,7 +52,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import SMALL, sample_play, simple_words, walk_frame, walk_play_button, walk_tablet  # noqa: E402
+from shots import SMALL, sample_play, simple_words, walk_frame, walk_play_button, walk_punch, walk_tablet  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 
@@ -3329,6 +3332,8 @@ def part_core(browser, page, failures: list, shot) -> None:
     print(f"tablet walk: {n} screens at 1280 x 800, 1024 x 768, 880 x 620, 800 x 1280, 768 x 1024 and 600 x 960, both modes")
     if not page.evaluate("window.__groovebox.playing"):
         failures.append("the transport stopped during the tablet walk")
+    # T3 slice b: the punch pads on the phone's Mix page and both tablet layouts, a finger held, slid off and lifted.
+    walk_punch(page, failures, True)
     # P10d: later taps of Play and Stop in Simple and Advanced, and a Stop during a drop's build, each sampled.
     walk_play_button(page, failures, "core")
     page.click('[data-appmode="advanced"]')
@@ -3350,6 +3355,8 @@ def part_core(browser, page, failures: list, shot) -> None:
         print("no attacks after Stop")
     if page.evaluate("window.__groovebox.playing"):
         failures.append("transport did not stop")
+    # T3 slice b: a punch pad pressed while stopped does nothing visible.
+    walk_punch(page, failures, False)
     walk_g5_songs(page, failures, f"http://localhost:{PORT}/index.html")
 
 

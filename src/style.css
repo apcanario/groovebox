@@ -3065,6 +3065,8 @@ button:disabled {
   align-content: start;
 }
 .punchpads.punchslot {
+  flex: none;
+  min-height: var(--hit);
   grid-template-columns: repeat(6, minmax(var(--hit), 1fr));
   grid-auto-rows: 1fr;
   align-content: stretch;

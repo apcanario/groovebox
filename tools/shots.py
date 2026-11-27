@@ -165,7 +165,8 @@ CONTROL_KEYS = r"""() => {
   const drums = !!body.querySelector('[data-whole="drums"], [data-page="drums:beat"]');
   const out = new Set();
   for (const el of body.querySelectorAll('button, a, input, [role=slider], [role=switch], [role=group]')) {
-    if (!el.getClientRects().length || el.closest('.pager')) continue;
+    // T3: a tablet has the punch pads over its pads, not in the Mix panel (the punch walk checks them there).
+    if (!el.getClientRects().length || el.closest('.pager') || el.closest('.punchpads')) continue;
     const k = Object.keys(el.dataset).find((n) => !skip.has(n));
     let key = k ? `${k}=${el.dataset[k]}` : el.id ? `#${el.id}` : null;
     if (!key) continue;
@@ -295,6 +296,8 @@ class Walk:
         self.place: dict = {}
         # T2 review S3: the frame walk gathers the phone's Advanced panel controls (PHONE_KEYS).
         self.collect = False
+        # T3 slice b: Punch pages of the Mix tab checked (screen).
+        self.punch = 0
 
     def screen(self, size: tuple, label: str) -> None:
         _settle(self.page)
@@ -312,6 +315,11 @@ class Walk:
             self.failures.append(f"{where}: {b}")
         if "-mix" in label:
             for b in self.page.evaluate(MIX_CHIPS):
+                self.failures.append(f"{where}: {b}")
+        if label.endswith("-mix-punch"):
+            # T3 slice b: the phone's Punch page of the Mix tab holds the six pads (walk_frame counts these).
+            self.punch += 1
+            for b in self.page.evaluate(PUNCH, ["page", PUNCH_ORDER]):
                 self.failures.append(f"{where}: {b}")
         if label == "simple-mix-master":
             for b in self.page.evaluate(MORPH_SPEED_ROW):
@@ -493,6 +501,9 @@ def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
     if w.chips < least:
         failures.append(f"the frame walk turned {w.chips} picker pages, expected at least {least} (beats, bass and synth rhythms at each size)")
     print(f"frame walk: {w.chips} picker pages turned (at least {least})")
+    # T3 slice b: the Mix tab's Punch page, at each phone size in both modes; absent, the pads went unchecked.
+    if w.punch != 2 * len(SIZES):
+        failures.append(f"the frame walk checked the Mix tab's Punch page {w.punch} times, not {2 * len(SIZES)} (each phone size, both modes)")
     return w.count
 
 
@@ -800,9 +811,108 @@ SCREEN_HELD = """() => ({ panel: document.querySelector('.shell .inst')?.dataset
   size: document.documentElement.dataset.size, dial: !!document.querySelector('.shell .inst .body .dial') })"""
 
 
+# T3 slice b (spec 9.4): the six punch pads, on the phone's Punch page of the Mix tab ("page") or in the band over the
+# tablet pads ("band"): all six there in order, each at least 48 px each way, inside the screen, none overlapping
+# another, nothing drawn over any of them (the element at its centre is the pad), and the band inside its 48 px space
+# over the grid or the lanes. Absent pads fail.
+PUNCH_ORDER = ["cut", "filter", "stutter", "echo", "wash", "riser"]
+PUNCH = r"""([where, order]) => {
+  const bad = [];
+  const box = document.querySelector(where === 'band' ? '.shell .punchpads.punchslot' : '.mixtab .punchpads');
+  if (!box || !box.getClientRects().length) return [`no punch pads (${where === 'band' ? 'the band over the pads' : 'the Punch page'})`];
+  if (document.querySelectorAll('.punchpads').length !== 1) bad.push(`${document.querySelectorAll('.punchpads').length} sets of punch pads on screen, not 1`);
+  const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  const pads = [...box.querySelectorAll('[data-punch]')].filter((p) => p.getClientRects().length);
+  const got = pads.map((p) => p.dataset.punch);
+  if (got.join() !== order.join()) bad.push(`punch pads ${got.join(', ') || 'none'}, not ${order.join(', ')}`);
+  const rs = pads.map((p) => p.getBoundingClientRect());
+  const bx = box.getBoundingClientRect();
+  rs.forEach((r, i) => {
+    const n = got[i];
+    if (r.width < 47.5 || r.height < 47.5) bad.push(`the ${n} pad is ${r.width.toFixed(0)} x ${r.height.toFixed(0)} px`);
+    if (r.left < -0.5 || r.top < -0.5 || r.right > vw + 0.5 || r.bottom > vh + 0.5) bad.push(`the ${n} pad is outside the screen`);
+    if (r.left < bx.left - 0.5 || r.right > bx.right + 0.5 || r.top < bx.top - 0.5 || r.bottom > bx.bottom + 0.5) bad.push(`the ${n} pad sticks out of its row`);
+    for (let j = 0; j < i; j++) {
+      const o = rs[j];
+      if (Math.min(r.right, o.right) - Math.max(r.left, o.left) > 0.5 && Math.min(r.bottom, o.bottom) - Math.max(r.top, o.top) > 0.5) bad.push(`the ${n} pad overlaps the ${got[j]} pad`);
+    }
+    const at = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+    if (!at || !pads[i].contains(at)) bad.push(`the ${n} pad is covered at its centre`);
+    if (!pads[i].querySelector('svg') || pads[i].querySelector('b')?.textContent.trim() !== n[0].toUpperCase() + n.slice(1)) bad.push(`the ${n} pad lacks its icon or its word`);
+  });
+  if (where === 'band') {
+    const under = document.querySelector('.shell .deskgrid') || document.querySelector('.dock .nowlist');
+    if (under && bx.bottom > under.getBoundingClientRect().top + 0.5) bad.push('the punch pads overlap the pads under them');
+    if (bx.height < 47.5) bad.push(`the punch band is ${bx.height.toFixed(0)} px tall`);
+  }
+  return bad;
+}"""
+
+# Where the punch walk presses the pads: the phone's Punch page and both tablet layouts.
+PUNCH_SIZES = [((390, 844), "phone"), ((1280, 800), "landscape"), ((800, 1280), "portrait")]
+
+
+def walk_punch(page, failures: list, playing: bool) -> None:
+    """T3 slice b (spec 9.4, 9.6): at the phone size on the Mix tab's Punch page and at a desk and a dock size, the pads
+    pass PUNCH, then a finger on Cut. Playing: Cut is held at once (the engine's state and the pad's look), a finger
+    sliding onto Filter keeps Cut held and does not press Filter (pointer capture), and the lift lets Cut go. Stopped: a
+    press shows nothing and does nothing (no pad held, lit or waiting; page errors are the caller's). Waits for every pad
+    to end, so the walks after it hear the whole mix. Leaves the phone at 390 x 844 in Simple on the Play tab."""
+    state = f"((p) => {E}.punchState().find((s) => s.pad === p))"
+    mode = "playing" if playing else "stopped"
+    if page.evaluate(f"{E}.playing") != playing:
+        failures.append(f"punch walk: the transport is not {mode}")
+    for size, orient in PUNCH_SIZES:
+        page.set_viewport_size({"width": size[0], "height": size[1]})
+        if not _wait(page, f"document.documentElement.dataset.size === {orient!r}", 2.0):
+            failures.append(f"{size[0]}x{size[1]}: not the {orient} layout")
+            continue
+        if orient == "phone":
+            page.click('[data-tab="mix"]')
+            page.click('[data-page="mix:punch"]')
+        _settle(page)
+        where = f"{size[0]}x{size[1]} punch pads, {mode}"
+        for b in page.evaluate(PUNCH, ["page" if orient == "phone" else "band", PUNCH_ORDER]):
+            failures.append(f"{where}: {b}")
+        cut, flt = page.locator('.punchpads [data-punch="cut"]'), page.locator('.punchpads [data-punch="filter"]')
+        if not cut.count() or not flt.count():
+            failures.append(f"{where}: no Cut or Filter pad to press")
+            continue
+        a, f = cut.bounding_box(), flt.bounding_box()
+        page.mouse.move(a["x"] + a["width"] / 2, a["y"] + a["height"] / 2)
+        page.mouse.down()
+        if playing:
+            if not _wait(page, f"{state}('cut').held && !!document.querySelector('.punchpads [data-punch=cut].held')", 0.5):
+                failures.append(f"{where}: a finger on Cut did not hold it")
+            page.mouse.move(f["x"] + f["width"] / 2, f["y"] + f["height"] / 2, steps=4)
+            time.sleep(0.1)
+            if not page.evaluate(f"{state}('cut').held"):
+                failures.append(f"{where}: Cut let go when the finger slid off it")
+            if page.evaluate(f"{state}('filter').held"):
+                failures.append(f"{where}: a finger sliding from Cut onto Filter pressed Filter")
+        else:
+            time.sleep(0.2)
+            if page.evaluate(f"{E}.punchState().some((s) => s.held || s.start !== null)") or page.locator(".punchpads .held, .punchpads .on, .punchpads .pending").count():
+                failures.append(f"{where}: a press while stopped held, lit or queued a pad")
+        page.mouse.up()
+        if not _wait(page, f"!{state}('cut').held && !document.querySelector('.punchpads .held')", 0.5):
+            failures.append(f"{where}: lifting the finger did not let Cut go")
+        # Cut returns on the next bar line after release: wait until every pad is out.
+        bar_s = 240.0 / page.evaluate(f"{E}.bpm")
+        if not _wait(page, f"{E}.punchState().every((s) => s.start === null || (s.end !== null && s.end <= {E}.audioNow()))", bar_s * 2 + 1):
+            failures.append(f"{where}: a punch pad never ended")
+    page.set_viewport_size({"width": 390, "height": 844})
+    _wait(page, "document.documentElement.dataset.size === 'phone'", 2.0)
+    page.click('[data-tab="mix"]')
+    page.click('[data-page="mix:master"]')
+    page.click('[data-tab="play"]')
+    print(f"punch walk ({mode}): {len(PUNCH_SIZES)} sizes")
+
+
 def tablet_layout(page, orient: str) -> list:
-    """The layout checks of the tablet layout shown: the desk (landscape) or the dock (portrait)."""
-    return page.evaluate(DESK if orient == "landscape" else DOCK)
+    """The layout checks of the tablet layout shown: the desk (landscape) or the dock (portrait), and T3's punch pads
+    in the band over its pads."""
+    return page.evaluate(DESK if orient == "landscape" else DOCK) + page.evaluate(PUNCH, ["band", PUNCH_ORDER])
 
 
 def beside(page, failures: list, where: str, pad_for) -> None:
@@ -1056,6 +1166,11 @@ def main() -> int:
             walk_play_button(page, failures, "Ambient, Morph on")
             # T1: the tablet sizes, last (the walks above are the phone's).
             n += walk_tablet(page, failures, out)
+            # T3 slice b: the punch pads pressed while playing, then while stopped.
+            walk_punch(page, failures, True)
+            page.click("#play")
+            _wait(page, f"!{E}.playing", 3.0)
+            walk_punch(page, failures, False)
             failures += [f"page error: {e}" for e in errors]
             browser.close()
     finally:
