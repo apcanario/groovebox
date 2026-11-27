@@ -119,6 +119,23 @@ CHECK = r"""() => {
   return bad;
 }"""
 
+# T2 slice c: an XY pad's axis names stay clear of its value readout (the narrow Drums pad on the desk once drew
+# "Resonance" under it). Any overlap of a shown name's box with the readout's box fails.
+XY_CLEAR = r"""() => {
+  const bad = [];
+  for (const xy of document.querySelectorAll('.xy')) {
+    const rv = xy.querySelector('.rv');
+    if (!rv || !xy.getClientRects().length) continue;
+    const a = rv.getBoundingClientRect();
+    for (const l of xy.querySelectorAll('.lx, .ly')) {
+      const b = l.getBoundingClientRect();
+      if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5)
+        bad.push(`the XY pad's "${l.textContent.trim()}" sits under its readout "${rv.textContent.trim()}"`);
+    }
+  }
+  return bad;
+}"""
+
 # Words Simple never shows (spec 8.1: plain words only): synth, generator and scale terms and abbreviations.
 JARGON = ["Cutoff", "Resonance", "Euclid", "Envelope", "Env amt", "Filt env", "Attack", "Decay", "Release", "Sustain", "Hz",
           "Lock", "Hits", "Rotate", "Tension", "Density", "Detune", "Saw", "Tri", "4/4", "Filter", "DnB", "Saturate",
@@ -240,6 +257,8 @@ class Walk:
             self.failures.append(f"{where}: {b}")
         for b in self.page.evaluate(SMALL):
             self.failures.append(f"{where}: control under 48 px: {b}")
+        for b in self.page.evaluate(XY_CLEAR):
+            self.failures.append(f"{where}: {b}")
         if label.startswith("simple"):
             for b in simple_words(self.page):
                 self.failures.append(f"{where}: {b}")
@@ -685,10 +704,22 @@ DOCK = r"""() => {
 }"""
 
 
-# T2 (spec 9.2): on the desk at 1280 x 800 these Advanced panels show every page at once: no page chips, the panel whole.
-# Slice b: Drums (every voice by 16 steps as one grid), Mix (faders with meters) and Chords (editor beside the library).
-PAGELESS = {"chords", "drums", "bass", "synth", "layer1", "layer2", "mix"}
-PAGELESS_AT = (1280, 800)
+# T2 (spec 9.2, 9.3): the Advanced panels that show every page at once, by tablet size: no page chips, the panel whole.
+# On the desk at 1280 x 800 every panel of the rail (slices a and b). Slice c: on the dock at 800 x 1280 the panel has
+# 776 x 566 px over the pads, and these fit it whole; a lead (its Notes, Feel and Pulse dials over the XY pad) and Drums
+# (twelve rows of 48 px steps) do not, and keep their pages. A layer is named alone (every mode) or as layer:mode.
+PAGELESS = {
+    (1280, 800): {"chords", "drums", "bass", "synth", "layer1", "layer2", "mix"},
+    (800, 1280): {"chords", "bass", "synth", "mix"} | {f"{lid}:{m}" for lid in ("layer1", "layer2") for m in ("arp", "pad", "drone")},
+}
+
+
+def pageless(size: tuple, t: str, m: str | None = None) -> bool:
+    """Whether the Advanced panel t (in layer mode m) must show whole at this tablet size."""
+    want = PAGELESS.get(size, set())
+    return t in want or (m is not None and f"{t}:{m}" in want)
+
+
 WHOLE = r"""(panel) => {
   const chips = [...document.querySelectorAll('.shell .inst .body [data-page]')].filter((c) => c.getClientRects().length);
   const bad = [];
@@ -782,7 +813,8 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
     portrait, the dock), in both modes, with every panel of the rail (each layer in each mode) and every page, a pad (or,
     on Simple portrait, an instrument's lane) waiting for the next bar and a section queued. Each screen gets the frame walk's
     checks (nothing scrolls, nothing cut off, text fits, no control under 48 px) and the layout's own; a missing
-    screenshot fails. T2: at 1280 x 800 an Advanced panel of PAGELESS that still shows page chips fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
+    screenshot fails. T2: an Advanced panel that PAGELESS names for the size (1280 x 800, 800 x 1280) and that still shows
+    page chips fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
     (the panel and the layout held), the transport running and the level up throughout.
     The smoke's core part runs it without screenshots. Leaves the phone at 390 x 844 in Simple, on the Play tab."""
     w = Walk(page, failures, out_dir)
@@ -810,11 +842,11 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
             continue
         for mode in ("simple", "advanced"):
             page.click(f'[data-appmode="{mode}"]')
-            whole = mode == "advanced" and size == PAGELESS_AT
+            adv = mode == "advanced"
 
-            def no_pages(t: str, label: str) -> None:
-                # T2: at 1280 x 800 an Advanced panel of PAGELESS shows no page chip.
-                if whole and t in PAGELESS:
+            def no_pages(t: str, label: str, m: str | None = None) -> None:
+                # T2: at a size of PAGELESS an Advanced panel it names shows no page chip.
+                if adv and pageless(size, t, m):
                     _settle(page)
                     for b in page.evaluate(WHOLE, t):
                         failures.append(f"{size[0]}x{size[1]} {label}: {b}")
@@ -825,15 +857,15 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                 if t in ("layer1", "layer2"):
                     for m in LAYER_MODES:
                         page.click(f'[data-mode="{t}:{m}"]')
-                        no_pages(t, f"{label}-{m}")
+                        no_pages(t, f"{label}-{m}", m)
                         w.pages(size, f"{label}-{m}")
-                        if m == "generative" and whole:
+                        if m == "generative" and adv and pageless(size, t, m):
                             # Pulse adds its own dials and every other style has none: the whole panel holds both.
                             style = page.get_attribute("[data-leadstyle].on", "data-leadstyle")
                             for other in ("pulse", "hook"):
                                 if other != style:
                                     page.click(f'[data-leadstyle="{other}"]')
-                                    no_pages(t, f"{label}-{m}-{other}")
+                                    no_pages(t, f"{label}-{m}-{other}", m)
                                     w.pages(size, f"{label}-{m}-{other}")
                             page.click(f'[data-leadstyle="{style}"]')
                     page.click(f'[data-mode="{t}:{modes[t]}"]')
