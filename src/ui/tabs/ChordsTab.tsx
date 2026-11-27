@@ -6,7 +6,8 @@
 import { useEffect, useState } from "preact/hooks";
 import { MOODS, MOOD_TABLE, NOTE_NAMES, degreeChords } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Pager } from "../components.tsx";
+import { GroupLabel, Pager } from "../components.tsx";
+import { useFull } from "./full.ts";
 import {
   MAX_CHORDS,
   addChord,
@@ -24,11 +25,28 @@ import { SimpleChords } from "./SimpleChords.tsx";
 type ChordPage = "chords" | "key";
 
 export function ChordsTab({ ctx }: { ctx: Ctx }) {
-  return ctx.advanced ? <ChordEditor ctx={ctx} /> : <SimpleChords ctx={ctx} />;
+  // T2 (spec 9.2): Advanced Chords on the desk shows the editor and the progression library side by side where they fit.
+  const [full, ref] = useFull(ctx.advanced ? ctx : { ...ctx, desk: false }, "chords");
+  if (!ctx.advanced) return <SimpleChords ctx={ctx} />;
+  if (!full) return <ChordEditor ctx={ctx} sref={ref} />;
+  return (
+    <section ref={ref} class="chordtab whole" data-whole="chords">
+      <div class="cols">
+        <div class="col">
+          <ChordEditor ctx={ctx} whole />
+        </div>
+        <div class="col">
+          <SimpleChords ctx={ctx} title="Library" />
+        </div>
+      </div>
+    </section>
+  );
 }
 
-/** The G2 degree editor (Advanced, spec 8.4). */
-function ChordEditor({ ctx }: { ctx: Ctx }) {
+/**
+ * The G2 degree editor (Advanced, spec 8.4). Whole (T2, on the desk): the Key page over the Chords page, no page chips.
+ */
+function ChordEditor({ ctx, sref, whole = false }: { ctx: Ctx; sref?: { current: HTMLElement | null }; whole?: boolean }) {
   const { engine, song, edit } = ctx;
   const section = song.sections[edit];
   const [sel, setSel] = useState<number | null>(null);
@@ -59,10 +77,11 @@ function ChordEditor({ ctx }: { ctx: Ctx }) {
     sel !== null ? `Tap a chord to replace chord ${sel + 1}` : full ? "Sequence full: select a chord to replace it" : "Tap a chord to add it";
 
   return (
-    <section class="chordtab">
-      <Pager id="chords" pages={pages} page={page} onPage={setPage} />
-      {page === "key" && (
-        <div class="page">
+    <section ref={sref} class="chordtab">
+      {!whole && <Pager id="chords" pages={pages} page={page} onPage={setPage} />}
+      {whole && <GroupLabel thing="Key">{pages[1][1]}</GroupLabel>}
+      {(whole || page === "key") && (
+        <div class="page keypage">
           <div class="row5">
             {MOODS.map((m) => (
               <button
@@ -94,7 +113,8 @@ function ChordEditor({ ctx }: { ctx: Ctx }) {
           </p>
         </div>
       )}
-      {page === "chords" && (
+      {whole && <GroupLabel thing="Chords">{pages[0][1]}</GroupLabel>}
+      {(whole || page === "chords") && (
         <div class="page">
           <p class="note" id="chord-hint">
             {hint}

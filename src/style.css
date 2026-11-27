@@ -2818,3 +2818,18 @@ button:disabled {
 .mixtab.whole {
   min-width: 600px;
 }
+
+/* T2 slice b (spec 9.2): Chords whole on the desk: the editor (Key over Chords) beside the progression library. */
+.chordtab.whole {
+  min-width: 600px;
+}
+.chordtab.whole .keypage {
+  flex: none;
+}
+.chordtab.whole .col > section {
+  flex: 1 1 0;
+}
+/* The sequence's tools stay lowest, in thumb reach, under the Chords group. */
+.chordtab.whole .seqtools {
+  margin-top: auto;
+}

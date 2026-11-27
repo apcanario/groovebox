@@ -65,7 +65,8 @@ function Card({ id, state, locked, onTap }: { id: string; state: "playing" | "pe
   );
 }
 
-export function SimpleChords({ ctx }: { ctx: Ctx }) {
+/** `title`: the heading (T2: "Library" beside the Advanced editor on the desk). */
+export function SimpleChords({ ctx, title = "Chords" }: { ctx: Ctx; title?: string }) {
   const { engine, song, edit, pending } = ctx;
   const section = song.sections[edit];
   const playingId = findProgression(song.mood, section.chords);
@@ -113,7 +114,7 @@ export function SimpleChords({ ctx }: { ctx: Ctx }) {
         <h1 class="head">
           <em style={{ color: "var(--yellow)" }}>
             <Icon name="piano" />
-            Chords
+            {title}
           </em>
         </h1>
         <button
