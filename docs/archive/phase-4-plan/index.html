@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groovebox · Phase 4 spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0c;--card:#131316;--line:#24242a;--txt:#ececf1;--dim:#a9a9b6;--red:#ff6b6b;--org:#f4a261;--teal:#2a9d8f;--blue:#457b9d;--pur:#9b5de5;--yel:#e9c46a}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:"DM Sans",system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 64px}
+.mono{font-family:"Space Mono",monospace}
+header .k{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+h1{font-size:28px;line-height:1.15;margin:6px 0 8px;font-weight:700}
+header p{margin:0;color:var(--dim)}
+nav{position:sticky;top:0;z-index:5;background:rgba(10,10,12,.94);margin:16px -16px 0;padding:10px 16px;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav a{flex:none;font-family:"Space Mono",monospace;font-size:12px;color:var(--txt);text-decoration:none;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);white-space:nowrap}
+nav a:active{border-color:var(--red)}
+section{padding-top:28px;scroll-margin-top:52px}
+h2{font-size:21px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+h2 .n{font-family:"Space Mono",monospace;font-size:13px;width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#0a0a0c;font-weight:700;flex:none}
+.sub{color:var(--dim);margin:0 0 14px;font-size:15px}
+h3{font-size:13px;font-family:"Space Mono",monospace;letter-spacing:.1em;text-transform:uppercase;margin:0 0 10px;font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 12px}
+.card.l{border-left:3px solid var(--c,var(--red))}
+ul,ol{margin:0;padding-left:20px}
+li{margin:0 0 7px}
+li:last-child{margin-bottom:0}
+b{font-weight:700}
+.pick{border:1px solid var(--red);background:linear-gradient(180deg,rgba(255,107,107,.10),rgba(255,107,107,.02))}
+.pick .t{font-weight:700;font-size:17px;margin:0 0 8px}
+.pick .t span{color:var(--red);font-family:"Space Mono",monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-right:6px}
+.pick .o{margin:10px 0 0;font-size:15px;color:var(--dim)}
+.pick .o b{color:var(--org)}
+.tag{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;color:#0a0a0c;font-weight:700;margin-right:6px}
+.grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:620px){.grid.two{grid-template-columns:1fr 1fr}}
+.style h4{margin:0 0 8px;font-size:17px}
+.style dl{margin:0;display:grid;grid-template-columns:86px 1fr;gap:6px 10px;font-size:15px}
+.style dt{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--c);padding-top:3px}
+.style dd{margin:0}
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps li{counter-increment:s;position:relative;padding-left:40px;margin-bottom:12px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:8px;background:var(--pur);color:#0a0a0c;font-family:"Space Mono",monospace;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.form{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 4px}
+.form div{border-radius:8px;padding:10px 4px;text-align:center;font-family:"Space Mono",monospace;font-weight:700;color:#0a0a0c;font-size:14px}
+.form small{display:block;font-family:"DM Sans",sans-serif;font-weight:500;font-size:11px;margin-top:2px}
+.note{font-size:14px;color:var(--dim);margin:8px 0 0}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--yel);font-weight:700}
+tr:last-child td{border-bottom:0}
+svg{display:block;width:100%;height:auto;max-width:360px;margin:0 auto}
+.gal{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px}
+.gal figure{flex:none;margin:0;scroll-snap-align:center;min-width:0}
+.gal figure.p{width:70%;max-width:280px}.gal figure.w{width:92%;max-width:620px}
+.gal img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line)}
+.gal figcaption{font-size:13px;color:var(--dim);margin-top:6px}
+.gal figcaption b{display:block;color:var(--txt)}
+.tw{overflow-x:auto}
+code{font-family:"Space Mono",monospace;font-size:13px;background:#1b1b20;padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="k">Groovebox · spec · 27 Nov 2026</div>
+  <h1>Phase 4: instant start, top styles, lead engine, harmony pad, kick, tablet perform</h1>
+  <p>Drafted before reading the repo, then checked against it read-only (nothing pushed). The repo wording is in spec section 10 and rows F1 to F7; where this page and those differ, they win.</p>
+</header>
+
+<nav>
+  <a href="#start">1 Instant start</a>
+  <a href="#lead">2 Lead spike</a>
+  <a href="#pad">3 Harmony pad</a>
+  <a href="#kick">4 Kick</a>
+  <a href="#perform">5 Tablet</a>
+  <a href="#signature">6 Signature</a>
+  <a href="#rows">7 Order</a>
+  <a href="#screens">Screens</a>
+</nav>
+
+<section id="summary">
+  <div class="card">
+    <h3 style="color:var(--red)">In one screen</h3>
+    <ul>
+      <li><b>Instant start</b> — plain build. Launch lands on the main tab with a random top style loaded.</li>
+      <li><b>Top styles</b> — fourteen styles sit above a line in the list and get the engine work. The rest stay as they are, below the line.</li>
+      <li><b>Lead engine</b> — spike first. One generator built on rhythm cells, contour and phrase form.</li>
+      <li><b>Harmony pad</b> — a theremin for the whole piece. The patterns keep their rhythm; your finger supplies the pitch.</li>
+      <li><b>Kick</b> — a new synthesised kick with a shape you can play, and a Thump beat that is the kick on every beat and nothing else.</li>
+      <li><b>Tablet landscape</b> — a perform layout sized in millimetres for the Legion Y700: thumbs play at the edges, the centre is for looking.</li>
+      <li><b>Signature</b> — your own style, first in the list: simple drums, whooshing pads, sharp melodies.</li>
+      <li><b>Dependency:</b> the pad needs every layer stored as scale degrees. The lead engine is built that way, so it goes first.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="repo">
+  <div class="card l" style="--c:var(--yel)">
+    <h3 style="color:var(--yel)">What reading the repo changed</h3>
+    <ul>
+      <li><b>It is phase 4.</b> Phase 3 in the repo is the tablet work, already done (T1 to T3).</li>
+      <li><b>The beat is called Thump.</b> Pulse is already a lead style.</li>
+      <li><b>All fourteen top vibes exist.</b> Only Signature is new, as a 25th.</li>
+      <li><b>Hook, Phrase, Roll and Drift already exist.</b> The lead work changes how they plan notes; names and knobs stay. Deep techno's lead currently runs on the old Euclidean generator.</li>
+      <li><b>Old jams keep their notes.</b> Songs saved before this phase play through the old planner.</li>
+      <li><b>The tablet desk already has pads, punch pads and DROP on the left.</b> Perform tunes it and opens the right half on the harmony pad; the left-zone redesign in the Y700 screens is not needed.</li>
+      <li><b>On a short phone the picker cannot show 25 tiles at 48 px.</b> There the line carries a More switch.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="start">
+  <h2><span class="n" style="background:var(--teal)">1</span>Instant start</h2>
+  <p class="sub">No picker on launch. The list stays one tap away, top styles first.</p>
+
+  <div class="card l" style="--c:var(--yel)">
+    <h3 style="color:var(--yel)">Top styles</h3>
+    <p style="margin:0"><b style="color:var(--red)">Signature</b> · Deep techno · Melodic techno · Minimal techno · Dub techno · Deep house · Progressive · Drum and bass · Two-step · Breakbeat · Lo-fi · Ambient · Drone · Downtempo · Synthwave</p>
+    <p class="note">Random start and the dice draw from these only. Everything below the line is still one tap away in the list. Say so if the dice should include the rest.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--teal)">
+    <h3 style="color:var(--teal)">Behaviour</h3>
+    <ul>
+      <li>Launch opens the <b>main tab</b> with a style already loaded. The picker screen is gone as a gate.</li>
+      <li>The style comes from a <b>shuffle bag of Signature and the fourteen top styles</b>: every one appears once before any repeats, and never the same one as the previous launch. The bag is saved locally; if storage is unavailable it falls back to plain random.</li>
+      <li>One seed also rolls the <b>key</b>, a <b>bpm inside the style's range</b> and the <b>progression variant</b>, so the same style does not open identically twice.</li>
+      <li>A <b>style chip</b> on the main tab shows the style name plus a dice icon. Tap the name: the style list opens as a sheet over the main tab, same tiles as today. Tap the dice: reroll.</li>
+      <li>While playing, a style change from the list or the dice <b>lands on the next bar</b>, like every other toggle.</li>
+      <li>Simple / Advanced is remembered across launches. DROP and Morph keep their positions.</li>
+    </ul>
+  </div>
+
+  <div class="card pick">
+    <p class="t"><span>Pick:</span>Loaded and armed, one tap on Play starts it</p>
+    <ul>
+      <li>Browser audio cannot start without a touch.</li>
+      <li>No surprise sound when the phone opens in public.</li>
+      <li>Identical behaviour on the Pages build and the APK.</li>
+    </ul>
+    <p class="o"><b>Override if:</b> you want sound the instant the APK opens. That needs the wrapper's autoplay setting and would be APK-only.</p>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--yel)">Done when</h3>
+    <ul>
+      <li>Cold launch to first sound is one tap.</li>
+      <li>Fifteen launches in a row give fifteen different styles: Signature and the fourteen.</li>
+      <li>The list shows Signature, then the fourteen top styles, a line, then every other style smaller underneath.</li>
+      <li>The full style list is reachable in one tap from the main tab, with no scrolling added to Simple.</li>
+      <li>The chip text neither wraps nor overflows on the phone.</li>
+      <li>A reroll while playing swaps on the bar with no click or gap.</li>
+    </ul>
+    <p class="note"><b style="color:var(--yel)">Assumed:</b> some of the fourteen (dub techno, minimal techno, drone, synthwave and others) may not exist among the current 24 styles. Any that are missing get created in the tuning row.</p>
+    <p class="note">Risk: a full style swap rebuilds synth patches. Build the new patches silently first, then switch on the bar line.</p>
+  </div>
+</section>
+
+<section id="lead">
+  <h2><span class="n" style="background:var(--pur)">2</span>Lead engine spike</h2>
+  <p class="sub">Question: can rules alone produce leads you would keep, per style, with no samples and no model?</p>
+
+  <div class="card l" style="--c:var(--yel)">
+    <h3 style="color:var(--yel)">Why the current leads sound random (assumed)</h3>
+    <ul>
+      <li><b>No motif.</b> Nothing repeats, so nothing is recognisable.</li>
+      <li><b>Rhythm and pitch are chosen together</b>, step by step, so neither has a shape.</li>
+      <li><b>The chord underneath is ignored</b> beyond staying in the scale.</li>
+      <li><b>Phrases never end.</b> No landing note, no space afterwards.</li>
+    </ul>
+    <p class="note">First task of the spike: a read-only audit of the current lead generator, written down, to confirm or correct this list.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--pur)">
+    <h3 style="color:var(--pur)">The engine: five stages</h3>
+    <ol class="steps">
+      <li><b>Rhythm cell.</b> Pick a 1 or 2 bar pattern of onsets and lengths from the style's pool of hand-written cells (about eight per style). Rhythm is fixed before any pitch exists.</li>
+      <li><b>Contour.</b> Give the cell a shape: arch, rise, fall, pendulum, or flat with one jump. Mostly steps. A leap is at most a fifth and is followed by a step back the other way.</li>
+      <li><b>Anchor.</b> Strong onsets take tones of the current chord. Weak onsets take the neighbours and passing notes between them.</li>
+      <li><b>Phrase form.</b> Lay the motif over 4 or 8 bars as A A′ A B. A′ keeps the rhythm and re-anchors to the new chord. B answers, ends on a longer stable note, then leaves space.</li>
+      <li><b>Evolve.</b> The phrase loops unchanged. Every N loops it mutates one thing: one note, one onset, or the ending. It never regenerates wholesale unless you ask.</li>
+    </ol>
+    <div class="form">
+      <div style="background:var(--pur)">A<small>motif</small></div>
+      <div style="background:#b78bf0">A′<small>new chord</small></div>
+      <div style="background:var(--pur)">A<small>motif</small></div>
+      <div style="background:var(--org)">B<small>answer + rest</small></div>
+    </div>
+    <p class="note">Every note is stored as <code>degree above the chord · octave · start · length · accent · slide</code>, never as a fixed pitch, and the whole phrase comes from one seed. That is what lets the harmony pad move it later.</p>
+  </div>
+
+  <h3 style="color:var(--org);margin-top:20px">Top-style directions: lead and drums</h3>
+  <div class="card"><div class="tw"><table>
+    <tr><th>Style</th><th>Lead</th><th>Drums</th></tr>
+    <tr><td><b>Deep techno</b></td><td>One-bar cell looped, 2 to 4 notes from root, ♭3, 5, ♭7. One note changes at bar 8. Filter and delay do the moving.</td><td>Thump. Long, dark kick, sparse hats.</td></tr>
+    <tr><td><b>Melodic techno</b></td><td>8-bar arp-led phrase in minor, climbing to one peak, then resetting.</td><td>Thump or floor, offbeat hat.</td></tr>
+    <tr><td><b>Minimal techno</b></td><td>Two or three notes, mostly silence, tiny mutations.</td><td>Short dry kick, clicks for percussion.</td></tr>
+    <tr><td><b>Dub techno</b></td><td>The echoing chord stab is the melody. Lead almost absent.</td><td>Soft round kick, hats fed into delay.</td></tr>
+    <tr><td><b>Deep house</b></td><td>Two-bar call and response, short stabs, minor pentatonic, 40% silence.</td><td>Round kick, shuffled hats, clap on 2 and 4.</td></tr>
+    <tr><td><b>Progressive</b></td><td>8 to 16 bar slow-rising phrase over a steady arp.</td><td>Floor kick, long build.</td></tr>
+    <tr><td><b>Drum and bass</b></td><td>Half-time long notes, one wide leap per 8-bar phrase.</td><td>Simple two-step break, tight snare.</td></tr>
+    <tr><td><b>Two-step</b></td><td>Short syncopated hooks, bright, major or Dorian.</td><td>Skipping kick, shuffled hats.</td></tr>
+    <tr><td><b>Breakbeat</b></td><td>Riff hooks, pentatonic, call and response.</td><td>Syncopated synthesised break.</td></tr>
+    <tr><td><b>Lo-fi</b></td><td>Lazy phrases behind the beat, 7ths, pentatonic.</td><td>Soft kick, swing, noisy hats.</td></tr>
+    <tr><td><b>Ambient</b></td><td>Two or three loops of unequal length drifting apart. Never resolves.</td><td>None, or a very soft Thump as a heartbeat.</td></tr>
+    <tr><td><b>Drone</b></td><td>No melody. One or two held tones that move a step every several bars.</td><td>None.</td></tr>
+    <tr><td><b>Downtempo</b></td><td>Slow 4-bar phrases with long gaps.</td><td>Half-time soft kick, rim.</td></tr>
+    <tr><td><b>Synthwave</b></td><td>8th-note arps and anthemic 4-bar hooks in minor, heavy repetition.</td><td>Floor kick, big synthetic snare.</td></tr>
+  </table></div>
+    <p class="note">Starting directions, tuned by ear in the spike and the tuning row. Styles below the line keep their current engines.</p>
+    <p class="note">The four lead kinds from phase 2 (hooks, 4 to 8 bar phrases, rolling acid lines, slow evolving lines) become presets of this one engine, not four separate generators.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--org)">
+    <h3 style="color:var(--org)">Controls it unlocks</h3>
+    <table>
+      <tr><th>Mode</th><th>Controls</th></tr>
+      <tr><td><b>Simple</b></td><td>Kind (Hook · Phrase · Roll · Drift), New (dice), Vary (one mutation now)</td></tr>
+      <tr><td><b>Advanced</b></td><td>Density, Syncopation, Range, Repeat (A against B), Leap, Space, Phrase length 1/2/4/8, Evolve rate</td></tr>
+    </table>
+  </div>
+
+  <div class="card l" style="--c:var(--red)">
+    <h3 style="color:var(--red)">How the spike runs</h3>
+    <ul>
+      <li><b>Harness:</b> one standalone page on a spike branch, outside the app, using the app's synth and clock. Nothing in the app changes.</li>
+      <li><b>Test:</b> per style, eight seeds, old generator against new on the same patch, blind A/B, a keep or kill tap on each.</li>
+      <li><b>Measured in code per melody:</b> share of stepwise moves, share of strong onsets on chord tones, share of bars reusing the motif rhythm, range, share of rests. Each profile sets target bands; they become unit tests.</li>
+      <li><b>Order of test:</b> deep techno, deep house, ambient and drum and bass first; the other ten once those pass.</li>
+      <li><b>Pass:</b> you keep at least 6 of 8 new leads per style, and new beats old blind in at least 3 in every 4 styles.</li>
+      <li><b>If a style fails:</b> rewrite that style's cells and bands. The engine stays.</li>
+      <li><b>Timebox:</b> one Sonnet chat with Opus agents.</li>
+      <li><b>Out:</b> harness URL, the audit note, the profile data file, the build rows.</li>
+    </ul>
+    <p class="note">All numbers above are starting values to tune by ear, not findings.</p>
+  </div>
+</section>
+
+<section id="pad">
+  <h2><span class="n" style="background:var(--org)">3</span>Harmony pad</h2>
+  <p class="sub">A theremin for the whole piece. The patterns keep their rhythm; your finger supplies the pitch.</p>
+
+  <div class="card l" style="--c:var(--org)">
+    <h3 style="color:var(--org)">The lanes</h3>
+    <ul>
+      <li>The pad is a stack of <b>note lanes</b> over about two octaves, low at the bottom.</li>
+      <li><b>Wide lanes</b> are the notes of the chord sounding now. <b>Thin lanes</b> are the scale notes between them.</li>
+      <li>When the progression moves to the next chord, <b>the lanes redraw</b>. A held finger keeps its height, so its pitch follows the chord.</li>
+      <li>A strip above the pad shows the chord now and the next one with beats to go.</li>
+    </ul>
+  </div>
+
+  <div class="card l" style="--c:var(--pur)">
+    <h3 style="color:var(--pur)">What follows the finger</h3>
+    <table>
+      <tr><th>Layer</th><th>What it does</th></tr>
+      <tr><td><b>Lead</b></td><td>Its motif re-centres on the touched note. Rhythm and contour stay.</td></tr>
+      <tr><td><b>Arp</b></td><td>Its range centres on the touched note.</td></tr>
+      <tr><td><b>Chords</b></td><td>Re-voiced so the top note is the touched note, or the nearest chord tone below it.</td></tr>
+      <tr><td><b>Pad</b></td><td>Off by default. On: opens its voicing upward.</td></tr>
+      <tr><td><b>Bass</b></td><td>Locked to the roots.</td></tr>
+    </table>
+    <p class="note">Follow chips under the pad switch each layer in or out.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--teal)">
+    <h3 style="color:var(--teal)">Actuation</h3>
+    <ul>
+      <li><b>Immediate.</b> Unlike every other toggle, the pad does not wait for the bar. Every lane is in key, so nothing can clash.</li>
+      <li><b>Slide</b> glides through the lanes with a short portamento. <b>Tap</b> jumps.</li>
+      <li><b>Left to right is expression:</b> soft and dark on the left, open and bright on the right, applied to the layers that follow.</li>
+      <li>Held notes glide to the new pitch; they are not retriggered.</li>
+    </ul>
+  </div>
+
+  <div class="card pick">
+    <p class="t"><span>Pick:</span>Let go and it returns home; Latch holds it</p>
+    <ul>
+      <li>That is how a theremin behaves: hand away, effect gone.</li>
+      <li>A stray touch cannot leave the song stuck somewhere odd.</li>
+      <li>Latch stores the position per section.</li>
+    </ul>
+    <p class="o"><b>Override if:</b> you want the pad to stay where you leave it by default.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--yel)">
+    <h3 style="color:var(--yel)">Colour strip</h3>
+    <ul>
+      <li>The dark to bright mode control from the first draft stays, as a five-stop strip under the pad.</li>
+      <li>It changes the scale itself (Phrygian, Aeolian, Dorian, Mixolydian, Ionian; root fixed), so it lands on the next bar. Each style clamps its range.</li>
+    </ul>
+  </div>
+
+  <div class="card l" style="--c:var(--blue)">
+    <h3 style="color:var(--blue)">Placement</h3>
+    <ul>
+      <li><b>Phone:</b> a Harmony button on the main tab swaps the pattern grid for the pad. No scrolling added.</li>
+      <li><b>Tablet:</b> pad always visible beside the layers.</li>
+      <li><b style="color:var(--yel)">Assumed:</b> the screens draw Morph and DROP in a row above the sections. Their real fixed position is kept; Harmony goes wherever does not move them.</li>
+    </ul>
+  </div>
+
+  <div class="card l" style="--c:var(--red)">
+    <h3 style="color:var(--red)">Precondition and spike</h3>
+    <ul>
+      <li>Chords, bass, arp and pads must store <b>scale degrees</b>, not fixed pitches (<b style="color:var(--yel)">assumed</b> not fully true today). The audit confirms; if not, a refactor row goes before the pad.</li>
+      <li>Spiked in the lead harness: the pad over a looping four-chord progression with chords, bass and the new lead.</li>
+      <li><b>Pass:</b> sliding anywhere sounds musical in each top style, chord changes under a held finger are clean, and it responds with no audible lag.</li>
+    </ul>
+    <p class="note">Not included: key changes, playing chords by finger, anything on drums.</p>
+  </div>
+</section>
+
+<section id="kick">
+  <h2><span class="n" style="background:var(--red);">4</span>Kick and Thump</h2>
+  <p class="sub">A thumping kick on the beat for vibing: punchy, with a shape you can play.</p>
+
+  <div class="card l" style="--c:var(--red)">
+    <h3 style="color:var(--red)">Thump, a new beat</h3>
+    <ul>
+      <li>Kick on every beat. Nothing else.</li>
+      <li>Sits beside the existing four-on-the-floor, which keeps its hats and claps.</li>
+      <li>Other drum voices can be switched in one at a time on top of it.</li>
+      <li>Default beat for deep techno, minimal techno, dub techno and deep house. Ambient gets it very soft, as an option.</li>
+    </ul>
+  </div>
+
+  <div class="card l" style="--c:var(--org)">
+    <h3 style="color:var(--org)">The kick, in four parts</h3>
+    <table>
+      <tr><th>Part</th><th>What it is</th></tr>
+      <tr><td><b>Click</b></td><td>A tick of a few milliseconds at the front, so it cuts through on a phone speaker.</td></tr>
+      <tr><td><b>Punch</b></td><td>A fast pitch sweep from around 150 to 200 Hz down to the fundamental.</td></tr>
+      <tr><td><b>Body</b></td><td>A sine at 45 to 60 Hz, tuned to the song's root.</td></tr>
+      <tr><td><b>Tail</b></td><td>The volume decay, roughly 200 to 500 ms.</td></tr>
+    </table>
+    <p class="note">Then soft saturation for weight, and headroom before the limiter so it does not crackle. All synthesised, no samples.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--teal)">
+    <h3 style="color:var(--teal)">The envelope part</h3>
+    <ul>
+      <li><b>Kick quadrant</b>, same component as the envelope one: up is Punch (sweep depth plus click), right is Length (tail).</li>
+      <li><b>Pump:</b> each kick ducks chords, pads and bass, then lets them swell back. This is the breathing between the beats.</li>
+      <li><b>Simple:</b> the quadrant and Pump. <b>Advanced:</b> adds Tune, Click, Drive and pump release.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--yel)">Done when</h3>
+    <ul>
+      <li>Blind against the current kick, you pick the new one in deep house, deep techno and dub techno.</li>
+      <li>It thumps on headphones and is still audible on the phone speaker.</li>
+      <li>No clipping or crackle with Pump at full and DROP on.</li>
+    </ul>
+    <p class="note"><b style="color:var(--yel)">Assumed:</b> the current kick is a simpler one-stage sound. The audit confirms. All numbers are starting values.</p>
+  </div>
+</section>
+
+<section id="perform">
+  <h2><span class="n" style="background:var(--teal)">5</span>Tablet landscape: Perform</h2>
+  <p class="sub">Built for the Legion Y700 held in both hands. Thumbs play at the edges; the centre is for looking.</p>
+
+  <div class="card l" style="--c:var(--yel)">
+    <h3 style="color:var(--yel)">The device</h3>
+    <ul>
+      <li>8.8 inch, 16:10. The screen is about <b>189.5 × 118.5 mm</b>. Around 350 g, so it is held like a controller.</li>
+      <li>Pixel count differs between Y700 generations (2560 × 1600 or 3040 × 1904). The layout is sized in millimetres, so that does not matter. The first row reads the real viewport on your device.</li>
+    </ul>
+  </div>
+
+  <div class="card l" style="--c:var(--teal)">
+    <h3 style="color:var(--teal)">Three zones</h3>
+    <table>
+      <tr><th>Zone</th><th>What lives there</th></tr>
+      <tr><td><b>Left thumb</b><br>46 mm</td><td>Structure. Five layer mutes, sections A to D as a 2 × 2 block, Morph and DROP at the bottom.</td></tr>
+      <tr><td><b>Right thumb</b><br>59 mm</td><td>The harmony pad, full height, an octave and a half, chord lanes about 11 mm tall. Octave down, Latch, octave up underneath.</td></tr>
+      <tr><td><b>Centre</b></td><td>Chord strip, pattern view, the kick quadrant and the filter quadrant, transport. Things you look at, or set and leave.</td></tr>
+    </table>
+  </div>
+
+  <div class="card pick">
+    <p class="t"><span>Pick:</span>Grip layout, thumbs at the edges</p>
+    <ul>
+      <li>At this size and weight it gets held, not laid flat.</li>
+      <li>Both thumbs reach their whole zone without regripping.</li>
+      <li>Flat on a desk it still works with fingers.</li>
+    </ul>
+    <p class="o"><b>Override if:</b> you mostly play it flat on a desk. Then the pad moves to the centre and grows.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--org)">
+    <h3 style="color:var(--org)">Rules</h3>
+    <ul>
+      <li>Every performing control is at least <b>10 mm</b> on its short side.</li>
+      <li><b>Two thumbs at once:</b> holding the pad while hitting a mute, a section or DROP must work.</li>
+      <li>The pad reacts on touch-down, not on release.</li>
+      <li>No scrolling, no swiping. The screen stays awake while playing.</li>
+      <li>Tabs shrink to a slim strip at the top, out of the playing area.</li>
+      <li>Morph and DROP sit bottom-left in both Simple and Advanced.</li>
+      <li>This replaces the landscape Play tab only. Instrument tabs and portrait keep the current tablet layout.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--yel)">Done when</h3>
+    <ul>
+      <li>On the Y700, every control in both thumb zones is reachable without shifting grip.</li>
+      <li>Pad plus any left-zone control work together, every time.</li>
+      <li>Measured on the device, chord lanes are at least 10 mm tall.</li>
+    </ul>
+    <p class="note"><b style="color:var(--yel)">Assumed:</b> the 65 mm thumb reach in the annotated screen is my working estimate, not a measurement. The row starts with a one-screen reach test on your hands and sets the zone widths from that. I have not seen the current tablet layout either.</p>
+  </div>
+</section>
+
+<section id="signature">
+  <h2><span class="n" style="background:var(--pur)">6</span>Signature</h2>
+  <p class="sub">Your own style, first in the list. Natascha Polké, Jon Hopkins and Lane 8, reduced to what a synth-only groovebox can do.</p>
+
+  <div class="card l" style="--c:var(--pur)">
+    <h3 style="color:var(--pur)">What each one gives it</h3>
+    <table>
+      <tr><th>From</th><th>Taken</th></tr>
+      <tr><td><b>Polké</b></td><td>Melancholy, song-like lines. Glassy motifs over a warm bass. With no vocals in the app, the lead carries the voice's part.</td></tr>
+      <tr><td><b>Hopkins</b></td><td>A hard, steady pulse against soft ambient wash. One drone note under everything. A little grit on the texture.</td></tr>
+      <tr><td><b>Lane 8</b></td><td>Restraint. An arp that opens slowly, held bass notes, few elements, each one clear.</td></tr>
+    </table>
+    <p class="note">Built from published descriptions of their sound and general production knowledge, not from analysing audio. It gets tuned by ear against one reference track per artist that you name.</p>
+  </div>
+
+  <div class="card l" style="--c:var(--red)">
+    <h3 style="color:var(--red)">The recipe</h3>
+    <table>
+      <tr><th>Part</th><th>Setting</th></tr>
+      <tr><td><b>Tempo, key</b></td><td>123 bpm. Minor, home Aeolian, colour strip limited to Phrygian through Dorian.</td></tr>
+      <tr><td><b>Drums</b></td><td>Thump. Round tuned kick, medium tail. A quiet offbeat hat. Rim on 2 and 4 available, off by default. No fills.</td></tr>
+      <tr><td><b>Pads</b></td><td>Wide detuned pad with a slow filter sweep over 8 to 16 bars, a noise layer riding the sweep for the whoosh, long reverb, Pump high so it breathes around the kick.</td></tr>
+      <tr><td><b>Drone</b></td><td>The root, held, always on, very low in the mix.</td></tr>
+      <tr><td><b>Bass</b></td><td>One long sub note per chord, on the root.</td></tr>
+      <tr><td><b>Lead</b></td><td>Sharp: a bright pluck or bell, instant attack, short decay, dotted-eighth delay, little reverb. A 2-bar hook of 4 or 5 notes in an 8-bar A A′ A B phrase, peaking around bar 6.</td></tr>
+      <tr><td><b>Arp</b></td><td>Quiet 16ths under the lead, filter closed at first, opening on DROP.</td></tr>
+      <tr><td><b>Chords</b></td><td>Four-chord minor loops, one chord per bar or two, open voicings with added 9ths.</td></tr>
+    </table>
+  </div>
+
+  <div class="card l" style="--c:var(--teal)">
+    <h3 style="color:var(--teal)">Sections and DROP</h3>
+    <ul>
+      <li><b>A:</b> drone and pad, lead hook alone, kick enters late.</li>
+      <li><b>B:</b> the groove. Kick, bass, pad, hook, quiet arp.</li>
+      <li><b>C:</b> the comedown. Kick out, pad wide open, lead drops an octave and slows.</li>
+      <li><b>D:</b> kick and drone, everything else thinning.</li>
+      <li><b>DROP:</b> arp filter opens, hat and second pad layer join, lead doubles an octave up.</li>
+      <li><b>Harmony pad default:</b> lead and arp follow; chords stay put.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--yel)">Done when</h3>
+    <ul>
+      <li>Played after your three reference tracks, it sits in the same mood without sounding like a copy of any one.</li>
+      <li>You can leave it running for ten minutes with only the harmony pad and DROP and it stays interesting.</li>
+    </ul>
+    <p class="note">Signature is built last in the tuning row, because it needs the new kick, the lead engine and the pad all in place.</p>
+  </div>
+</section>
+
+<section id="rows">
+  <h2><span class="n" style="background:var(--blue)">7</span>Rows</h2>
+  <p class="sub">Three bundles, three chats, the usual starter. G7 Retouch moves to bundle 13.</p>
+  <div class="card">
+    <table>
+      <tr><th>Bundle</th><th>Row</th><th>What</th></tr>
+      <tr><td class="mono">10</td><td class="mono">F1</td><td>Straight in: random top vibe on launch, dice, the new picker</td></tr>
+      <tr><td class="mono">10</td><td class="mono">F2</td><td>The four-part kick, the kick quadrant, Thump</td></tr>
+      <tr><td class="mono">11</td><td class="mono">F3</td><td>Lead planner, measures, the lab; Deep techno, Deep house, Ambient, Drum and bass</td></tr>
+      <tr><td class="mono">11</td><td class="mono">F4</td><td>Lead and drum profiles for the other ten top vibes</td></tr>
+      <tr><td class="mono">12</td><td class="mono">F5</td><td>The harmony pad, phone and tablet, with Colour</td></tr>
+      <tr><td class="mono">12</td><td class="mono">F6</td><td>Perform on the Y700, sized in millimetres</td></tr>
+      <tr><td class="mono">12</td><td class="mono">F7</td><td>Signature</td></tr>
+    </table>
+  </div>
+  <div class="card l" style="--c:var(--org)">
+    <h3 style="color:var(--org)">For you by hand</h3>
+    <ul>
+      <li><b>H6, after bundle 11:</b> run the lab (old leads against new, blind) and send the tally in Notes.</li>
+      <li><b>H4, before bundle 12:</b> run the reach test on the Y700 from the lab page and send its four numbers in Notes.</li>
+      <li><b>H5, before bundle 12, optional:</b> one reference track per artist for Signature.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="screens">
+  <h2><span class="n" style="background:var(--yel)">▣</span>Screens</h2>
+  <p class="sub">Mockups drawn from the live look. Swipe sideways.</p>
+  <div class="gal">
+    <figure class="p"><img src="img/groovebox-mobile-1-harmony-pad.jpg" alt="Phone: harmony pad"><figcaption><b>Phone · harmony pad</b>Finger on the 5th of Am7, sliding up from the root.</figcaption></figure>
+    <figure class="p"><img src="img/groovebox-mobile-2-kick-thump.jpg" alt="Phone: kick and Thump"><figcaption><b>Phone · kick and Thump</b>Kick shape, quadrant, four knobs.</figcaption></figure>
+    <figure class="p"><img src="img/groovebox-mobile-3-top-styles.jpg" alt="Phone: style list"><figcaption><b>Phone · style list</b>Signature, fourteen top styles, a line, the rest.</figcaption></figure>
+    <figure class="w"><img src="img/groovebox-y700-perform.jpg" alt="Y700 perform layout"><figcaption><b>Y700 · Perform</b>Left thumb structure, right thumb pad, centre display.</figcaption></figure>
+    <figure class="w"><img src="img/groovebox-y700-perform-thumb-zones.jpg" alt="Y700 perform layout with thumb reach"><figcaption><b>Y700 · thumb zones</b>Reach arcs from a mid-edge grip, sizes in mm.</figcaption></figure>
+    <figure class="w"><img src="img/groovebox-tablet-1-harmony-pad.jpg" alt="Tablet: harmony pad"><figcaption><b>Tablet · first draft</b>Superseded in landscape by Perform.</figcaption></figure>
+    <figure class="w"><img src="img/groovebox-tablet-2-kick-styles.jpg" alt="Tablet: kick and styles"><figcaption><b>Tablet · kick and styles</b>Style list as a side panel.</figcaption></figure>
+  </div>
+</section>
+</div>
+<script>
+document.querySelectorAll('nav a').forEach(function(a){a.addEventListener('click',function(e){var t=document.querySelector(a.getAttribute('href'));if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'});}});});
+</script>
+</body>
+</html>

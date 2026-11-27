@@ -11,7 +11,10 @@ The next open bundle is the first numbered bundle below with a row not in Done. 
 | 7b | R1, P10b, P10c, P10d, player pass (Done) | A leaner build cycle, the drop's wind-down (C21), the bundle 7 player findings (C23), two live-build bugs from Pedro (play button, DROP and Morph position) |
 | 8 | T1 (Done), T2 (Done), T3 (Done) | Tablet layouts, punch pads |
 | 9 | G6 (Done) | The APK |
-| 10 | G7 | Retouch from notes |
+| 10 | F1, F2 | Phase 4: straight in with a random top vibe, the new picker, the new kick and Thump |
+| 11 | F3, F4 | Phase 4: leads that hold together in all fourteen top vibes, the lab |
+| 12 | F5, F6, F7 | Phase 4: the harmony pad, Perform on the Y700, Signature |
+| 13 | G7 | Retouch from notes |
 
 ## Carried
 
@@ -49,6 +52,9 @@ Fixes waiting for the next chat. The first builder of the next bundle clears the
 - **H4. Install the APK and play it** (27 Nov 2026): once the `apk.yml` run on `main` is green, download `groovebox-debug.apk` from https://github.com/apcanario/groovebox/releases/tag/latest and follow `docs/INSTALL.md` (uninstall any earlier APK once). Check: first tap starts the sound, the screen stays on while playing, backing out of the app stops the jam, a take saves to Downloads and shares, a phone stays portrait, a tablet rotates. Say in the next `Notes:` what breaks. Open until Pedro says done.
 
 - **H3. Hear and use the shell on the phone** (22 Nov 2026): open https://apcanario.github.io/groovebox/ and jam a whole song with one thumb; confirm whether the C1 crackle is gone. Send notes in the next starter's `Notes:` line. Now also covers the G3 tabs (Drums, Bass, Synth, Mix), the G4 layer tabs (Arp, Pad, Generative on Layer 1 and 2) and the G5 Songs sheet and recording. Open until Pedro says done.
+- **H4. Reach test on the Y700** (27 Nov 2026). After bundle 11 lands, open `https://apcanario.github.io/groovebox/#lab` on the tablet in landscape, run the reach test and put the four numbers it shows (viewport width and height, left reach, right reach) in the `Notes:` line of bundle 12. Without them F6 assumes 1280 x 800 and 65 mm.
+- **H5. Reference tracks for Signature** (27 Nov 2026). One track each by Natascha Polké, Jon Hopkins and Lane 8, named in the `Notes:` line of bundle 12. Optional: without them F7 builds from spec 10.2.
+- **H6. The lab tally** (27 Nov 2026). After bundle 11, go through `#lab` for the vibes you care most about and put the tally line in the next `Notes:`. Kills are reworked in G7.
 - H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026.
 
 ## Bundle 2: drums, bass, synth, mix
@@ -122,11 +128,93 @@ Done (27 Nov 2026), see Done below. Its text left the queue.
 
 Done (27 Nov 2026), see Done below. Its text left the queue.
 
-## Bundle 10: retouch
+## Bundle 10: phase 4, straight in and the kick
+
+Read spec 10.1, 10.2 and 10.5 in full before any row of this bundle.
+
+### F1. Straight in
+
+- The app opens on the Play tab with a vibe drawn from the shuffle bag of top vibes; key and bpm rolled with it; nothing sounds until Play (spec 10.1). `top: true` on the fourteen style files, `bpmRange` where a vibe wants more than plus or minus 2.
+- The bag: seeded generator only, kept in local storage, plain seeded draw without storage, never the last launch's vibe.
+- A launch jam never played or edited is not saved; the last jam is first in Songs.
+- The header's vibe control gains a dice; name opens the picker as a sheet; both land on the bar line while playing.
+- The picker: top vibes in two columns, a line, the other ten; "More" switch where both groups do not fit at 48 px; "Surprise me". Signature's tile is F7's; leave its slot out until then.
+- Spec 8.2's opening line is replaced by a pointer to 10.1. README updated.
+
+**Done when:** a cold start shows the Play tab with a top vibe loaded and Play starts sound in one tap (tested, and a smoke check in core); 14 draws from a fresh bag give 14 different vibes and the 15th differs from the 14th (tested); a draw rolls key and bpm inside the range (tested); an untouched launch jam adds nothing to Songs (tested); the picker shows no scroll and no tile under 48 px at 360 x 640, 412 x 915, 800 x 1280 and 1280 x 800, top group first (`tools/shots.py`); no label wraps or overflows (shots); the ten other vibes' smoke fingerprints are unchanged except where the opening changed them, listed in the changelog; `check` and `smoke` pass.
+
+### F2. The kick and Thump
+
+- The four-part kick voice of spec 10.5 in `src/engine/`, replacing the membrane voice: click, sweep, body, tail, then the drive as built. Root switch and tuning to the song's root.
+- Defaults reproduce the old kick for the ten other vibes. The fourteen top vibes get kick settings from the Drums column of the table in spec 10.3, as a new field of each style's drum patch.
+- The kick quadrant on the Drums panel, Simple and Advanced, phone and tablet; Click, Tune and Root in the Advanced voice controls. What the Drums XY held before stays reachable; say where in Choices.
+- Beat `thump` (name "Thump") in `src/data/beats/`. Top vibes take it where the table says so.
+- The quadrant acts at once and never clicks: the continuity check covers a sweep of each axis while the kick plays.
+
+**Done when:** the kick's measured fundamental sits within 30 cents of the song's root (or its octave between 45 and 60 Hz) with Root on, in three keys (tested); Punch at its ends changes the first 30 ms and Length at its ends changes the tail, both measurably (tested); Thump plays the kick on steps 0, 4, 8 and 12 and nothing else (tested); for each of the ten other vibes the kick's level and length measure within the smoke's existing tolerance of the old voice (tested against a fixture recorded from the old build before the change); master peak stays under the limit with Pump at full and a drop on (drop part of the vibe nearest the change); the quadrant is at least 48 px a side on every size and nothing moves DROP or Morph (shots, `PLAY_PLACE`); `check` and `smoke` pass. Whether it thumps is Pedro's ear.
+
+## Bundle 11: phase 4, leads
+
+Read spec 8.5 and 10.3 in full before any row of this bundle. `docs/reviews/P5-patterns.md` shows what the old planner prints.
+
+### F3. The lead planner, the measures and the lab
+
+- `src/music/leadMeasure.ts` with the five measures of spec 10.3. First slice: run it over the old planner, 8 seeds for each of the fourteen top vibes as their style files stand, and write the table to `docs/reviews/F3-before.md`. This is the audit: it says in numbers what "random" was.
+- Rhythm cells as data in `src/data/cells/`, and the new planning in `leadKit.ts` and the four planned styles: rhythm first, strong onsets on chord tones, steps with bounded leaps, a phrase ending, one change at a time. Pulse untouched.
+- `leadVersion` on the song: old songs play the old planner note for note (a fixture of a song saved before this row must print the same notes); new jams use the new one.
+- Lead profiles and at least six cells each for Deep techno, Deep house, Ambient and Drum and bass. Their style files move to the profile's lead style.
+- Every knob of 8.5 still audible in the new planner.
+- The lab at `#lab`: A and B in random order per seed, keep and kill, a tally line; a viewport readout and the reach test for H4. Not linked from the UI, no effect on the app.
+- `docs/reviews/F3-after.md`: the same table from the new planner, beside the bands.
+
+**Done when:** each of the four vibes' phrases sits inside its profile's bands for 8 seeds (tested, and the test fails on the old planner); a pre-phase song fixture prints identical notes before and after (tested); for each planned style every knob's minimum and maximum give different notes (tested, as in P5); a phrase loops identically until Lock lets one thing change, and then exactly one note, onset or ending differs (tested); the lab plays both planners on the same patch and its tally survives a reload (smoke check in core); no saved-jam format break (load fixtures pass); `check` and `smoke` pass. Whether the lines are good is Pedro's ear, through the lab.
+
+### F4. The other ten top vibes
+
+- Lead profiles and at least six cells each for Melodic techno, Minimal techno, Dub techno, Progressive, 2-step, Breakbeat, Lo-fi, Drone, Downtempo and Synthwave, following the table in spec 10.3. Ambient's unequal-length cells and Drone's held tones are checked by their own measures (no bar-repeat band for either).
+- The drum direction of the same table for these ten: beat choice and kick settings only, from what F2 built.
+- The lab lists all fourteen.
+- `docs/reviews/F4-after.md`: the measures table for all fourteen.
+
+**Done when:** all fourteen top vibes sit inside their bands for 8 seeds (tested); Ambient's layers do not realign within 64 bars and Drone moves by step no more often than its profile says (tested); the ten other vibes' style files are unchanged (git diff shows none of them); `check` and `smoke` pass.
+
+## Bundle 12: phase 4, the harmony pad, Perform and Signature
+
+Read spec 10.2, 10.4 and 10.6, with 9.2 and 9.6, in full before any row of this bundle. A `Notes:` line may carry H4's four numbers and H5's three tracks.
+
+### F5. The harmony pad
+
+- `engine.harmony({ height, expression } | null)` behind the engine layer: the lead window, the arp range, the synth's top voice and, when switched in, pad and drone voicing follow; the bass never. At once, with a glide and no retrigger; expression as a filter and level offset taken off on release.
+- The pad UI: lanes from the chord sounding now and the scale, redrawn on the chord change with the finger's height kept; the chord strip; follow chips; Latch; release returns home over one beat; a latched position stored with the section and saved with the song.
+- Phone: the Harmony control on the Play tab swaps the lanes area for the pad. Tablet: an eighth rail button, first, its panel the pad at full height. Simple and Advanced the same.
+- Colour: the five-stop strip, landing on the bar line, `colour` clamp in the style files of the top vibes; spec section 3's mood line edited as 10.4 says.
+- Many fingers (9.6): the pad with a punch pad, a section and DROP.
+- Last slice: a recorded take of a slide across every lane in three vibes passes the continuity check.
+
+**Done when:** every lane's pitch is in the song's scale and every wide lane is a tone of the chord sounding then, across a full progression in three vibes (tested); a held height gives a new pitch at the chord change with no new attack (tested on the event log); with the pad held the bass's notes are identical to a run without it (tested); release brings every followed value back to its own setting within one beat, and a latched position survives a section switch and a save and reload (tested); a slide across all lanes makes no jump above the continuity threshold (smoke, nearest part plus one drop group); pad plus Cut plus DROP held together all act (shots walk with three pointers); wide lanes are at least 48 px tall on every size, DROP and Morph have not moved (shots, `PLAY_PLACE`); Colour lands on the bar line and old songs load with their mood (tested); `check` and `smoke` pass.
+
+### F6. Perform on the Y700
+
+- Tablet landscape opens with the right half on Harmony.
+- Millimetre sizing from H4's numbers in `Notes:` (spec 10.6): pixels per millimetre for this viewport in `src/ui/size.ts`, wide lanes, punch pads, section pads and DROP at least 10 mm on the short side, everything a thumb hits while playing inside the measured reach. Without the numbers: 1280 x 800 and 65 mm, recorded under Choices.
+- No change to the phone or to tablet portrait. Panels that were whole at 1280 x 800 (C32) stay whole.
+
+**Done when:** at the Y700 viewport every performing control measures at least 10 mm on its short side by the stored pixels per millimetre (shots, a new `PERFORM_MM` check); each control's centre lies inside the reach arc of its side (shots); the seven instrument panels are still whole at 1280 x 800 (the `full` tests); rotation still changes layout with no audio gap (core); `check` and `smoke` pass. Whether it plays well in the hands is Pedro's test.
+
+### F7. Signature
+
+- `src/styles/signature.ts`, `top: true`, `signature: true`, built to the table in spec 10.2: beat `signature`, its progressions tagged in the library, its lead profile and cells, its drop recipe, its Morph limits, its `colour` clamp.
+- First in the picker on its own full-width tile, first in the bag's order, in the lab.
+- If `Notes:` names H5's tracks, tune toward their mood within the table. Copy nothing from them.
+- The 25th vibe joins a drop smoke group and the vibes part; `tools/smoke_parts.py` must still place every check.
+
+**Done when:** Signature loads from the picker and from the bag and plays every section (vibes part); its lead sits inside its bands for 8 seeds (tested); its drop measures wider and within the level rule of 8.9 (its drop group); Morph runs ten minutes on it with no repeat by the morph check; the picker still fits every size with its tile added (shots); the README lists 25 vibes; `check` and `smoke` pass. Whether it sounds like him is Pedro's ear.
+
+## Bundle 13: retouch
 
 ### G7. Retouch
 
-Runs only when the starter carries a `Notes:` line. After phases 2 and 3 and the install (P1 to P11, T1 to T3, G6) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
+Runs only when the starter carries a `Notes:` line. After phases 2, 3 and 4 and the install (P1 to P11, T1 to T3, G6, F1 to F7) Pedro plays it and sends notes on the interface, the instruments and the sounds. This row works those notes and nothing else: each note is a fix, grouped by tab. Where a note changes the spec, the spec is edited in the same commit. The row reopens for every new set of notes; it is never Done.
 
 **Done when:** every note in the `Notes:` line is either fixed or answered in the reply with the reason it was not; `check` and `smoke` pass.
 
@@ -140,7 +228,6 @@ Not scheduled. Each becomes a row when Pedro asks for it.
 - **L6.** Knob snapshots per section.
 - **L7.** Morph between two saved generative patterns.
 - **L9.** Automatic transitions on a section switch (drum fill, filter drop), chosen per style.
-- **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch.
 - **L11.** Take one part from another style (only its drums, only its chords, only its sounds).
 
 ### Later rows closed or moved by the phase 2 and 3 plan
@@ -151,6 +238,7 @@ Kept here so no row disappears without a record.
 - **L5.** Stutter and beat-repeat on the Mix tab. Moved into T3 as the Stutter punch pad.
 - **L8.** One effect slot per instrument and a lo-fi master. Moved into P9 (two slots per instrument, twelve effects) and P7 (the lo-fi master).
 - **L12.** Autopilot. Moved into P11 as Morph.
+- **L10.** A play pad: an XY surface that plays in-key notes on a layer by touch. Moved into F5 as the harmony pad (spec 10.4), 27 Nov 2026.
 
 ## Done
 

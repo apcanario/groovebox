@@ -541,3 +541,110 @@ Six momentary performance effects, all synthesized, all landing in time.
 
 - Any number of controls can be used at once: two dials, the XY pad and a pad, several pads together.
 - No control cancels another's touch.
+
+## 10. Phase 4: straight in, leads that hold together, the harmony pad, the kick
+
+Settled on 27 Nov 2026. Sections 1 to 9 still hold except where a line here says it replaces one. `docs/design/phase4/` holds the screens Pedro approved as direction; they were drawn before the tablet desk was read, so where a screen and section 9 disagree on layout, section 9 and this section win.
+
+### 10.1 Opening the app
+
+Replaces the "Opening the app" line of 8.2.
+
+- **The app opens on the Play tab with a vibe already loaded.** No picker first. Nothing sounds until Play: one tap from a cold start to sound, the same on Pages and in the APK.
+- **The vibe is drawn from a shuffle bag of the top vibes (10.2):** each comes up once before any repeats, and never the one the last launch drew. The bag is kept in local storage; without storage the draw is plain seeded random. The same draw rolls the key and a bpm inside the vibe's range (`bpmRange` in the style file, default the vibe's bpm plus or minus 2), so one vibe does not open the same twice.
+- **The jam from last time is not lost:** it is first in Songs. A launch jam that was never played or edited is not saved.
+- **The vibe control in the header gains a dice.** Tapping the name opens the picker as a sheet; tapping the dice draws the next vibe from the bag. While playing, both land on the next bar line (8.2).
+- **The picker:** Signature first on a tile of its own, full width; then the fourteen top vibes in two columns; then a line; then the ten other vibes. Where both groups fit at 48 px a tile with no scrolling, both show. Where they do not, the line carries a "More" switch that swaps the top group for the others and back. A "Surprise me" button draws from the bag. The text-fit rule of 8.6 applies.
+
+### 10.2 Top vibes and Signature
+
+- **Top vibes (14):** Deep techno, Melodic techno, Minimal techno, Dub techno, Deep house, Progressive, Drum and bass, 2-step, Breakbeat, Lo-fi, Ambient, Drone, Downtempo, Synthwave. A style file marks itself `top: true`. These get the work of 10.3 to 10.5. The other ten keep their sound: no row of this phase may change how they sound, and the smoke's fingerprints for them are the proof.
+- **Signature** is a 25th style, Pedro's own, marked `top: true` and `signature: true`, first everywhere a vibe is listed. Brief: Natascha Polké, Jon Hopkins and Lane 8 reduced to what a synth-only groovebox does. Simple drums, whooshing pads, sharp melodies.
+
+| Part | Signature |
+|---|---|
+| Tempo, key | 123 bpm (range 121 to 125), minor, mood dark-to-neutral |
+| Drums | Beat "Signature": Thump (10.5) plus a quiet offbeat closed hat. No clap, no fills. Round tuned kick, medium tail. |
+| Bass | Long notes on the root, Sub patch |
+| Synth | Pluck eighths, quiet, filter mostly closed; the Drop opens it |
+| Layer 1 | Lead, Hook: a bright Pluck or Bell patch, instant attack, short decay, a dotted-eighth echo, little reverb. A 2-bar hook of 4 or 5 notes in an 8-bar phrase, its highest note around bar 6. |
+| Layer 2 | Pad: Airy patch, wide, Motion high (a filter sweep over 8 to 16 bars), the air layer on, long reverb |
+| Mix | Pump high so the pad breathes around the kick |
+| Sections | Intro: pad and lead, kick enters late. Groove: everything. Break: kick out, pad wide open, lead an octave lower and sparser. Outro: kick and pad. |
+| Drop | Synth filter opens, hats up, pad widens, lead doubled an octave up. Bigger by width, not level. |
+| Morph | On by default, slow |
+
+- Built from written descriptions of the three artists, not from their audio. If the starter's `Notes:` names reference tracks, the row tunes toward their mood; it never copies a melody, a chord sequence or a sound.
+
+### 10.3 Leads that hold together
+
+The lead styles, their names and their twelve knobs (8.5) stay. What changes is how Hook, Phrase, Roll and Drift plan their notes. Pulse is unchanged.
+
+- **Rhythm first.** A planned style picks a rhythm cell (one or two bars of onsets, lengths and accents) before any pitch. Cells are data in `src/data/cells/`, tagged by vibe and lead style, at least six per top vibe. Busy thins or fills a cell; it does not replace it with random hits.
+- **Strong onsets take chord tones.** An onset on a beat, or the first or last onset of a bar, takes a tone of the chord sounding then. Other onsets take the scale notes between their neighbours. Tension loosens this toward the right, as built.
+- **Mostly steps.** A leap is a fifth at most (an octave where the profile allows one) and the next move steps back the other way.
+- **A phrase ends.** The last onset of a phrase is longer, lands on the root, third or fifth, and is followed by rest.
+- **It repeats, then changes one thing.** A phrase loops unchanged; when Lock lets it change, one note, one onset or the ending changes, never the whole phrase. New idea still redraws everything.
+- **A lead profile per top vibe** in its style file: lead style, cell tags, pitch pool, phrase length, how often it may change, target bands for the measures below. Directions:
+
+| Vibe | Lead | Drums |
+|---|---|---|
+| Deep techno | Hook. A one-bar cell of 2 to 4 notes on root, flat third, fifth, flat seventh; one note changes every 8 bars. | Thump, long dark kick, sparse hats |
+| Melodic techno | Phrase, 8 bars, minor, climbing to one peak | Thump or Techno, offbeat hat |
+| Minimal techno | Hook. Two or three notes, mostly rest. | Minimal, short dry kick |
+| Dub techno | Drift, nearly absent: the echoing chord is the melody | Dub, soft round kick |
+| Deep house | Hook. Two-bar call and response, short notes, minor pentatonic, at least 40% rest. | Thump or House shuffle, round kick |
+| Progressive | Phrase, 8 bars, slow rise | Progressive |
+| Drum and bass | Phrase, half-time long notes, one leap of a sixth or an octave per 8 bars | DnB two-step |
+| 2-step | Hook. Short syncopated, bright (major or dorian). | 2-step |
+| Breakbeat | Hook. Pentatonic riff, call and response. | Breakbeat |
+| Lo-fi | Phrase. Lazy, behind the beat, pentatonic. | Boom bap, soft kick |
+| Ambient | Drift. Two or three cells of unequal length (7, 11, 13 beats) that never line up. | None, or Thump very soft |
+| Drone | Drift. One or two held tones moving a step every several bars. | None |
+| Downtempo | Phrase, 4 bars, long gaps | Downtempo |
+| Synthwave | Hook, 4 bars, eighth notes, heavy repetition | Synthwave |
+
+- **Measured, per phrase** (`src/music/leadMeasure.ts`, pure): share of moves that are steps; share of strong onsets on chord tones; share of bars that reuse the first bar's rhythm; range in scale steps; share of rest. Each profile sets a band for each; a unit test draws 8 seeds per top vibe and fails when a phrase falls outside its band.
+- **Old jams keep their notes.** A song stores `leadVersion`. A song saved before this phase plays through the old planner, note for note; a new jam uses the new one.
+- **The lab.** `#lab` on the built app is a plain page, not linked from the UI: per top vibe, 8 seeds, old planner against new on the same patch, shown as A and B in a random order, with keep and kill taps and a tally Pedro can read out. The measures say whether a line has a shape. Only his ears say whether it is good (CLAUDE.md).
+- The numbers in this section are starting values.
+
+### 10.4 The harmony pad
+
+Replaces Later row L10. A theremin for the whole piece: the patterns keep their rhythm, the finger gives the pitch.
+
+- **Lanes.** The pad is a stack of note lanes over an octave and a half to two octaves, low at the bottom. Wide lanes are the tones of the chord sounding now, labelled with the note and its role (root, 3rd, 5th, 7th); thin lanes are the scale notes between. When the chord changes the lanes redraw, and a held finger keeps its height, so its pitch follows the chord. A strip over the pad shows the chord now and the next one with beats to go.
+- **What follows the finger,** each switchable by a chip under the pad:
+
+| Instrument | Follows by | Default |
+|---|---|---|
+| Layer in Lead mode | Its pitch window centres on the touched note; rhythm and contour stay | on |
+| Layer in Arp mode | Its octave range centres on the touched note | on |
+| Synth | Re-voiced so its top note is the touched note or the nearest chord tone below | on |
+| Layer in Pad or Drone mode | Voicing opens upward | off |
+| Bass | Never. It stays on the roots. | locked |
+
+- **It acts at once,** like a knob (section 3), not on the bar line. Sliding glides sounding notes to the new pitch (about 60 ms); nothing is retriggered. A tap jumps.
+- **Left to right is expression:** soft and dark at the left, open and bright at the right, as a filter and level offset on the instruments that follow. It adds to their own filter settings and is taken off on release.
+- **Release returns home** over one beat. **Latch** holds the position instead; a latched position is stored with the section.
+- **Colour.** A five-stop strip under the pad moves the song's mood from darker to brighter around the vibe's own mood, the root unchanged. It changes the scale itself, so it lands on the next bar line. Each style may clamp its stops (`colour` in the style file). Section 3's "one mood per song" becomes: one mood at a time.
+- **Phone:** a Harmony control on the Play tab swaps the lanes area for the pad and back. DROP and Morph do not move (the `PLAY_PLACE` check stays). **Tablet:** Harmony is an eighth rail button, first in the rail, and its panel is the pad at full height.
+- 9.6 applies: the pad, a punch pad, a section and DROP can all be touched together.
+- The engine call is one: `engine.harmony({ height, expression } | null)`. UI never touches Tone.js (section 7).
+
+### 10.5 The kick, and Thump
+
+- **A kick with four parts,** replacing the membrane voice: a click of a few milliseconds; a pitch sweep from 150 to 200 Hz down to the body; a sine body at 45 to 60 Hz; a tail of 0.15 to 0.5 s. Then the drive as built. Tune follows the song's root by default in the top vibes (a Root switch; off gives the Pitch dial as built).
+- **The other ten vibes must sound as before:** the new voice's defaults reproduce the old kick's level and length within what the smoke already measures.
+- **Kick quadrant** on the Drums panel in both modes: up is Punch (sweep depth and click together), right is Length (tail). Advanced adds Click, Tune and the Root switch to the kick's voice controls. Pump stays where it is.
+- **Thump** is a new beat: the kick on every beat and nothing else. It sits beside Four floor. Other voices can be added in the sequencer as with any beat.
+- Level stays inside the C1 trims. No sample.
+
+### 10.6 Perform on the Legion Y700
+
+Pedro's tablet is a Lenovo Legion Y700: 8.8 inch, 16:10, a screen of about 189.5 by 118.5 mm, held in two hands like a controller. Which generation, and so its CSS viewport, is not known; the lab reports it.
+
+- **The desk (9.2) is the performing surface and stays.** This section tunes it; it does not replace it.
+- **In tablet landscape the right half opens on Harmony.** With the pads on the left and the pad on the right, both thumbs play.
+- **Sized in millimetres on this device.** The lab page reports the viewport and has a reach test (Pedro drags each thumb as far as it goes from a normal grip). With those numbers: wide lanes are at least 10 mm tall, punch pads, section pads and DROP at least 10 mm on their short side, and nothing a thumb must hit while playing sits outside its reach. Without the numbers the row assumes 1280 x 800 and a 65 mm reach and records that as a choice.
+- Other tablets keep the size rules of 9.1; the millimetre rule is applied by converting from this device's measured pixels per millimetre.

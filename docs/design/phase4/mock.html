@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+:root{--bg:#0b0b0d;--tile:#1a1a1f;--tile2:#141418;--line:#2a2a31;--tx:#f2f2f4;--dim:#9c9ca8;--coral:#ff6b6b;--teal:#2a9d8f;--blue:#5b8fb5;--pur:#9b5de5;--yel:#e9c46a;--org:#f4a261}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:"DM Sans",sans-serif;font-weight:500;overflow:hidden}
+.scr{display:none;flex-direction:column;gap:6px;padding:8px 10px 0;background:var(--bg);position:relative}
+.phone{width:360px;height:800px}
+.tab{width:1280px;height:800px;padding:10px 14px 0;gap:8px}
+.row{display:flex;gap:6px;flex:none}
+.t{background:var(--tile);display:flex;align-items:center;justify-content:center;white-space:nowrap;border-radius:3px;font-size:13px;color:var(--dim);font-weight:700}
+.t.on{color:#0b0b0d}
+.f1{flex:1}.f2{flex:2}.f3{flex:3}
+.lab{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:700}
+.top .t{height:42px;font-size:13px}
+.tabs{display:flex;margin:auto -10px 0;height:54px;background:#101013;flex:none}
+.tab .tabs{margin:auto -14px 0;height:46px}
+.tabs div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:var(--dim);gap:4px;border-top:3px solid transparent}
+.tabs div i{width:16px;height:16px;border:1.6px solid currentColor;border-radius:4px;display:block}
+.tabs div.on{color:var(--tx);border-top-color:var(--c,var(--coral))}
+.sec .t{height:52px;flex-direction:column;font-size:19px;color:var(--tx);line-height:1}
+.sec .t small{font-size:10px;color:var(--dim);margin-top:4px;font-weight:500}
+.sec .t.on{background:var(--teal);color:#0b0b0d}.sec .t.on small{color:#0b0b0d}
+.tr .t{height:44px}
+.tr .stop{background:var(--coral);width:58px}.tr .stop i{width:14px;height:14px;background:#0b0b0d;display:block}
+.tr .num{flex-direction:column;align-items:flex-start;padding:0 10px;color:var(--tx);font-size:16px;line-height:1}
+.tr .num small{font-size:9px;color:var(--dim);font-weight:500;margin-top:2px}
+.tr .rec i{width:16px;height:16px;border:2px solid var(--coral);border-radius:50%;display:block}
+.perf .t{height:44px;font-size:14px;color:var(--tx)}
+.new{position:absolute;top:-5px;right:-3px;background:var(--yel);color:#0b0b0d;font-size:8px;letter-spacing:.08em;padding:1px 4px;border-radius:2px;font-weight:700}
+.rel{position:relative}
+/* style chip */
+.chip{height:48px}
+.chip .dice{width:48px;background:var(--tile);color:var(--tx)}
+.chip .name{flex:1;background:var(--coral);color:#0b0b0d;justify-content:space-between;padding:0 12px;font-size:19px}
+.chip .name small{font-size:11px;font-weight:700}
+.die{width:20px;height:20px;border:2px solid currentColor;border-radius:5px;position:relative;display:block}
+.die::before,.die::after{content:"";position:absolute;width:4px;height:4px;border-radius:50%;background:currentColor}
+.die::before{left:3px;top:3px;box-shadow:7px 7px 0 currentColor}.die::after{display:none}
+/* chord strip */
+.chords{height:34px}
+.chords .t{font-size:12px;flex:1;color:var(--dim)}
+.chords .t.now{background:var(--org);color:#0b0b0d;flex:1.6;font-size:14px}
+.chords .t.nx{border:1px dashed var(--org);background:none;color:var(--org)}
+/* theremin pad */
+.pad{flex:1;display:flex;flex-direction:column;gap:2px;position:relative;background:var(--tile2);padding:2px;border-radius:3px;min-height:0}
+.ln{flex:1;display:flex;align-items:center;padding-left:8px;font-size:9px;color:#5c5c68;background:#17171b;border-radius:2px;font-weight:700;min-height:0}
+.ln.c{flex:3.2;font-size:12px;color:var(--org);background:linear-gradient(90deg,rgba(244,162,97,.10),rgba(244,162,97,.26))}
+.ln.c.r{background:linear-gradient(90deg,rgba(255,107,107,.14),rgba(255,107,107,.34));color:var(--coral)}
+.ln.c.hit{background:linear-gradient(90deg,rgba(244,162,97,.45),var(--org));color:#0b0b0d}
+.ln span{font-size:9px;font-weight:500;margin-left:6px;opacity:.75}
+.puck{position:absolute;width:46px;height:46px;border-radius:50%;background:var(--org);border:3px solid #fff;transform:translate(-50%,-50%)}
+.ghost{position:absolute;width:30px;height:30px;border-radius:50%;border:2px dashed #fff;opacity:.45;transform:translate(-50%,-50%)}
+.trail{position:absolute;width:3px;background:linear-gradient(#fff,transparent);opacity:.5;transform:translateX(-50%)}
+.xl{position:absolute;bottom:6px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#fff;opacity:.7;font-weight:700}
+.read{position:absolute;top:8px;right:10px;font-size:12px;color:#fff;font-weight:700;background:rgba(11,11,13,.65);padding:3px 7px;border-radius:3px}
+.fol .t{height:34px;font-size:12px}
+.fol .t.on{background:var(--pur)}.fol .t.lock{color:#5c5c68}
+.col{height:34px;align-items:center;background:var(--tile);padding:0 10px;border-radius:3px;gap:8px}
+.col .dots{flex:1;display:flex;justify-content:space-between;align-items:center;position:relative}
+.col .dots::before{content:"";position:absolute;left:0;right:0;height:2px;background:var(--line)}
+.col .dots i{width:10px;height:10px;border-radius:50%;background:#3a3a44;position:relative}
+.col .dots i.on{width:18px;height:18px;background:var(--yel)}
+/* drums */
+.hd{align-items:center;height:36px;gap:10px}.hd b{font-size:22px;color:var(--coral)}
+.beat .t{height:40px;font-size:12px}.beat .t.on{background:var(--coral)}
+.steps{height:34px;gap:3px}
+.steps i{flex:1;background:var(--tile);border-radius:2px;display:block}
+.steps i.k{background:var(--coral)}.steps i.b{background:#202026}
+.card{background:var(--tile2);border-radius:3px;padding:8px 10px;flex:none}
+.card svg{display:block;width:100%}
+.xy{flex:1;background:var(--tile2);border-radius:3px;position:relative;min-height:0;background-image:radial-gradient(#2c2c34 1px,transparent 1px);background-size:22px 22px}
+.xy .h,.xy .v{position:absolute;background:var(--coral)}
+.xy .h{left:0;right:0;height:1px}.xy .v{top:0;bottom:0;width:1px}
+.xy .p{position:absolute;width:44px;height:44px;border-radius:50%;background:var(--coral);transform:translate(-50%,-50%)}
+.xy .lab{position:absolute}
+.knobs .k{flex:1;background:var(--tile);height:74px;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--tx)}
+.knob{width:40px;height:40px;border-radius:50%;border:4px solid #2c2c34;border-top-color:var(--c);border-left-color:var(--c);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transform:rotate(0)}
+/* style sheet */
+.dim{position:absolute;inset:0;background:rgba(5,5,7,.78)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#101013;border-top:3px solid var(--coral);padding:12px 10px 14px;display:flex;flex-direction:column;gap:6px}
+.sheet h4{font-size:20px;display:flex;justify-content:space-between;align-items:center}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.st{height:42px;background:var(--tile);border-left:4px solid var(--c);display:flex;align-items:center;padding:0 10px;font-size:14px;font-weight:700;color:var(--tx);white-space:nowrap;border-radius:2px}
+.st.on{background:var(--c);color:#0b0b0d}
+.st.sig{grid-column:1/-1;height:50px;font-size:17px;border-left:0;background:linear-gradient(90deg,#ff6b6b,#f4a261,#9b5de5);color:#0b0b0d;justify-content:space-between}.st.sig small{font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.st.s{height:32px;font-size:11px;color:var(--dim);border-left-color:#3a3a44;font-weight:500}
+.rule{display:flex;align-items:center;gap:8px;margin:4px 0 0}.rule::after{content:"";flex:1;height:1px;background:var(--line)}
+/* tablet */
+.body{display:flex;gap:10px;flex:1;min-height:0}
+.colL{width:470px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.colR{flex:1;display:flex;flex-direction:column;gap:6px;min-height:0}
+.lay{flex:1;display:flex;gap:4px;min-height:0}
+.lay .n{width:150px;background:var(--c);color:#0b0b0d;display:flex;flex-direction:column;justify-content:center;padding:0 12px;font-size:17px;font-weight:700;border-radius:3px}
+.lay .n small{font-size:11px;font-weight:500}
+.lay .g{flex:1;background:var(--tile2);border-radius:3px;position:relative;overflow:hidden}
+.lay .g i{position:absolute;background:var(--c);opacity:.75;display:block}
+
+/* perform */
+.pf{width:1280px;height:800px;padding:10px 12px 12px;gap:8px}
+.pf .strip .t{height:46px;font-size:13px}
+.pf .strip .tb{flex:1;font-size:11px;color:var(--dim);background:#101013}
+.pf .strip .tb.on{color:var(--tx);border-bottom:3px solid var(--coral)}
+.pz{display:flex;gap:10px;flex:1;min-height:0}
+.zl{width:310px;display:flex;flex-direction:column;gap:6px}
+.zc{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.zr{width:400px;display:flex;flex-direction:column;gap:6px}
+.mute{flex:1;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:18px;font-weight:700;color:#0b0b0d;border-radius:3px;background:var(--c)}
+.mute small{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.mute.off{background:var(--tile);color:var(--dim);border-left:5px solid var(--c)}
+.s22{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.s22 .t{height:80px;flex-direction:column;font-size:24px;color:var(--tx);line-height:1}
+.s22 .t small{font-size:11px;color:var(--dim);margin-top:4px;font-weight:500}
+.s22 .t.on{background:var(--teal);color:#0b0b0d}.s22 .t.on small{color:#0b0b0d}
+.s22 .t.q{outline:2px dashed var(--teal);outline-offset:-2px}
+.big .t{height:104px;font-size:22px;color:var(--tx)}
+.pv{flex:1;display:flex;flex-direction:column;gap:3px;min-height:0}
+.pv .g{flex:1;background:var(--tile2);border-radius:3px;position:relative;overflow:hidden}
+.pv .g i{position:absolute;background:var(--c);opacity:.75;display:block}
+.xys{display:flex;gap:6px;height:200px;flex:none}
+.anno{position:absolute;inset:0;pointer-events:none;display:none}
+.pf.a .anno{display:block}
+</style></head><body>
+
+<!-- M1: harmony pad, phone -->
+<div class="scr phone" id="m1">
+  <div class="row top"><div class="t f2" style="color:var(--tx)">+ New jam</div><div class="t f1" style="color:var(--tx)">Songs</div><div class="t f2 on" style="background:var(--coral)">Simple</div><div class="t f2">Advanced</div></div>
+  <div class="row chip"><div class="t dice"><i class="die"></i></div><div class="t name">Deep techno<small>All styles ›</small></div></div>
+  <div class="row chords"><div class="t">Fmaj7</div><div class="t now">Am7 · now</div><div class="t nx">Dm7 in 3</div><div class="t">Em7</div></div>
+  <div class="pad" id="pad1"></div>
+  <div class="row fol"><div class="t f1 on">Lead</div><div class="t f1 on">Arp</div><div class="t f1 on">Chords</div><div class="t f1">Pad</div><div class="t f1 lock">Bass ⌁</div><div class="t f1" style="border:1px solid var(--yel);color:var(--yel);background:none">Latch</div></div>
+  <div class="row col"><span class="lab">Dark</span><div class="dots"><i></i><i class="on"></i><i></i><i></i><i></i></div><span class="lab">Bright</span></div>
+  <div class="row perf"><div class="t f1">Morph</div><div class="t f1" style="background:var(--coral);color:#0b0b0d">DROP</div><div class="t f1 rel" style="background:var(--org);color:#0b0b0d">Harmony<span class="new">NEW</span></div></div>
+  <div class="row sec"><div class="t f1">A<small>Intro</small></div><div class="t f1 on">B<small>Playing</small></div><div class="t f1">C<small>Break</small></div><div class="t f1">D<small>Outro</small></div></div>
+  <div class="row tr"><div class="t stop"><i></i></div><div class="t num">124<small>bpm</small></div><div class="t num f1">4.2<small>bar</small></div><div class="t rec" style="width:58px"><i></i></div></div>
+  <div class="tabs"><div class="on"><i></i>Play</div><div><i></i>Chords</div><div><i></i>Drums</div><div><i></i>Bass</div><div><i></i>Synth</div><div><i></i>Layer 1</div><div><i></i>Layer 2</div><div><i></i>Mix</div></div>
+</div>
+
+<!-- M2: kick, phone -->
+<div class="scr phone" id="m2">
+  <div class="row top"><div class="t f2" style="color:var(--tx)">+ New jam</div><div class="t f1" style="color:var(--tx)">Songs</div><div class="t f2">Simple</div><div class="t f2 on" style="background:var(--coral)">Advanced</div></div>
+  <div class="row hd"><b>Drums</b><span class="lab">B · Groove · Deep techno</span></div>
+  <div class="row beat"><div class="t f1">Floor</div><div class="t f1 on rel">Thump<span class="new">NEW</span></div><div class="t f1">Shuffle</div><div class="t f1">Break</div><div class="t f1">2-step</div></div>
+  <div class="row steps" id="steps2"></div>
+  <div class="card"><div class="lab" style="margin-bottom:4px">Kick shape</div>
+    <svg viewBox="0 0 340 108"><path d="M4 90 L8 10 C40 14 110 52 200 78 S310 89 336 90 Z" fill="rgba(255,107,107,.28)" stroke="#ff6b6b" stroke-width="2"/><path d="M8 16 C22 60 44 76 90 80 L336 82" fill="none" stroke="#e9c46a" stroke-width="2" stroke-dasharray="5 4"/><g font-family="DM Sans" font-size="10" font-weight="700"><text x="14" y="9" fill="#fff">Click</text><text x="78" y="22" fill="#ff6b6b">Punch</text><text x="170" y="52" fill="#ff6b6b">Body</text><text x="268" y="72" fill="#ff6b6b">Tail</text><text x="8" y="105" fill="#e9c46a">- - Pitch drop: 180 → 55 Hz</text></g></svg></div>
+  <div class="xy"><div class="h" style="top:38%"></div><div class="v" style="left:62%"></div><div class="p" style="left:62%;top:38%"></div><span class="lab" style="left:10px;top:8px">Punch ↑</span><span class="lab" style="right:10px;bottom:8px">Length →</span><span style="position:absolute;right:10px;top:8px;font-size:12px;color:var(--coral);font-weight:700">Hard · 380 ms</span></div>
+  <div class="row knobs"><div class="k"><div class="knob" style="--c:var(--yel)">A</div>Tune · root</div><div class="k"><div class="knob" style="--c:var(--tx)">30</div>Click</div><div class="k"><div class="knob" style="--c:var(--org)">40</div>Drive</div><div class="k"><div class="knob" style="--c:var(--teal)">60</div>Pump</div></div>
+  <div class="row sec"><div class="t f1">A<small>Intro</small></div><div class="t f1 on">B<small>Playing</small></div><div class="t f1">C<small>Break</small></div><div class="t f1">D<small>Outro</small></div></div>
+  <div class="row tr"><div class="t stop"><i></i></div><div class="t num">124<small>bpm</small></div><div class="t num f1">6.1<small>bar</small></div><div class="t rec" style="width:58px"><i></i></div></div>
+  <div class="tabs"><div><i></i>Play</div><div><i></i>Chords</div><div class="on"><i></i>Drums</div><div><i></i>Bass</div><div><i></i>Synth</div><div><i></i>Layer 1</div><div><i></i>Layer 2</div><div><i></i>Mix</div></div>
+</div>
+
+<!-- M3: style list, phone -->
+<div class="scr phone" id="m3">
+  <div class="row top"><div class="t f2" style="color:var(--tx)">+ New jam</div><div class="t f1" style="color:var(--tx)">Songs</div><div class="t f2 on" style="background:var(--coral)">Simple</div><div class="t f2">Advanced</div></div>
+  <div class="row chip"><div class="t dice"><i class="die"></i></div><div class="t name">Dub techno<small>All styles ›</small></div></div>
+  <div class="dim"></div>
+  <div class="sheet"><h4>Styles <span class="t" style="height:34px;padding:0 12px;color:var(--tx);gap:8px"><i class="die" style="width:16px;height:16px;border-width:1.6px"></i>Surprise me</span></h4>
+    <div class="lab" style="color:var(--yel)">★ Top styles</div>
+    <div class="g2" id="top3"></div>
+    <div class="rule lab">More styles</div>
+    <div class="g3" id="more3"></div>
+  </div>
+</div>
+
+<!-- T1: tablet play + pad -->
+<div class="scr tab" id="t1">
+  <div class="row top"><div class="t" style="width:150px;color:var(--tx)">+ New jam</div><div class="t" style="width:110px;color:var(--tx)">Songs</div><div class="t dice" style="width:46px;color:var(--tx)"><i class="die"></i></div><div class="t f1" style="background:var(--coral);color:#0b0b0d;justify-content:space-between;padding:0 14px;font-size:18px">Deep techno<small style="font-size:11px">All styles ›</small></div><div class="t on" style="width:130px;background:var(--coral)">Simple</div><div class="t" style="width:130px">Advanced</div></div>
+  <div class="body">
+    <div class="colL" id="lays"></div>
+    <div class="colR">
+      <div class="row chords"><div class="t">Fmaj7</div><div class="t now">Am7 · now</div><div class="t nx">Dm7 in 3 beats</div><div class="t">Em7</div></div>
+      <div class="pad" id="pad2"></div>
+      <div class="row fol"><div class="t f1 on">Lead</div><div class="t f1 on">Arp</div><div class="t f1 on">Chords</div><div class="t f1">Pad</div><div class="t f1 lock">Bass ⌁ roots</div><div class="t f1" style="border:1px solid var(--yel);color:var(--yel);background:none">Latch</div>
+        <div class="row col f3" style="height:34px"><span class="lab">Dark</span><div class="dots"><i></i><i class="on"></i><i></i><i></i><i></i></div><span class="lab">Bright</span></div></div>
+    </div>
+  </div>
+  <div class="row" style="gap:10px">
+    <div class="row sec" style="width:470px"><div class="t f1">A<small>Intro</small></div><div class="t f1 on">B<small>Playing</small></div><div class="t f1">C<small>Break</small></div><div class="t f1">D<small>Outro</small></div></div>
+    <div class="row perf f1"><div class="t f1" style="height:52px">Morph</div><div class="t f1" style="height:52px;background:var(--coral);color:#0b0b0d">DROP</div></div>
+    <div class="row tr" style="width:330px"><div class="t stop" style="height:52px"><i></i></div><div class="t num" style="height:52px">124<small>bpm</small></div><div class="t num f1" style="height:52px">4.2<small>bar</small></div><div class="t rec" style="width:58px;height:52px"><i></i></div></div>
+  </div>
+  <div class="tabs"><div class="on"><i></i>Play</div><div><i></i>Chords</div><div><i></i>Drums</div><div><i></i>Bass</div><div><i></i>Synth</div><div><i></i>Layer 1</div><div><i></i>Layer 2</div><div><i></i>Mix</div></div>
+</div>
+
+<!-- T2: tablet drums + style panel -->
+<div class="scr tab" id="t2">
+  <div class="row top"><div class="t" style="width:150px;color:var(--tx)">+ New jam</div><div class="t" style="width:110px;color:var(--tx)">Songs</div><div class="t dice" style="width:46px;color:var(--tx)"><i class="die"></i></div><div class="t f1" style="background:var(--coral);color:#0b0b0d;justify-content:space-between;padding:0 14px;font-size:18px">Deep house<small style="font-size:11px">Close styles ✕</small></div><div class="t" style="width:130px">Simple</div><div class="t on" style="width:130px;background:var(--coral)">Advanced</div></div>
+  <div class="body">
+    <div class="colR">
+      <div class="row hd"><b>Drums</b><span class="lab">B · Groove · Deep house</span></div>
+      <div class="row beat"><div class="t f1">Floor</div><div class="t f1 on rel">Thump<span class="new">NEW</span></div><div class="t f1">Shuffle</div><div class="t f1">Break</div><div class="t f1">2-step</div></div>
+      <div class="row steps" id="steps3"></div>
+      <div class="body">
+        <div class="colR"><div class="card"><div class="lab" style="margin-bottom:4px">Kick shape</div>
+          <svg viewBox="0 0 340 134"><path d="M4 112 L8 12 C40 18 110 64 200 98 S310 110 336 112 Z" fill="rgba(255,107,107,.28)" stroke="#ff6b6b" stroke-width="2"/><path d="M8 20 C22 76 44 96 90 100 L336 103" fill="none" stroke="#e9c46a" stroke-width="2" stroke-dasharray="5 4"/><g font-family="DM Sans" font-size="10" font-weight="700"><text x="14" y="10" fill="#fff">Click</text><text x="78" y="28" fill="#ff6b6b">Punch</text><text x="170" y="66" fill="#ff6b6b">Body</text><text x="268" y="92" fill="#ff6b6b">Tail</text><text x="8" y="130" fill="#e9c46a">- - Pitch drop: 170 → 49 Hz</text></g></svg></div>
+          <div class="row knobs"><div class="k"><div class="knob" style="--c:var(--yel)">G</div>Tune · root</div><div class="k"><div class="knob" style="--c:var(--tx)">45</div>Click</div><div class="k"><div class="knob" style="--c:var(--org)">25</div>Drive</div><div class="k"><div class="knob" style="--c:var(--teal)">50</div>Pump</div></div>
+        </div>
+        <div class="xy" style="flex:1"><div class="h" style="top:45%"></div><div class="v" style="left:48%"></div><div class="p" style="left:48%;top:45%;width:56px;height:56px"></div><span class="lab" style="left:10px;top:8px">Punch ↑</span><span class="lab" style="right:10px;bottom:8px">Length →</span><span style="position:absolute;right:10px;top:8px;font-size:13px;color:var(--coral);font-weight:700">Round · 300 ms</span></div>
+      </div>
+    </div>
+    <div style="width:440px;background:#101013;border-left:3px solid var(--coral);padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+      <h4 style="font-size:20px;display:flex;justify-content:space-between;align-items:center">Styles <span class="t" style="height:34px;padding:0 12px;color:var(--tx);gap:8px"><i class="die" style="width:16px;height:16px;border-width:1.6px"></i>Surprise me</span></h4>
+      <div class="lab" style="color:var(--yel)">★ Top styles</div>
+      <div class="g2" id="top4"></div>
+      <div class="rule lab">More styles</div>
+      <div class="g3" id="more4"></div>
+    </div>
+  </div>
+  <div class="row" style="gap:10px">
+    <div class="row sec" style="width:470px"><div class="t f1">A<small>Intro</small></div><div class="t f1 on">B<small>Playing</small></div><div class="t f1">C<small>Break</small></div><div class="t f1">D<small>Outro</small></div></div>
+    <div class="row perf f1"><div class="t f1" style="height:52px">Morph</div><div class="t f1" style="height:52px;background:var(--coral);color:#0b0b0d">DROP</div></div>
+    <div class="row tr" style="width:330px"><div class="t stop" style="height:52px"><i></i></div><div class="t num" style="height:52px">122<small>bpm</small></div><div class="t num f1" style="height:52px">6.1<small>bar</small></div><div class="t rec" style="width:58px;height:52px"><i></i></div></div>
+  </div>
+  <div class="tabs"><div><i></i>Play</div><div><i></i>Chords</div><div class="on"><i></i>Drums</div><div><i></i>Bass</div><div><i></i>Synth</div><div><i></i>Layer 1</div><div><i></i>Layer 2</div><div><i></i>Mix</div></div>
+</div>
+
+<!-- T3: perform landscape, Y700 -->
+<div class="scr pf" id="t3">
+  <div class="row strip"><div class="t tb on">Play</div><div class="t tb">Chords</div><div class="t tb">Drums</div><div class="t tb">Bass</div><div class="t tb">Synth</div><div class="t tb">Layer 1</div><div class="t tb">Layer 2</div><div class="t tb">Mix</div>
+    <div class="t dice" style="width:46px;color:var(--tx)"><i class="die"></i></div><div class="t" style="width:250px;background:var(--coral);color:#0b0b0d;justify-content:space-between;padding:0 12px;font-size:17px">Deep techno<small style="font-size:11px">Styles ›</small></div><div class="t on" style="width:84px;background:var(--coral)">Simple</div><div class="t" style="width:84px">Adv</div></div>
+  <div class="pz">
+    <div class="zl">
+      <div class="mute" style="--c:var(--coral)">Drums<small>Thump</small></div>
+      <div class="mute" style="--c:var(--teal)">Bass<small>Offbeat</small></div>
+      <div class="mute off" style="--c:var(--blue)">Synth<small>Off</small></div>
+      <div class="mute" style="--c:var(--pur)">Layer 1<small>Lead</small></div>
+      <div class="mute" style="--c:var(--yel)">Layer 2<small>Pad</small></div>
+      <div class="s22"><div class="t">A<small>Intro</small></div><div class="t on">B<small>Playing</small></div><div class="t q">C<small>Next bar</small></div><div class="t">D<small>Outro</small></div></div>
+      <div class="row big"><div class="t f1">Morph</div><div class="t f1" style="background:var(--coral);color:#0b0b0d;font-size:26px">DROP</div></div>
+    </div>
+    <div class="zc">
+      <div class="row chords" style="height:46px"><div class="t">Fmaj7</div><div class="t now">Am7 · now</div><div class="t nx">Dm7 in 3</div><div class="t">Em7</div></div>
+      <div class="pv" id="pv3"></div>
+      <div class="xys">
+        <div class="xy"><div class="h" style="top:38%"></div><div class="v" style="left:60%"></div><div class="p" style="left:60%;top:38%"></div><span class="lab" style="left:8px;top:8px">Kick · punch ↑</span><span class="lab" style="right:8px;bottom:8px">Length →</span></div>
+        <div class="xy"><div class="h" style="top:62%;background:var(--org)"></div><div class="v" style="left:35%;background:var(--org)"></div><div class="p" style="left:35%;top:62%;background:var(--org)"></div><span class="lab" style="left:8px;top:8px">Filter · reso ↑</span><span class="lab" style="right:8px;bottom:8px">Cutoff →</span></div>
+      </div>
+      <div class="row tr"><div class="t stop" style="height:56px;width:70px"><i></i></div><div class="t num" style="height:56px">124<small>bpm</small></div><div class="t num f1" style="height:56px">4.2<small>bar</small></div><div class="t" style="height:56px;padding:0 12px;color:var(--teal)">Pump 60</div><div class="t rec" style="width:70px;height:56px"><i></i></div></div>
+    </div>
+    <div class="zr">
+      <div class="pad" id="pad3"></div>
+      <div class="row fol"><div class="t f1" style="height:60px;font-size:15px;color:var(--tx)">Oct −</div><div class="t f1" style="height:60px;font-size:15px;border:1px solid var(--yel);color:var(--yel);background:none">Latch</div><div class="t f1" style="height:60px;font-size:15px;color:var(--tx)">Oct +</div></div>
+    </div>
+  </div>
+  <svg class="anno" viewBox="0 0 1280 800">
+    <circle cx="0" cy="424" r="439" fill="rgba(42,157,143,.10)" stroke="#2a9d8f" stroke-width="2" stroke-dasharray="8 6"/>
+    <circle cx="1280" cy="424" r="439" fill="rgba(244,162,97,.10)" stroke="#f4a261" stroke-width="2" stroke-dasharray="8 6"/>
+    <g font-family="DM Sans" font-weight="700" font-size="15">
+      <rect x="336" y="240" width="270" height="30" rx="4" fill="#0b0b0d"/><text x="348" y="261" fill="#2a9d8f">LEFT THUMB · 65 mm from mid-edge</text>
+      <rect x="618" y="330" width="216" height="30" rx="4" fill="#0b0b0d"/><text x="630" y="351" fill="#f4a261">RIGHT THUMB · same reach</text>
+      <rect x="512" y="420" width="256" height="30" rx="4" fill="#0b0b0d"/><text x="524" y="441" fill="#e9c46a">CENTRE · look, set and leave</text>
+      <rect x="176" y="150" width="140" height="26" rx="4" fill="#0b0b0d"/><text x="186" y="169" fill="#fff" font-size="13">46 mm wide zone</text>
+      <rect x="1010" y="150" width="130" height="26" rx="4" fill="#0b0b0d"/><text x="1020" y="169" fill="#fff" font-size="13">59 mm wide pad</text>
+      <rect x="1050" y="250" width="150" height="26" rx="4" fill="#0b0b0d"/><text x="1060" y="269" fill="#fff" font-size="13">chord lane ≈ 11 mm</text>
+      <rect x="20" y="770" width="170" height="26" rx="4" fill="#0b0b0d"/><text x="30" y="789" fill="#fff" font-size="13">DROP ≈ 22 × 15 mm</text>
+      <rect x="480" y="772" width="320" height="24" rx="4" fill="#e9c46a"/><text x="492" y="789" fill="#0b0b0d" font-size="13">Legion Y700 · 8.8 in · 189.5 × 118.5 mm · 16:10</text>
+    </g>
+  </svg>
+</div>
+
+<script>
+// lanes, top = high. A minor over Am7: chord tones A C E G
+var notes=['A4','G4','F4','E4','D4','C4','B3','A3','G3','F3','E3','D3','C3','B2','A2'];
+var role={A:'root',C:'3rd',E:'5th',G:'7th'};
+function pad(id,hit,px,gy){var p=document.getElementById(id),h='';
+  notes.forEach(function(n){var r=role[n[0]];h+='<div class="ln'+(r?' c':'')+(n[0]=='A'?' r':'')+(n==hit?' hit':'')+'">'+n+(r?'<span>'+r+'</span>':'')+'</div>';});
+  p.innerHTML=h+'<div class="trail" style="left:'+(px-9)+'%;top:'+(gy.t)+'%;height:'+(gy.h)+'%"></div><div class="ghost" style="left:'+(px-9)+'%;top:'+(gy.t+gy.h)+'%"></div><div class="puck" style="left:'+px+'%;top:'+gy.p+'%"></div><span class="xl" style="left:110px">← Soft</span><span class="xl" style="right:10px">Open →</span><span class="read">E4 · 5th of Am7</span>';}
+pad('pad1','E4',66,{t:26,h:20,p:25.5});pad('pad2','E4',62,{t:26,h:20,p:25.5});
+function steps(id){var h='';for(var i=0;i<16;i++)h+='<i class="'+(i%4==0?'k':(Math.floor(i/4)%2?'b':''))+'"></i>';document.getElementById(id).innerHTML=h;}
+steps('steps2');steps('steps3');
+var TOPS=[['Deep techno','blue'],['Melodic techno','blue'],['Minimal techno','blue'],['Dub techno','blue'],['Deep house','coral'],['Progressive','coral'],['Drum and bass','teal'],['Two-step','teal'],['Breakbeat','teal'],['Lo-fi','yel'],['Ambient','pur'],['Drone','pur'],['Downtempo','yel'],['Synthwave','org']];
+function styles(a,b,cur){document.getElementById(a).innerHTML='<div class="st sig">Signature<small>★ mine</small></div>'+TOPS.map(function(s){return '<div class="st'+(s[0]==cur?' on':'')+'" style="--c:var(--'+s[1]+')">'+s[0]+'</div>';}).join('');
+  document.getElementById(b).innerHTML=['Tropical house','IDM','EDM','…','…','…'].map(function(s){return '<div class="st s">'+s+'</div>';}).join('');}
+styles('top3','more3','Dub techno');styles('top4','more4','Deep house');
+var L=[['Drums','Thump','coral',[[0,60,3,30],[25,60,3,30],[50,60,3,30],[75,60,3,30]]],['Bass','Offbeat','teal',[[12,35,8,30],[37,35,8,30],[62,35,8,30],[87,35,8,30]]],['Synth','Stabs','blue',[[0,15,6,14],[0,40,6,14],[0,65,6,14],[30,15,6,14],[30,40,6,14],[30,65,6,14],[70,15,6,14],[70,40,6,14],[70,65,6,14]]],['Layer 1','Lead · follows pad','pur',[[0,70,16,18],[24,40,8,18],[34,22,10,18],[48,22,26,18],[82,40,14,18]]],['Layer 2','Pad','yel',[[0,15,100,10],[0,40,100,10],[0,65,100,10]]]];
+document.getElementById('lays').innerHTML=L.map(function(l){return '<div class="lay" style="--c:var(--'+l[2]+')"><div class="n">'+l[0]+'<small>'+l[1]+'</small></div><div class="g">'+l[3].map(function(b){return '<i style="left:'+b[0]+'%;top:'+b[1]+'%;width:'+b[2]+'%;height:'+b[3]+'%"></i>';}).join('')+'<i style="left:41%;top:0;width:2px;height:100%;background:#fff;opacity:1"></i></div></div>';}).join('');
+
+(function(){var n3=['A4','G4','F4','E4','D4','C4','B3','A3','G3','F3','E3'],h='';
+n3.forEach(function(n){var r=role[n[0]];h+='<div class="ln'+(r?' c':'')+(n[0]=='A'?' r':'')+(n=='E4'?' hit':'')+'" style="'+(r?'font-size:16px':'font-size:10px')+'">'+n+(r?'<span style="font-size:11px">'+r+'</span>':'')+'</div>';});
+document.getElementById('pad3').innerHTML=h+'<div class="trail" style="left:48%;top:35%;height:24%"></div><div class="ghost" style="left:48%;top:59%"></div><div class="puck" style="left:60%;top:34%;width:60px;height:60px"></div><span class="xl" style="left:120px">← Soft</span><span class="xl" style="right:10px">Open →</span><span class="read">E4 · 5th of Am7</span>';
+document.getElementById('pv3').innerHTML=L.map(function(l,i){return '<div class="g" style="--c:var(--'+l[2]+')'+(i==2?';opacity:.3':'')+'">'+l[3].map(function(b){return '<i style="left:'+b[0]+'%;top:'+b[1]+'%;width:'+b[2]+'%;height:'+b[3]+'%"></i>';}).join('')+'<i style="left:41%;top:0;width:2px;height:100%;background:#fff;opacity:1"></i></div>';}).join('');})();
+var id=location.hash.slice(1)||'m1';if(id=='t3a'){id='t3';document.getElementById('t3').classList.add('a');}document.getElementById(id).style.display='flex';
+
+</script></body></html>

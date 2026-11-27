@@ -66,9 +66,9 @@ Built and live on the link above, and in the APK (rows G0 to G5, P1, P1b, P2, P3
 
 ## Where it is going
 
-**Next, bundle 10: retouch** (row G7), which runs on Pedro's notes from playing the app. Bundles 7b, 8 (tablet) and 9 (the APK) are done. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix comes after the APK, by Pedro's decision, so it is now due.
+**Next, bundle 10: phase 4** (rows F1 and F2): the app opens straight into a random top vibe with the picker one tap away, and the kick is rebuilt with a kick-only beat, Thump. Then bundle 11 (F3, F4): leads planned from rhythm cells so they repeat and resolve, in the fourteen top vibes. Then bundle 12 (F5 to F7): the harmony pad, a touch surface that moves the pitch of the whole piece inside the current chord; Perform sizing for the Legion Y700; and Signature, a 25th vibe. Retouch (row G7) is bundle 13 and runs on Pedro's notes from playing the app. Bundles 7b, 8 (tablet) and 9 (the APK) are done. Known: in the rubber-bass vibes (IDM, EDM, Electro, Progressive, Minimal techno) the bass's two oscillators can still fall out of phase after a stall, which drops the level 1 to 2 dB until the bass rests (about 1 drop run in 24 in the probe, C24); the fix comes after the APK, by Pedro's decision, so it is now due.
 
-The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
+The full plan is `docs/SPEC.md` sections 8 to 10 and `docs/BACKLOG.md`.
 
 **Install:** `docs/INSTALL.md`. The MP3 encoder is LGPL; its licence ships in `LICENSES.txt`.
 
@@ -86,6 +86,7 @@ The full plan is `docs/SPEC.md` sections 8 and 9 and `docs/BACKLOG.md`.
 |---|---|---|
 | G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d, T1, T2, T3 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph, the tablet layouts, Advanced without pages, punch pads, movement and many fingers | Done |
 | G6 | APK: Capacitor shell, workflow that builds a debug APK to the release `latest`, `docs/INSTALL.md` | Done: the workflow built and released the APK on `main` (27 Nov 2026); not yet run on a device |
+| F1 to F7 | Phase 4: straight in, the kick and Thump, leads that hold together, the harmony pad, Perform on the Y700, Signature | Planned (spec 10), not started |
 | G7 | Retouch from Pedro's notes | Always open |
 
 `docs/BACKLOG.md` is the live version of this table.
