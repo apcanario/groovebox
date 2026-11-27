@@ -42,6 +42,7 @@ import { Air, Breath, LoFi, Lfo, ModRoute, ReverbBank, afterFade } from "./mods.
 import { FxRackNode, loadFxWorklet } from "./fx.ts";
 import { AttackQueue, freshSetNeeded } from "./attacks.ts";
 import { DropOverlay } from "./drop.ts";
+import { PunchRack } from "./punch.ts";
 import { nativeParam, patchOscillatorEnd, type OscillatorProto } from "./oscPatch.ts";
 import { DEFAULT_FX, EFFECT_DEFS, type FxSlot } from "../music/effects.ts";
 
@@ -1298,6 +1299,8 @@ export class Graph {
   readonly reverb: ReverbBank;
   /** P10 (spec 8.9): the Drop's overlay, on the master path between the sweep filters and the lo-fi master. */
   readonly drop: DropOverlay;
+  /** T3 (spec 9.4): the punch pads, on the master path between the Drop's overlay and the lo-fi master. */
+  readonly punch: PunchRack;
 
   private constructor(
     buses: Buses,
@@ -1330,6 +1333,15 @@ export class Graph {
       layer2: new Poly(buses, 2, 10, 0.5, { padTone: true }, "layer2"),
     };
     drop.feedReverb(INSTRUMENT_LIST.map((id) => this.instruments[id].channel.level));
+    const ctx = Tone.getContext().rawContext as unknown as AudioContext;
+    this.punch = new PunchRack(ctx, () => {
+      const tr = Tone.getTransport();
+      if (tr.state !== "started") return null;
+      const at = ctx.currentTime;
+      return { at, beats: tr.getTicksAtTime(at) / tr.PPQ, bpm: tr.bpm.value };
+    }, [nativeParam(this.instruments.drums.channel.input.gain), nativeParam(this.instruments.bass.channel.input.gain)]);
+    Tone.connect(drop.output, this.punch.input);
+    Tone.connect(this.punch.output, p7.lofi.input);
   }
 
   static async build(): Promise<Graph> {
@@ -1364,7 +1376,7 @@ export class Graph {
     // P10: the Drop's overlay sits after the sweep filters, so its level follower hears what the filter lets through.
     const drop = new DropOverlay({ duck, drums, reverb: bank.input });
     Tone.connect(hp, drop.input);
-    Tone.connect(drop.output, lofi.input);
+    // T3: the Drop's overlay goes to the lo-fi master through the punch rack (connected in the constructor).
     return new Graph({ duck, drums, delay, reverb: bank.input }, meter, scope, lp, hp, sat, limiter, { lofi, air, reverb: bank }, drop);
   }
 

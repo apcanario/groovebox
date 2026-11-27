@@ -55,6 +55,8 @@ import { fxCounts, fxDebug, fxWorklets, type FxSlotNode } from "./fx.ts";
 import { songFx } from "./song.ts";
 import { HANDS_BARS, MORPH_MACROS, MorphPlanner, checkMorphSettings, morphStep, resolveMorph, type MorphMove, type MorphPlan, type MorphSettings } from "../music/morph.ts";
 import { inScale } from "../music/scales.ts";
+import { PUNCH_PADS, type PunchPad } from "../music/punch.ts";
+import type { PunchState } from "./punch.ts";
 
 export * from "./song.ts";
 export { MOODS, MOOD_TABLE, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
@@ -83,6 +85,8 @@ export type { LaneBar, LaneNote, LaneNotes, LanePhrase } from "./sequencer.ts";
 export { LOG_OPS, type LogEvent, type LogOp } from "./eventlog.ts";
 export { DROP_BUILDS, DROP_CLIFFS, DROP_WINDS, windSteps, type WindBar, type WindState, type DropBuild, type DropCliff, type DropIntent, type DropPhase, type DropRecipe, type DropSettings, type DropWind } from "../music/drop.ts";
 export type { Energy } from "./continuity.ts";
+export { PUNCH_PADS, PUNCH_RULES, type PunchPad, type PunchRule } from "../music/punch.ts";
+export type { PunchState } from "./punch.ts";
 export { HANDS_BARS, MORPH_THINGS, VOICING_STEPS, voicingShift, type MorphPlan, type MorphSettings, type MorphThing } from "../music/morph.ts";
 
 /** P11: one move Morph made, for the smoke test and the tests: the journey's bar and the engine call it made. */
@@ -495,6 +499,8 @@ export class Engine {
       this.graph.instruments[id].releaseAll(now);
     }
     this.graph.resetPump();
+    // T3: every punch pad out with Stop.
+    this.graph.punch.reset();
     this.graph.setPlaying(false);
     // P10: a drop ends with Stop; a section waiting behind it is chosen now.
     const held = this.dropSection;
@@ -1139,6 +1145,29 @@ export class Engine {
       this.graph.setTempo(bpm);
     }
     this.changed();
+  }
+
+  // ---- Punch pads (T3, spec 9.4) ---------------------------------------------------
+
+  /**
+   * A punch pad pressed (down) or let go (up). Each lands on its own grid line (`src/music/punch.ts`); any number
+   * can be held at once. Cut, Filter, Stutter and Riser act while held; Echo and Wash act on the press for one bar
+   * and ignore the release. Stopped, it does nothing. Recorded. Not a song edit: no change event.
+   */
+  punch(pad: PunchPad, down: boolean): void {
+    if (!this.graph || !this.seq.isRunning || !PUNCH_PADS.includes(pad)) return;
+    this.note("punch", [pad, down]);
+    this.graph.punch.press(pad, down);
+  }
+
+  /** What every punch pad is doing now (held, start and end on the audio clock), for the pads to draw. */
+  punchState(): PunchState[] {
+    return this.graph ? this.graph.punch.state() : PUNCH_PADS.map((pad) => ({ pad, held: false, start: null, end: null }));
+  }
+
+  /** The audio clock now (seconds), to read `punchState` times against. */
+  audioNow(): number {
+    return Tone.getContext().currentTime;
   }
 
   // ---- The Drop (P10, spec 8.9) ---------------------------------------------------

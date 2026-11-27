@@ -43,6 +43,8 @@ export const LOG_OPS = [
   "setDrop",
   // P11 (spec 8.11): the Morph button and the Morph page.
   "setMorph",
+  // T3 (spec 9.4): a punch pad pressed or let go.
+  "punch",
 ] as const;
 export type LogOp = (typeof LOG_OPS)[number];
 
