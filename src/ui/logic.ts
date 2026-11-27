@@ -561,6 +561,28 @@ export const KIT_KNOBS: readonly KnobSpec[] = [
   { key: "shakerDecay", label: "S decay" },
 ];
 
+/**
+ * T2 (spec 9.2): the whole Drums panel on the desk puts each voice's level and decay beside its rows of the grid, and the
+ * other drum knobs (the kick's pitch and drive, the perc's pitch) in its column. Between them every drum knob of the
+ * Kick, Hats and Kit pages, once (tested). The decay row sits under its voice's level row, so it is named "Decay".
+ */
+export const VOICE_KNOBS = {
+  kick: ["kickLevel", "kickDecay"],
+  clap: ["clapLevel", "clapDecay"],
+  hat: ["hatLevel", "hatDecay"],
+  open: ["openLevel", "openDecay"],
+  perc: ["percLevel", "percDecay"],
+  shaker: ["shakerLevel", "shakerDecay"],
+} as const;
+export const DRUM_EXTRAS = ["pitch", "drive", "percPitch"] as const;
+
+/** Every drum knob of the phone's pages, by its patch key. */
+export function drumKnob(key: string): KnobSpec {
+  const k = [...(KNOB_PAGES.drums ?? []).flatMap((p) => p.knobs), ...KIT_KNOBS].find((x) => x.key === key);
+  if (!k) throw new Error(`no drum knob ${key}`);
+  return k;
+}
+
 // ---- Sound picker (C8, P7) ----------------------------------------------------------------
 
 /** A patch file's word: its name in Advanced, its plain word in Simple. */

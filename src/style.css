@@ -2833,3 +2833,144 @@ button:disabled {
 .chordtab.whole .seqtools {
   margin-top: auto;
 }
+
+/*
+ * T2 slice b (spec 9.2): Drums whole on the desk. Left: the beat over the grid, every voice two rows of eight
+ * sixteenths (16 cells of 48 px do not fit across), each row ending in its voice's level or decay as a flat dial.
+ * Right: the name and switch, the sound and Reset, the kick's and perc's dials and swing, both effect slots, the sends
+ * and the XY pad lowest. Under its least width it overflows and takes the phone's pages (useFull).
+ */
+.insttab.drumwhole {
+  flex-direction: row;
+  gap: var(--group);
+  min-width: 640px;
+}
+.drumwhole .dleft {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--group);
+}
+.drumwhole .dgrid {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.drumwhole .drow {
+  flex: 1 1 0;
+  min-height: var(--hit);
+  display: grid;
+  grid-template-columns: repeat(8, minmax(var(--hit), 1fr)) minmax(86px, 1fr);
+  gap: var(--gap);
+}
+.drumwhole .drow .cell {
+  min-width: 0;
+  min-height: var(--hit);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  border-radius: var(--r);
+}
+.drumwhole .drow .cell.beat:not(.on) {
+  color: var(--text);
+}
+.drumwhole .drow .cell.on {
+  color: var(--bg);
+}
+/* 96 narrow cells at fractional widths: a solid fill, so no cell shows a sliver of the wipe's other half at its edge. */
+.drumwhole .drow .cell:not(.on) {
+  background: var(--card);
+}
+.drumwhole .drow .cell.now {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+.drumwhole .drow .dials {
+  display: contents;
+}
+/* A flat dial: the ring on the left with its value, the name beside it. */
+.drumwhole .drow .dial {
+  min-height: 0;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 2px 6px 2px 2px;
+}
+.drumwhole .drow .dial .knob {
+  flex: none;
+  height: 100%;
+  max-height: 42px;
+}
+.drumwhole .drow .dial label {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-top: 0;
+  justify-content: flex-start;
+}
+.drumwhole .dright {
+  flex: 0 0 150px;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.drumwhole .dright .headrow {
+  margin-bottom: calc(var(--group) - var(--gap));
+}
+.drumwhole .dright .head {
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  font-size: 17px;
+}
+.drumwhole .dright .headrow > .tog {
+  flex: 0 0 56px;
+  min-width: var(--hit);
+}
+.drumwhole .dright .head em .ic {
+  width: 20px;
+  height: 20px;
+}
+.drumwhole .dpick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  grid-template-rows: var(--hit);
+  gap: var(--gap);
+}
+.drumwhole .dpick > .btn {
+  min-height: 0;
+}
+.drumwhole .dright > .dials {
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 64px;
+}
+/* Each slot: its on/off and its effect over its three knobs. */
+.drumwhole .fxboth .dials.fxdials {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: var(--hit) 60px;
+  grid-auto-rows: 60px;
+}
+.drumwhole .fxboth .dials.fxdials > .btn.fxpick {
+  grid-column: span 2;
+}
+.drumwhole .sends {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.drumwhole .sends .send {
+  padding: 0 8px;
+}
+.drumwhole .xy {
+  flex: 1 1 0;
+  min-height: 96px;
+}
+.drumwhole .dright .headrow {
+  gap: 6px;
+}

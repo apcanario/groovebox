@@ -22,9 +22,9 @@ import {
   type InstrumentId,
 } from "../../engine/index.ts";
 import type { Ctx } from "../App.tsx";
-import { Chips, Dial, GroupLabel, PagedChips, Pager, SendBar, Toggle, XYPad } from "../components.tsx";
+import { Chips, Dial, GroupLabel, PagedChips, Pager, SendBar, Sheet, Toggle, XYPad } from "../components.tsx";
 import { SoundPicker } from "./SimpleTab.tsx";
-import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
+import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, DRUM_EXTRAS, VOICE_KNOBS, drumKnob, patchName, patchOf, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 import { FxPage, FxSlots } from "./fx.tsx";
@@ -283,9 +283,10 @@ function basePages(inst: InstrumentId): PageDef<InstPage>[] {
 }
 
 export function InstrumentTab({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
-  // T2 (spec 9.2): Bass and Synth on the desk show every page at once where they fit. Drums keeps its pages (slice b).
-  const [full, ref] = useFull(inst === "drums" ? { ...ctx, desk: false } : ctx, inst);
-  return full ? <WholeInstrument ctx={ctx} inst={inst} sref={ref} /> : <PagedInstrument ctx={ctx} inst={inst} sref={ref} />;
+  // T2 (spec 9.2): Drums, Bass and Synth on the desk show every page at once where they fit.
+  const [full, ref] = useFull(ctx, inst);
+  if (!full) return <PagedInstrument ctx={ctx} inst={inst} sref={ref} />;
+  return inst === "drums" ? <WholeDrums ctx={ctx} sref={ref} /> : <WholeInstrument ctx={ctx} inst={inst} sref={ref} />;
 }
 
 function Rhythms({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
@@ -355,6 +356,131 @@ function WholeInstrument({ ctx, inst, sref }: { ctx: Ctx; inst: InstrumentId; sr
           </div>
           <FilterXY ctx={ctx} inst={inst} />
         </div>
+      </div>
+    </section>
+  );
+}
+
+/** A voice's level or decay beside its row of the grid: the full name for the ear, the short one on screen. */
+function VoiceDial({ ctx, k, name }: { ctx: Ctx; k: KnobSpec; name: string }) {
+  const v = ctx.song.patches.drums[k.key];
+  return (
+    <Dial
+      id={`drums:${k.key}`}
+      label={knobLabel(k)}
+      name={name}
+      value={knobPos(k, v)}
+      min={0}
+      max={1}
+      display={knobText(k, v)}
+      color={INST_COLOR.drums}
+      onChange={(p) => ctx.engine.setParam("drums", k.key, knobValue(k, p))}
+    />
+  );
+}
+
+/** The drum sound picker in a sheet, opened from one button (T2: the whole Drums panel has no row to spare for it). */
+function SoundButton({ ctx }: { ctx: Ctx }) {
+  const [open, setOpen] = useState(false);
+  const ids = ctx.engine.patchIds("drums");
+  const now = patchOf("drums", ctx.song.patches.drums, ids);
+  return (
+    <>
+      <button class="btn fxpick" id="drums-sound" aria-label="Drum sound: tap to choose another" onClick={() => setOpen(true)}>
+        <span>Sound</span>
+        <b>{now ? patchName(now) : "Edited"}</b>
+      </button>
+      {open && (
+        <Sheet onClose={() => setOpen(false)}>
+          <h2>Drum sound</h2>
+          <SoundPicker ctx={ctx} inst="drums" />
+          <button class="btn wide" id="sound-close" onClick={() => setOpen(false)}>
+            Close
+          </button>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+/**
+ * T2 (spec 9.2): Drums whole, on the desk. Every voice's 16 steps as one grid, each voice two rows of eight (a half
+ * bar each: 16 cells of 48 px do not fit across the panel), with the voice's level and decay beside its two rows; the
+ * beat over the grid; the name and switch, the sound, Reset, the kick's pitch and drive, the perc's pitch and swing,
+ * both effect slots, the sends and the XY pad (lowest, in thumb reach) in the column on the right.
+ */
+function WholeDrums({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
+  const { engine, song, edit } = ctx;
+  const section = song.sections[edit];
+  const drums = section.drums;
+  const grid = sectionDrumGrid(section);
+  const edited = drums.grid !== undefined;
+  const patch = song.patches.drums;
+  const half = SEQ_STEPS_16 / 2;
+  return (
+    <section ref={sref} class="insttab whole drumwhole" data-whole="drums" style={{ "--c": INST_COLOR.drums, "--chip": INST_COLOR.drums }}>
+      <div class="dleft">
+        <PagedChips
+          name="preset"
+          what="beats"
+          options={DRUM_PRESETS}
+          value={edited ? null : drums.preset}
+          label={(p) => presetName("beat", p)}
+          onPick={(p) => engine.setDrumPreset(edit, p)}
+        />
+        <div class="dgrid">
+          {DRUM_VOICES.map((v) =>
+            [0, 1].map((h) => (
+              <div class="drow" key={`${v}${h}`} data-voice-row={`${v}:${h}`}>
+                {Array.from({ length: half }, (_, i) => {
+                  const k = h * half + i;
+                  const lit = (grid[v][k] ?? 0) > 0;
+                  const now = ctx.pos.playing && edit === ctx.playing && ctx.pos.step === k;
+                  return (
+                    <button
+                      key={k}
+                      class={`cell${lit ? " on" : ""}${now ? " now" : ""}${i % 4 === 0 ? " beat" : ""}`}
+                      data-step16={`${v}:${k}`}
+                      aria-pressed={lit}
+                      aria-label={`${VOICE_NAME[v]} sixteenth ${k + 1}`}
+                      onClick={() => engine.toggleDrumStep(edit, v, k, true)}
+                    >
+                      {k + 1}
+                    </button>
+                  );
+                })}
+                <VoiceDial ctx={ctx} k={drumKnob(VOICE_KNOBS[v][h])} name={h === 0 ? VOICE_NAME[v] : "Decay"} />
+              </div>
+            )),
+          )}
+        </div>
+      </div>
+      <div class="dright">
+        <div class="headrow">
+          <HeadName ctx={ctx} inst="drums" />
+          <InstToggle ctx={ctx} inst="drums" />
+        </div>
+        <div class="dpick">
+          <SoundButton ctx={ctx} />
+          <button
+            class="btn"
+            id="drums-revert"
+            disabled={!edited}
+            aria-label={edited ? `Back to the ${presetName("beat", drums.preset)} preset` : "The beat is the preset"}
+            onClick={() => engine.revertDrums(edit)}
+          >
+            Reset
+          </button>
+        </div>
+        <Knobs ctx={ctx} inst="drums" knobs={DRUM_EXTRAS.map(drumKnob)}>
+          <SwingDial ctx={ctx} />
+        </Knobs>
+        <FxSlots ctx={ctx} inst="drums" />
+        <div class="sends" data-grp="sends">
+          <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(x) => engine.setParam("drums", "delay", x)} />
+          <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(x) => engine.setParam("drums", "reverb", x)} />
+        </div>
+        <FilterXY ctx={ctx} inst="drums" />
       </div>
     </section>
   );
