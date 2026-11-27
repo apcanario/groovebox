@@ -11,7 +11,7 @@
     "apk:debug": "npm run build:android && cd android && ./gradlew assembleDebug",
     "icon": "python3 tools/make_icon.py",
     "preview": "vite preview",
-    "check": "tsc --noEmit && vitest run && python3 tools/test_smoke_parts.py && python3 tools/test_offline_check.py && python3 tools/test_make_icon.py && vite build && python3 tools/offline_check.py dist",
+    "check": "tsc --noEmit && vitest run && python3 tools/test_smoke_parts.py && python3 tools/test_offline_check.py && python3 tools/test_make_icon.py && python3 tools/test_release_check.py && vite build && python3 tools/offline_check.py dist",
     "smoke": "vite build && python3 tools/smoke.py dist",
     "test": "vitest run",
     "record-test": "vite build && python3 tools/record_long.py dist 10",

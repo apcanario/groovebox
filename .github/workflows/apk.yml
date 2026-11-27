@@ -1,0 +1,54 @@
+name: Build debug APK
+
+# G6: on every push to main, build the debug APK and put it on the release named `latest` (docs/INSTALL.md).
+# Separate from pages.yml: its own concurrency group, nothing shared, so the Pages deploy is untouched.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Capacitor 8 compiles its Android library for Java 21 (JavaVersion.VERSION_21), so 17 cannot build it.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      # The Android SDK (ANDROID_HOME) is preinstalled on ubuntu-latest; Gradle fetches platform 36 if missing.
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build:android
+      - name: assembleDebug
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: testDebugUnitTest
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon
+      - name: Rename the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk groovebox-debug.apk
+      # The release `latest` is recreated on each push, so its tag points at the commit the APK was built from.
+      - name: Publish release latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest groovebox-debug.apk \
+            --title latest \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --notes "Debug APK built from ${GITHUB_SHA}. Install: docs/INSTALL.md."

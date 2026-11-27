@@ -11,6 +11,7 @@ import type { Keeper } from "../store/keeper.ts";
 import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
 import { startFit } from "./fit.ts";
 import { setNativeKeepAwake } from "./keepAwake.ts";
+import { stopInBackground } from "./background.ts";
 import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState, tapPlay } from "./logic.ts";
@@ -406,6 +407,8 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
   useEffect(() => showLanes(lanes), [lanes]);
 
   useWakeLock(pos.playing);
+  // G6 (spec section 2): in the APK the jam stops when the app goes to the background (background.ts).
+  useEffect(() => stopInBackground(engine, document), [engine]);
 
   const count = song.sections.length;
   const playing = Math.min(pos.section, count - 1);
