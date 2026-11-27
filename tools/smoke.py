@@ -3433,7 +3433,7 @@ STALL_READ = """() => { const s = window.__stall; s.run = false; if (s.obs) s.ob
 def walk_motion_cost(browser, page, failures: list) -> dict:
     """T3 slice c: at the desk (1280 x 800, Advanced, the whole Mix beside the pads: meters, pulses, the ghost dials),
     everything on and playing, the audio load (measure_cost, six seconds of the webaudio trace) and the worst stall of
-    the page's thread over the same six seconds, with motion on and then off (the Mix switch). Reported, not judged:
+    the page's thread over six seconds of its own, untraced, with motion on and then off (the Mix switch). Reported, not judged:
     figures in docs/reviews/T3-measure.md."""
     page.set_viewport_size({"width": 1280, "height": 800})
     wait_for(page, "document.documentElement.dataset.size === 'landscape'", 2.0)
@@ -3448,8 +3448,10 @@ def walk_motion_cost(browser, page, failures: list) -> dict:
     for on in (True, False):
         page.click(f'[data-motion="{"on" if on else "off"}"]')
         label = f"motion {'on' if on else 'off'}"
-        page.evaluate(STALL_START)
         out = measure_cost(browser, page, f"desk, everything on, {label}", True)
+        # The stall over six seconds of its own, without the trace (starting and stopping a trace stalls the page).
+        page.evaluate(STALL_START)
+        time.sleep(6.0)
         st = page.evaluate(STALL_READ)
         out.update(stall_ms=st["worst"], longtask_ms=st["longest"], frames=st["frames"])
         print(f"cost T3 {label}: worst main-thread stall {st['worst']:.1f} ms between frames ({st['frames']} frames), "
