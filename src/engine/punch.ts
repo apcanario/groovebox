@@ -53,23 +53,64 @@ interface Slot {
   held: boolean;
   start: number | null;
   end: number | null;
+  /** A hold pad let go: the line its finish was scheduled on (the riser's fall starts there; its `end` is a beat on). */
+  line: number | null;
   /** Bumped on every press, so a late housekeeping callback for an older press does nothing. */
   gen: number;
 }
 
+/**
+ * The last move scheduled on each param, so that a browser without `cancelAndHoldAtTime` (T3 review M9) can still hold
+ * a param at the value it will have at `t` (setting the value it has now at a later time would be a step).
+ */
+interface Seg {
+  t0: number;
+  v0: number;
+  t1: number;
+  v1: number;
+  exp: boolean;
+}
+const segs = new WeakMap<AudioParam, Seg>();
+
+/** The value the rack's last move leaves `p` at, at time `t`. */
+function valueAt(p: AudioParam, t: number): number {
+  const s = segs.get(p);
+  if (!s) return p.value;
+  if (t >= s.t1 || s.t1 <= s.t0) return s.v1;
+  if (t <= s.t0) return s.v0;
+  const k = (t - s.t0) / (s.t1 - s.t0);
+  return s.exp && s.v0 > 0 && s.v1 > 0 ? s.v0 * Math.pow(s.v1 / s.v0, k) : s.v0 + (s.v1 - s.v0) * k;
+}
+
+/** A ramp from the last event to `v` at `t` (linear, or exponential with `exp`). */
+function ramp(p: AudioParam, v: number, t: number, exp = false): void {
+  const last = segs.get(p);
+  segs.set(p, { t0: last ? last.t1 : t, v0: last ? last.v1 : p.value, t1: t, v1: v, exp });
+  if (exp) p.exponentialRampToValueAtTime(v, t);
+  else p.linearRampToValueAtTime(v, t);
+}
+
+/** A value set at `t`. */
+function setAt(p: AudioParam, v: number, t: number): void {
+  segs.set(p, { t0: t, v0: v, t1: t, v1: v, exp: false });
+  p.setValueAtTime(v, t);
+}
+
 /** Hold a param where it is at `t` and clear what is scheduled after. */
 function hold(p: AudioParam, t: number): void {
+  const v = valueAt(p, t);
   if (typeof p.cancelAndHoldAtTime === "function") p.cancelAndHoldAtTime(t);
   else {
     p.cancelScheduledValues(t);
-    p.setValueAtTime(p.value, t);
+    p.setValueAtTime(v, t);
   }
+  segs.set(p, { t0: t, v0: v, t1: t, v1: v, exp: false });
 }
 
 /** A linear move to `v` that finishes at `t`, from where the param is at `t - len`. */
 function landAt(p: AudioParam, v: number, t: number, len = R): void {
   hold(p, t - len);
-  p.linearRampToValueAtTime(v, t);
+  ramp(p, v, t);
 }
 
 export class PunchRack {
@@ -106,7 +147,7 @@ export class PunchRack {
     /** Housekeeping after a fade (disconnect an idle reverb); the engine passes setTimeout. */
     private readonly later: (fn: () => void, seconds: number) => void = (fn, s) => void setTimeout(fn, s * 1000),
   ) {
-    for (const pad of PUNCH_PADS) this.slots.set(pad, { held: false, start: null, end: null, gen: 0 });
+    for (const pad of PUNCH_PADS) this.slots.set(pad, { held: false, start: null, end: null, line: null, gen: 0 });
     const g = (v: number): GainNode => {
       const n = ctx.createGain();
       n.gain.value = v;
@@ -122,7 +163,8 @@ export class PunchRack {
     this.filter = ctx.createBiquadFilter();
     this.filter.type = "lowpass";
     this.filter.frequency.value = FILTER_OPEN;
-    this.filter.Q.value = 0.9;
+    // Web Audio reads a low-pass Q in dB: -3.01 dB is a Butterworth, flat with no peak (T3 review M2).
+    this.filter.Q.value = -3.01;
     const sum = g(1);
     this.input.connect(this.dry).connect(this.filter);
     this.input.connect(this.rec).connect(this.loop);
@@ -167,39 +209,52 @@ export class PunchRack {
    * A pad pressed (down) or let go (up) at audio time `now`. A tap pad acts on press and ignores the release.
    * Returns the pad's state after it, or null while the transport is stopped (nothing to land on).
    */
-  press(pad: PunchPad, down: boolean, now = this.ctx.currentTime): PunchState | null {
+  press(pad: PunchPad, down: boolean, at?: number): PunchState | null {
     const g = this.grid();
     const s = this.slots.get(pad)!;
     if (!g) return null;
+    let now = at ?? this.ctx.currentTime;
     const rule = PUNCH_RULES[pad];
     if (down) {
       if (s.held) return this.one(pad);
-      const live = s.end !== null && s.end > now && s.start !== null;
+      // T3 review M3: the first Wash builds its reverb before its start line is chosen, so the line is still ahead.
+      if (pad === "wash" && !this.wash) {
+        this.linkWash();
+        if (at === undefined) now = this.ctx.currentTime;
+      }
+      const running = s.end !== null && s.end > now && s.start !== null;
+      // T3 review E1, E2: a pad whose start line is still ahead has not started: a second press keeps that start.
+      const started = running && s.start! <= now;
       s.gen++;
       if (rule.kind === "tap") {
         const start = punchStart(pad, g, now);
         const end = punchEnd(pad, g, start, now);
-        // A second tap while it runs keeps it in and moves its end on.
-        this.tap(pad, g, live ? null : start, end);
-        s.start = live ? s.start : start;
+        // A second tap keeps it in (or keeps its start, if it has not started) and moves its end on.
+        if (!running) this.tap(pad, g, start, end, null, now);
+        else this.tap(pad, g, null, end, started ? null : s.end, now);
+        s.start = running ? s.start : start;
         s.end = end;
         return this.one(pad);
       }
       s.held = true;
-      if (live) {
-        // Pressed again before its release landed: stay in, the scheduled end is cleared.
+      if (running && started) {
+        // Pressed again while it is in and its release is still ahead: stay in, the scheduled end is cleared.
         this.resume(pad, g, now);
-        s.end = null;
-        return this.one(pad);
+      } else if (running) {
+        // Pressed again before its start line: its start stays where it is scheduled, only the finish is cleared.
+        this.unfinish(pad, g, s.start!, s.line ?? s.end!);
+      } else {
+        s.start = punchStart(pad, g, now);
+        this.begin(pad, g, s.start);
       }
-      s.start = punchStart(pad, g, now);
       s.end = null;
-      this.begin(pad, g, s.start);
+      s.line = null;
       return this.one(pad);
     }
     if (rule.kind === "tap" || !s.held || s.start === null) return this.one(pad);
     s.held = false;
     s.end = punchEnd(pad, g, s.start, now);
+    s.line = s.end;
     this.finish(pad, g, s.start, s.end);
     return this.one(pad);
   }
@@ -213,6 +268,7 @@ export class PunchRack {
       s.held = false;
       s.start = null;
       s.end = null;
+      s.line = null;
     }
     for (const c of this.cuts) landAt(c, 1, t);
     landAt(this.dry.gain, 1, t);
@@ -220,10 +276,12 @@ export class PunchRack {
     landAt(this.fb.gain, 0, t);
     landAt(this.wet.gain, 0, t);
     hold(this.filter.frequency, now);
-    this.filter.frequency.exponentialRampToValueAtTime(FILTER_OPEN, now + FILTER_OPEN_RAMP);
+    ramp(this.filter.frequency, FILTER_OPEN, now + FILTER_OPEN_RAMP, true);
     landAt(this.echoSend.gain, 0, t);
     landAt(this.washSend.gain, 0, t);
     this.riserOff(now, 0.05);
+    // T3 review M1: the wash reverb is cut from its send once its tail has rung out, after a Stop too.
+    if (this.washLinked) this.unlinkLater(now, now + R);
   }
 
   private one(pad: PunchPad): PunchState {
@@ -239,14 +297,14 @@ export class PunchRack {
       case "filter": {
         const f = this.filter.frequency;
         hold(f, t);
-        f.exponentialRampToValueAtTime(FILTER_FLOOR, timeOfBeat(g, beatAt(g, t) + FILTER_SWEEP_BEATS));
+        ramp(f, FILTER_FLOOR, timeOfBeat(g, beatAt(g, t) + FILTER_SWEEP_BEATS), true);
         return;
       }
       case "stutter": {
         // The loop is the half beat just before `t`; its length is set while the loop is out of the mix.
         const half = 30 / g.bpm;
         hold(this.loop.delayTime, t - R - 1e-3);
-        this.loop.delayTime.setValueAtTime(half, t - R - 1e-3);
+        setAt(this.loop.delayTime, half, t - R - 1e-3);
         landAt(this.dry.gain, 0, t);
         landAt(this.rec.gain, 0, t);
         landAt(this.fb.gain, 1, t);
@@ -270,7 +328,7 @@ export class PunchRack {
       case "filter": {
         const f = this.filter.frequency;
         hold(f, now);
-        f.exponentialRampToValueAtTime(FILTER_FLOOR, timeOfBeat(g, beatAt(g, now) + FILTER_SWEEP_BEATS));
+        ramp(f, FILTER_FLOOR, timeOfBeat(g, beatAt(g, now) + FILTER_SWEEP_BEATS), true);
         return;
       }
       case "stutter":
@@ -284,9 +342,46 @@ export class PunchRack {
         this.riserSource(t);
         const top = timeOfBeat(g, beatAt(g, now) + RISER_BEATS / 2);
         hold(this.riserGain.gain, t);
-        this.riserGain.gain.linearRampToValueAtTime(RISER_PEAK, top);
+        ramp(this.riserGain.gain, RISER_PEAK, top);
         hold(this.riserBand.frequency, t);
-        this.riserBand.frequency.exponentialRampToValueAtTime(RISER_TO, top);
+        ramp(this.riserBand.frequency, RISER_TO, top, true);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  /**
+   * T3 review E2: let go and pressed again before its start line. What `begin` scheduled stays on its line; only what
+   * `finish` scheduled for `end` is cleared (from that ramp's own start on), and a move it cut short goes on.
+   */
+  private unfinish(pad: PunchPad, g: PunchGrid, start: number, end: number): void {
+    switch (pad) {
+      case "cut":
+        for (const c of this.cuts) hold(c, end - R);
+        return;
+      case "filter": {
+        const f = this.filter.frequency;
+        const floor = timeOfBeat(g, beatAt(g, start) + FILTER_SWEEP_BEATS);
+        hold(f, end - FILTER_OPEN_RAMP);
+        if (floor > end - FILTER_OPEN_RAMP) ramp(f, FILTER_FLOOR, floor, true);
+        return;
+      }
+      case "stutter":
+        for (const p of [this.dry.gain, this.rec.gain, this.fb.gain, this.wet.gain]) hold(p, end - R);
+        return;
+      case "riser": {
+        // The fall is cleared and the climb goes on to its top; a fresh source takes over before the start line, as
+        // a source cannot be un-stopped.
+        const top = timeOfBeat(g, beatAt(g, start) + RISER_BEATS);
+        const gain = this.riserGain.gain;
+        hold(gain, end);
+        if (top > end) ramp(gain, RISER_PEAK, top);
+        const f = this.riserBand.frequency;
+        hold(f, end);
+        if (top > end) ramp(f, RISER_TO, top, true);
+        this.riserSource(Math.max(this.ctx.currentTime, start - R));
         return;
       }
       default:
@@ -303,7 +398,7 @@ export class PunchRack {
       case "filter": {
         const f = this.filter.frequency;
         hold(f, end - FILTER_OPEN_RAMP);
-        f.exponentialRampToValueAtTime(FILTER_OPEN, end);
+        ramp(f, FILTER_OPEN, end, true);
         return;
       }
       case "stutter":
@@ -324,28 +419,38 @@ export class PunchRack {
     }
   }
 
-  /** Echo or Wash: the send fully open on `start` (null: already open) and closed on `end`. */
-  private tap(pad: PunchPad, g: PunchGrid, start: number | null, end: number): void {
+  /**
+   * Echo or Wash: the send fully open on `start` and closed on `end`. A second tap passes `start` null: while it runs
+   * (`was` null) the send is brought back fully open from now; before its start line (`was`, the end scheduled then)
+   * the opening ramp stays on its line and only the close is moved (T3 review E1).
+   */
+  private tap(pad: PunchPad, g: PunchGrid, start: number | null, end: number, was: number | null, now: number): void {
     const send = pad === "echo" ? this.echoSend : this.washSend;
     if (pad === "echo" && start !== null) {
       const d = (ECHO_BEATS * 60) / g.bpm;
       if (Math.abs(this.echo.delayTime.value - d) > 1e-3) {
         // Set while the send is closed (a tempo change), a short glide rather than a step.
         hold(this.echo.delayTime, start - R - 1e-3);
-        this.echo.delayTime.linearRampToValueAtTime(d, start - R);
+        ramp(this.echo.delayTime, d, start - R);
       }
     }
     if (pad === "wash") this.linkWash();
     if (start !== null) landAt(send.gain, 1, start);
-    else hold(send.gain, this.ctx.currentTime);
-    landAt(send.gain, 0, end);
-    if (pad === "wash") {
-      const gen = this.slots.get("wash")!.gen;
-      // The reverb is cut from its send once its tail has rung out, so an idle reverb costs nothing.
-      this.later(() => {
-        if (this.slots.get("wash")!.gen === gen) this.unlinkWash();
-      }, end - this.ctx.currentTime + WASH_SECONDS + 0.5);
+    else if (was !== null) hold(send.gain, was - R);
+    else {
+      hold(send.gain, now);
+      ramp(send.gain, 1, now + R);
     }
+    landAt(send.gain, 0, end);
+    if (pad === "wash") this.unlinkLater(now, end);
+  }
+
+  /** The reverb is cut from its send once its tail has rung out after `end`, so an idle reverb costs nothing. */
+  private unlinkLater(now: number, end: number): void {
+    const gen = this.slots.get("wash")!.gen;
+    this.later(() => {
+      if (this.slots.get("wash")!.gen === gen) this.unlinkWash();
+    }, end - now + WASH_SECONDS + 0.5);
   }
 
   private linkWash(): void {
@@ -415,20 +520,20 @@ export class PunchRack {
     const top = timeOfBeat(g, beatAt(g, t) + RISER_BEATS);
     const gain = this.riserGain.gain;
     hold(gain, t - R);
-    gain.linearRampToValueAtTime(RISER_PEAK, top);
+    ramp(gain, RISER_PEAK, top);
     const f = this.riserBand.frequency;
     hold(f, t - R);
-    f.exponentialRampToValueAtTime(RISER_TO, top);
+    ramp(f, RISER_TO, top, true);
   }
 
   /** The riser falls to silence from `t` over `len` seconds; its source stops after. */
   private riserOff(t: number, len: number): void {
     const gain = this.riserGain.gain;
     hold(gain, t);
-    gain.linearRampToValueAtTime(0, t + len);
+    ramp(gain, 0, t + len);
     const f = this.riserBand.frequency;
     hold(f, t);
-    f.exponentialRampToValueAtTime(RISER_FROM, t + len);
+    ramp(f, RISER_FROM, t + len, true);
     // A later press replaces this stop time with its own (the last stop() called is the one applied).
     this.riserSrc?.stop(t + len + 0.01);
   }

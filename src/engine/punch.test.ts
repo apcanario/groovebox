@@ -290,3 +290,257 @@ describe("punch pads on the audio clock (spec 9.4)", () => {
     }
   });
 });
+
+/** Sampled every millisecond from `t0` to `t1`, the param never jumps more than a 5 ms ramp allows. */
+function noStep(param: FakeParam, t0: number, t1: number, most = 0.25): void {
+  let last = param.at(t0);
+  for (let t = t0; t < t1; t += 0.001) {
+    const v = param.at(t);
+    expect(Math.abs(v - last)).toBeLessThan(most);
+    last = v;
+  }
+}
+
+describe("a quick second press before the start line (T3 review E1, E2)", () => {
+  for (const pad of ["echo", "wash"] as const) {
+    it(`${pad}: a second tap inside the first beat keeps it fully in from its start line for the bar (E1)`, () => {
+      const { rack, p, at } = rig();
+      const send = pad === "echo" ? p.echo : p.wash;
+      at(10.1);
+      rack.press(pad, true);
+      at(10.25);
+      const s = rack.press(pad, true)!;
+      expect(s.start).toBeCloseTo(10.5, 9);
+      expect(s.end).toBeCloseTo(12.5, 9);
+      expect(send.at(10.49)).toBeLessThan(1);
+      for (const t of [10.5, 10.6, 11, 11.5, 12.49 - 0.005]) expect(send.at(t)).toBe(1);
+      expect(send.at(12.5)).toBe(0);
+      noStep(send, 10, 13);
+    });
+
+    it(`${pad}: a second tap inside the guard of the start line keeps the start and ends a bar from the next beat`, () => {
+      const { rack, p, at } = rig();
+      const send = pad === "echo" ? p.echo : p.wash;
+      at(10.1);
+      rack.press(pad, true);
+      at(10.49);
+      const s = rack.press(pad, true)!;
+      expect(s.start).toBeCloseTo(10.5, 9);
+      expect(s.end).toBeCloseTo(13, 9);
+      for (const t of [10.5, 11, 12.5, 12.99 - 0.005]) expect(send.at(t)).toBe(1);
+      expect(send.at(13)).toBe(0);
+      noStep(send, 10, 14);
+    });
+
+    it(`${pad}: three taps, two before the start and one while it runs, stay in to the last tap's bar`, () => {
+      const { rack, p, at } = rig();
+      const send = pad === "echo" ? p.echo : p.wash;
+      at(10.1);
+      rack.press(pad, true);
+      at(10.2);
+      rack.press(pad, true);
+      at(11.2);
+      const s = rack.press(pad, true)!;
+      expect(s.start).toBeCloseTo(10.5, 9);
+      expect(s.end).toBeCloseTo(13.5, 9);
+      for (const t of [10.5, 11.2, 12.5, 13.49 - 0.005]) expect(send.at(t)).toBe(1);
+      expect(send.at(13.5)).toBe(0);
+      noStep(send, 10, 14);
+    });
+  }
+
+  it("a tap after the last one ended is a fresh tap on its own beat", () => {
+    const { rack, p, at } = rig();
+    at(10.1);
+    rack.press("echo", true);
+    at(12.7);
+    const s = rack.press("echo", true)!;
+    expect(s.start).toBeCloseTo(13, 9);
+    expect(s.end).toBeCloseTo(15, 9);
+    expect(p.echo.at(12.9)).toBe(0);
+    expect(p.echo.at(13)).toBe(1);
+    expect(p.echo.at(15)).toBe(0);
+  });
+
+  it("Cut: let go and pressed again before its start line, silent from that line and not before (E2)", () => {
+    const { rack, drums, bass, at } = rig();
+    at(10.3);
+    rack.press("cut", true);
+    at(10.31);
+    rack.press("cut", false);
+    at(10.32);
+    const s = rack.press("cut", true)!;
+    expect(s.start).toBeCloseTo(10.375, 9);
+    expect(s.held).toBe(true);
+    expect(s.end).toBeNull();
+    for (const g of [drums, bass]) {
+      expect(g.at(10.33)).toBe(1);
+      expect(g.at(10.369)).toBe(1);
+      expect(g.at(10.375)).toBe(0);
+      expect(g.at(12)).toBe(0);
+      expect(g.at(14)).toBe(0);
+      noStep(g, 10.3, 15);
+    }
+    at(13.1);
+    expect(rack.press("cut", false)!.end).toBeCloseTo(14, 9);
+    expect(drums.at(14)).toBe(1);
+  });
+
+  it("Cut: let go before its start line and not pressed again, in on its line and out on the bar after", () => {
+    const { rack, drums, at } = rig();
+    at(10.3);
+    rack.press("cut", true);
+    at(10.31);
+    const e = rack.press("cut", false)!;
+    expect(e.end).toBeCloseTo(12, 9);
+    expect(drums.at(10.36)).toBe(1);
+    expect(drums.at(10.375)).toBe(0);
+    expect(drums.at(11.99)).toBe(0);
+    expect(drums.at(12)).toBe(1);
+  });
+
+  it("Filter: let go and pressed again before its start line, the sweep starts on its line (E2)", () => {
+    const { rack, p, at } = rig();
+    at(10.3);
+    rack.press("filter", true);
+    at(10.31);
+    rack.press("filter", false);
+    at(10.32);
+    const s = rack.press("filter", true)!;
+    expect(s.start).toBeCloseTo(10.375, 9);
+    expect(p.filter.at(10.33)).toBeCloseTo(FILTER_OPEN, 3);
+    expect(p.filter.at(10.375)).toBeCloseTo(FILTER_OPEN, 3);
+    expect(p.filter.at(10.875)).toBeLessThan(FILTER_OPEN / 2);
+    expect(p.filter.at(11.375)).toBeCloseTo(FILTER_FLOOR, 3);
+    expect(p.filter.at(12.5)).toBeCloseTo(FILTER_FLOOR, 3);
+    at(12.6);
+    expect(rack.press("filter", false)!.end).toBeCloseTo(13, 9);
+    expect(p.filter.at(13)).toBeCloseTo(FILTER_OPEN, 3);
+  });
+
+  it("Stutter: let go and pressed again before its start line, the loop is set before it comes in on its line (E2)", () => {
+    const { rack, p, at } = rig();
+    at(10.3);
+    rack.press("stutter", true);
+    at(10.31);
+    rack.press("stutter", false);
+    at(10.32);
+    const s = rack.press("stutter", true)!;
+    expect(s.start).toBeCloseTo(10.5, 9);
+    expect(p.wet.at(10.33)).toBe(0);
+    expect(p.dry.at(10.33)).toBe(1);
+    expect(p.wet.at(10.49)).toBe(0);
+    expect(p.dry.at(10.5)).toBe(0);
+    expect(p.wet.at(10.5)).toBe(1);
+    expect(p.fb.at(10.5)).toBe(1);
+    expect(p.wet.at(11.5)).toBe(1); // still held
+    // Wherever the loop is heard, it is half a beat long.
+    for (let t = 10.3; t < 12; t += 0.001) if (p.wet.at(t) > 0 || p.fb.at(t) > 0) expect(p.loop.at(t)).toBeCloseTo(0.25, 9);
+    for (const g of [p.dry, p.wet, p.fb]) noStep(g, 10.3, 12);
+    at(11.6);
+    expect(rack.press("stutter", false)!.end).toBeCloseTo(12, 9);
+    expect(p.wet.at(12)).toBe(0);
+    expect(p.dry.at(12)).toBe(1);
+  });
+
+  it("Stutter: a first stutter pressed twice in rhythm never loops at a length other than the half beat", () => {
+    const { rack, p, at } = rig();
+    at(10.3);
+    rack.press("stutter", true);
+    at(10.4);
+    rack.press("stutter", false);
+    at(10.45);
+    rack.press("stutter", true);
+    at(10.9);
+    rack.press("stutter", false);
+    for (let t = 10.3; t < 12; t += 0.001) if (p.wet.at(t) > 0 || p.fb.at(t) > 0) expect(p.loop.at(t)).toBeCloseTo(0.25, 9);
+    expect(p.wet.at(10.5)).toBe(1);
+    expect(p.wet.at(11)).toBe(0);
+  });
+
+  it("Riser: let go and pressed again before its start line, it starts climbing on its line and keeps climbing (E2)", () => {
+    const { rack, p, at } = rig();
+    at(10.3);
+    rack.press("riser", true);
+    at(10.31);
+    rack.press("riser", false);
+    at(10.32);
+    const s = rack.press("riser", true)!;
+    expect(s.start).toBeCloseTo(10.375, 9);
+    expect(s.end).toBeNull();
+    expect(p.riser.at(10.33)).toBe(0);
+    expect(p.riser.at(10.37)).toBe(0);
+    expect(p.riser.at(11.375)).toBeGreaterThan(0);
+    expect(p.riser.at(12)).toBeGreaterThan(p.riser.at(11.375));
+    expect(p.riser.at(14.375)).toBeCloseTo(RISER_PEAK, 9);
+    expect(p.band.at(12.375)).toBeGreaterThan(p.band.at(11.375));
+    noStep(p.riser, 10.3, 15, 0.01);
+  });
+});
+
+describe("small guards (T3 review M1, M3, M9)", () => {
+  it("after a Stop during a Wash, the reverb is cut from its send once its tail has rung out (M1)", () => {
+    const { rack, at, jobs } = rig();
+    at(10.3);
+    rack.press("wash", true);
+    at(11);
+    rack.reset();
+    expect(jobs.length).toBe(2);
+    // The tap's own job belongs to an older press: it does nothing.
+    jobs[0].fn();
+    expect(rack.washOn()).toBe(true);
+    expect(jobs[1].s).toBeGreaterThan(3.5);
+    jobs[1].fn();
+    expect(rack.washOn()).toBe(false);
+  });
+
+  it("the first Wash builds its reverb before its start line is chosen, so the line is still ahead (M3)", () => {
+    const { rack, ctx, at } = rig();
+    // Building the reverb takes 40 ms here, past the 25 ms guard of the line it would have chosen.
+    const make = ctx.createConvolver.bind(ctx);
+    ctx.createConvolver = () => {
+      ctx.currentTime += 0.04;
+      return make();
+    };
+    at(10.47);
+    const s = rack.press("wash", true)!;
+    expect(ctx.currentTime).toBeCloseTo(10.51, 9);
+    expect(s.start!).toBeGreaterThanOrEqual(ctx.currentTime + PUNCH_GUARD);
+    expect(s.start).toBeCloseTo(11, 9);
+  });
+
+  it("without cancelAndHoldAtTime, every move is still a ramp from where the param is (M9)", () => {
+    const ctx = new FakeContext();
+    const drums = new FakeParam(ctx, 1);
+    const plain = (p: FakeParam) => Object.defineProperty(p, "cancelAndHoldAtTime", { value: undefined });
+    plain(drums);
+    const orig = ctx.createGain.bind(ctx);
+    ctx.createGain = () => {
+      const n = orig();
+      plain(n.gain);
+      return n;
+    };
+    const rack = new PunchRack(ctx as unknown as BaseAudioContext, () => GRID, [drums] as unknown as AudioParam[], () => undefined);
+    const r = rack as unknown as Record<string, { gain: FakeParam }>;
+    ctx.currentTime = 10.3;
+    rack.press("cut", true);
+    rack.press("stutter", true);
+    rack.press("echo", true);
+    ctx.currentTime = 10.31;
+    rack.press("cut", false);
+    ctx.currentTime = 10.32;
+    rack.press("cut", true);
+    ctx.currentTime = 11.1;
+    rack.press("cut", false);
+    rack.press("stutter", false);
+    ctx.currentTime = 11.3;
+    rack.press("echo", true);
+    expect(drums.at(10.375)).toBe(0);
+    expect(drums.at(12)).toBe(1);
+    expect(r.wet.gain.at(10.5)).toBe(1);
+    expect(r.wet.gain.at(11.5)).toBe(0);
+    expect(r.echoSend.gain.at(12)).toBe(1);
+    expect(r.echoSend.gain.at(13.5)).toBe(0);
+    for (const g of [drums, r.dry.gain, r.wet.gain, r.fb.gain, r.echoSend.gain]) noStep(g, 10.3, 15);
+  });
+});
