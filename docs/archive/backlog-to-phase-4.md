@@ -1,0 +1,141 @@
+# Backlog items retired on 27 Nov 2026
+
+When phase 4 was planned, everything in `docs/BACKLOG.md` that dated from before phase 3 was either bundled into a phase 4 row, folded into one listen list (H8) or one flake list (C35), or retired. This file keeps the full text of every item that left the backlog, unchanged, so nothing is lost. Nothing here is a rule or a queue.
+
+| Item | Where it went |
+|---|---|
+| C1, C2, C3 | Row F2 (the kick) and H8 Sound |
+| C5, C6, C7 | H8 Recording and Screen |
+| C11, C13, C19 | Row F3 (Drift) and H8 Leads, Vibes |
+| C14 | H8 Pads and space |
+| C20 | H8 The Drop; its open causes in C35 |
+| C22 | H8 Morph; its changed checks are history, kept below |
+| C24 | Row F0 |
+| C25 | H8 The Drop; its open causes in C35 |
+| C28 | Row F1 (the stale check), C35 (Draw), H8 Screen |
+| C30 | H8 Morph; its choices were not vetoed and stand |
+| H3 | H8 |
+| H1, H2 | Done on 22 Nov 2026 |
+| L2 | Closed: G7 does it |
+| L4, L7 | Archived, not scheduled |
+| Bundle 2 to 9 headings | Removed: every row under them was Done and is in the backlog's Done list |
+
+C12, C31, C32, C33 and C34 stayed in the backlog.
+
+## Carried, as written
+
+- **C1. Treble crackle, applied, waiting for Pedro's ear.** G1 changed everything on the original list (22 Nov 2026): 4x oversampled kick drive and waveshapers, resonance capped (Q 6, level-compensated), filters top out at 10 kHz, hats and clap lower, master bus 0.5, limiter now -4 dB with 1 ms attack, compressor with 120 ms release in place of Tone.Limiter, pump ramps 4 ms, buffer default `balanced`. Pedro confirms by ear; if it still crackles, the next suspects are the 4x oversampled shapers' CPU cost and buffer underruns (`?hint=interactive` vs `balanced`). G5 added (23 Nov 2026): Tone's oscillator leak (every started oscillator stayed reachable, about 4 a second) is patched in `audio.ts`; it grew memory on long jams and may have contributed to crackle, so listen on a jam of ten minutes or more.
+
+- **C2. G3 listen items for C1** (23 Nov 2026): the bass lost its second filter (listen for crackle on a saw bass with Env amt high); the drum filter still tops at 18 kHz, not the 10 kHz of the other filters. If C1 crackle persists, these are the next suspects after buffer size.
+
+- **C3. G3 sound defaults changed** (23 Nov 2026): default bass cutoff 0.3 with env amount 0.45, kick now about 0.2 s, drum level and sub dials max out at the C1 trims, defaults moved up the dial. Pedro's ears judge them.
+
+- **C7. Bundle 4 listen item** (23 Nov 2026): the drum lane is about 32 px high at 640 px screen height (recorded choice); say in the notes if it is hard to read.
+
+- **C6. P1b listen item** (23 Nov 2026): the animation loop's per-frame cost on the phone was not measured (review M7); if the UI feels heavy while playing, switch Motion to Still on the Mix Audio page and say so in the notes.
+
+- **C5. G5 listen items** (23 Nov 2026): the MP3 is 160 kbps, tap Record, play, Stop, then save or share it from the take sheet and play the file back: listen for dropouts or clicks at the start and end (1.5 s tail kept). Songs live on the Play tab (the tab bar has no room). Autosave runs 0.4 s after an edit and on page hide; reload and check the song and mix return.
+
+- **C11. P5 listen items** (23 Nov 2026): Drift is sparse after the review fix (4 notes in 8 bars at seed 1234, whole bars of silence), say in the notes if it is too sparse; an accent brightens every sounding note of the layer, a lead-is-monophonic approximation (review M3); Pulse slides do not hold the previous note over the next as the other styles do.
+
+- **C13. P6 listen item** (23 Nov 2026): the continuity check cannot reliably catch small clicks from knob turns or style switches; and a steady Drift sound (long notes, Busy 0.9) shows jumps of 0.43 of its peak on a sine in the worklet, cause unexplained (voice stealing is one candidate). Listen on Drift for clicks and say so in the notes.
+
+- **C14. P7 listen items** (24 Nov 2026): the 20 s reverb decay is a 3.2 s impulse plus a feedback tail (a full 20 s impulse took load to about 93%); say in the notes if the tail sounds wrong, and that the default reverb tail is now measurably longer in every vibe (review S1, fixed to match the old tail by default). Drift pans the sound rather than widening it, because the voices are mono (review M3); the Drone mode and Swoop glide, the air layer and the lo-fi master need Pedro's ears. On short screens the mode icons hide under 400 px so "Drone" draws at full size (review M8).
+
+- **C19. P8 listen items** (24 Nov 2026): from G5 to P9 a short note's ended oscillator could cut the next note to 0 Hz (the G5 leak patch disconnected an oscillator's frequency and detune signals from every oscillator; fixed in P8, `src/engine/oscPatch.ts`, unit test and smoke check that fail on the old patch), so short notes dropped pitch since G5: re-hear C1, C11 and C13 on this build, and re-run C13's 0.43 measurement on Drift. Whether each of the 24 vibes sounds like its name is Pedro's ear; sound changed in Trance (F# minor, offbeat bass, Saw lead arp, Gate), Drone (8 bars per chord, closed organ synth), Acid house (new beat) and Progressive (new hits) in the review fixes. Ambient into Drone is the only transition above 71% load (71.5%, fresh page); the phone itself is unmeasured. `tools/cost.py vibes` now measures each vibe on a fresh page.
+
+- **C20. P10 listen items** (25 Nov 2026): whether each vibe's drop goes BAM is your ear, vibe by vibe; the balance of the extra layers; whether the level follower (it lifts the drop by up to 2 dB to make up the deeper pump, only up to the section's level; it reads only the loop places heard before the build) is heard moving in the first bar after the impact, and above all whether Ambient and Drone hold steady through the eight bars (they sagged and climbed before the fix); the Filter knob's value is kept during a drop and applied when it ends; taps during the build or the drop wait until the wind-down ends; a press during the wind-down does nothing. Measured: drop within 0.18 dB of the section in all 24 vibes (no single bar more than 1.95 dB off, Ambient), at least 1.23 times wider, highest peak -0.7 dBFS; on the heaviest scene, measured before the drop-level fix (everything on plus the six heaviest effects) load 61.1% to 66.2%, worst stall 12.7 to 17.5 ms, at most 35 of the overlay's own 48 voices; the phone is unmeasured. Two things were not settled: a rare Tone error (a drum hit landing on its own stop) had been hidden by a 0.2 ms retry, the retry is removed, the cause was not found, and any throw now fails the smoke run with its stack; and the P9 knob-turn click check failed once in about 24 full smoke runs (Ring, Follow, layer 1, jump 3.6 times the steady sound) and could not be reproduced (0 of 10 runs on the base commit, 0 of 22 on this build), so the check now turns a clicking knob again up to three times and fails only if every turn clicks: that can hide a click that happens on one turn in three, so listen to Ring's Follow turned from low to high. A third thing was not settled: after the final drop-level fix the fixer's second probe run, the first in a fresh browser, read DubTechno -4.07 dB and Drone -3.79 dB with Ambient's section 9 dB quiet and wide, which looks like the bass lost again (the sub-sine cancellation by another path); one clean probe run and the full smoke passed, three clean runs in a row were not reached, so if a vibe's bass drops out after switching vibes, that is this. Drone's gain settles at 0.75 (-2.5 dB), a slow fade mid-drop: listen to it.
+
+- **C22. P11 Morph listen items and changed checks** (25 Nov 2026): whether Morph is good to coast on is your ear: Ambient and Drone with Morph on for ten minutes or more, the instrument dropouts (one instrument out for a phrase, then back), the Voicing dial on the Pad page, Morph's own speed; the other vibes start with Morph off and only Ambient and Drone have their own limits; section moves are built but off. For your veto: by the notes alone, ten minutes of Ambient (160 bars) repeat 12 sixteen-bar stretches with 36 distinct bars, and Drone (150 bars) repeats 10 with 17 distinct bars; the no-repeat check passes only counting every value Morph moves (0 repeats). A notes-alone pass would need Morph to voice or drop instruments more often, which changes the music, so it was not done. Changed checks, no threshold changed: the hands-win reading in `tools/morphcheck.py` (the first version measured wrongly); the core Pad to Arp read in `tools/smoke.py` now measures again from Pad, up to two more times, only when the move was first seen more than 15 ms ahead (a stalled page thread), so a stall no longer fails it (core's timing checks also failed once each in two lone runs, a section long-press, synth detune and a layer 1 accent click, and passed in the full run; read as flakes under load); the Pad page check counts 6 dials (was 5); the drop check in `morphcheck.py` allows only give-backs on the first held bar.
+
+- **C24. The rubber-bass level jump: mostly gone since C27's fix, cause of the rest measured, fix deferred** (26 Nov 2026, found in P10b; Pedro's decision at 00:44 on 26 Nov: fix after the MVP and the APK). Bundle 7b player probe (`docs/reviews/bundle-7b.md`, E1), Minimal Techno, IDM, EDM, Electro, Progressive and Drum and bass, four reps each, a drop each: before `42d9aad` 8 of 24 runs failed a level line, after it 1 of 24 (EDM: the section 2 dB down and wider, +2.3 dB after the wind-down); both full smokes of the player passed drop-5 and drop-6. Cause of the rest: the bass's wave and sub start at one time 50 ms ahead (`LATE_LEAD`), but on a stalled main thread Tone builds each native oscillator inside `start` (9 ms for the wave, 20 ms for the sub in the logged case), so the sub's start reached the audio thread late; legato keeps the offset and the sine sub cancels the square's fundamental (wave/sub correlation 0.86 to between 0.66 and -0.77, master 0.5 to 1.5 dB down, until a gap in the bass). Fix to make (changes how the bass is built, so it must be heard again): run the bass's two oscillators for the life of their voice set, started together once while the set is silent and gated only by their envelopes, or build the sub from the wave's own oscillator; a larger `LATE_LEAD` only moves the margin. Until then drop-5 and drop-6 can fail now and then. No threshold was loosened.
+
+- **C25. P10b listen items and carried findings** (26 Nov 2026): whether the wind-down feels like a calm-down that mirrors the build is your ear, vibe by vibe (listen for a bar that still jumps, and Ambient and Drone, where it is slowest). Carried: in Ambient and Drone the extra layers read -120 dB in the last wind-down bar while about three voices are still counted (cause not found, the voices fall to zero on the next bar line); the after-end width check has a Morph exception (judged only when Morph did not move in the bars read); the cost part's Tail-dial load reading failed once after R1 and once after P10b (70.7% to 86.1%, 64.8% to 83.1%) and passed on rerun both times, intermittent, no threshold changed.
+
+- **C28. P10d carried** (26 Nov 2026, `docs/reviews/P10d.md`): Tone's Draw drops callbacks later than 0.25 s, so a position update can be skipped on a slow phone; the vibe pick in `src/ui/vibes.tsx:40` still checks `engine.playing` (harmless); on a first tap the button dims for about a second while audio starts (intended). Pedro's exact symptom (Play after a tap while the music plays) did not reproduce on the old build in 12 headless scenarios; what reproduced was Play shown for 6 to 7 frames after a first tap and Stop stuck after a Stop, both fixed. Check by hand on the phone.
+
+- **C30. Bundle 7b player** (26 Nov 2026, `docs/reviews/bundle-7b.md`). For your veto: every six-chip page row (Advanced Drums, a Lead's pages, the layer pages at 412 px) and the five-chip rows under 400 px of width (Bass, Layer Arp, Pad and Drone) now set the icon over the word at 12 px, as the Mix row does, so no label runs to the chip's edge (C26, checked by `PAGE_CHIPS` in `tools/shots.py`). Listen: Ambient's first chord of its 16-bar loop measures 2 dB under the next three (the same in every load, -18.7 to -15.6 dB), Drone steps down 1.2 dB at its chord change; no dropout, click or bass cancellation was measured in either. The rubber vibes' peaks sit 0.0 to 0.2 dB higher since C27's fix (top -0.66 dBFS, limit -0.5; the C29 one-offs did not come back in 48 probe drops and two full smokes). C26, C27 and C29 are closed.
+
+## By hand, as written
+
+- **H3. Hear and use the shell on the phone** (22 Nov 2026): open https://apcanario.github.io/groovebox/ and jam a whole song with one thumb; confirm whether the C1 crackle is gone. Send notes in the next starter's `Notes:` line. Now also covers the G3 tabs (Drums, Bass, Synth, Mix), the G4 layer tabs (Arp, Pad, Generative on Layer 1 and 2) and the G5 Songs sheet and recording. Open until Pedro says done.
+- H1 (Pages on) and H2 (spike heard) were done on 22 Nov 2026.
+
+## Later, as written
+
+- **L2.** Patch polish pass, driven by Pedro's notes.
+- **L4.** Offline re-render of the event log, in chunks.
+- **L7.** Morph between two saved generative patterns.
+
+## Bundle headings whose rows were all Done, as written
+
+## Bundle 2: drums, bass, synth, mix
+
+All rows of this bundle are Done.
+
+## Bundle 3: the layers
+
+All rows of this bundle are Done.
+
+## Bundle 4: phase 2, the screens, the look and the two modes
+
+All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-4.md`.
+
+
+## Bundle 5: phase 2, vibes, chords and leads
+
+All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-5.md`.
+
+## Bundle 6: phase 2, sounds, effects and all 24 vibes
+
+All rows of this bundle are Done. The player's check of the bundle is in `docs/reviews/bundle-6.md`.
+
+## Bundle 7: phase 2, the Drop and Morph
+
+Read spec 8.9 and 8.11 in full before any row of this bundle.
+
+### P10. The Drop
+
+Done (25 Nov 2026), see Done below. Its text left the queue.
+
+### P11. Morph
+
+Done (25 Nov 2026), see Done below. Its text left the queue.
+
+## Bundle 7b: the cycle and the drop's wind-down
+
+Worked after bundle 7 and before bundle 8. R1, P10b, P10c, P10d and the player pass are Done; P10b was built with the cycle R1 wrote, so it was also R1's trial.
+
+### R1. A leaner build cycle
+
+Done (25 Nov 2026), see Done below. Its text left the queue.
+
+### P10b. The Drop's wind-down
+
+Done (26 Nov 2026), see Done below. Its text left the queue.
+
+### P10c. Bundle 7 player findings
+
+Done (26 Nov 2026), see Done below. Its text left the queue; M1 moved into P10d.
+
+### Bundle 7b player pass
+
+Done (26 Nov 2026), see Done below. Its text left the queue.
+
+### P10d. Play button state and DROP and Morph position
+
+Done (26 Nov 2026), see Done below. Its text left the queue.
+
+## Bundle 8: phase 3, tablet
+
+Spec section 9 is the brief. Read it in full, with section 8.12, before any row of this bundle.
+
+### T1. Three layouts and the docked pads
+
+Done (27 Nov 2026), see Done below. Its text left the queue.
+
+## Bundle 9: the install
+
+### G6. APK
+
+Done (27 Nov 2026), see Done below. Its text left the queue.
