@@ -20,7 +20,9 @@ P11: Morph (tools/morphcheck.py): its switch beside DROP, the Speed dial and the
 ten minutes of Ambient never repeating a 16-bar stretch and never leaving the key, its journey the seeded one; a hand
 holding a dial for 16 bars; a drop holding Morph.
 T1: the layout follows the screen (phone, tablet portrait, tablet landscape) live, and a rotation while playing leaves
-the transport running with no gap in the level and nothing changed in the engine.
+the transport running with no gap in the level and nothing changed in the engine. The tablet walk of tools/shots.py
+(walk_tablet) checks the four tablet sizes in both modes: nothing scrolls or is cut off, text fits, no control under
+48 px, the desk's and the dock's layouts, and the pads and a panel used without changing screen.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
@@ -43,7 +45,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import SMALL, sample_play, simple_words, walk_frame, walk_play_button  # noqa: E402
+from shots import SMALL, sample_play, simple_words, walk_frame, walk_play_button, walk_tablet  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 
@@ -3314,6 +3316,12 @@ def part_core(browser, page, failures: list, shot) -> None:
     if not page.evaluate("window.__groovebox.playing"):
         failures.append("the transport stopped during the shell walk")
     walk_rotate(page, failures)
+    # T1: the four tablet sizes in both modes, every panel and page, each with the frame checks and its layout's own
+    # (the desk in landscape, the dock in portrait), and a pad and a panel's dial used without changing screen.
+    n = walk_tablet(page, failures, None)
+    print(f"tablet walk: {n} screens at 1280 x 800, 1024 x 768, 800 x 1280 and 768 x 1024, both modes")
+    if not page.evaluate("window.__groovebox.playing"):
+        failures.append("the transport stopped during the tablet walk")
     # P10d: later taps of Play and Stop in Simple and Advanced, and a Stop during a drop's build, each sampled.
     walk_play_button(page, failures, "core")
     page.click('[data-appmode="advanced"]')

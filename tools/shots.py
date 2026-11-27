@@ -640,7 +640,7 @@ DOCK = r"""() => {
   const hdr = q('.hdr'), inst = q('.shell .inst'), dock = q('.shell .pads.dock'), slot = q('.dock .punchslot');
   const drop = q('.dock #drop'), morph = q('.dock .droprow .morph'), secs = q('.dock .secs'), top = q('.dock .top'), rail = q('.dock .rail');
   if (!hdr || !inst || !dock || !slot || !drop || !morph || !secs || !top || !rail) return ['the dock is missing a part (panel, punch space, DROP, Morph, strip, transport or rail)'];
-  if (!hdr.querySelector('.vibectl')) bad.push('the header has no vibe control');
+  if (!hdr.querySelector('.vibectl') || !hdr.querySelector('.vibectl').getClientRects().length) bad.push('the header has no vibe control');
   const e = window.__groovebox, n = e.getSong().sections.length;
   const adv = document.querySelector('[data-appmode="advanced"]').getAttribute('aria-checked') === 'true';
   const view = q(adv ? '.dock .deskgrid' : '.dock .nowlist');
@@ -776,11 +776,15 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
             else:
                 song0 = page.evaluate(f"JSON.stringify({E}.getSong())")
                 b = dial.bounding_box()
-                page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
-                page.mouse.down()
-                page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2 - 40, steps=4)
-                page.mouse.up()
-                if page.evaluate(f"JSON.stringify({E}.getSong())") == song0:
+                moved = False
+                # Up, then down: a dial at its top or bottom moves the other way.
+                for dy in (-40, 40):
+                    page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
+                    page.mouse.down()
+                    page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2 + dy, steps=4)
+                    page.mouse.up()
+                    moved = moved or page.evaluate(f"JSON.stringify({E}.getSong())") != song0
+                if not moved:
                     failures.append(f"{where}: a drag on the panel's dial changed nothing")
             # A slow vibe (Ambient's long tones) may start nothing for a beat or two: up to two bars.
             if not _wait(page, f"{E}.attacks() > {before}", bar_s * 2 + 1) or not page.locator(".dock .nowlist, .deskgrid").count():
