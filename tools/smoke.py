@@ -23,6 +23,8 @@ T1: the layout follows the screen (phone, tablet portrait, tablet landscape) liv
 the transport running with no gap in the level and nothing changed in the engine. The tablet walk of tools/shots.py
 (walk_tablet) checks the six tablet sizes (the row's four, 600 x 960 and 880 x 620) in both modes: nothing scrolls or is cut off, text fits, no control under
 48 px, the desk's and the dock's layouts, and the pads and a panel used without changing screen.
+T2: at 1280 x 800 the Advanced panels of shots.PAGELESS (Bass, Synth, Layer 1 and 2 in every mode, a lead with and
+without Pulse) show whole, with no page chips.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded

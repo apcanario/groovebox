@@ -685,6 +685,19 @@ DOCK = r"""() => {
 }"""
 
 
+# T2 (spec 9.2): on the desk at 1280 x 800 these Advanced panels show every page at once: no page chips, the panel whole.
+# Slice b adds Drums, Mix and Chords.
+PAGELESS = {"bass", "synth", "layer1", "layer2"}
+PAGELESS_AT = (1280, 800)
+WHOLE = r"""(panel) => {
+  const chips = [...document.querySelectorAll('.shell .inst .body [data-page]')].filter((c) => c.getClientRects().length);
+  const bad = [];
+  if (chips.length) bad.push(`the Advanced ${panel} panel still has pages (${chips.map((c) => c.dataset.page).join(', ')})`);
+  else if (!document.querySelector(`.shell .inst [data-whole="${panel}"]`)) bad.push(`the Advanced ${panel} panel is not shown whole`);
+  return bad;
+}"""
+
+
 # What must hold while a pad and a panel's dial are used (T1 review S2): the panel shown, the layout, the panel's dials.
 SCREEN_HELD = """() => ({ panel: document.querySelector('.shell .inst')?.dataset.panel ?? null,
   size: document.documentElement.dataset.size, dial: !!document.querySelector('.shell .inst .body .dial') })"""
@@ -769,7 +782,7 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
     portrait, the dock), in both modes, with every panel of the rail (each layer in each mode) and every page, a pad (or,
     on Simple portrait, an instrument's lane) waiting for the next bar and a section queued. Each screen gets the frame walk's
     checks (nothing scrolls, nothing cut off, text fits, no control under 48 px) and the layout's own; a missing
-    screenshot fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
+    screenshot fails. T2: at 1280 x 800 an Advanced panel of PAGELESS that still shows page chips fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen
     (the panel and the layout held), the transport running and the level up throughout.
     The smoke's core part runs it without screenshots. Leaves the phone at 390 x 844 in Simple, on the Play tab."""
     w = Walk(page, failures, out_dir)
@@ -797,15 +810,35 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
             continue
         for mode in ("simple", "advanced"):
             page.click(f'[data-appmode="{mode}"]')
+            whole = mode == "advanced" and size == PAGELESS_AT
+
+            def no_pages(t: str, label: str) -> None:
+                # T2: at 1280 x 800 an Advanced panel of PAGELESS shows no page chip.
+                if whole and t in PAGELESS:
+                    _settle(page)
+                    for b in page.evaluate(WHOLE, t):
+                        failures.append(f"{size[0]}x{size[1]} {label}: {b}")
+
             for t in PANELS:
                 page.click(f'.rail [data-tab="{t}"]')
                 label = f"{mode}-{orient}-{t}"
                 if t in ("layer1", "layer2"):
                     for m in LAYER_MODES:
                         page.click(f'[data-mode="{t}:{m}"]')
+                        no_pages(t, f"{label}-{m}")
                         w.pages(size, f"{label}-{m}")
+                        if m == "generative" and whole:
+                            # Pulse adds its own dials and every other style has none: the whole panel holds both.
+                            style = page.get_attribute("[data-leadstyle].on", "data-leadstyle")
+                            for other in ("pulse", "hook"):
+                                if other != style:
+                                    page.click(f'[data-leadstyle="{other}"]')
+                                    no_pages(t, f"{label}-{m}-{other}")
+                                    w.pages(size, f"{label}-{m}-{other}")
+                            page.click(f'[data-leadstyle="{style}"]')
                     page.click(f'[data-mode="{t}:{modes[t]}"]')
                 else:
+                    no_pages(t, label)
                     w.pages(size, label)
                 # The panel as it opens, with the layout's own checks.
                 layout(size, orient, label)
