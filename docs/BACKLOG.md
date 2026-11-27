@@ -140,6 +140,7 @@ Spec section 9 is the brief. Read it in full, with section 8.12, before any row 
 History, kept from the G5 chat: "G5 is Done. G6 is parked by Pedro (23 Nov 2026): do not work it until he asks." Pedro moved it on 24 Nov 2026: G6 waits until after the tablet bundle (bundle 8) and is bundle 9; the chat that works bundle 9 starts it, and a `Notes:` line can park it again.
 
 - Capacitor Android project wrapping the built app. Portrait only, screen kept awake while playing, app icon, works offline (fonts bundled, no network needed).
+- Note from T1 (spec 9.1): "portrait only" is for phones; a tablet (600 px or more on its short side) rotates freely.
 - No foreground service and no background audio: spec section 2.
 - A GitHub Actions workflow that builds a debug APK on each push to `main` and attaches it to a release named `latest`.
 - A short `docs/INSTALL.md`: where to download the APK and how to install it.

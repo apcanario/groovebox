@@ -13,8 +13,9 @@ Screenshots left from an earlier run are deleted first, so shots/ holds only the
 After the walk, the live walk (P10c M5) loads Ambient and saves, at both sizes, Morph on, the Morph page with Sections
 off and on, the Drop page and DROP in build, on and wind-down (LIVE_SCREENS); a missing one fails the run.
 
-T1 slice b: the tablet landscape walk (walk_tablet) saves the desk at 1280 x 800 and 1024 x 768 in both modes, every
-rail panel and page, with the same checks and the desk's own layout (DESK).
+T1: the tablet walk (walk_tablet) saves the four tablet sizes in both modes: the desk at 1280 x 800 and 1024 x 768 and
+the dock at 800 x 1280 and 768 x 1024, every rail panel and page, with the same checks and the layout's own (DESK,
+DOCK); the smoke's core part runs it too, without screenshots.
 
 tools/smoke.py runs the same walk (without screenshots) while the transport plays.
 
@@ -585,11 +586,14 @@ def walk_live(page, failures: list, out_dir: str | None) -> int:
     return w.count
 
 
-# T1 slice b (spec 9.2): tablet landscape, the desk, at both sizes of the row, in both modes.
-TABLET_LANDSCAPE = [(1280, 800), (1024, 768)]
+# T1 (spec 9.1 to 9.3): the four tablet sizes of the row, each with the layout it must show, in both modes.
+TABLET_SIZES = [((1280, 800), "landscape"), ((1024, 768), "landscape"), ((800, 1280), "portrait"), ((768, 1024), "portrait")]
 PANELS = ["chords", "drums", "bass", "synth", "layer1", "layer2", "mix"]
-TABLET_SCREENS = [f"{m}-landscape-{t}" for m in ("simple", "advanced") for t in ("chords", "drums", "mix")] + [
-    f"{m}-landscape-{s}" for m in ("simple", "advanced") for s in ("pad-next-bar", "section-next-bar")]
+TABLET_SCREENS = {
+    o: [f"{m}-{o}-{t}" for m in ("simple", "advanced") for t in ("chords", "drums", "mix")]
+    + [f"{m}-{o}-{s}" for m in ("simple", "advanced") for s in ("pad-next-bar", "section-next-bar")]
+    for o in ("landscape", "portrait")
+}
 
 # The desk's own layout: five labelled rows by every section, the punch pads' space above the grid, the strip under the
 # grid's columns as their labels, DROP and the transport bar side by side under the strip, the playing column's pads
@@ -625,33 +629,95 @@ DESK = r"""() => {
   return bad;
 }"""
 
+# T1 slice c (spec 9.3): tablet portrait, the dock. The chosen panel on top under the header; the dock below it, top to
+# bottom: the punch pads' space (48 px at least), the five lanes (Simple) or the labelled grid with the strip as its
+# column labels (Advanced), DROP with Morph beside it, the strip, the transport bar and the rail of seven as the tab bar
+# on the bottom edge. The vibe control sits in the header.
+DOCK = r"""() => {
+  const bad = [];
+  const q = (s) => document.querySelector(s), r = (el) => el.getBoundingClientRect();
+  const vh = document.documentElement.clientHeight;
+  const hdr = q('.hdr'), inst = q('.shell .inst'), dock = q('.shell .pads.dock'), slot = q('.dock .punchslot');
+  const drop = q('.dock #drop'), morph = q('.dock .droprow .morph'), secs = q('.dock .secs'), top = q('.dock .top'), rail = q('.dock .rail');
+  if (!hdr || !inst || !dock || !slot || !drop || !morph || !secs || !top || !rail) return ['the dock is missing a part (panel, punch space, DROP, Morph, strip, transport or rail)'];
+  if (!hdr.querySelector('.vibectl')) bad.push('the header has no vibe control');
+  const e = window.__groovebox, n = e.getSong().sections.length;
+  const adv = document.querySelector('[data-appmode="advanced"]').getAttribute('aria-checked') === 'true';
+  const view = q(adv ? '.dock .deskgrid' : '.dock .nowlist');
+  if (!view) return [`the dock has no ${adv ? 'pad grid' : 'lanes'}`];
+  if (q(adv ? '.dock .nowlist' : '.dock .deskgrid')) bad.push(`the dock shows the ${adv ? 'lanes' : 'grid'} in ${adv ? 'Advanced' : 'Simple'}`);
+  const h = r(hdr), ih = r(inst), dk = r(dock), sl = r(slot), v = r(view), d = r(drop), m = r(morph), st = r(secs), t = r(top), rl = r(rail);
+  if (ih.top < h.bottom - 0.5 || ih.bottom > dk.top + 0.5) bad.push('the panel is not between the header and the dock');
+  if (ih.height < 300) bad.push(`the panel has ${ih.height.toFixed(0)} px`);
+  if (!inst.querySelector('.body button, .body .dial, .body [role=slider]')) bad.push('the panel shows no control');
+  if (sl.height < 47.5 || sl.bottom > v.top + 0.5) bad.push(`no space of 48 px for the punch pads above the ${adv ? 'grid' : 'lanes'} (${sl.height.toFixed(0)} px)`);
+  if (adv) {
+    const heads = [...view.querySelectorAll('.deskrow')];
+    if (heads.length !== 5) bad.push(`${heads.length} labelled rows, not 5`);
+    for (const x of heads) if (!x.querySelector('span')?.textContent.trim()) bad.push(`row ${x.dataset.row} does not say what it plays`);
+    const cells = [...view.querySelectorAll('[data-cell]')];
+    if (cells.length !== 5 * n) bad.push(`${cells.length} pads, not ${5 * n}`);
+    for (let i = 0; i < n; i++) {
+      const a = q(`[data-strip="${i}"]`), c = q(`[data-cell="${i}:drums"]`);
+      if (a && c && (Math.abs(r(a).left - r(c).left) > 1 || Math.abs(r(a).right - r(c).right) > 1)) bad.push(`section ${i}'s strip tile is not under its column`);
+    }
+    const live = cells.filter((c) => c.dataset.live !== undefined);
+    if (live.length !== 5) bad.push(`${live.length} pads in the playing column, not 5`);
+    if (e.playing && live.length && !live.every((c) => c.querySelector('.padnotes'))) bad.push("the playing column's pads do not draw their notes");
+  } else {
+    if (view.querySelectorAll('[data-now]').length !== 5 || view.querySelectorAll('.lane').length !== 5) bad.push('the dock does not show five instruments with their lanes');
+  }
+  for (const x of view.querySelectorAll('[data-now], .deskrow')) if (r(x).height < 47.5) bad.push(`a row of the dock is ${r(x).height.toFixed(0)} px tall`);
+  if (v.bottom > d.top + 0.5 || Math.abs(d.top - m.top) > 1 || d.right > m.left + 0.5) bad.push('DROP with Morph beside it is not under the pads');
+  if (d.bottom > st.top + 0.5) bad.push('DROP is not above the strip');
+  if (st.bottom > t.top + 0.5) bad.push('the strip is not above the transport bar');
+  if (t.bottom > rl.top + 0.5) bad.push('the transport bar is not above the rail');
+  if (Math.abs(rl.bottom - vh) > 1) bad.push(`the rail is not on the bottom edge (${rl.bottom.toFixed(0)} of ${vh})`);
+  if (rail.querySelectorAll('[data-tab]').length !== 7) bad.push(`the rail has ${rail.querySelectorAll('[data-tab]').length} tabs, not 7`);
+  return bad;
+}"""
+
+
+def tablet_layout(page, orient: str) -> list:
+    """The layout checks of the tablet layout shown: the desk (landscape) or the dock (portrait)."""
+    return page.evaluate(DESK if orient == "landscape" else DOCK)
+
 
 def walk_tablet(page, failures: list, out_dir: str | None) -> int:
-    """T1 slice b: tablet landscape (the desk) at 1280 x 800 and 1024 x 768, in both modes, with every panel of the rail
-    (each layer in each mode) and every page, a pad waiting for the next bar and a section queued. Each screen gets the
-    frame walk's checks (nothing scrolls, nothing cut off, text fits, no control under 48 px) and the desk's own layout;
-    a missing screenshot fails. Then a pad tapped on the desk and a panel's control used, both without changing screen.
-    Leaves the phone at 390 x 844 in Simple."""
+    """T1: the four tablet sizes (1280 x 800 and 1024 x 768 landscape, the desk; 800 x 1280 and 768 x 1024 portrait, the
+    dock), in both modes, with every panel of the rail (each layer in each mode) and every page, a pad (or, on Simple
+    portrait, an instrument's lane) waiting for the next bar and a section queued. Each screen gets the frame walk's
+    checks (nothing scrolls, nothing cut off, text fits, no control under 48 px) and the layout's own; a missing
+    screenshot fails. Then, at each size and in both modes, a pad tapped and a panel's dial dragged without changing screen.
+    The smoke's core part runs it without screenshots. Leaves the phone at 390 x 844 in Simple, on the Play tab."""
     w = Walk(page, failures, out_dir)
     sec = page.evaluate(f"{E}.position().section")
     modes = {lid: page.evaluate(f"{E}.getSong().sections[{sec}].{lid}.mode") for lid in ["layer1", "layer2"]}
     bar_s = 240.0 / page.evaluate(f"{E}.bpm")
 
-    def desk(size: tuple, label: str) -> None:
+    def layout(size: tuple, orient: str, label: str) -> None:
         w.screen(size, label)
-        for b in page.evaluate(DESK):
+        for b in tablet_layout(page, orient):
             failures.append(f"{size[0]}x{size[1]} {label}: {b}")
 
-    for size in TABLET_LANDSCAPE:
+    def pad_sel(orient: str, mode: str, s: int, inst: str) -> str:
+        # Simple portrait's dock has the lanes: an instrument's label toggles it in the playing section.
+        return f'[data-now="{inst}"]' if (orient, mode) == ("portrait", "simple") else f'[data-cell="{s}:{inst}"]'
+
+    def settle_toggles() -> None:
+        if not _wait(page, f"{E}.pendingShown().toggles.length === 0", bar_s * 2 + 1):
+            failures.append("tablet walk: a pad's toggle never landed")
+
+    for size, orient in TABLET_SIZES:
         page.set_viewport_size({"width": size[0], "height": size[1]})
-        if not _wait(page, "document.documentElement.dataset.size === 'landscape'", 2.0):
-            failures.append(f"{size[0]}x{size[1]}: not the landscape layout")
+        if not _wait(page, f"document.documentElement.dataset.size === {orient!r}", 2.0):
+            failures.append(f"{size[0]}x{size[1]}: not the {orient} layout")
             continue
         for mode in ("simple", "advanced"):
             page.click(f'[data-appmode="{mode}"]')
             for t in PANELS:
                 page.click(f'.rail [data-tab="{t}"]')
-                label = f"{mode}-landscape-{t}"
+                label = f"{mode}-{orient}-{t}"
                 if t in ("layer1", "layer2"):
                     for m in LAYER_MODES:
                         page.click(f'[data-mode="{t}:{m}"]')
@@ -659,59 +725,78 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
                     page.click(f'[data-mode="{t}:{modes[t]}"]')
                 else:
                     w.pages(size, label)
-                # The panel as it opens, with the desk's own checks.
-                desk(size, label)
-            # A pad of the playing column waiting for the next bar (its hatched frame), then put back.
+                # The panel as it opens, with the layout's own checks.
+                layout(size, orient, label)
+            # A pad of the playing section waiting for the next bar (its hatched frame), then put back.
             sec = page.evaluate(f"{E}.schedulerSection()")
+            sel = pad_sel(orient, mode, sec, "synth")
             was = page.evaluate(f"{E}.getSong().sections[{sec}].on.synth")
             # Tapped early in a bar, so the screen is taken well before the bar line.
             _wait(page, f"{E}.position().step <= 2", bar_s + 1)
-            page.click(f'[data-cell="{sec}:synth"]')
-            if not _wait(page, f"!!document.querySelector('[data-cell=\"{sec}:synth\"].pending')", 0.5):
+            page.click(sel)
+            if not _wait(page, f"!!document.querySelector('{sel}.pending')", 0.5):
                 failures.append(f"{size[0]}x{size[1]} {mode}: a tapped pad does not show Next bar")
-            desk(size, f"{mode}-landscape-pad-next-bar")
-            page.click(f'[data-cell="{sec}:synth"]')
-            if not _wait(page, f"{E}.pendingShown().toggles.length === 0", bar_s * 2 + 1):
-                failures.append(f"{size[0]}x{size[1]} {mode}: the pad's toggle never landed")
+            layout(size, orient, f"{mode}-{orient}-pad-next-bar")
+            page.click(sel)
+            settle_toggles()
             if page.evaluate(f"{E}.getSong().sections[{sec}].on.synth") != was:
-                page.click(f'[data-cell="{sec}:synth"]')
-                _wait(page, f"{E}.pendingShown().toggles.length === 0", bar_s * 2 + 1)
-            # A section queued: the strip's Next bar and the outlined column, then landed.
+                page.click(sel)
+                settle_toggles()
+            # A section queued: the strip's Next bar (and on the grid the outlined column), then landed.
             n = page.evaluate(f"{E}.getSong().sections.length")
             nxt = (sec + 1) % n
             if n > 1:
                 _wait(page, f"{E}.position().step <= 2", bar_s + 1)
                 page.click(f'[data-strip="{nxt}"]')
-                if not _wait(page, f"!!document.querySelector('[data-cell=\"{nxt}:drums\"].nextcol')", 0.5):
-                    failures.append(f"{size[0]}x{size[1]} {mode}: the queued section's column has no outline")
-                desk(size, f"{mode}-landscape-section-next-bar")
+                shown = f'[data-strip="{nxt}"].pending' if (orient, mode) == ("portrait", "simple") else f'[data-cell="{nxt}:drums"].nextcol'
+                if not _wait(page, f"!!document.querySelector('{shown}')", 0.5):
+                    failures.append(f"{size[0]}x{size[1]} {mode}: the queued section does not show Next bar")
+                layout(size, orient, f"{mode}-{orient}-section-next-bar")
                 if not _wait(page, f"{E}.position().section === {nxt}", bar_s * 2 + 1):
                     failures.append(f"{size[0]}x{size[1]} {mode}: the queued section never played")
-    # Pads and one instrument without changing screen: a panel's dial moves while the pads stay on screen and live.
-    page.click('[data-appmode="advanced"]')
-    page.click('.rail [data-tab="drums"]')
-    sec = page.evaluate(f"{E}.schedulerSection()")
-    before = page.evaluate(f"{E}.attacks()")
-    page.click(f'[data-cell="{sec}:bass"]')
-    if not page.locator(f'[data-cell="{sec}:bass"].pending').count():
-        failures.append("desk: a pad tap beside an open panel did not queue")
-    page.click(f'[data-cell="{sec}:bass"]')
-    if not page.locator(".inst .body .dial, .inst .body [role=slider]").count():
-        failures.append("desk: the Drums panel shows no control beside the pads")
-    time.sleep(1.0)
-    if page.evaluate(f"{E}.attacks()") <= before or not page.locator(".deskgrid").count():
-        failures.append("desk: the pads stopped while the panel was open")
-    _wait(page, f"{E}.pendingShown().toggles.length === 0", bar_s * 2 + 1)
+        # Pads and one instrument without changing screen: a pad queues and the pads keep playing beside an open panel,
+        # whose control moves the song.
+        for mode in ("advanced", "simple"):
+            page.click(f'[data-appmode="{mode}"]')
+            page.click('.rail [data-tab="drums"]')
+            where = f"{size[0]}x{size[1]} {mode} {orient}"
+            sec = page.evaluate(f"{E}.schedulerSection()")
+            sel = pad_sel(orient, mode, sec, "bass")
+            before = page.evaluate(f"{E}.attacks()")
+            page.click(sel)
+            if not page.locator(f"{sel}.pending").count():
+                failures.append(f"{where}: a pad tap beside an open panel did not queue")
+            page.click(sel)
+            # Advanced Drums opens on its step grid: the Kit page has dials.
+            if page.locator('.inst [data-page="drums:kit"]').count():
+                page.click('.inst [data-page="drums:kit"]')
+            dial = page.locator(".inst .body .dial").first
+            if not dial.count():
+                failures.append(f"{where}: the Drums panel shows no dial beside the pads")
+            else:
+                song0 = page.evaluate(f"JSON.stringify({E}.getSong())")
+                b = dial.bounding_box()
+                page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
+                page.mouse.down()
+                page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2 - 40, steps=4)
+                page.mouse.up()
+                if page.evaluate(f"JSON.stringify({E}.getSong())") == song0:
+                    failures.append(f"{where}: a drag on the panel's dial changed nothing")
+            # A slow vibe (Ambient's long tones) may start nothing for a beat or two: up to two bars.
+            if not _wait(page, f"{E}.attacks() > {before}", bar_s * 2 + 1) or not page.locator(".dock .nowlist, .deskgrid").count():
+                failures.append(f"{where}: the pads stopped or left the screen while the panel was used")
+            settle_toggles()
     page.click('[data-appmode="simple"]')
     page.set_viewport_size({"width": 390, "height": 844})
     _wait(page, "document.documentElement.dataset.size === 'phone'", 2.0)
+    page.click('[data-tab="play"]')
     if out_dir:
-        for size in TABLET_LANDSCAPE:
-            for label in TABLET_SCREENS:
+        for size, orient in TABLET_SIZES:
+            for label in TABLET_SCREENS[orient]:
                 f = f"{size[0]}x{size[1]}-{label}.png"
                 if not os.path.exists(os.path.join(out_dir, f)):
                     failures.append(f"tablet walk: no screenshot {f}")
-    print(f"tablet walk: {w.count} landscape screens")
+    print(f"tablet walk: {w.count} screens at four sizes in both modes")
     return w.count
 
 
@@ -752,7 +837,7 @@ def main() -> int:
             n += walk_live(page, failures, out)
             # P10d: with Ambient (Morph on) playing, every tap during a morph.
             walk_play_button(page, failures, "Ambient, Morph on")
-            # T1 slice b: the tablet landscape desk, last (the walks above are the phone's).
+            # T1: the four tablet sizes, last (the walks above are the phone's).
             n += walk_tablet(page, failures, out)
             failures += [f"page error: {e}" for e in errors]
             browser.close()
