@@ -664,10 +664,12 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
             # A pad of the playing column waiting for the next bar (its hatched frame), then put back.
             sec = page.evaluate(f"{E}.schedulerSection()")
             was = page.evaluate(f"{E}.getSong().sections[{sec}].on.synth")
+            # Tapped early in a bar, so the screen is taken well before the bar line.
+            _wait(page, f"{E}.position().step <= 2", bar_s + 1)
             page.click(f'[data-cell="{sec}:synth"]')
-            desk(size, f"{mode}-landscape-pad-next-bar")
-            if not page.locator(f'[data-cell="{sec}:synth"].pending').count():
+            if not _wait(page, f"!!document.querySelector('[data-cell=\"{sec}:synth\"].pending')", 0.5):
                 failures.append(f"{size[0]}x{size[1]} {mode}: a tapped pad does not show Next bar")
+            desk(size, f"{mode}-landscape-pad-next-bar")
             page.click(f'[data-cell="{sec}:synth"]')
             if not _wait(page, f"{E}.pendingShown().toggles.length === 0", bar_s * 2 + 1):
                 failures.append(f"{size[0]}x{size[1]} {mode}: the pad's toggle never landed")
@@ -678,10 +680,11 @@ def walk_tablet(page, failures: list, out_dir: str | None) -> int:
             n = page.evaluate(f"{E}.getSong().sections.length")
             nxt = (sec + 1) % n
             if n > 1:
+                _wait(page, f"{E}.position().step <= 2", bar_s + 1)
                 page.click(f'[data-strip="{nxt}"]')
-                desk(size, f"{mode}-landscape-section-next-bar")
-                if page.locator(f'[data-cell="{nxt}:drums"].nextcol').count() != 1:
+                if not _wait(page, f"!!document.querySelector('[data-cell=\"{nxt}:drums\"].nextcol')", 0.5):
                     failures.append(f"{size[0]}x{size[1]} {mode}: the queued section's column has no outline")
+                desk(size, f"{mode}-landscape-section-next-bar")
                 if not _wait(page, f"{E}.position().section === {nxt}", bar_s * 2 + 1):
                     failures.append(f"{size[0]}x{size[1]} {mode}: the queued section never played")
     # Pads and one instrument without changing screen: a panel's dial moves while the pads stay on screen and live.
