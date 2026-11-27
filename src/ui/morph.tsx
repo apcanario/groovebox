@@ -48,7 +48,7 @@ export function MorphSpeed({ engine, label = "Speed" }: { engine: Engine; label?
 }
 
 /** The Morph page (Advanced): a switch per thing it may move, the speed and the depth. */
-export function MorphPage({ engine, brief = false }: { engine: Engine; brief?: boolean }) {
+export function MorphPage({ engine }: { engine: Engine }) {
   const p = engine.morphPlan();
   return (
     <div class="morphpage">
@@ -72,7 +72,7 @@ export function MorphPage({ engine, brief = false }: { engine: Engine; brief?: b
         <MorphSpeed engine={engine} />
         <Dial id="morphDepth" label="Depth" value={p.depth} min={0} max={1} color="var(--purple)" onChange={(v) => engine.setMorph({ depth: Math.round(v * 100) / 100 })} />
       </div>
-      {!brief && <p class="note" id="morph-help">{morphHelp(p.moves.sections, p.recipe.sections)}</p>}
+      <p class="note" id="morph-help">{morphHelp(p.moves.sections, p.recipe.sections)}</p>
     </div>
   );
 }

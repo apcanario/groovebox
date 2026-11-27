@@ -2974,3 +2974,11 @@ button:disabled {
 .drumwhole .dright .headrow {
   gap: 6px;
 }
+
+/*
+ * T2 slice c: the whole Drums column's XY pad is 150 px wide, too narrow for "Resonance" and its readout side by side:
+ * the readout drops under the name, still on its dark backing in the top corner.
+ */
+.drumwhole .xy .rv {
+  top: 28px;
+}

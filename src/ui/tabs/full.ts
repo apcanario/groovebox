@@ -1,6 +1,6 @@
 /**
- * T2 (spec 9.1, 9.2): an Advanced instrument panel on the desk shows every page at once, with no page chips, where it
- * fits. Whether it fits is measured, not guessed: the panel is drawn whole, and if its tab body then holds more than it
+ * T2 (spec 9.1, 9.2, 9.3): an Advanced instrument panel on a tablet (the desk, and the dock's panel in portrait) shows
+ * every page at once, with no page chips, where it fits. Whether it fits is measured, not guessed: the panel is drawn whole, and if its tab body then holds more than it
  * shows, it falls back to the phone's pages for that body size and that shape of panel (a layer's mode, a lead's Pulse
  * page), so nothing ever scrolls. A new body size or a new shape tries the whole panel again. Display only.
  */
@@ -13,25 +13,27 @@ export function overflowing(el: { scrollHeight: number; clientHeight: number; sc
 }
 
 /**
- * The panel's whole form on the desk: true while it fits. `shape` names what changes the panel's content (a mode, a
- * style); the returned ref goes on the panel's section, whose parent is the tab body measured.
+ * The panel's whole form on a tablet: true while it fits. `shape` names what changes the panel's content (a mode, a
+ * style); `on` is false where the panel has no whole form (Simple); the returned ref goes on the panel's section, whose
+ * parent is the tab body measured.
  */
-export function useFull(ctx: Ctx, shape: string): [boolean, { current: HTMLElement | null }] {
+export function useFull(ctx: Ctx, shape: string, on = true): [boolean, { current: HTMLElement | null }] {
   const ref = useRef<HTMLElement | null>(null);
   const [size, setSize] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const key = `${size}|${shape}`;
-  const full = ctx.desk && failed !== key;
+  const tablet = ctx.tablet && on;
+  const full = tablet && failed !== key;
   // The body's size, watched: a new size tries the whole panel again.
   useLayoutEffect(() => {
     const body = ref.current?.parentElement;
-    if (!ctx.desk || !body) return;
+    if (!tablet || !body) return;
     const read = (): void => setSize(`${body.clientWidth}x${body.clientHeight}`);
     read();
     const ro = new ResizeObserver(read);
     ro.observe(body);
     return () => ro.disconnect();
-  }, [ctx.desk]);
+  }, [tablet]);
   // After every render of the whole panel: if the body overflows, the pages for this size and shape.
   useLayoutEffect(() => {
     const section = ref.current;

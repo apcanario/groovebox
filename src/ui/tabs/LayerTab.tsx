@@ -258,9 +258,11 @@ export function LayerTab({ ctx, id }: { ctx: Ctx; id: LayerInstrument }) {
 
 /**
  * T2 (spec 9.2): a layer whole, on the desk. The mode switch with the on/off switch, in Lead the style selector, the
- * lane with Back and New idea; then two columns: the patch (Sound, Mod with the wave, both effect slots, the sends) and
- * what it plays (Lead: Notes, Feel and Pulse's own dials; Arp: direction, rate, octaves and gate; Pad and Drone: their
- * dials) over the XY pad, bottom right in thumb reach (spec 9.1). Where the panel is narrow the columns stack.
+ * lane with Back and New idea; then two columns: the patch (Sound, Mod with the wave, both effect slots, a lead's sends)
+ * and what it plays (Lead: Notes, Feel and Pulse's own dials; Arp: direction, rate, octaves and gate; Pad and Drone:
+ * their dials, then the sends) over the XY pad, bottom right in thumb reach (spec 9.1). T2 slice c: Arp, Pad and Drone
+ * put the sends over the XY pad, where their column has the room, so the patch column fits the shorter panel over the
+ * dock (800 x 1280); a lead's dials fill its right column, so its sends stay with the patch. Where the panel is narrow the columns stack.
  */
 function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { current: HTMLElement | null } }) {
   const { edit } = ctx;
@@ -268,6 +270,12 @@ function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { 
   const lead = layer.mode === "generative";
   const pulse = lead && leadStyleOf(ctx, id) === "pulse";
   const patch = ctx.song.patches[id];
+  const sends = (
+    <div class="sends" data-grp="sends">
+      <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => ctx.engine.setParam(id, "delay", v)} />
+      <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => ctx.engine.setParam(id, "reverb", v)} />
+    </div>
+  );
   return (
     <section
       ref={sref}
@@ -290,10 +298,7 @@ function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { 
             <Mod ctx={ctx} id={id} />
           </div>
           <FxSlots ctx={ctx} inst={id} />
-          <div class="sends" data-grp="sends">
-            <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => ctx.engine.setParam(id, "delay", v)} />
-            <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => ctx.engine.setParam(id, "reverb", v)} />
-          </div>
+          {lead && sends}
         </div>
         <div class="col playcol">
           {lead && (
@@ -325,6 +330,7 @@ function WholeLayer({ ctx, id, sref }: { ctx: Ctx; id: LayerInstrument; sref: { 
               <Pad ctx={ctx} id={id} />
             </div>
           )}
+          {!lead && sends}
           <FilterXY ctx={ctx} inst={id} />
         </div>
       </div>

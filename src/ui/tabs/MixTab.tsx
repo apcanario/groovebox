@@ -34,7 +34,7 @@ function MasterMeter({ engine }: { engine: Engine }) {
 }
 
 /** The app's own motion switch (spec 8.12): off, nothing moves and every state reads by fill and hatching. */
-function MotionSwitch({ brief = false }: { brief?: boolean }) {
+function MotionSwitch() {
   const [wanted, setWanted] = useState(motionWanted);
   useEffect(() => onMotionPref(() => setWanted(motionWanted())), []);
   // The phone's reduce-motion setting holds everything still whatever the switch says: show Still (P1b review M10).
@@ -58,10 +58,16 @@ function MotionSwitch({ brief = false }: { brief?: boolean }) {
         ))}
       </div>
       {system && <p class="note" id="motion-system">The phone's setting is on.</p>}
-      {!brief && <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>}
+      <p class="note">Still stops every movement on screen. The phone's reduce-motion setting does the same.</p>
     </>
   );
 }
+
+/** The help notes, the same on the Mix pages and in the whole Mix (T2 slice c). */
+const SPACE_NOTE = "Tail is how long the reverb rings. Air is a soft breath of noise. Lo-fi wobbles, crunches and hisses.";
+const AUDIO_NOTE = "If it crackles, try Safe. The page reloads; the song is kept.";
+const STOP_NOTE = "Stop to change it.";
+const AGAIN_NOTE = "Tap again to reload.";
 
 const BUFFERS = [
   ["interactive", "Fast"],
@@ -129,7 +135,7 @@ const DECAY = { label: "Tail", seconds: MIX_RANGES.reverbDecay };
 
 export function MixTab({ ctx }: { ctx: Ctx }) {
   // T2 (spec 9.2): Advanced Mix on the desk shows every page at once where it fits; Simple keeps its own.
-  const [full, ref] = useFull(ctx.advanced ? ctx : { ...ctx, desk: false }, "mix");
+  const [full, ref] = useFull(ctx, "mix", ctx.advanced);
   return full ? <WholeMix ctx={ctx} sref={ref} /> : <PagedMix ctx={ctx} sref={ref} />;
 }
 
@@ -201,8 +207,10 @@ function useInstrumentMeters(engine: Engine): Record<string, number> {
 }
 
 /**
- * T2 (spec 9.2): the Mix panel whole, on the desk. The master meter on top; then two columns: the master and the space
- * over a fader with its live meter per instrument (lowest, in thumb reach), and the Drop, Morph and Audio settings.
+ * T2 (spec 9.2): the Mix panel whole, on a tablet. The master meter on top; then two columns: the master, the space,
+ * the audio buffer and the motion switch over a fader with its live meter per instrument (lowest, in thumb reach); and
+ * the Drop and Morph settings. T2 slice c: the help notes of the Audio, Motion and Morph pages
+ * are shown, as on the pages (the Space page's is left to the pages: the faders need its height over the dock).
  */
 function WholeMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null } }) {
   const { engine, pos } = ctx;
@@ -220,6 +228,16 @@ function WholeMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null
           <div class="grp" data-grp="space">
             <GroupLabel thing="Space" />
             <SpaceDials ctx={ctx} />
+          </div>
+          <div class="grp" data-grp="audio">
+            <GroupLabel thing="Audio" />
+            <Buffers ctx={ctx} armed={armed} choose={choose} />
+            <p class="note">{AUDIO_NOTE}</p>
+            {/* What a tap does now, on a line of its own that is always there, so the panel keeps its height. */}
+            <p class="note" data-audio-state>{pos.playing ? STOP_NOTE : armed ? AGAIN_NOTE : "\u00a0"}</p>
+          </div>
+          <div class="grp" data-grp="motion">
+            <MotionSwitch />
           </div>
           <div class="grp levels" data-grp="levels">
             <GroupLabel thing="Levels" />
@@ -245,12 +263,7 @@ function WholeMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null
           </div>
           <div class="grp" data-grp="morph">
             <GroupLabel thing="Morph" />
-            <MorphPage engine={engine} brief />
-          </div>
-          <div class="grp" data-grp="audio">
-            <GroupLabel thing="Audio" split={pos.playing ? "Stop to change" : armed ? "Tap again to reload" : undefined} />
-            <Buffers ctx={ctx} armed={armed} choose={choose} />
-            <MotionSwitch brief />
+            <MorphPage engine={engine} />
           </div>
         </div>
       </div>
@@ -337,7 +350,7 @@ function PagedMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null
       {page === "space" && (
         <>
           <SpaceDials ctx={ctx} />
-          <p class="note">Tail is how long the reverb rings. Air is a soft breath of noise. Lo-fi wobbles, crunches and hisses.</p>
+          <p class="note">{SPACE_NOTE}</p>
         </>
       )}
       {page === "drop" && <DropPage engine={engine} />}
@@ -345,9 +358,9 @@ function PagedMix({ ctx, sref }: { ctx: Ctx; sref: { current: HTMLElement | null
       {page === "audio" && (
         <>
           <Buffers ctx={ctx} armed={armed} choose={choose} />
-          <p class="note">If it crackles, try Safe. The page reloads; the song is kept.</p>
-          {pos.playing && <p class="note">Stop to change it.</p>}
-          {armed && !pos.playing && <p class="note">Tap again to reload.</p>}
+          <p class="note">{AUDIO_NOTE}</p>
+          {pos.playing && <p class="note">{STOP_NOTE}</p>}
+          {armed && !pos.playing && <p class="note">{AGAIN_NOTE}</p>}
           <MotionSwitch />
         </>
       )}

@@ -50,13 +50,8 @@ export interface Ctx {
    * not, instrument tabs give them a page of their own, so nothing scrolls.
    */
   roomy: boolean;
-  /** A tablet layout (spec 9.1): display only. */
+  /** A tablet layout (spec 9.1): display only. T2: Advanced panels there show every page at once where they fit (useFull in tabs/full.ts). */
   tablet: boolean;
-  /**
-   * T2 (spec 9.2): tablet landscape, the desk. Advanced instrument panels there show every page at once where they fit
-   * (useFull in tabs/full.ts), and the phone's pages where they do not.
-   */
-  desk: boolean;
   /** Start the audio (from a tap); false when it failed (the error is shown). */
   startAudio: () => Promise<boolean>;
   /** Open the vibe picker. */
@@ -448,7 +443,6 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
     advanced,
     roomy,
     tablet,
-    desk: size === "landscape",
     startAudio,
     openVibes: () => setVibes(true),
   };

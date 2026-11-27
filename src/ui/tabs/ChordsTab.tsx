@@ -26,7 +26,7 @@ type ChordPage = "chords" | "key";
 
 export function ChordsTab({ ctx }: { ctx: Ctx }) {
   // T2 (spec 9.2): Advanced Chords on the desk shows the editor and the progression library side by side where they fit.
-  const [full, ref] = useFull(ctx.advanced ? ctx : { ...ctx, desk: false }, "chords");
+  const [full, ref] = useFull(ctx, "chords", ctx.advanced);
   if (!ctx.advanced) return <SimpleChords ctx={ctx} />;
   if (!full) return <ChordEditor ctx={ctx} sref={ref} />;
   return (
