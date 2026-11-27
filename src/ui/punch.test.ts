@@ -55,3 +55,12 @@ describe("punch pad pointers (spec 9.6)", () => {
     expect(p.clear()).toEqual([]);
   });
 });
+
+describe("punch pad words (Simple keeps Advanced words off the screen)", () => {
+  it("names the Filter pad Sweep in Simple only", async () => {
+    const { punchWord } = await import("./punch.tsx");
+    expect(punchWord("filter", false)).toBe("Sweep");
+    expect(punchWord("filter", true)).toBe("Filter");
+    expect(punchWord("cut", false)).toBe("Cut");
+  });
+});

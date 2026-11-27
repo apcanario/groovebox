@@ -32,6 +32,14 @@ const PUNCH_COLOR: Record<PunchPad, string> = {
   riser: "var(--yellow)",
 };
 
+/**
+ * The word a pad shows. Simple keeps Advanced's words off the screen (P2: "Filter" is one; Simple's master filter dial
+ * is Tone), so there the Filter pad reads Sweep, with the same icon; Advanced shows the spec's names.
+ */
+export function punchWord(pad: PunchPad, advanced: boolean): string {
+  return !advanced && pad === "filter" ? "Sweep" : PUNCH_NAME[pad];
+}
+
 const HOW: Record<PunchPad, string> = {
   cut: "hold: drums and bass out, back on the next bar",
   filter: "hold: the filter sweeps down, opens on the next beat",
@@ -84,7 +92,8 @@ export function PunchPads({ ctx, band = false }: { ctx: Ctx; band?: boolean }) {
             data-punch={pad}
             data-look={look}
             aria-pressed={s.held || lit}
-            aria-label={`${PUNCH_NAME[pad]}, ${HOW[pad]}`}
+            data-word={punchWord(pad, ctx.advanced)}
+            aria-label={`${punchWord(pad, ctx.advanced)}, ${HOW[pad]}`}
             onPointerDown={(e) => press(pad, e)}
             onPointerUp={lift}
             onPointerCancel={lift}
@@ -92,7 +101,7 @@ export function PunchPads({ ctx, band = false }: { ctx: Ctx; band?: boolean }) {
             onContextMenu={(e) => e.preventDefault()}
           >
             <Icon thing={PUNCH_NAME[pad]} />
-            <b>{PUNCH_NAME[pad]}</b>
+            <b>{punchWord(pad, ctx.advanced)}</b>
           </button>
         );
       })}

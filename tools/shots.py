@@ -838,7 +838,7 @@ PUNCH = r"""([where, order]) => {
     }
     const at = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
     if (!at || !pads[i].contains(at)) bad.push(`the ${n} pad is covered at its centre`);
-    if (!pads[i].querySelector('svg') || pads[i].querySelector('b')?.textContent.trim() !== n[0].toUpperCase() + n.slice(1)) bad.push(`the ${n} pad lacks its icon or its word`);
+    if (!pads[i].querySelector('svg') || !pads[i].dataset.word || pads[i].querySelector('b')?.textContent.trim() !== pads[i].dataset.word) bad.push(`the ${n} pad lacks its icon or its word`);
   });
   if (where === 'band') {
     const under = document.querySelector('.shell .deskgrid') || document.querySelector('.dock .nowlist');
