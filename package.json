@@ -7,8 +7,11 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single --outDir dist-single",
+    "build:android": "npm run build && python3 tools/offline_check.py dist && cap sync android",
+    "apk:debug": "npm run build:android && cd android && ./gradlew assembleDebug",
+    "icon": "python3 tools/make_icon.py",
     "preview": "vite preview",
-    "check": "tsc --noEmit && vitest run && python3 tools/test_smoke_parts.py && vite build",
+    "check": "tsc --noEmit && vitest run && python3 tools/test_smoke_parts.py && python3 tools/test_offline_check.py && python3 tools/test_make_icon.py && vite build && python3 tools/offline_check.py dist",
     "smoke": "vite build && python3 tools/smoke.py dist",
     "test": "vitest run",
     "record-test": "vite build && python3 tools/record_long.py dist 10",
@@ -20,6 +23,9 @@
     "tone": "^15.1.22"
   },
   "devDependencies": {
+    "@capacitor/android": "8.6.3",
+    "@capacitor/cli": "8.6.3",
+    "@capacitor/core": "8.6.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vite-plugin-singlefile": "^2.3.4",

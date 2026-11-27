@@ -10,6 +10,7 @@ import { Engine, LIMITS, type LaneBar, type LatencyHint, type Pending, type Posi
 import type { Keeper } from "../store/keeper.ts";
 import { Sheet, useLongPress, useVerticalDrag } from "./components.tsx";
 import { startFit } from "./fit.ts";
+import { setNativeKeepAwake } from "./keepAwake.ts";
 import { Icon } from "./icons.tsx";
 import { showLanes, startMotion } from "./motion.ts";
 import { barLabel, beatLights, clockLabel, editedSection, keepChosen, recordLabel, sectionLetter, sizeLabel, stripState, tapPlay } from "./logic.ts";
@@ -102,11 +103,15 @@ function StripTile({
   );
 }
 
-/** Keep the screen on while playing (spec section 2). Released on stop; re-taken when the page returns. */
+/**
+ * Keep the screen on while playing (spec section 2). Released on stop; re-taken when the page returns. In the APK
+ * the WebView has no Wake Lock API, so the native shell's keep-screen-on flag is set too (G6, keepAwake.ts).
+ */
 function useWakeLock(on: boolean): void {
   const lock = useRef<WakeLockSentinel | null>(null);
   useEffect(() => {
     let cancelled = false;
+    const native = setNativeKeepAwake(on);
     const take = async (): Promise<void> => {
       try {
         if (!("wakeLock" in navigator) || lock.current) return;
@@ -131,6 +136,7 @@ function useWakeLock(on: boolean): void {
     }
     return () => {
       cancelled = true;
+      if (native && on) setNativeKeepAwake(false);
       document.removeEventListener("visibilitychange", onVis);
       const l = lock.current;
       lock.current = null;
