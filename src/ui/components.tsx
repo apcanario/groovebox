@@ -501,8 +501,10 @@ export function Pager<K extends string>({
 export function Meter() {
   return (
     <div class="meter" id="meter" data-master="" aria-label="Master level">
-      <div class="fill" />
-      <div class="pk" />
+      <div class="mtrack">
+        <div class="fill" />
+        <div class="pk" />
+      </div>
       <span>Master</span>
       <b>–</b>
     </div>

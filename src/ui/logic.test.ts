@@ -444,8 +444,8 @@ describe("T3 motion (spec 9.5)", () => {
 describe("the master meter's look, drawn by the motion loop (T3 review S2)", () => {
   it("fills by the level and puts the peak line by the peak, as transforms; the reading is the peak in dB", async () => {
     const { masterMeterLook } = await import("./logic.ts");
-    expect(masterMeterLook(-30, -6)).toEqual({ fill: "scaleX(0.5)", pk: "translateX(90%)", text: "-6.0 dB" });
-    expect(masterMeterLook(-Infinity, -Infinity)).toEqual({ fill: "scaleX(0)", pk: "translateX(0%)", text: "–" });
+    expect(masterMeterLook(-30, -6)).toEqual({ fill: "scaleX(0.5)", pk: "translateX(calc(0.9 * (100cqw - 2px)))", text: "-6.0 dB" });
+    expect(masterMeterLook(-Infinity, -Infinity)).toEqual({ fill: "scaleX(0)", pk: "translateX(calc(0 * (100cqw - 2px)))", text: "–" });
     expect(masterMeterLook(3, 3).fill).toBe("scaleX(1)");
   });
 });

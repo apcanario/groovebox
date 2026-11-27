@@ -1489,7 +1489,14 @@ button:disabled {
   letter-spacing: 0.02em;
 }
 /* T3 review S2: drawn by the motion loop (src/ui/motion.ts) as transforms only: the fill scaled from the left, the
-   peak line (the left edge of a box as wide as the meter) moved along it. */
+   2 px peak line moved along the meter's own width (container units of the track, which covers the whole meter, so
+   the line never reaches past the edge). */
+.meter .mtrack {
+  position: absolute;
+  inset: 0;
+  container-type: inline-size;
+  pointer-events: none;
+}
 .meter .fill {
   position: absolute;
   left: 0;
@@ -1507,9 +1514,8 @@ button:disabled {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 100%;
-  box-sizing: border-box;
-  border-left: 2px solid var(--coral);
+  width: 2px;
+  background: var(--coral);
   transform: translateX(0);
   pointer-events: none;
 }

@@ -421,8 +421,8 @@ export function meterScale(db: number, still: boolean): number {
  */
 export function masterMeterLook(rms: number, peak: number): { fill: string; pk: string; text: string } {
   const f = Math.round(meterFraction(rms) * 1000) / 1000;
-  const k = Math.round(meterFraction(peak) * 1000) / 10;
-  return { fill: `scaleX(${f})`, pk: `translateX(${k}%)`, text: Number.isFinite(peak) ? `${peak.toFixed(1)} dB` : "–" };
+  const k = Math.round(meterFraction(peak) * 1000) / 1000;
+  return { fill: `scaleX(${f})`, pk: `translateX(calc(${k} * (100cqw - 2px)))`, text: Number.isFinite(peak) ? `${peak.toFixed(1)} dB` : "–" };
 }
 
 /** Meter fill 0..1 for a level in dB: -60 dB empty, 0 dB full. */
