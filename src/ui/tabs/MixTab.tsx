@@ -144,7 +144,7 @@ export function MixTab({ ctx }: { ctx: Ctx }) {
   const set = (k: MixKey) => (v: number) => engine.setMix(k, v);
   const lofi = mixValue(mix, "lofi") > 0;
   return (
-    <section class="mixtab">
+    <section class={`mixtab${together ? " together" : ""}`}>
       <MasterMeter engine={engine} />
       <Pager id="mix" pages={pages} page={page} onPage={setPage} />
       {page === "master" && (

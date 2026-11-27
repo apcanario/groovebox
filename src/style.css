@@ -1986,6 +1986,10 @@ button:disabled {
 .mixtab .dials.n4 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+/* T1 review M4: Master and Levels on one page (Simple on a tablet with the height): the two sets of dials stack. */
+.mixtab.together .dials {
+  flex: none;
+}
 .fxrow.one {
   grid-template-columns: minmax(0, 1fr);
 }
