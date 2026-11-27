@@ -2516,11 +2516,19 @@ button:disabled {
 }
 
 /*
- * T1 review M2: a lane label of the dock waiting for the next bar keeps its words inside the 5 px hatched frame at
- * rows of 48 px (19 px name, 2 px gap, 12 px "Next bar", 1.1 line height: 6 px clear above and below).
+ * T1 review M2: a lane label of the dock waiting for the next bar keeps its words clear of the 5 px hatched frame at
+ * rows of 48 px (the panel has no 20 px to spare for rows of 52 px at 768 x 1024): the icon at 1 em (19 px, not 26),
+ * 1 px, "Next bar" at line height 1.1: 33 px, 7 px above and below.
  */
 .dock .nowlist .tile {
-  gap: 2px;
+  gap: 1px;
+}
+.dock .nowlist .tile b {
+  line-height: 1;
+}
+.dock .nowlist .tile b .ic {
+  width: 1em;
+  height: 1em;
 }
 .dock .nowlist .tile > span {
   line-height: 1.1;
