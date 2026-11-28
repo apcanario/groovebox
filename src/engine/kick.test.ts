@@ -39,7 +39,7 @@ vi.mock("tone", () => {
 });
 
 import { KickVoice } from "./kick.ts";
-import { KICK_KEYS } from "../music/kick.ts";
+import { KICK_KEYS, sweepStartHz } from "../music/kick.ts";
 import { kickHz } from "../music/sound.ts";
 
 const out = {} as never;
@@ -79,7 +79,8 @@ describe("the kick voice (spec 10.5)", () => {
     k.setKey("A");
     k.hit(2, 0.4, 1);
     const next = h.calls.slice(before);
-    expect(next.find((c) => c.who === "body" && c.what === "set octaves")?.args[0]).toBe(7);
+    // Root on: Punch 1 starts the sweep at sweepStartHz(1), over the body at 55 Hz.
+    expect(next.find((c) => c.who === "body" && c.what === "set octaves")?.args[0]).toBeCloseTo(sweepStartHz(1) / 55, 9);
     expect(next.find((c) => c.who === "body" && c.what === "triggerAttackRelease")?.args[0]).toBeCloseTo(55, 6);
     const click = next.find((c) => c.who === "click" && c.what === "triggerAttackRelease")!;
     expect(click.args[1]).toBe(2); // the click starts with the hit

@@ -1,6 +1,6 @@
 /** F2 (spec 10.5): the kick's numbers. */
 import { describe, expect, it } from "vitest";
-import { KICK_BAND, KICK_DEFAULTS, KICK_SWEEP_S, clickGain, kickSetting, kickShape, rootBodyHz, sweepRatio } from "./kick.ts";
+import { KICK_BAND, KICK_DEFAULTS, KICK_SWEEP_BAND, KICK_SWEEP_S, clickGain, kickSetting, kickShape, rootBodyHz, sweepRatio, type KickSettings } from "./kick.ts";
 import { kickHz } from "./sound.ts";
 import { NOTE_NAMES, type KeyName } from "./scales.ts";
 import { defaultPatch, validateSong } from "../engine/song.ts";
@@ -63,7 +63,7 @@ describe("Root tunes the body to the song's root (spec 10.5)", () => {
 });
 
 describe("Punch and Click", () => {
-  it("Punch moves the sweep from 2x to 7x the body; the sweep starts about 150 to 200 Hz in the middle", () => {
+  it("Root off: Punch moves the sweep from 2x to 7x the body; Root on: Punch 0.3 starts it in 150 to 200 Hz", () => {
     expect(sweepRatio(0)).toBe(2);
     expect(sweepRatio(1)).toBe(7);
     expect(sweepRatio(-1)).toBe(2);
@@ -71,6 +71,25 @@ describe("Punch and Click", () => {
     expect(mid.bodyHz * mid.sweepRatio).toBeGreaterThan(150);
     expect(mid.bodyHz * mid.sweepRatio).toBeLessThan(200);
     expect(KICK_SWEEP_S).toBeLessThan(0.05);
+  });
+
+  it("every top vibe, in all twelve keys, starts its sweep in 150 to 200 Hz (spec 10.5)", () => {
+    for (const id of TOP_IDS) {
+      const d = vibeSong(id)!.patches.drums as unknown as KickSettings & { pitch: number };
+      expect(d.kickRoot, id).toBe(1);
+      for (const key of NOTE_NAMES) {
+        const s = kickShape(d, d.pitch, key);
+        const start = s.bodyHz * s.sweepRatio;
+        expect(start, `${id} in ${key}`).toBeGreaterThanOrEqual(KICK_SWEEP_BAND[0] - 1e-9);
+        expect(start, `${id} in ${key}`).toBeLessThanOrEqual(KICK_SWEEP_BAND[1] + 1e-9);
+      }
+    }
+  });
+
+  it("with Root on, Punch still moves the sweep's start, and with Root off it keeps the old ratio", () => {
+    const on = (p: number) => kickShape({ ...KICK_DEFAULTS, kickRoot: 1, kickPunch: p }, 0.4, "D");
+    expect(on(0).bodyHz * on(0).sweepRatio).toBeLessThan(on(1).bodyHz * on(1).sweepRatio);
+    expect(kickShape({ ...KICK_DEFAULTS, kickPunch: 1 }, 0.4, "D").sweepRatio).toBe(7);
   });
 
   it("the click is off at Click 0 and rises with Punch", () => {

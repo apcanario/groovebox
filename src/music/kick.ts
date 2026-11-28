@@ -2,8 +2,10 @@
  * F2 (spec 10.5): the kick's four parts as numbers. Pure, no audio dependency, unit-tested.
  *
  * - Click: a burst of a few milliseconds (`kickClick`, scaled by Punch). 0 at the default: the old kick had none.
- * - Sweep: the pitch falls from `sweepRatio` times the body to the body over `KICK_SWEEP_S` (Punch: 2x to 7x). The
- *   default Punch, 0.5, is the old membrane's 4.5x over 45 ms: about 220 Hz down to 49 Hz at the default Pitch.
+ * - Sweep: the pitch falls from `sweepRatio` times the body to the body over `KICK_SWEEP_S`. With Root off, Punch
+ *   moves the ratio 2x to 7x: the default Punch, 0.5, is the old membrane's 4.5x over 45 ms (about 220 Hz down to 49 Hz
+ *   at the default Pitch), so the ten other vibes are unchanged. With Root on, Punch sets the start in hertz
+ *   (`sweepStartHz`), so the top vibes' Punch values start the sweep in spec 10.5's 150 to 200 Hz in any key.
  * - Body: a sine at `bodyHz`: the song's root in its octave nearest 45 to 60 Hz with Root on, the Pitch dial (Tune) as
  *   built with it off.
  * - Tail: the body's decay, the Length axis: the kick's Decay dial as built (`drumDecay`), so a song that never set
@@ -43,6 +45,19 @@ export const KICK_BAND: readonly [number, number] = [45, 60];
 /** Sweep start over the body: 2x at Punch 0, 4.5x (the old kick) at 0.5, 7x at 1. */
 export const sweepRatio = (punch: number): number => 2 + 5 * clamp01(punch);
 
+/** With Root on, the Punch values the top vibes use (KICK_PUNCH_BAND) start the sweep in this band (spec 10.5). */
+export const KICK_SWEEP_BAND: readonly [number, number] = [150, 200];
+/** The Punch values that map onto KICK_SWEEP_BAND: the top vibes' range, Ambient's 0.2 to Drum and bass's 0.7. */
+export const KICK_PUNCH_BAND: readonly [number, number] = [0.2, 0.7];
+
+/** With Root on, the sweep's start in hertz: geometric in Punch, 150 Hz at Punch 0.2 and 200 Hz at 0.7 (134 to 238 Hz
+ *  over the whole axis), whatever the key. */
+export function sweepStartHz(punch: number): number {
+  const [f0, f1] = KICK_SWEEP_BAND;
+  const [p0, p1] = KICK_PUNCH_BAND;
+  return f0 * Math.pow(f1 / f0, (clamp01(punch) - p0) / (p1 - p0));
+}
+
 /** The click's gain: the Click dial, more of it with Punch (half at Punch 0, 1.5x at Punch 1). */
 export const clickGain = (click: number, punch: number): number => KICK_CLICK_MAX * clamp01(click) * (0.5 + clamp01(punch)) / 1.5;
 
@@ -80,9 +95,11 @@ export interface KickShape {
 
 /** One hit's shape from the settings, the Pitch dial and the song's key. */
 export function kickShape(s: KickSettings, pitch: number, key: KeyName): KickShape {
+  const root = s.kickRoot >= 0.5;
+  const bodyHz = root ? rootBodyHz(key) : kickHz(pitch);
   return {
-    bodyHz: s.kickRoot >= 0.5 ? rootBodyHz(key) : kickHz(pitch),
-    sweepRatio: sweepRatio(s.kickPunch),
+    bodyHz,
+    sweepRatio: root ? sweepStartHz(s.kickPunch) / bodyHz : sweepRatio(s.kickPunch),
     sweepS: KICK_SWEEP_S,
     clickGain: clickGain(s.kickClick, s.kickPunch),
     clickS: KICK_CLICK_S,

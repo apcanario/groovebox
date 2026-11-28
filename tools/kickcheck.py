@@ -495,7 +495,7 @@ def taps(page, sel: str, n: int, seconds: float = SWEEP_S) -> None:
 DIAL_UP = ((0.5, 0.5), (0.5, -2.8))
 SWEEPS = [
     ("Punch", "simple", None, {"kickPunch": 0.0}, lambda p: slow_drag(p, '[data-xy="kick"]', (0.5, 0.98), (0.5, 0.02)),
-     "s => s.settings.kickPunch > 0.95 && s.next.sweepRatio > 6.9"),
+     "s => s.settings.kickPunch > 0.95 && s.next.bodyHz * s.next.sweepRatio > 237"),  # Root on: sweepStartHz(1), 237.7 Hz
     ("Length", "simple", None, {"kickDecay": 0.0}, lambda p: slow_drag(p, '[data-xy="kick"]', (0.02, 0.5), (0.98, 0.5)),
      None),
     ("Click", "advanced", "drums:kick", {"kickClick": 0.0}, lambda p: slow_drag(p, '[data-dial="drums:kickClick"]', *DIAL_UP),
