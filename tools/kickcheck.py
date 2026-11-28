@@ -342,7 +342,8 @@ NOW = "window.__groovebox.graph.instruments.drums.channel.input.context.currentT
 # What is judged, on the kick's own samples (its voice gain, before the drum channel and Pump):
 #  - a step: the largest sample-to-sample jump over the peak of the hit it sits in, from STILL_SKIP_S after each logged
 #    hit (past the sweep and the click) to the next. While an axis is swept it may not pass dropcheck.CLICK_FACTOR
-#    times the same figure over the still stretches before and after the sweep (one end of the axis, then the other).
+#    times the same figure over the still stretches before and after the sweep (one end of the axis, then the other),
+#    and over those still stretches it may not pass STILL_JUMP_MAX.
 #  - a retrigger: the rise of the kick's envelope (the largest sample over the last STILL_ENV_S, longer than a period
 #    of the lowest body, 35 Hz) over STILL_HOP_S, over the hit's peak, from STILL_RISE_SKIP_S after each logged hit: a
 #    sounding kick only falls. While swept it may pass neither CLICK_FACTOR times the still figure nor STILL_RISE.
@@ -356,6 +357,10 @@ STILL_HOP_S = 0.005
 STILL_RISE_SKIP_S = 0.035
 STILL_RISE = 0.10
 STILL_GRID_S = 0.002
+# The still kick's own largest jump past STILL_SKIP_S, over its peak: a sine body of 80 Hz (Tune's top) moves 0.011 of its
+# peak a sample at 44.1 kHz, and the kick measures 0.004 to 0.007. The click's stereo noise, while it restarted the drive's
+# oversampler, put a step of 0.07 to 0.22 into every hit (fixed in slice c): a click of the kick itself, moved or not.
+STILL_JUMP_MAX = 0.02
 SWEEP_S = 2.4
 SWEEP_STEPS = 48
 HOLD_S = 1.3
@@ -503,6 +508,8 @@ def check_sweep(page) -> list:
             failures.append(f"sweep: {name}: a kick was scheduled {-ahead * 1000:.0f} ms after its time (the main thread stalled while it moved)")
         if not (rj > 0 and sj == sj):
             failures.append(f"sweep: {name}: no kicks measured ({len(hits)} logged)")
+        elif rj > STILL_JUMP_MAX:
+            failures.append(f"sweep: {name}: a step in the still kick (jump {rj:.4f} of its peak, over {STILL_JUMP_MAX}): it clicks unmoved")
         elif sj > CLICK_FACTOR * rj:
             failures.append(f"sweep: {name}: a step in a sounding kick (jump {sj:.4f} of its peak, {sj / rj:.1f} times the still kick's, over {CLICK_FACTOR})")
         if sr_ > max(STILL_RISE, CLICK_FACTOR * rr):
