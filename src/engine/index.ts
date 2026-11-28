@@ -3,7 +3,7 @@
  * switch section, toggle instrument, and reads pending switches and the playing position.
  * Notes are scheduled ahead on the audio clock by the transport; the UI's timers never schedule.
  */
-import type { KickSettings, KickShape } from "../music/kick.ts";
+import { kickSetting, KICK_KEYS, type KickKey, type KickSettings, type KickShape } from "../music/kick.ts";
 import * as Tone from "tone";
 import { Graph, oscProbe } from "./audio.ts";
 import { oscPatchStats } from "./oscPatch.ts";
@@ -40,7 +40,6 @@ import {
   type LayerMode,
   type PadParams,
   migrateSong,
-  type NumericPatchKey,
   type Patch,
   type Song,
   type Wave,
@@ -49,7 +48,7 @@ import {
 import type { KeyName, Mood } from "../music/scales.ts";
 import type { BassPreset, DrumPreset, DrumVoice, SynthPreset } from "../music/presets.ts";
 import type { ArpParams } from "../music/arp.ts";
-import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument } from "../music/macros.ts";
+import { MACROS, findMacro, macroKey, sectionScoped, targetValue, type MacroId, type MacroInstrument, type MacroPatchKey } from "../music/macros.ts";
 import { macroPosition } from "./macro.ts";
 import { PATCHES, PATCH_IDS, STYLES as VIBES, patchFor, resolvePatch } from "../music/styles.ts";
 import { EFFECTS, EFFECT_DEFS, MAX_ACTIVE_FX, activate, deactivate, fxKey, type EffectId, type FxKnobs, type FxSlot } from "../music/effects.ts";
@@ -1043,7 +1042,7 @@ export class Engine {
    * those dials read the value again (P2 review S2: the Simple XY pad moves the cutoff a Bright dial shows).
    * Returns whether any position was forgotten.
    */
-  releaseMacros(inst: InstrumentId, key: NumericPatchKey): boolean {
+  releaseMacros(inst: InstrumentId, key: MacroPatchKey): boolean {
     const stored = this.seq.song.macros;
     if (!stored) return false;
     const drop = (MACROS[inst as MacroInstrument] ?? [])
@@ -1804,12 +1803,12 @@ export class Engine {
         const def = findMacro(m.inst, m.id)!;
         const patch = this.seq.song.patches[m.inst];
         const step = morphStep(plan) * 1.5;
-        const values: Partial<Record<NumericPatchKey, number>> = {};
+        const values: Partial<Record<MacroPatchKey, number>> = {};
         let there = true;
         for (const t of def.targets) {
           if (t.kind !== "patch") continue;
           const want = targetValue(t, m.pos);
-          const cur = patch[t.key];
+          const cur = (KICK_KEYS as readonly string[]).includes(t.key) ? kickSetting(patch, t.key as KickKey) : (patch[t.key] as number);
           const max = step * Math.abs(t.to - t.from);
           const next = Math.abs(want - cur) <= max ? want : cur + Math.sign(want - cur) * max;
           if (Math.abs(next - want) > 1e-6) there = false;

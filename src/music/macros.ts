@@ -8,6 +8,11 @@
  * position per section; the others keep it per song.
  */
 import type { NumericPatchKey } from "../engine/song.ts";
+import type { KickKey } from "./kick.ts";
+
+/** A patch value a macro can move: the always-present ones, and the kick's optional settings (F2, a missing one
+ *  reads its default, KICK_DEFAULTS). */
+export type MacroPatchKey = NumericPatchKey | KickKey;
 
 export type MacroId = "punch" | "hats" | "swing" | "level" | "bright" | "weight" | "space" | "busy" | "evolve";
 
@@ -16,7 +21,7 @@ export type MacroInstrument = "drums" | "bass" | "synth" | "layer1" | "layer2";
 
 /** Where a target value lives. */
 export type MacroTarget =
-  | { kind: "patch"; key: NumericPatchKey; from: number; to: number; exp?: boolean }
+  | { kind: "patch"; key: MacroPatchKey; from: number; to: number; exp?: boolean }
   | { kind: "gen"; key: "density" | "hits" | "lock"; from: number; to: number; whole?: boolean }
   /** An arp setting with a few values: the dial picks one of `steps`, in order, in equal bands. */
   | { kind: "arp"; key: "rate" | "octaves"; steps: readonly number[] }
@@ -69,12 +74,14 @@ const evolve: MacroDef = {
 export const MACROS: Record<MacroInstrument, readonly MacroDef[]> = {
   drums: [
     {
+      // F2 review S2: the dial is the kick quadrant's up axis (spec 10.5's Punch, sweep depth and click together) and
+      // the drive, first kickPunch so it reads where the quadrant stands. It no longer moves kickDecay (the quadrant's
+      // Length) or pitch (dead with Root on, which every top vibe has).
       id: "punch",
       label: "Punch",
       targets: [
+        { kind: "patch", key: "kickPunch", from: 0, to: 1 },
         { kind: "patch", key: "drive", from: 0, to: 0.8 },
-        { kind: "patch", key: "kickDecay", from: 0.75, to: 0.3 },
-        { kind: "patch", key: "pitch", from: 0.25, to: 0.55 },
       ],
     },
     {

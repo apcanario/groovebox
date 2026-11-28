@@ -81,10 +81,12 @@ describe("macros (spec 8.3)", () => {
     // the generative dials, the arp chips and gate, the pad dials and the Swing dial on the drums' Hats page.
     const filterPanel = ["cutoff", "resonance", "delay", "reverb"];
     const mixLevels = ["level"];
+    // F2 (spec 10.5): the kick quadrant, in Advanced too: Punch up, Length (kickDecay) right.
+    const kickPad = ["kickPunch", "kickDecay"];
     for (const inst of INSTRUMENTS) {
       const patchDials = inst === "layer1" || inst === "layer2" ? LAYER_PATCH_KNOBS.map((k) => k.key) : (KNOB_PAGES[inst] ?? []).flatMap((p) => p.knobs.map((k) => k.key));
       const shown: Record<MacroTarget["kind"], string[]> = {
-        patch: [...patchDials, ...filterPanel, ...mixLevels],
+        patch: [...patchDials, ...filterPanel, ...mixLevels, ...(inst === "drums" ? kickPad : [])],
         gen: Object.values(LEAD_PAGES).flatMap((page) => page.map((k) => k.key)),
         arp: ["direction", "gate", ...(ARP_RATES.length ? ["rate"] : []), ...(ARP_OCTAVES.length ? ["octaves"] : [])],
         pad: PAD_KNOBS.map((k) => k.key),

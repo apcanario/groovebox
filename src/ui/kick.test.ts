@@ -10,6 +10,48 @@ import { KIT_KNOBS, KNOB_PAGES, KICK_CLICK_KNOB, kickPad, kickPadMove, kickRootO
 import kickSrc from "./tabs/kick.tsx?raw";
 import instSrc from "./tabs/InstrumentTab.tsx?raw";
 import simpleSrc from "./tabs/SimpleTab.tsx?raw";
+import { MACROS } from "../music/macros.ts";
+import { KICK_KEYS } from "../music/kick.ts";
+import { Engine } from "../engine/index.ts";
+import { defaultSong } from "../engine/song.ts";
+import { macroPosition } from "../engine/macro.ts";
+
+describe("one Punch on the Simple Drums tab (F2 review S2)", () => {
+  // The quadrant owns Punch (kickPunch) and Length (kickDecay); the voice owns Click, Root and Tune (the Pitch dial).
+  const quadrant = ["kickPunch", "kickDecay"];
+  const voice = [...KICK_KEYS.filter((k) => !quadrant.includes(k)), "pitch"];
+  it("no Simple Drums macro moves a value the quadrant owns, except the Punch dial moving the quadrant's Punch end to end", () => {
+    for (const m of MACROS.drums)
+      for (const t of m.targets) {
+        if (t.kind !== "patch") continue;
+        if (m.id === "punch" && t.key === "kickPunch") {
+          expect([t.from, t.to]).toEqual([0, 1]); // the same axis as the quadrant's up, end to end
+          continue;
+        }
+        expect(quadrant, `${m.id} moves ${t.key}`).not.toContain(t.key);
+        expect(voice, `${m.id} moves ${t.key}`).not.toContain(t.key);
+      }
+    const punch = MACROS.drums.find((m) => m.id === "punch")!;
+    expect(punch.targets[0]).toMatchObject({ kind: "patch", key: "kickPunch" });
+  });
+  it("the Punch dial and the quadrant read one value: the dial reads where the quadrant set it, and moves it", () => {
+    const e = new Engine(defaultSong());
+    e.setParams("drums", { kickPunch: 0.8 });
+    expect(macroPosition(e.getSong(), 1, "drums", "punch")).toBeCloseTo(0.8, 9);
+    e.setMacro(1, "drums", "punch", 0.25);
+    expect(kickPad(e.getSong().patches.drums).y).toBeCloseTo(0.25, 9);
+    const decay = e.getSong().patches.drums.kickDecay;
+    e.setMacro(1, "drums", "punch", 0.9);
+    expect(e.getSong().patches.drums.kickDecay).toBe(decay); // the dot does not move sideways
+    // A quadrant move lets the dial read the value again.
+    e.setParams("drums", kickPadMove(0.5, 0.4));
+    e.releaseMacros("drums", "kickPunch");
+    expect(macroPosition(e.getSong(), 1, "drums", "punch")).toBeCloseTo(0.4, 9);
+  });
+  it("the quadrant releases the Punch dial when it moves", () => {
+    expect(kickSrc as string).toMatch(/releaseMacros\("drums", "kickPunch"\)/);
+  });
+});
 
 describe("the kick quadrant (spec 10.5)", () => {
   it("reads Length across and Punch up; a patch from before F2 reads the default Punch", () => {

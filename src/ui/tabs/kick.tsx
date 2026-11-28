@@ -21,7 +21,11 @@ export function KickPad({ ctx }: { ctx: Ctx }) {
       xLabel="Length"
       yLabel="Punch"
       readout={simpleXYReadout(x, y)}
-      onChange={(nx, ny) => ctx.engine.setParams("drums", kickPadMove(nx, ny))}
+      onChange={(nx, ny) => {
+        ctx.engine.setParams("drums", kickPadMove(nx, ny));
+        // The Simple Drums Punch dial's first value is the quadrant's Punch: let it read the value again (as SimpleXY).
+        ctx.engine.releaseMacros("drums", "kickPunch");
+      }}
     />
   );
 }
