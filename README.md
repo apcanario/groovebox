@@ -67,7 +67,7 @@ Built and live on the link above, and in the APK (rows G0 to G5, P1, P1b, P2, P3
 
 ## Where it is going
 
-**Next, bundle 10** (rows F1 and F2; F0 is done): phase 4 begins: the kick is rebuilt with a kick-only beat, Thump. Then bundle 11 (F3, F4): leads planned from rhythm cells so they repeat and resolve, in the fourteen top vibes. Then bundle 12 (F5 to F7): the harmony pad, a touch surface that moves the pitch of the whole piece inside the current chord; Perform sizing for the Legion Y700; and Signature, a 25th vibe. Retouch (row G7) is bundle 13 and runs on Pedro's notes from playing the app. Bundles 7b, 8 (tablet) and 9 (the APK) are done.
+**Next, bundle 10** (row F2; F0 and F1 are done): phase 4 begins: the kick is rebuilt with a kick-only beat, Thump. Then bundle 11 (F3, F4): leads planned from rhythm cells so they repeat and resolve, in the fourteen top vibes. Then bundle 12 (F5 to F7): the harmony pad, a touch surface that moves the pitch of the whole piece inside the current chord; Perform sizing for the Legion Y700; and Signature, a 25th vibe. Retouch (row G7) is bundle 13 and runs on Pedro's notes from playing the app. Bundles 7b, 8 (tablet) and 9 (the APK) are done.
 
 The full plan is `docs/SPEC.md` sections 8 to 10 and `docs/BACKLOG.md`.
 
@@ -88,7 +88,7 @@ The full plan is `docs/SPEC.md` sections 8 to 10 and `docs/BACKLOG.md`.
 | G0 to G5, P1, P1b, P2, P3, P4, P5, P6, P7, P9, P8, P10, P11, P10b, P10c, P10d, T1, T2, T3 | Sound spike, engine, shell, instrument tabs, layers, save and record, the new frame, the look, Simple and Advanced, eight vibes and the picker, Simple chords, lead styles and their screens, new sounds, effects, all 24 vibes and the full lists, the Drop, Morph, the tablet layouts, Advanced without pages, punch pads, movement and many fingers | Done |
 | G6 | APK: Capacitor shell, workflow that builds a debug APK to the release `latest`, `docs/INSTALL.md` | Done: the workflow built and released the APK on `main` (27 Nov 2026); not yet run on a device |
 | F0 | The rubber-bass fix (C24): the bass's wave and sub oscillators run for the life of their voice set, so a stalled main thread no longer shifts the sub against the wave | Done (28 Nov 2026); how it sounds is for the ear (C36) |
-| F1 | Straight in: a top vibe from the bag on a cold start, the dice, the picker as a sheet with the top vibes first | In progress: built; the smoke's cold-start check to come |
+| F1 | Straight in: a top vibe from the bag on a cold start, the dice, the picker as a sheet with the top vibes first | Done (28 Nov 2026); how it feels to open is for the ear and the thumb (C37) |
 | F2 to F7 | Phase 4: the kick and Thump, leads that hold together, the harmony pad, Perform on the Y700, Signature | Planned (spec 10), not started |
 | G7 | Retouch from Pedro's notes | Always open |
 
