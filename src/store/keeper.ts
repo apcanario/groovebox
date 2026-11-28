@@ -22,6 +22,12 @@ export class Keeper {
    * loaded over it replaces it in Songs instead of keeping an empty "Song 1" (P3).
    */
   scratch = false;
+  /**
+   * F1 (spec 10.1): the open song is the launch jam, drawn on a cold start and not in Songs yet. It is saved, as a
+   * new song, the first time it is played or edited; never played or edited, it adds nothing to Songs. `id` is
+   * empty while this holds.
+   */
+  launch = false;
   /** The song a vibe started that is still waiting for its bar line. */
   private queuedId: string | null = null;
 
@@ -36,10 +42,56 @@ export class Keeper {
   }
 
   start(): void {
-    this.engine.onChange(() => this.schedule());
+    this.listen();
     const now = (): void => void this.flush();
     document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && now());
     window.addEventListener("pagehide", now);
+  }
+
+  /** Hear the engine: an edit saves a moment later; Play or an edit keeps the launch jam (F1). */
+  listen(): void {
+    this.engine.onChange(() => this.schedule());
+    this.engine.onRunning((on) => {
+      if (on) void this.keepLaunch();
+    });
+  }
+
+  /**
+   * Open the launch jam (F1, spec 10.1): `doc` is loaded from `section` and held outside Songs until it is played or
+   * edited. The last jam stays in Songs as it was, and so stays first there.
+   */
+  openLaunch(doc: Song, section: number): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.launch = true;
+    this.scratch = false;
+    this.queuedId = null;
+    this.id = "";
+    this.engine.loadSong(doc, section);
+    // Loading counts as a change; nothing is saved for it.
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.savedLog = this.engine.getLog();
+    this.emit();
+  }
+
+  /** The launch jam becomes a song in Songs, named after its vibe (F1). Runs once; the chain keeps saves in order. */
+  private keepLaunch(): Promise<void> {
+    if (!this.launch) return this.chain;
+    this.launch = false;
+    const doc = this.engine.getDocument();
+    this.chain = this.chain
+      .then(async () => {
+        const names = (await this.lib.list()).map((e) => e.name);
+        const named: Song = { ...doc, name: freeName(doc.name, names) };
+        const id = await this.lib.create(named);
+        this.id = id;
+        this.savedLog = named.log ?? null;
+        this.setFailed(false);
+        this.emit();
+      })
+      .catch(() => this.setFailed(true));
+    return this.chain;
   }
 
   onChange(fn: () => void): () => void {
@@ -51,12 +103,18 @@ export class Keeper {
   flush(): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    // The untouched launch jam is not saved (F1).
+    if (this.launch) return this.chain;
     const id = this.id;
     const doc = this.engine.getDocument();
     const log = this.engine.getLog();
     const withLog = log !== this.savedLog;
+    // An empty id: the launch jam's first save is still in the chain ahead of this one; save under the id it got.
     this.chain = this.chain
-      .then(() => this.lib.save(id, doc, withLog))
+      .then(() => {
+        const to = id || this.id;
+        return to ? this.lib.save(to, doc, withLog) : undefined;
+      })
       .then(
         () => {
           if (withLog) this.savedLog = log;
@@ -94,6 +152,12 @@ export class Keeper {
   /** Delete a song; deleting the open one opens the next (or a new one). Refused while playing or recording. */
   async remove(id: string): Promise<boolean> {
     if (!this.idle()) return false;
+    if (this.launch && id === this.id) {
+      const { id: next, doc } = await this.lib.open();
+      this.launch = false;
+      this.switchTo(next, doc);
+      return true;
+    }
     if (id !== this.id) {
       await this.lib.remove(id);
       this.emit();
@@ -137,6 +201,11 @@ export class Keeper {
   private async startVibeNow(doc: Song, section: number): Promise<boolean> {
     const st = this.engine.recordInfo().state;
     if (st === "recording" || st === "finishing") return false;
+    // F1: a vibe over the untouched launch jam (stopped, so never heard) is a launch jam in its place: still not in Songs.
+    if (this.launch) {
+      this.openLaunch(doc, section);
+      return true;
+    }
     // Replaced, not kept: the untouched first-launch song, or a vibe still waiting for its bar line (never heard).
     const drop = this.scratch || (this.engine.pendingLoad() && this.queuedId === this.id) ? this.id : null;
     this.scratch = false;
@@ -166,6 +235,8 @@ export class Keeper {
   private switchTo(id: string, doc: Song): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    // Opening another song leaves an untouched launch jam unsaved (F1).
+    this.launch = false;
     this.id = id;
     this.engine.loadSong(doc);
     // Loading counts as a change; nothing new to save.
@@ -177,6 +248,7 @@ export class Keeper {
 
   private schedule(): void {
     this.scratch = false;
+    if (this.launch) void this.keepLaunch();
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.flush(), SAVE_DELAY_MS);
   }

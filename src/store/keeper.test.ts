@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { defaultSong, type EventLog, type Song } from "../engine/song.ts";
 import type { Engine, RecordState } from "../engine/index.ts";
-import { Keeper } from "./keeper.ts";
+import { Keeper, SAVE_DELAY_MS } from "./keeper.ts";
+import { drawLaunch } from "./vibeBag.ts";
 import { Library, MemoryKv } from "./library.ts";
 import { vibeSong } from "../music/styles.ts";
 
@@ -40,8 +41,24 @@ class FakeEngine {
     if (this.queued) this.loadSong(this.queued);
     this.queued = null;
   }
-  onChange(): () => void {
+  changeFns: (() => void)[] = [];
+  runFns: ((on: boolean) => void)[] = [];
+  onChange(fn?: () => void): () => void {
+    if (fn) this.changeFns.push(fn);
     return () => undefined;
+  }
+  onRunning(fn: (on: boolean) => void): () => void {
+    this.runFns.push(fn);
+    return () => undefined;
+  }
+  /** An edit from the UI. */
+  edit(): void {
+    this.song = { ...this.song, bpm: this.song.bpm + 1 };
+    for (const fn of this.changeFns) fn();
+  }
+  play(): void {
+    this.playing = true;
+    for (const fn of this.runFns) fn(true);
   }
 }
 
@@ -168,3 +185,70 @@ describe("Keeper", () => {
     expect(await keeper.startVibeWith(() => null)).toBe(false);
   });
 });
+
+describe("Keeper: the launch jam (F1, spec 10.1)", () => {
+  async function launched() {
+    const kv = new CountingKv();
+    const lib = new Library(kv, (() => {
+      let t = 1000;
+      return () => (t += 10);
+    })());
+    const old = await lib.create({ ...vibeSong("loFi")!, name: "Old jam" });
+    const engine = new FakeEngine();
+    const keeper = new Keeper(engine as unknown as Engine, lib, old, true);
+    keeper.listen();
+    const draw = drawLaunch(1234, null)!;
+    keeper.openLaunch(draw.song, 1);
+    return { lib, engine, keeper, old, draw };
+  }
+
+  it("an untouched launch jam adds nothing to Songs, and the last jam is first there", async () => {
+    const { lib, engine, keeper, old, draw } = await launched();
+    expect(engine.song.style).toBe(draw.id);
+    expect(keeper.launch).toBe(true);
+    await keeper.flush();
+    await new Promise((r) => setTimeout(r, SAVE_DELAY_MS + 50));
+    const list = await lib.list();
+    expect(list.map((e) => e.id)).toEqual([old]);
+    expect(list[0].name).toBe("Old jam");
+  });
+
+  it("a vibe drawn over the untouched launch jam is still not in Songs", async () => {
+    const { lib, engine, keeper, old } = await launched();
+    expect(await keeper.startVibe(drawLaunch(99, null)!.song, 1)).toBe(true);
+    expect(await keeper.startVibe(vibeSong("ambient")!, 1)).toBe(true);
+    expect(engine.song.style).toBe("ambient");
+    await keeper.flush();
+    expect((await lib.list()).map((e) => e.id)).toEqual([old]);
+  });
+
+  it("played, the launch jam becomes a song in Songs, newest first", async () => {
+    const { lib, engine, keeper, old, draw } = await launched();
+    engine.play();
+    await keeper.flush();
+    expect(keeper.launch).toBe(false);
+    const list = await lib.list();
+    expect(list.map((e) => e.id)).toEqual([keeper.id, old]);
+    expect(await lib.load(keeper.id)).toMatchObject({ style: draw.id, key: draw.song.key, bpm: draw.song.bpm });
+  });
+
+  it("edited, the launch jam is saved with the edit, once", async () => {
+    const { lib, engine, keeper, old, draw } = await launched();
+    engine.edit();
+    engine.edit();
+    await keeper.flush();
+    const list = await lib.list();
+    expect(list).toHaveLength(2);
+    expect(list[1].id).toBe(old);
+    expect((await lib.load(keeper.id))!.bpm).toBe(draw.song.bpm + 2);
+  });
+
+  it("opening a saved song leaves the untouched launch jam out of Songs", async () => {
+    const { lib, engine, keeper, old } = await launched();
+    expect(await keeper.open(old)).toBe(true);
+    expect(keeper.launch).toBe(false);
+    expect(engine.song.name).toBe("Old jam");
+    expect((await lib.list()).map((e) => e.id)).toEqual([old]);
+  });
+});
+

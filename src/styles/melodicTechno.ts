@@ -6,6 +6,7 @@ export default {
   name: "Melodic techno",
   family: "techno",
   bpm: 123,
+  top: true,
   key: "A",
   mood: "minor",
   patches: { drums: "punchy", bass: "pluckBass", synth: "padSwell", layer1: "bell", layer2: "sawLead" },

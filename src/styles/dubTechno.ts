@@ -6,6 +6,7 @@ export default {
   name: "Dub techno",
   family: "techno",
   bpm: 118,
+  top: true,
   key: "C",
   mood: "house",
   patches: { drums: "deep", bass: "sub", synth: "dubChord", layer1: "driftPad", layer2: "tapePad" },

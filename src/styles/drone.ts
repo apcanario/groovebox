@@ -10,6 +10,8 @@ export default {
   name: "Drone",
   family: "slow",
   bpm: 60,
+  top: true,
+  bpmRange: [60, 66],
   key: "D",
   mood: "dark",
   patches: {

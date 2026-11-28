@@ -6,6 +6,7 @@ export default {
   name: "Progressive",
   family: "house",
   bpm: 124,
+  top: true,
   key: "A",
   mood: "minor",
   patches: { drums: "punchy", bass: "rubber", synth: "pluck", layer1: "pluckLead", layer2: "strings" },

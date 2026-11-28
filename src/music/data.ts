@@ -257,6 +257,10 @@ export interface StyleDef {
   name: string;
   family: StyleFamily;
   bpm: number;
+  /** F1 (spec 10.1): the bpm a launch draw may roll, low and high, inclusive; missing: the bpm plus or minus 2. */
+  bpmRange?: [number, number];
+  /** F1 (spec 10.2): one of the top vibes, the ones the launch bag draws from. */
+  top?: boolean;
   swing?: number;
   key: KeyName;
   mood: string;

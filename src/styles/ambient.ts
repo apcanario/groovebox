@@ -11,6 +11,8 @@ export default {
   name: "Ambient",
   family: "slow",
   bpm: 64,
+  top: true,
+  bpmRange: [60, 72],
   key: "E",
   mood: "major",
   patches: {

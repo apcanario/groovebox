@@ -10,6 +10,8 @@ export default {
   name: "Lo-fi",
   family: "slow",
   bpm: 80,
+  top: true,
+  bpmRange: [74, 88],
   key: "D",
   mood: "deep",
   patches: {

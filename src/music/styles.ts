@@ -35,7 +35,7 @@ import { checkDropRecipe } from "./drop.ts";
 import { checkMorphRecipe } from "./morph.ts";
 import { EFFECTS, MAX_ACTIVE_FX, fxSlot, type FxRack } from "./effects.ts";
 import { BASS_PRESETS, DRUM_PRESETS, SYNTH_PRESETS } from "./presets.ts";
-import { deriveSeed } from "./random.ts";
+import { deriveSeed, type Rng } from "./random.ts";
 import { MOODS, NOTE_NAMES } from "./scales.ts";
 
 // ---- Patches -------------------------------------------------------------------------------
@@ -131,6 +131,17 @@ export function checkStyle(def: StyleDef, id: string, patches: Readonly<Record<s
   if (!(STYLE_FAMILIES as readonly string[]).includes(def.family)) out.push("family: unknown");
   if (!(def.bpm >= LIMITS.bpm[0] && def.bpm <= LIMITS.bpm[1])) out.push(`bpm: must be ${LIMITS.bpm[0]}..${LIMITS.bpm[1]}`);
   if (!(NOTE_NAMES as readonly string[]).includes(def.key)) out.push("key: unknown");
+  if (def.top !== undefined && typeof def.top !== "boolean") out.push("top: must be true or false");
+  if (def.bpmRange !== undefined) {
+    const r = def.bpmRange;
+    const ok =
+      Array.isArray(r) &&
+      r.length === 2 &&
+      r.every((b) => Number.isInteger(b) && b >= LIMITS.bpm[0] && b <= LIMITS.bpm[1]) &&
+      r[0] <= def.bpm &&
+      def.bpm <= r[1];
+    if (!ok) out.push(`bpmRange: two whole bpms in ${LIMITS.bpm[0]}..${LIMITS.bpm[1]}, low first, around the style's bpm`);
+  }
   if (!MOODS.includes(def.mood)) out.push(`mood: unknown ${def.mood}`);
   if (!Array.isArray(def.sections) || def.sections.length !== 4) out.push("sections: must be four (intro, groove, break, outro)");
   for (const id of ["layer1", "layer2"] as const)
@@ -213,3 +224,27 @@ export function vibeStart(id: string): number {
   return STYLES[id]?.start ?? 1;
 }
 
+
+// ---- F1 (spec 10.1, 10.2): the top vibes and the launch draw ------------------------------------------------------
+
+/** The top vibes (spec 10.2), in picker order: the styles whose file says `top: true`. */
+export const TOP_IDS: readonly string[] = STYLE_IDS.filter((id) => STYLES[id].top === true);
+
+/** The bpm a launch draw may roll for a style: its `bpmRange`, else its bpm plus or minus 2, inside the app's limits. */
+export function vibeBpmRange(def: StyleDef): [number, number] {
+  const [lo, hi] = def.bpmRange ?? [def.bpm - 2, def.bpm + 2];
+  return [Math.max(LIMITS.bpm[0], lo), Math.min(LIMITS.bpm[1], hi)];
+}
+
+/**
+ * The song a launch draw opens (spec 10.1): the vibe's song with a key rolled from the twelve and a whole bpm rolled
+ * inside its range, both from `rng`, so one vibe does not open the same twice. Null for an unknown id.
+ */
+export function rollVibe(id: string, rng: Rng, byId: Readonly<Record<string, StyleDef>> = STYLES): Song | null {
+  const def = byId[id];
+  if (!def) return null;
+  const key = rng.pick(NOTE_NAMES);
+  const [lo, hi] = vibeBpmRange(def);
+  const bpm = lo + rng.int(hi - lo + 1);
+  return { ...styleSong(id, def), key, bpm };
+}

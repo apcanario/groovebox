@@ -6,6 +6,7 @@ export default {
   name: "Drum and bass",
   family: "breaks",
   bpm: 174,
+  top: true,
   key: "F",
   mood: "minor",
   patches: { drums: "tight", bass: "sub", synth: "softKeys", layer1: "airyPad", layer2: "bell" },

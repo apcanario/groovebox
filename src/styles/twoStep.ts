@@ -6,6 +6,7 @@ export default {
   name: "2-step",
   family: "breaks",
   bpm: 132,
+  top: true,
   key: "G",
   mood: "house",
   patches: { drums: "punchy", bass: "round", synth: "organ", layer1: "bell", layer2: "warmPad" },

@@ -6,6 +6,7 @@ export default {
   name: "Deep techno",
   family: "techno",
   bpm: 124,
+  top: true,
   key: "F",
   mood: "dark",
   patches: { drums: "deep", bass: "sub", synth: "dubChord", layer1: "softSine", layer2: "darkPad" },

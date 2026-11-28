@@ -6,6 +6,7 @@ export default {
   name: "Minimal techno",
   family: "techno",
   bpm: 126,
+  top: true,
   key: "G",
   mood: "dark",
   patches: {

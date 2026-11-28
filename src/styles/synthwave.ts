@@ -6,6 +6,7 @@ export default {
   name: "Synthwave",
   family: "slow",
   bpm: 100,
+  top: true,
   key: "A",
   mood: "minor",
   patches: { drums: "bigRoom", bass: "pluckBass", synth: "brass", layer1: "sawLead", layer2: "strings" },

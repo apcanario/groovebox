@@ -6,6 +6,8 @@ export default {
   name: "Downtempo",
   family: "slow",
   bpm: 92,
+  top: true,
+  bpmRange: [86, 100],
   key: "A",
   mood: "house",
   patches: { drums: "dusty", bass: "warmBass", synth: "softKeys", layer1: "softSine", layer2: "tapePad" },

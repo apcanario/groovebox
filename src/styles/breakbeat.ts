@@ -6,6 +6,7 @@ export default {
   name: "Breakbeat",
   family: "breaks",
   bpm: 130,
+  top: true,
   key: "E",
   mood: "minor",
   patches: { drums: "dusty", bass: "pluckBass", synth: "organ", layer1: "sawLead", layer2: "darkPad" },

@@ -6,6 +6,7 @@ export default {
   name: "Deep house",
   family: "house",
   bpm: 122,
+  top: true,
   key: "F",
   mood: "deep",
   patches: { drums: "punchy", bass: "round", synth: "warmStab", layer1: "bell", layer2: "warmPad" },
