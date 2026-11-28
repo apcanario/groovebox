@@ -1,0 +1,58 @@
+{
+ "recorded_from": "d6052fd",
+ "bars": 9,
+ "block": 32,
+ "length_db": 30.0,
+ "vibes": {
+  "tropicalHouse": {
+   "level": -0.74,
+   "length": 0.5562,
+   "hits": 37
+  },
+  "acidHouse": {
+   "level": -1.48,
+   "length": 0.4806,
+   "hits": 36
+  },
+  "afroHouse": {
+   "level": -1.61,
+   "length": 0.5007,
+   "hits": 37
+  },
+  "dubstep": {
+   "level": -1.53,
+   "length": 1.5004,
+   "hits": 18
+  },
+  "futureGarage": {
+   "level": -0.77,
+   "length": 0.8211,
+   "hits": 28
+  },
+  "idm": {
+   "level": -1.47,
+   "length": 0.8188,
+   "hits": 28
+  },
+  "edm": {
+   "level": -2.76,
+   "length": 0.4691,
+   "hits": 36
+  },
+  "trance": {
+   "level": -2.67,
+   "length": 0.4355,
+   "hits": 38
+  },
+  "electro": {
+   "level": -1.5,
+   "length": 0.7149,
+   "hits": 28
+  },
+  "trap": {
+   "level": -1.53,
+   "length": 0.7505,
+   "hits": 28
+  }
+ }
+}
