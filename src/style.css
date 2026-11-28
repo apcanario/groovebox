@@ -3216,3 +3216,55 @@ button:disabled {
   width: 16px;
   height: 16px;
 }
+
+/*
+ * F2 (spec 10.5): the Kick page. Kick, K decay, Tune and K drive in one row of four; under them Click, the Root switch
+ * and the kick quadrant over two columns, so the page keeps two rows of dial height at 360 x 640.
+ */
+.insttab .dials.kickdials {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.dials.kickdials > .xy {
+  grid-column: span 2;
+  min-height: 0;
+}
+/* The Root switch, a tile the size of a dial: its name over On or Off, filled in the instrument's colour when on. */
+.rootsw {
+  min-width: var(--hit);
+  min-height: var(--hit);
+  border-radius: var(--r);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
+  color: var(--text);
+}
+.rootsw b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.rootsw span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+}
+.rootsw.on {
+  background: var(--c);
+  color: var(--bg);
+}
+.rootsw.on span {
+  color: var(--bg);
+}
+/* The whole Drums column: Tune, K drive and P pitch over Click, Swing and Root, three to a row (48 px each at 150 px). */
+.drumwhole .dright > .dials {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* The drums' filter pad in the Sound sheet on the desk. */
+.sheet .xy {
+  flex: none;
+  height: 160px;
+  min-height: 0;
+}

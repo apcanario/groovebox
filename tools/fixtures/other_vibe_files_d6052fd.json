@@ -1,0 +1,16 @@
+{
+  "recorded": "d6052fd",
+  "note": "sha256 of each of the ten other vibes' style files (spec 10.2), as F2 found them; F2 changes none",
+  "files": {
+    "acidHouse": "05f5e54a36fe250a6f2fb47889b33995e445a040855dc0005b13f5bc381d283e",
+    "afroHouse": "5acb54fb796ba41c3eaeb796ecfe39f30c29b8a316b681f076fb66c769bf2999",
+    "dubstep": "671cc6bba7c07cbe3c60ea7db1c765e207234fc9b3678c9564c50fda43409e82",
+    "edm": "1022f4311a4a05ec319f36b4535fae3306fe50d35e97649d4b37ff74e542fa6f",
+    "electro": "069b6495eaff6ece725bc7bead5104252fdbf505184dc40baaf218670c8958d5",
+    "futureGarage": "12574267d0f55f432aac3b5f26a9a5803529e333d130564b811b4c01a55031bc",
+    "idm": "a4cde2b41af09c4e97a838d096162f9e9779539142552674f17ecd79fcbb2d01",
+    "trance": "5be477aadaa6bb210a8c384e60e7d3dbfa4033d8ebd2b16e0e0bd6fc69188e23",
+    "trap": "e0fb126891cb57dce4304284f2a54b077a06218a104d9f03d424af083bafb346",
+    "tropicalHouse": "5f317cf45b0bdaa0f44bdf9e577f6d52463c6857a74ad113956cff541f733ea5"
+  }
+}

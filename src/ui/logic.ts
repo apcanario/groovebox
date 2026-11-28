@@ -5,6 +5,7 @@ import { FM_RATIOS, LFO_RATE_LABEL, driftPeriod, fmRatio, lfoBeats, lfoRateIndex
 import { BASS_NAMES, BEAT_NAMES, SYNTH_NAMES, type PresetNames } from "../music/presets.ts";
 import { LEAD_SHAPES, PHRASE_BARS, type LeadParams, type LeadShape, type LeadStyle } from "../music/lead.ts";
 import { leadKnobs } from "../music/leadKit.ts";
+import { kickSetting } from "../music/kick.ts";
 
 export const MAX_CHORDS = 8;
 /** The Length button cycles these (P7 adds 4 and 8 bars, spec 8.10). */
@@ -298,20 +299,23 @@ export interface KnobPage {
 /** The patch dials of the Drums, Bass and Synth tabs, page by page; no page holds more than six. */
 export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
   drums: [
+    // F2 (spec 10.5): the Kick page is the kick's voice: its level, decay (Length), Tune (the Pitch dial as built, used
+    // with Root off) and drive, then Click, the Root switch and the kick quadrant (KickControls). The clap moves to the
+    // Hats page and Swing to the Kit page to make the room.
     {
-      name: "Kick · Clap",
+      name: "Kick",
       knobs: [
         { key: "kickLevel", label: "Kick" },
         { key: "kickDecay", label: "K decay" },
-        { key: "pitch", label: "K pitch" },
+        { key: "pitch", label: "Tune" },
         { key: "drive", label: "K drive" },
-        { key: "clapLevel", label: "Clap" },
-        { key: "clapDecay", label: "C decay" },
       ],
     },
     {
       name: "Hats",
       knobs: [
+        { key: "clapLevel", label: "Clap" },
+        { key: "clapDecay", label: "C decay" },
         { key: "hatLevel", label: "Hat" },
         { key: "hatDecay", label: "H decay" },
         { key: "openLevel", label: "Open" },
@@ -376,6 +380,28 @@ export const MACRO_COLOR: Record<string, string> = {
   weight: "var(--blue)",
   level: "var(--teal)",
 };
+
+// ---- The kick quadrant (F2, spec 10.5) ----------------------------------------------------
+
+/**
+ * The kick quadrant: up is Punch (the sweep's depth and the click together), right is Length (the tail, the kick's
+ * decay as built). Where the dot sits for a drum patch; a patch saved before F2 has no Punch and reads its default.
+ */
+export function kickPad(patch: Patch): { x: number; y: number } {
+  return { x: Math.max(0, Math.min(1, patch.kickDecay)), y: Math.max(0, Math.min(1, kickSetting(patch, "kickPunch"))) };
+}
+
+/** What a move of the quadrant to (x, y) sets on the drum patch: Length and Punch, nothing else. */
+export function kickPadMove(x: number, y: number): Pick<Patch, "kickDecay" | "kickPunch"> {
+  const c = (v: number): number => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
+  return { kickDecay: c(x), kickPunch: c(y) };
+}
+
+/** The Advanced Click dial: the click's level, 0..100. */
+export const KICK_CLICK_KNOB: KnobCurve = { label: "Click" };
+
+/** The Root switch reads on from 0.5 up, as the engine does (src/music/kick.ts). */
+export const kickRootOn = (patch: Patch): boolean => kickSetting(patch, "kickRoot") >= 0.5;
 
 /** The Simple XY pad's readout: Tone and Edge as 0..100, no hertz. */
 export function simpleXYReadout(x: number, y: number): string {
@@ -592,7 +618,7 @@ export const KIT_KNOBS: readonly KnobSpec[] = [
 
 /**
  * T2 (spec 9.2): the whole Drums panel on the desk puts each voice's level and decay beside its rows of the grid, and the
- * other drum knobs (the kick's pitch and drive, the perc's pitch) in its column. Between them every drum knob of the
+ * other drum knobs (the kick's Tune and drive, the perc's pitch; F2: with Click, Swing and Root) in its column. Between them every drum knob of the
  * Kick, Hats and Kit pages, once (tested). The decay row sits under its voice's level row, so it is named "Decay".
  */
 export const VOICE_KNOBS = {

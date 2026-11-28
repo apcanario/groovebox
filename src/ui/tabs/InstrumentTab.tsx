@@ -28,6 +28,7 @@ import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, DRUM_EXTRAS, VOICE_KNOBS, drumKnob, p
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 import { FxPage, FxSlots } from "./fx.tsx";
+import { ClickDial, KickPad, RootSwitch } from "./kick.tsx";
 import { instShapes, probeProps, useFull, type Full } from "./full.ts";
 
 const VOICE_NAME: Record<DrumVoice, string> = { kick: "Kick", clap: "Clap", hat: "Hat", open: "Open", perc: "Perc", shaker: "Shaker" };
@@ -37,10 +38,10 @@ type SeqView = "8" | "16a" | "16b";
 const SEQ_VIEWS: readonly SeqView[] = ["8", "16a", "16b"];
 const SEQ_VIEW_LABEL: Record<SeqView, string> = { "8": "8 steps", "16a": "1–8", "16b": "9–16" };
 
-function Knobs({ ctx, inst, knobs, children }: { ctx: Ctx; inst: InstrumentId; knobs: readonly KnobSpec[]; children?: ComponentChildren }) {
+function Knobs({ ctx, inst, knobs, children, cls }: { ctx: Ctx; inst: InstrumentId; knobs: readonly KnobSpec[]; children?: ComponentChildren; cls?: string }) {
   const patch = ctx.song.patches[inst];
   return (
-    <div class={`dials n${knobs.length}`}>
+    <div class={`dials n${knobs.length}${cls ? ` ${cls}` : ""}`}>
       {knobs.map((k) => (
         <Dial
           key={k.key}
@@ -275,7 +276,8 @@ type InstPage = "beat" | "steps" | "rhythm" | "sound" | "kick" | "hats" | "kit" 
 /**
  * The pages of the Drums, Bass and Synth tabs, before the Filter page. P7: Drums gets Steps (the sequencer, 8 or 16
  * steps, Perc and Shaker), Kit (Perc and Shaker dials) and its sounds on the Beat page; Bass and Synth get Mod. P9: every
- * instrument gets FX; with six chips or more "Kick · Clap" is shortened to "Kick".
+ * instrument gets FX. F2 (spec 10.5): Kick is the kick's voice with Click, Root and the kick quadrant; the clap moves to
+ * Hats and Swing to Kit.
  */
 function basePages(inst: InstrumentId): PageDef<InstPage>[] {
   if (inst === "drums") return [["beat", "Beat"], ["steps", "Steps"], ["kick", "Kick"], ["hats", KNOB_PAGES.drums![1].name], ["kit", "Kit"], ["fx", "FX"]];
@@ -396,6 +398,9 @@ function SoundButton({ ctx }: { ctx: Ctx }) {
         <Sheet onClose={() => setOpen(false)}>
           <h2>Drum sound</h2>
           <SoundPicker ctx={ctx} inst="drums" />
+          {/* F2: the drums' filter pad, which the kick quadrant replaced at the foot of the column. */}
+          <GroupLabel thing="Filter" />
+          <FilterXY ctx={ctx} inst="drums" />
           <button class="btn wide" id="sound-close" onClick={() => setOpen(false)}>
             Close
           </button>
@@ -408,8 +413,9 @@ function SoundButton({ ctx }: { ctx: Ctx }) {
 /**
  * T2 (spec 9.2): Drums whole, on the desk. Every voice's 16 steps as one grid, each voice two rows of eight (a half
  * bar each: 16 cells of 48 px do not fit across the panel), with the voice's level and decay beside its two rows; the
- * beat over the grid; the name and switch, the Drums lane (spec 8.12, T2 review M1), the sound, Reset, the kick's pitch and drive, the perc's pitch and swing,
- * both effect slots, the sends and the XY pad (lowest, in thumb reach) in the column on the right.
+ * beat over the grid; the name and switch, the Drums lane (spec 8.12, T2 review M1), the sound, Reset, the kick's Tune and drive, the perc's pitch,
+ * Click, Swing and Root, both effect slots, the sends and the kick quadrant (lowest, in thumb reach; F2) in the column on the right.
+ * F2: the drums' filter pad, which sat where the quadrant is, is in the Sound sheet.
  */
 function WholeDrums({ ctx, f }: { ctx: Ctx; f: Full }) {
   const { engine, song, edit } = ctx;
@@ -478,14 +484,17 @@ function WholeDrums({ ctx, f }: { ctx: Ctx; f: Full }) {
           </button>
         </div>
         <Knobs ctx={ctx} inst="drums" knobs={DRUM_EXTRAS.map(drumKnob)}>
+          <ClickDial ctx={ctx} />
           <SwingDial ctx={ctx} />
+          <RootSwitch ctx={ctx} />
         </Knobs>
         <FxSlots ctx={ctx} inst="drums" />
         <div class="sends" data-grp="sends">
           <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(x) => engine.setParam("drums", "delay", x)} />
           <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(x) => engine.setParam("drums", "reverb", x)} />
         </div>
-        <FilterXY ctx={ctx} inst="drums" />
+        {/* F2 (spec 10.5): the kick quadrant, lowest in thumb reach; the filter pad is in the Sound sheet. */}
+        <KickPad ctx={ctx} />
       </div>
     </section>
   );
@@ -506,17 +515,23 @@ function PagedInstrument({ ctx, inst, sref, chosen, setPage }: { ctx: Ctx; inst:
           {page === "beat" && <DrumPresets ctx={ctx} />}
           {page === "beat" && <SoundPicker ctx={ctx} inst={inst} />}
           {page === "steps" && <DrumBeat ctx={ctx} />}
-          {page === "kick" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
-          {page === "hats" && (
-            <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs}>
-              <SwingDial ctx={ctx} />
+          {page === "kick" && (
+            <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} cls="kickdials">
+              <ClickDial ctx={ctx} />
+              <RootSwitch ctx={ctx} />
+              <KickPad ctx={ctx} />
             </Knobs>
           )}
+          {page === "hats" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs} />}
           {page === "rhythm" && <Rhythms ctx={ctx} inst={inst} />}
           {page === "rhythm" && <Waves ctx={ctx} inst={inst} />}
           {page === "sound" && <SoundPicker ctx={ctx} inst={inst} />}
           {page === "sound" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} />}
-          {page === "kit" && <Knobs ctx={ctx} inst={inst} knobs={KIT_KNOBS} />}
+          {page === "kit" && (
+            <Knobs ctx={ctx} inst={inst} knobs={KIT_KNOBS}>
+              <SwingDial ctx={ctx} />
+            </Knobs>
+          )}
           {page === "mod" && <Knobs ctx={ctx} inst={inst} knobs={MOD_KNOBS} />}
           {page === "fx" && <FxPage ctx={ctx} inst={inst} />}
         </div>

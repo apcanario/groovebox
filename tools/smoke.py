@@ -1275,7 +1275,7 @@ def advanced_read(page, sec: int, inst: str, t: dict) -> tuple:
 
     kind, key = t["kind"], t.get("key")
     if kind == "swing":
-        go("hats")
+        go("kit")  # F2: Swing moved from Hats to Kit to make room for the clap on Hats
         return dial("drums:swing"), str(page.evaluate(f"Math.round(window.__groovebox.getSong().sections[{sec}].drums.swing * 100)"))
     if kind in ("gen", "arp", "pad"):
         page.click(f'[data-mode="{inst}:{ {"gen": "generative", "arp": "arp", "pad": "pad"}[kind] }"]')
@@ -1348,7 +1348,9 @@ def walk_p2(page, failures: list) -> None:
                 "synth": ["bright", "punch", "space", "level"]}.get(inst, ["busy", "evolve", "bright", "space"])]
         if ids != want:
             failures.append(f"Simple {inst}: dials {ids}, the spec's table says {want}")
-        if not page.locator(f'[data-xy="{inst}"]').count():
+        # F2 (spec 10.5): the Simple Drums pad is the kick quadrant.
+        pad = "kick" if inst == "drums" else inst
+        if not page.locator(f'[data-xy="{pad}"]').count():
             failures.append(f"Simple {inst}: no XY pad")
         if inst in ("drums", "bass", "synth"):
             n = page.locator(".body .chips").count()

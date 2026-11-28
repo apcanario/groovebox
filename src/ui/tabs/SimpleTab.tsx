@@ -15,6 +15,7 @@ import { MACRO_COLOR, patchName, patchOf, presetName, seedHeard, simpleXYReadout
 import { INST_COLOR } from "../theme.tsx";
 import { HeadRow } from "./InstrumentTab.tsx";
 import { FxButtons } from "./fx.tsx";
+import { KickPad } from "./kick.tsx";
 
 /** The four macro dials of an instrument (spec 8.3's table), for the edited section. */
 function Macros({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
@@ -61,6 +62,15 @@ function SimpleXY({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
       }}
     />
   );
+}
+
+/**
+ * The pad lowest on a Simple Drums, Bass or Synth tab. F2 (spec 10.5): on Drums it is the kick quadrant (Punch up,
+ * Length right); the drums' Tone and Edge it held before are the Advanced Drums filter pad (the Filter page on a
+ * phone, the Sound sheet on the desk).
+ */
+function InstXY({ ctx, inst }: { ctx: Ctx; inst: "drums" | "bass" | "synth" }) {
+  return inst === "drums" ? <KickPad ctx={ctx} /> : <SimpleXY ctx={ctx} inst={inst} />;
 }
 
 /** The one picker of a Simple instrument tab: Beat (drums), Rhythm (bass), Sound (synth). */
@@ -131,10 +141,10 @@ export function SimpleInstrumentTab({ ctx, inst }: { ctx: Ctx; inst: "drums" | "
       <Macros ctx={ctx} inst={inst} />
       {roomy && <FxButtons ctx={ctx} inst={inst} />}
       {roomy ? (
-        <SimpleXY ctx={ctx} inst={inst} />
+        <InstXY ctx={ctx} inst={inst} />
       ) : (
         <div class="xyrow">
-          <SimpleXY ctx={ctx} inst={inst} />
+          <InstXY ctx={ctx} inst={inst} />
           <FxButtons ctx={ctx} inst={inst} column />
         </div>
       )}
