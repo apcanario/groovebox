@@ -35,7 +35,7 @@ vi.mock("tone", () => {
         h.calls.push({ who, what: "triggerAttackRelease", args });
       }
     };
-  return { MembraneSynth: recorder("body"), NoiseSynth: recorder("click"), Filter: recorder("filter") };
+  return { MembraneSynth: recorder("body"), NoiseSynth: recorder("click"), Filter: recorder("filter"), Gain: recorder("mono") };
 });
 
 import { KickVoice } from "./kick.ts";

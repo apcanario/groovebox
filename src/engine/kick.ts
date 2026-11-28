@@ -39,8 +39,16 @@ export class KickVoice {
       noise: { type: "white" },
       envelope: { attack: 0.0005, decay: 0.004, sustain: 0, release: 0.002 },
     });
+    // F2 slice c: the click is folded to one channel before the drive. Tone's noise is stereo, and while a click and its
+    // filter's tail sound the drive's input turned stereo and back, which restarted its 4x oversampler: a step of about
+    // a fifth of the kick's level on every hit with Click above 0, 40 to 110 ms in (tools/smoke.py, walk_kick_still).
+    // The fold averages the two channels, so it carries the noise up by the square root of 2 to keep the click's level.
+    const mono = new Tone.Gain(Math.SQRT2);
+    mono.channelCount = 1;
+    mono.channelCountMode = "explicit";
     const bp = new Tone.Filter({ frequency: CLICK_HZ, type: "bandpass", Q: CLICK_Q });
-    this.click.connect(bp);
+    this.click.connect(mono);
+    mono.connect(bp);
     bp.connect(out);
   }
 
