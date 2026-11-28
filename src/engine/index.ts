@@ -3,6 +3,7 @@
  * switch section, toggle instrument, and reads pending switches and the playing position.
  * Notes are scheduled ahead on the audio clock by the transport; the UI's timers never schedule.
  */
+import type { KickSettings, KickShape } from "../music/kick.ts";
 import * as Tone from "tone";
 import { Graph, oscProbe } from "./audio.ts";
 import { oscPatchStats } from "./oscPatch.ts";
@@ -2102,6 +2103,15 @@ export class Engine {
     return w.read();
   }
 
+  /**
+   * F2 (spec 10.5), for the smoke: the kick's settings now, the shape its next hit plays (sweep, body, click) and the
+   * last hit's. Every setting acts from the next hit, so a sweep of an axis while the kick plays shows here at once.
+   */
+  kickState(): { settings: KickSettings; next: KickShape; last: KickShape | null } | null {
+    const k = this.graph?.instruments.drums.kick;
+    return k ? { settings: k.values, next: k.shape(), last: k.last } : null;
+  }
+
   /** Native value of a drum voice's level gain (its trim times its dial). */
   drumGain(voice: DrumVoice): number | null {
     return this.graph ? this.graph.instruments.drums.levelGain(voice) : null;
@@ -2319,6 +2329,8 @@ export class Engine {
       }
       switch (e.inst) {
         case "drums": {
+          // F2: the kick's Root switch tunes to the key the song is in when the hit starts.
+          if (e.voice === "kick") g.instruments.drums.setKey(this.seq.song.key);
           // P7: a roll splits the sixteenth into 2..4 quick hits, each softer than the last and short enough to end before the next.
           const n = e.repeat && e.repeat > 1 ? e.repeat : 1;
           for (let k = 0; k < n; k++)

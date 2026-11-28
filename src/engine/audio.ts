@@ -15,7 +15,9 @@
  * old wave and ring out, so no oscillator is swapped mid-note.
  */
 import * as Tone from "tone";
-import { midiToHz } from "../music/scales.ts";
+import { midiToHz, type KeyName } from "../music/scales.ts";
+import { KICK_KEYS, kickSetting, type KickKey } from "../music/kick.ts";
+import { KickVoice } from "./kick.ts";
 import { DRUM_VOICES, type DrumVoice } from "../music/presets.ts";
 import {
   DRIFT_MAX,
@@ -31,7 +33,6 @@ import {
   fmIndex,
   fmRatio,
   glideSeconds,
-  kickHz,
   lfoBeats,
   lfoDepthCents,
   percHz,
@@ -556,7 +557,8 @@ export abstract class Instrument {
   set(key: keyof Patch, v: number | Wave, patch: Patch, at?: number): void {
     if (key === "wave") return this.setWave(v as Wave, at);
     if (ENV_KEYS.includes(key)) return this.setEnvelope(patch);
-    this.channel.set(key, v as number, at);
+    if ((KICK_KEYS as readonly string[]).includes(key)) return; // F2: the kick's own, only the drums have one
+    this.channel.set(key as NumericPatchKey, v as number, at);
   }
   protected abstract setWave(w: Wave, at?: number): void;
   protected abstract setEnvelope(p: Patch): void;
@@ -566,7 +568,8 @@ export abstract class Instrument {
 }
 
 export class Drums extends Instrument {
-  private kick: Tone.MembraneSynth;
+  /** F2 (spec 10.5): click, sweep, body and tail (kick.ts), into the drive as built. */
+  readonly kick: KickVoice;
   private kickDrive: Tone.Distortion;
   private hat: Tone.NoiseSynth;
   private open: Tone.NoiseSynth;
@@ -578,7 +581,6 @@ export class Drums extends Instrument {
   /** One ramped gain per voice: its trim times its level knob. */
   private gains = {} as Record<DrumVoice, Tone.Gain>;
   private decays: Record<DrumVoice, number> = { kick: 0.5, clap: 0.5, hat: 0.5, open: 0.5, perc: 0.5, shaker: 0.5 };
-  private pitch = 0.4;
   private percPitch = 0.5;
 
   constructor(buses: Buses) {
@@ -588,15 +590,9 @@ export class Drums extends Instrument {
       node.connect(g);
       this.gains[voice] = g;
     };
-    // Kick: sine with a fast pitch drop; the drive is 4x oversampled so its harmonics do not alias.
-    this.kick = new Tone.MembraneSynth({
-      pitchDecay: 0.045,
-      octaves: 4.5,
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: DRUM_RELEASE.kick },
-    });
+    // Kick (F2, kick.ts): click, sweep, body and tail; the drive is 4x oversampled so its harmonics do not alias (C1).
     this.kickDrive = new Tone.Distortion({ distortion: 0.18, oversample: "4x", wet: 0.5 });
-    this.kick.connect(this.kickDrive);
+    this.kick = new KickVoice(this.kickDrive, DRUM_RELEASE.kick);
     into("kick", this.kickDrive);
 
     this.hat = new Tone.NoiseSynth({
@@ -645,7 +641,8 @@ export class Drums extends Instrument {
   override set(key: keyof Patch, v: number | Wave, patch: Patch, at?: number): void {
     const n = v as number;
     if (key === "drive") return void ramp(this.kickDrive.wet, clamp01(n), at);
-    if (key === "pitch") return void (this.pitch = clamp01(n)); // from the next kick
+    if (key === "pitch") return void this.kick.setPitch(n); // from the next kick
+    if ((KICK_KEYS as readonly string[]).includes(key)) return void this.kick.set(key as KickKey, n); // from the next kick
     if (key === "percPitch") return void (this.percPitch = clamp01(n)); // from the next perc hit
     for (const voice of DRUM_VOICES) {
       if (key === `${voice}Level`) return void ramp(this.gains[voice].gain, this.trims[voice] * drumLevel(n), at);
@@ -656,6 +653,17 @@ export class Drums extends Instrument {
 
   protected setWave(): void {}
   protected setEnvelope(): void {}
+
+  /** F2: the kick's own settings are optional in a patch (not in PATCH_KEYS); a missing one is its default. */
+  override apply(p: Patch, at?: number): void {
+    super.apply(p, at);
+    for (const k of KICK_KEYS) this.kick.set(k, kickSetting(p, k));
+  }
+
+  /** F2: the song's key, for the kick's Root switch (from the next kick). */
+  setKey(key: KeyName): void {
+    this.kick.setKey(key);
+  }
 
   /** Native value of a voice's level gain, for the smoke test (G3 review E1). */
   levelGain(voice: DrumVoice): number {
@@ -671,8 +679,7 @@ export class Drums extends Instrument {
     const hit = (time: number): void => {
       switch (voice) {
         case "kick":
-          this.kick.envelope.decay = d;
-          return void this.kick.triggerAttackRelease(kickHz(this.pitch), d, time, vel);
+          return void this.kick.hit(time, d, vel);
         case "hat":
           this.open.triggerRelease(time); // closed hat chokes the open one
           this.hat.envelope.decay = d;

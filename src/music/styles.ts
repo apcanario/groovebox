@@ -70,7 +70,8 @@ export function resolvePatch(inst: InstrumentId, ref: StylePatch, patches: Reado
   const def = patches[id];
   if (!def) throw new Error(`unknown patch ${id}`);
   if (def.instrument !== patchFor(inst)) throw new Error(`patch ${id} is for ${def.instrument}, not ${inst}`);
-  return { ...defaultPatch(inst), ...def.values, ...(typeof ref === "string" ? {} : ref.set) };
+  if (typeof ref !== "string" && ref.kick && inst !== "drums") throw new Error(`patch ${id}: kick settings on ${inst}, not the drums`);
+  return { ...defaultPatch(inst), ...def.values, ...(typeof ref === "string" ? {} : { ...ref.set, ...ref.kick }) };
 }
 
 // ---- Styles ---------------------------------------------------------------------------------

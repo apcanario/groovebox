@@ -20,6 +20,7 @@ import {
 import { MOODS, NOTE_NAMES, type KeyName, type Mood } from "../music/scales.ts";
 import { checkEvents, type LogEvent } from "./eventlog.ts";
 import { MACRO_KEYS } from "../music/macros.ts";
+import { KICK_KEYS, type KickKey } from "../music/kick.ts";
 import { FX_SLOTS, checkFxSlot, defaultRack, type FxRack } from "../music/effects.ts";
 
 export const INSTRUMENTS = ["drums", "bass", "synth", "layer1", "layer2"] as const;
@@ -79,8 +80,15 @@ export interface Patch {
   percPitch: number;
   shakerLevel: number;
   shakerDecay: number;
+  // ---- F2 (spec 10.5): the kick's settings (src/music/kick.ts). Optional: a song without them plays KICK_DEFAULTS,
+  // the kick as it was before F2, so the ten other vibes' songs stay as they were (otherVibes.test.ts). Length is
+  // kickDecay and Tune the Pitch dial, as built. Not in PATCH_KEYS: Drums.apply sets them (KICK_KEYS). ----
+  kickPunch?: number;
+  kickClick?: number;
+  kickRoot?: number;
 }
-export type NumericPatchKey = Exclude<keyof Patch, "wave">;
+/** Every numeric key a patch always has (the kick's optional settings, KICK_KEYS, are apart). */
+export type NumericPatchKey = Exclude<keyof Patch, "wave" | KickKey>;
 export const PATCH_KEYS: readonly NumericPatchKey[] = [
   "attack",
   "decay",
@@ -134,7 +142,7 @@ export const P7_PATCH_DEFAULTS = {
 export type P7PatchKey = keyof typeof P7_PATCH_DEFAULTS;
 const P7_KEYS = Object.keys(P7_PATCH_DEFAULTS) as P7PatchKey[];
 /** Allowed range per numeric patch key. */
-export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
+export const PATCH_RANGES: Record<NumericPatchKey | KickKey, [number, number]> = {
   // P7 (spec 8.10): attack and release up to 20 seconds, for pads and drones.
   attack: [0.001, 20],
   decay: [0.01, 4],
@@ -170,13 +178,16 @@ export const PATCH_RANGES: Record<NumericPatchKey, [number, number]> = {
   percPitch: [0, 1],
   shakerLevel: [0, 1],
   shakerDecay: [0, 1],
+  kickPunch: [0, 1],
+  kickClick: [0, 1],
+  kickRoot: [0, 1],
 };
 
 /** A patch value forced into its allowed range; null for an unknown wave or a non-number. */
 export function clampPatchValue<K extends keyof Patch>(key: K, value: Patch[K]): Patch[K] | null {
   if (key === "wave") return (WAVES as readonly unknown[]).includes(value) ? value : null;
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  const [lo, hi] = PATCH_RANGES[key as NumericPatchKey];
+  const [lo, hi] = PATCH_RANGES[key as NumericPatchKey | KickKey];
   return Math.max(lo, Math.min(hi, value)) as Patch[K];
 }
 
@@ -474,6 +485,7 @@ export function checkPatch(p: unknown, at: string, errors: string[]): void {
     const [lo, hi] = PATCH_RANGES[k];
     if (!inRange(p[k], lo, hi)) errors.push(`${at}.${k}: must be ${lo}..${hi}`);
   }
+  for (const k of KICK_KEYS) if (p[k] !== undefined && !inRange(p[k], 0, 1)) errors.push(`${at}.${k}: must be 0..1`);
 }
 
 function checkLayer(l: unknown, at: string, errors: string[]): void {

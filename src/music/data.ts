@@ -5,6 +5,7 @@
  * folder, so a data file can import its types from here without a cycle. No audio dependency.
  */
 import type { DropRecipe } from "./drop.ts";
+import type { KickSettings } from "./kick.ts";
 import type { MorphRecipe } from "./morph.ts";
 import type { DroneParams, InstrumentId, LayerMode, MixState, PadParams, Patch } from "../engine/song.ts";
 import type { ArpParams } from "./arp.ts";
@@ -210,8 +211,11 @@ export interface PatchDef extends Named {
 export const STYLE_FAMILIES = ["house", "techno", "breaks", "slow", "other"] as const;
 export type StyleFamily = (typeof STYLE_FAMILIES)[number];
 
-/** A patch of a style: a patch id, or a patch id with some values changed. */
-export type StylePatch = string | { patch: string; set: Partial<Patch> };
+/**
+ * A patch of a style: a patch id, or a patch id with some values changed. F2 (spec 10.5): the drums' may carry `kick`,
+ * the kick's settings (src/music/kick.ts); missing ones are KICK_DEFAULTS, the kick as it was before F2.
+ */
+export type StylePatch = string | { patch: string; set?: Partial<Patch>; kick?: Partial<KickSettings> };
 
 /** A layer in one section of a style: its mode and any settings that differ from the defaults. */
 export interface StyleLayer {
