@@ -17,6 +17,9 @@ T1: the tablet walk (walk_tablet) saves six tablet sizes in both modes: the desk
 and the dock at 800 x 1280, 768 x 1024 and 600 x 960, every rail panel and page, with the same checks and the layout's own (DESK,
 DOCK); the smoke's core part runs it too, without screenshots.
 
+F1: before the frame walk, the vibe picker (walk_picker) at 360 x 640, 412 x 915, 800 x 1280 and 1280 x 800: no scroll,
+no tile under 48 px, no label wrapped or overflowing, the top group first, More's other group checked the same.
+
 tools/smoke.py runs the same walk (without screenshots) while the transport plays.
 
 Usage: python3 tools/shots.py [dist] [out_dir]    (builds first: npm run build)
@@ -406,6 +409,143 @@ def close_picker(page) -> None:
     page.wait_for_selector(".shell", timeout=5000)
     if page.locator(".vpick, .vibes").count():
         page.keyboard.press("Escape")
+
+
+PICKER_SIZES = [(360, 640), (412, 915), (800, 1280), (1280, 800)]
+# F1 (spec 10.1): what the vibe picker sheet shows, measured: its groups in order with their tiles, whether it or the
+# document scrolls, tiles off the screen or under 48 px, labels that wrap or overflow, the More switch.
+PICKER_READ = r"""() => {
+  const v = document.querySelector('.vpick');
+  if (!v) return null;
+  const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  const se = document.scrollingElement;
+  const bad = [];
+  if (v.scrollHeight > v.clientHeight + 1 || v.scrollWidth > v.clientWidth + 1) bad.push(`the picker scrolls: ${v.scrollWidth}x${v.scrollHeight} in ${v.clientWidth}x${v.clientHeight}`);
+  if (se.scrollHeight > vh + 1 || se.scrollWidth > vw + 1) bad.push(`the document scrolls: ${se.scrollWidth}x${se.scrollHeight} in ${vw}x${vh}`);
+  const sr = v.getBoundingClientRect();
+  const oneLine = (el, what) => {
+    if (!el || !el.getClientRects().length) return;
+    if (el.scrollWidth > el.clientWidth + 0.5) bad.push(`${what} overflows: ${el.scrollWidth} > ${el.clientWidth}`);
+    const box = el.getBoundingClientRect();
+    const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      const rects = [...range.getClientRects()].filter((q) => q.width > 0);
+      if (new Set(rects.map((q) => Math.round(q.top))).size > 1) bad.push(`${what} wraps: "${n.textContent.trim()}"`);
+      const u = range.getBoundingClientRect();
+      if (u.left < box.left - 0.5 || u.right > box.right + 0.5 || u.top < box.top - 0.5 || u.bottom > box.bottom + 0.5)
+        bad.push(`${what} passes its edge: "${n.textContent.trim()}"`);
+    }
+  };
+  const groups = [...v.querySelectorAll('[data-group]')].map((g) => {
+    const tiles = [...g.querySelectorAll('[data-vibe]')].map((t) => {
+      const b = t.getBoundingClientRect();
+      const id = t.dataset.vibe;
+      if (b.width < 47.99 || b.height < 47.99) bad.push(`tile ${id} under 48 px: ${b.width.toFixed(1)}x${b.height.toFixed(1)}`);
+      if (b.left < -0.5 || b.top < -0.5 || b.right > vw + 0.5 || b.bottom > vh + 0.5) bad.push(`tile ${id} off the screen`);
+      if (b.left < sr.left - 0.5 || b.right > sr.right + 0.5 || b.top < sr.top - 0.5 || b.bottom > sr.bottom + 0.5) bad.push(`tile ${id} cut off by the sheet`);
+      oneLine(t, `tile ${id}'s label`);
+      return { id, top: b.top, bottom: b.bottom, left: b.left, right: b.right, x: Math.round(b.left) };
+    });
+    for (let i = 0; i < tiles.length; i++)
+      for (let j = i + 1; j < tiles.length; j++) {
+        const a = tiles[i], c = tiles[j];
+        if (a.left < c.right - 0.5 && c.left < a.right - 0.5 && a.top < c.bottom - 0.5 && c.top < a.bottom - 0.5)
+          bad.push(`tiles ${a.id} and ${c.id} overlap`);
+      }
+    const r = g.getBoundingClientRect();
+    return { name: g.dataset.group, top: r.top, tiles, cols: new Set(tiles.map((t) => t.x)).size,
+             span: tiles.length ? Math.max(...tiles.map((t) => t.bottom)) - Math.min(...tiles.map((t) => t.top)) : 0 };
+  });
+  oneLine(v.querySelector('.vline span'), 'the line\'s label');
+  oneLine(v.querySelector('#vibe-surprise'), 'Surprise me');
+  oneLine(v.querySelector('#vibe-more'), 'More');
+  oneLine(v.querySelector('.vphead h2'), 'the title');
+  const line = v.querySelector('.vline');
+  const gap = parseFloat(getComputedStyle(v).rowGap) || 0;
+  return { bad, groups, more: !!v.querySelector('#vibe-more'), surprise: !!v.querySelector('#vibe-surprise'),
+           sheet: sr.height, line: line ? line.getBoundingClientRect().height : 0, gap, vh };
+}"""
+
+
+def walk_picker(page, failures: list, out_dir: str | None = None) -> int:
+    """F1 (spec 10.1, Done when): the vibe picker at 360 x 640, 412 x 915, 800 x 1280 and 1280 x 800, opened from the
+    vibe control's name in Simple: no scroll, no tile under 48 px, no label wrapped or overflowing, the top group first
+    (the top vibes in their order, then the others), two columns; where the More switch shows, it swaps in the other
+    vibes with the same checks, and both groups would not have fit (where they fit, both show). Leaves the app in
+    Simple on the Play tab at 390 x 844 with the picker closed. Returns the number of screens checked."""
+    vibes = page.evaluate("window.__vibes")
+    top = [v["id"] for v in vibes if v["top"]]
+    others = [v["id"] for v in vibes if not v["top"]]
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    n = 0
+    for size in PICKER_SIZES:
+        where = f"{size[0]}x{size[1]} vibe picker"
+        page.set_viewport_size({"width": size[0], "height": size[1]})
+        time.sleep(0.25)
+        opener = "#vibe-open" if page.locator("#vibe-open").count() else "#new-jam"
+        page.click(opener)
+        if not _wait(page, "!!document.querySelector('.vpick')", 2.0):
+            failures.append(f"{where}: {opener} did not open the picker")
+            continue
+        _settle(page)
+        p = page.evaluate(PICKER_READ)
+        views = [("", p)]
+        names = [g["name"] for g in p["groups"]]
+        if not names or names[0] != "top":
+            failures.append(f"{where}: the first group is {names[:1]}, not the top vibes")
+        if p["more"]:
+            if names != ["top"]:
+                failures.append(f"{where}: with More, the groups shown are {names}, expected the top group alone")
+            page.click("#vibe-more")
+            _settle(page)
+            q = page.evaluate(PICKER_READ)
+            views.append((" More", q))
+            if [g["name"] for g in q["groups"]] != ["other"]:
+                failures.append(f"{where}: More did not swap in the other vibes ({[g['name'] for g in q['groups']]})")
+            elif q["groups"]:
+                # Where both groups fit at 48 px a tile, both show: the sheet as it would be with both, from what was
+                # measured (the 48 px More row back to the plain line, the other group under it).
+                other_span = q["groups"][0]["span"]
+                both = p["sheet"] - p["line"] + 28 + p["gap"] + other_span
+                if both <= p["vh"] + 0.5:
+                    failures.append(f"{where}: More shows, but both groups fit ({both:.0f} px of {p['vh']} px)")
+            if abs(q["sheet"] - p["sheet"]) > 0.5:
+                failures.append(f"{where}: More moved the sheet ({p['sheet']:.0f} -> {q['sheet']:.0f} px tall)")
+            if out_dir:
+                page.screenshot(path=os.path.join(out_dir, f"{size[0]}x{size[1]}-simple-vibe-picker-more.png"))
+            page.click("#vibe-more")
+            _settle(page)
+            if [g["name"] for g in page.evaluate(PICKER_READ)["groups"]] != ["top"]:
+                failures.append(f"{where}: More did not swap the top vibes back")
+        elif names != ["top", "other"]:
+            failures.append(f"{where}: groups {names}, expected the top vibes, then the others")
+        elif not p["groups"][0]["top"] < p["groups"][1]["top"]:
+            failures.append(f"{where}: the top group is not above the others")
+        got = [t["id"] for _l, q in views for g in q["groups"] for t in g["tiles"]]
+        if got != top + others:
+            failures.append(f"{where}: tiles {got}, expected the top vibes {top} then the others {others}")
+        for label, q in views:
+            for b in q["bad"]:
+                failures.append(f"{where}{label}: {b}")
+            for g in q["groups"]:
+                if g["cols"] != 2:
+                    failures.append(f"{where}{label}: the {g['name']} group in {g['cols']} columns, expected two")
+            if not q["surprise"]:
+                failures.append(f"{where}{label}: no Surprise me")
+        if out_dir:
+            page.screenshot(path=os.path.join(out_dir, f"{size[0]}x{size[1]}-simple-vibe-picker.png"))
+        n += len(views)
+        page.keyboard.press("Escape")
+        if not _wait(page, "!document.querySelector('.vpick')", 2.0):
+            failures.append(f"{where}: Escape did not close the picker")
+    page.set_viewport_size({"width": 390, "height": 844})
+    time.sleep(0.2)
+    print(f"vibe picker: {n} screens at {', '.join(f'{w} x {h}' for w, h in PICKER_SIZES)}; top group first, no scroll, tiles 48 px")
+    return n
 
 
 def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
@@ -1384,7 +1524,9 @@ def main() -> int:
             sample_play(page, failures, "first tap after load", True)
             page.click('[data-strip="1"]')  # Groove: every instrument on
             time.sleep(2.5)
-            n = walk_frame(page, failures, out)
+            # F1: the vibe picker at the four sizes of its Done-when line.
+            n = walk_picker(page, failures, out)
+            n += walk_frame(page, failures, out)
             n += walk_live(page, failures, out)
             # P10d: with Ambient (Morph on) playing, every tap during a morph.
             walk_play_button(page, failures, "Ambient, Morph on")

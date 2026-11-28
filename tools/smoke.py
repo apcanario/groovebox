@@ -55,7 +55,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import SMALL, sample_play, simple_words, walk_fingers, walk_frame, walk_play_button, walk_punch, walk_tablet  # noqa: E402
+from shots import SMALL, sample_play, simple_words, walk_fingers, walk_frame, walk_picker, walk_play_button, walk_punch, walk_tablet  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 from basscheck import walk_bass_run  # noqa: E402
@@ -3260,7 +3260,71 @@ def walk_rotate(page, failures: list) -> None:
     print(f"rotation: {len(ROTATE_SIZES)} sizes in both modes while playing, level floor {floor:.1f} dB, transport running")
 
 
+def walk_cold_start(browser, failures: list) -> None:
+    """F1 (spec 10.1), a cold start in a fresh browser context (no storage, no bag, no songs): the app opens on the
+    Play tab with a top vibe loaded and no picker, nothing sounding and nothing in Songs; one tap on Play starts the
+    transport and sound comes out (the master over the smoke's -60 dB silence line, attacks started), and the jam,
+    now played, is the one song in Songs."""
+    E = "window.__groovebox"
+    ctx = browser.new_context(viewport={"width": 390, "height": 844})
+    page = ctx.new_page()
+    errors: list = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    try:
+        page.goto(f"http://localhost:{PORT}/index.html")
+        if not wait_for(page, "!!window.__groovebox && !!document.querySelector('.shell')", 8.0):
+            failures.append("cold start: the app did not open")
+            return
+        time.sleep(0.3)
+        tab = page.evaluate("document.querySelector('.tabs .tab.on')?.dataset.tab")
+        if tab != "play":
+            failures.append(f"cold start: opened on the {tab} tab, not Play")
+        if page.locator(".vpick, .vibes").count():
+            failures.append("cold start: a picker shows before the Play tab")
+        top = page.evaluate("window.__vibes.filter((v) => v.top).map((v) => v.id)")
+        style = page.evaluate(f"{E}.getSong().style")
+        if style not in top:
+            failures.append(f"cold start: the launch jam is {style!r}, not a top vibe")
+        if not page.evaluate("window.__keeper.launch"):
+            failures.append("cold start: the open song is not the launch jam")
+        if page.evaluate(f"{E}.playing"):
+            failures.append("cold start: playing before Play")
+        songs = page.evaluate("window.__keeper.list().then(l => l.map(e => e.name))")
+        if songs:
+            failures.append(f"cold start: Songs holds {songs} before anything was played or edited")
+        before = page.evaluate(f"{E}.attacks()")
+        quiet = read_level(page, 1.0, 0.2)
+        if quiet > -60:
+            failures.append(f"cold start: sound before Play ({quiet:.1f} dB)")
+        # One tap, the only one.
+        page.click("#play")
+        if not wait_for(page, f"{E}.playing", 3.0):
+            failures.append("cold start: one tap on Play did not start the transport")
+            return
+        level = read_level(page, 3.0, 0.3)
+        hits = page.evaluate(f"{E}.attacks()") - before
+        print(f"cold start: Play tab, {style} at {page.evaluate(f'{E}.bpm')} bpm in {page.evaluate(f'{E}.getSong().key')}; "
+              f"one tap on Play: {level:.1f} dB, {hits} attacks")
+        if level < -60:
+            failures.append(f"cold start: one tap on Play made no sound ({level:.1f} dB)")
+        if hits <= 0:
+            failures.append("cold start: one tap on Play started no notes")
+        if page.evaluate(f"{E}.getSong().style") != style:
+            failures.append("cold start: Play changed the launch jam")
+        if not wait_for(page, "window.__keeper.list().then(l => l.length === 1 && !!window.__keeper.id && l[0].id === window.__keeper.id"
+                              " && !window.__keeper.launch)", 3.0):
+            failures.append(f"cold start: the played launch jam is not the one song in Songs: "
+                            f"{page.evaluate('window.__keeper.list().then(l => l.map(e => e.name))')}")
+        page.click("#play")
+    finally:
+        for e in errors:
+            failures.append(f"cold start: page error: {e}")
+        ctx.close()
+
+
 def part_core(browser, page, failures: list, shot) -> None:
+    # F1 (spec 10.1): a cold start opens on the Play tab with a top vibe, and one tap on Play sounds.
+    walk_cold_start(browser, failures)
     # Sound and switching, then the screens, as one span of the single run (its walks build on one another's state):
     # the C4 and P5 layer levels, the Now view, the P1b look, P2's modes, a section and three toggles landing on the
     # bar, the master level and peak, every layer soloed; then in Advanced the G2 shell, G3 and G4 controls, P6's lead
@@ -3365,6 +3429,8 @@ def part_core(browser, page, failures: list, shot) -> None:
         failures.append("New jam is disabled while playing (P3 enables it: a vibe loads as a new song)")
     n = walk_frame(page, failures)
     print(f"frame walk: {n} screens at 360 x 640 and 412 x 915, both modes")
+    # F1 (spec 10.1): the vibe picker at 360 x 640, 412 x 915, 800 x 1280 and 1280 x 800 (tools/shots.py).
+    walk_picker(page, failures)
     page.click('[data-appmode="advanced"]')
     narrow_pass(page, failures)
     if not page.evaluate("window.__groovebox.playing"):
