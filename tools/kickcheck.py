@@ -10,9 +10,13 @@
                                                       45 to 60 Hz where an octave of the root falls there
     python3 tools/kickcheck.py dist axes              Punch 0 against 1 changes the first 30 ms; Length (the Decay
                                                       dial) 0 against 1 changes the tail
+    python3 tools/kickcheck.py dist sweep             the quadrant acts at once and never clicks: Punch, Length, Click, Tune and
+                                                      Root each swept through the UI while the kick plays (check_sweep)
     python3 tools/kickcheck.py dist peak              the master under dropcheck.PEAK_DBFS through a drop with Pump at
                                                       full and the loudest kick (Punch 1, Click 1, Root on)
-    python3 tools/kickcheck.py dist all               tune, axes, others and peak
+    python3 tools/kickcheck.py dist all               tune, axes, sweep, others and peak
+
+The smoke runs them: tune, axes, sweep and others in its kick part, peak in drop-1 (Deep house's drop group).
 
 What is measured: the kick's own sound, at its voice gain (after the drive and the C1 trim, before the drum channel),
 read on the audio thread in blocks of BLOCK samples (the largest sample of each block). Every kick the sequencer starts
@@ -219,8 +223,7 @@ def cents_to_class(hz: float, key: str) -> float:
     return c - 1200 * round(c / 1200)
 
 
-def check_tune(app: App) -> list:
-    page = app.page
+def check_tune(page) -> list:
     failures = []
     for key in TUNE_KEYS:
         kick_song(page, key)
@@ -240,9 +243,8 @@ def check_tune(app: App) -> list:
     return failures
 
 
-def check_axes(app: App) -> list:
+def check_axes(page) -> list:
     import numpy as np
-    page = app.page
     failures = []
     kick_song(page)
     play(page)
@@ -272,9 +274,8 @@ def check_axes(app: App) -> list:
     return failures
 
 
-def check_peak(app: App) -> list:
+def check_peak(page) -> list:
     """Pump at full, the loudest kick, a drop: the master stays under PEAK_DBFS (dropcheck.judge reads it)."""
-    page = app.page
     failures = []
     v = next(x for x in page.evaluate("window.__vibes") if x["id"] == "deepHouse")
     page.evaluate(f"(v) => {E}.loadAtBar(window.__vibeSong(v.id), v.start)", v)
@@ -294,6 +295,216 @@ def check_peak(app: App) -> list:
     return failures
 
 
+# ---- The quadrant acts at once and never clicks: each axis swept while the kick plays ----------------------------
+
+# The capture of RAW_READ split in two, so the UI can be used while it runs: RAW_START wraps the drums' trigger (every
+# kick the sequencer starts from then on is logged) and starts the samples; RAW_STOP returns them with the hits.
+RAW_START = """async () => {
+  const e = window.__groovebox, d = e.graph.instruments.drums, ctx = d.channel.input.context, raw = ctx.rawContext;
+  const code = `registerProcessor('kick-raw', class extends AudioWorkletProcessor {
+    constructor() { super(); this.on = false; this.x = []; this.t0 = null;
+      this.port.onmessage = (m) => { if (m.data === 'go') { this.on = true; this.x = []; this.t0 = null; }
+        else { this.on = false; this.port.postMessage({ t0: this.t0, x: this.x }); } }; }
+    process(ins) {
+      if (!this.on) return true;
+      const a = ins[0][0];
+      if (this.t0 === null) this.t0 = currentFrame / sampleRate;
+      for (let i = 0; i < 128; i++) this.x.push(a ? a[i] : 0);
+      return true;
+    }
+  });`;
+  if (!raw.__kickRaw) {
+    const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+    raw.__kickRaw = raw.audioWorklet.addModule(url);
+  }
+  await raw.__kickRaw;
+  const node = ctx.createAudioWorkletNode('kick-raw', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
+  const hits = [], orig = d.trigger;
+  d.trigger = function (voice, time, vel, bpm, gap) {
+    if (voice === 'kick') hits.push(time);
+    return orig.call(this, voice, time, vel, bpm, gap);
+  };
+  d.gains.kick.connect(node);
+  node.port.postMessage('go');
+  window.__kickCap = { node, hits, orig, d };
+  return ctx.currentTime;
+}"""
+RAW_STOP = """async () => {
+  const c = window.__kickCap, ctx = c.d.channel.input.context;
+  const data = await new Promise((res) => { c.node.port.onmessage = (m) => res(m.data); c.node.port.postMessage('stop'); });
+  c.d.trigger = c.orig;
+  c.d.gains.kick.disconnect(c.node);
+  window.__kickCap = null;
+  return { t0: data.t0, x: data.x, sr: ctx.sampleRate, hits: c.hits, beat: 60 / window.__groovebox.bpm };
+}"""
+NOW = "window.__groovebox.graph.instruments.drums.channel.input.context.currentTime"
+
+# What is judged, on the kick's own samples (its voice gain, before the drum channel and Pump):
+#  - a step: the largest sample-to-sample jump over the peak of the hit it sits in, from STILL_SKIP_S after each logged
+#    hit (past the sweep and the click) to the next. While an axis is swept it may not pass dropcheck.CLICK_FACTOR
+#    times the same figure over the still stretches before and after the sweep (one end of the axis, then the other).
+#  - a retrigger: the rise of the kick's envelope (the largest sample over the last STILL_ENV_S, longer than a period
+#    of the lowest body, 35 Hz) over STILL_HOP_S, over the hit's peak, from STILL_RISE_SKIP_S after each logged hit: a
+#    sounding kick only falls. While swept it may pass neither CLICK_FACTOR times the still figure nor STILL_RISE.
+#  - every kick the sequencer starts sits a beat after the one before (Four floor), within STILL_GRID_S: a move that
+#    starts a kick of its own fails.
+#  - acts at once: when the finger lifts, the engine already holds the axis's end (the next hit's shape, or the drum
+#    patch's Length), and the next kick plays it.
+STILL_SKIP_S = 0.050
+STILL_ENV_S = 0.030
+STILL_HOP_S = 0.005
+STILL_RISE_SKIP_S = 0.035
+STILL_RISE = 0.10
+STILL_GRID_S = 0.002
+SWEEP_S = 2.4
+SWEEP_STEPS = 48
+HOLD_S = 1.3
+
+
+def still_figures(x, sr: float, t0: float, hits: list, lo: float, hi: float, inside: bool) -> tuple:
+    """(largest jump, largest envelope rise), each over its hit's peak, over the samples whose time is in [lo, hi)
+    (inside) or outside it (not inside), from the first logged hit on."""
+    import numpy as np
+    n = len(x)
+    t = t0 + np.arange(n) / sr
+    hs = sorted(h for h in hits if t0 <= h < t0 + n / sr)
+    if len(hs) < 2:
+        return float("nan"), float("nan")
+    a = np.abs(x)
+    peak = np.zeros(n)
+    skip = np.ones(n, dtype=bool)
+    rskip = np.ones(n, dtype=bool)
+    bounds = hs + [t0 + n / sr]
+    for h, nx in zip(bounds, bounds[1:]):
+        i, j = int(round((h - t0) * sr)), int(round((nx - t0) * sr))
+        i0 = max(0, i - int(0.002 * sr))
+        peak[i0:j] = a[i0:j].max() if j > i0 else 0
+        skip[i0:min(j, i + int(STILL_SKIP_S * sr))] = True
+        skip[i + int(STILL_SKIP_S * sr):j] = False
+        rskip[i + int(STILL_RISE_SKIP_S * sr):j] = False
+    sel = (t >= lo) & (t < hi)
+    if not inside:
+        sel = ~sel
+    first = int(round((hs[0] - t0) * sr))
+    sel[:first] = False
+    ok = peak > 1e-4
+    jumps = np.zeros(n)
+    jumps[1:] = np.abs(np.diff(x))
+    m = sel & ~skip & ok
+    jump = float((jumps[m] / peak[m]).max()) if m.any() else 0.0
+    w, hop = int(STILL_ENV_S * sr), int(STILL_HOP_S * sr)
+    from numpy.lib.stride_tricks import sliding_window_view
+    env = np.zeros(n)
+    env[w - 1:] = sliding_window_view(a, w).max(axis=1)
+    rise = np.zeros(n)
+    rise[hop:] = env[hop:] - env[:-hop]
+    m = sel & ~rskip & ok
+    m[:w + hop] = False
+    up = float((rise[m] / peak[m]).max()) if m.any() else 0.0
+    return jump, max(up, 0.0)
+
+
+def slow_drag(page, sel: str, frm: tuple, to: tuple, seconds: float = SWEEP_S, steps: int = SWEEP_STEPS) -> None:
+    """Press at `frm` (fractions of the element's box, or pixels from its middle for a dial when `px`), move to `to` in
+    `steps` moves spread over `seconds`, release."""
+    box = page.locator(sel).bounding_box()
+    pt = lambda f: (box["x"] + f[0] * box["width"], box["y"] + f[1] * box["height"])
+    x0, y0 = pt(frm)
+    x1, y1 = pt(to)
+    page.mouse.move(x0, y0)
+    page.mouse.down()
+    for i in range(1, steps + 1):
+        page.mouse.move(x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps)
+        time.sleep(seconds / steps)
+    page.mouse.up()
+
+
+def taps(page, sel: str, n: int, seconds: float = SWEEP_S) -> None:
+    for _ in range(n):
+        page.click(sel)
+        time.sleep(seconds / n)
+
+
+# Each axis: its name, how the UI sweeps it, and what the engine must hold once the finger lifts. A dial is pressed in
+# its middle and dragged 1.5 drag spans (DRAG_SPAN_PX, 220 px) up, so it reaches its top from anywhere.
+DIAL_UP = ((0.5, 0.5), (0.5, -2.8))
+SWEEPS = [
+    ("Punch", "simple", None, {"kickPunch": 0.0}, lambda p: slow_drag(p, '[data-xy="kick"]', (0.5, 0.98), (0.5, 0.02)),
+     "s => s.settings.kickPunch > 0.95 && s.next.sweepRatio > 6.9"),
+    ("Length", "simple", None, {"kickDecay": 0.0}, lambda p: slow_drag(p, '[data-xy="kick"]', (0.02, 0.5), (0.98, 0.5)),
+     None),
+    ("Click", "advanced", "drums:kick", {"kickClick": 0.0}, lambda p: slow_drag(p, '[data-dial="drums:kickClick"]', *DIAL_UP),
+     "s => s.settings.kickClick > 0.95 && s.next.clickGain > 0"),
+    ("Tune", "advanced", "drums:kick", {"kickRoot": 0, "pitch": 0.0}, lambda p: slow_drag(p, '[data-dial="drums:pitch"]', *DIAL_UP),
+     "s => s.settings.kickRoot < 0.5 && s.next.bodyHz > 79"),
+    ("Root", "advanced", "drums:kick", {"kickRoot": 0, "pitch": 1.0}, lambda p: taps(p, '[data-kickroot="drums"]', 11),
+     "s => s.settings.kickRoot >= 0.5 && Math.abs(s.next.bodyHz - 55) < 0.01"),
+]
+
+
+def check_sweep(page) -> list:
+    """F2 Done-when: the quadrant acts at once and never clicks. Deep house in A, Four floor, Morph off: each axis
+    (Punch and Length on the Simple Drums quadrant; Click, Tune with Root off, and the Root switch on the Advanced Kick
+    page) swept from one end to the other through the UI while the kick plays, its samples captured throughout."""
+    from dropcheck import CLICK_FACTOR
+    page.set_viewport_size({"width": 390, "height": 844})
+    failures = []
+    kick_song(page, "A")
+    play(page)
+    for name, mode, chip, start, sweep, held in SWEEPS:
+        page.click(f'[data-appmode="{mode}"]')
+        page.click('[data-tab="drums"]')
+        if chip:
+            page.click(f'[data-page="{chip}"]')
+        page.evaluate(f"(v) => {E}.setParams('drums', v)", start)
+        time.sleep(0.3)
+        page.evaluate(RAW_START)
+        time.sleep(HOLD_S)
+        lo = page.evaluate(NOW)
+        before = page.evaluate(f"{E}.kickState()")
+        decay0 = page.evaluate(f"{E}.getSong().patches.drums.kickDecay")
+        sweep(page)
+        hi = page.evaluate(NOW)
+        # Acts at once: the engine holds the end the moment the finger lifts, well before the next kick.
+        now = page.evaluate(f"{E}.kickState()")
+        decay1 = page.evaluate(f"{E}.getSong().patches.drums.kickDecay")
+        if held and not page.evaluate(f"(s) => ({held})(s)", now):
+            failures.append(f"sweep: {name}: when the finger lifts the kick does not hold the axis's end ({now['settings']}, next {now['next']})")
+        if name == "Length" and not (decay0 < 0.05 and decay1 > 0.95):
+            failures.append(f"sweep: Length: the drum patch's Length moved {decay0:.2f} -> {decay1:.2f}, not end to end")
+        if name != "Length" and now["next"] == before["next"]:
+            failures.append(f"sweep: {name}: the next kick's shape did not move ({now['next']})")
+        time.sleep(HOLD_S + 0.6)
+        last = page.evaluate(f"{E}.kickState()")
+        if last["last"] != now["next"]:
+            failures.append(f"sweep: {name}: the next kick played {last['last']}, not what the engine held when the finger lifted ({now['next']})")
+        r = page.evaluate(RAW_STOP)
+        import numpy as np
+        x, sr, t0, hits, beat = np.asarray(r["x"], dtype=float), r["sr"], r["t0"], r["hits"], r["beat"]
+        # The sounding kicks the sweep can step: from the hit before the sweep began to half a second after it.
+        sj, sr_ = still_figures(x, sr, t0, hits, lo - beat, hi + 0.5, True)
+        rj, rr = still_figures(x, sr, t0, hits, lo - beat, hi + 0.5, False)
+        print(f"sweep: {name}: jump {sj:.4f} of the hit's peak (still {rj:.4f}: {sj / max(rj, 1e-9):.2f} times), "
+              f"envelope rise {sr_:.3f} (still {rr:.3f}); {len(hits)} kicks", flush=True)
+        if not (rj > 0 and sj == sj):
+            failures.append(f"sweep: {name}: no kicks measured ({len(hits)} logged)")
+        elif sj > CLICK_FACTOR * rj:
+            failures.append(f"sweep: {name}: a step in a sounding kick (jump {sj:.4f} of its peak, {sj / rj:.1f} times the still kick's, over {CLICK_FACTOR})")
+        if sr_ > max(STILL_RISE, CLICK_FACTOR * rr):
+            failures.append(f"sweep: {name}: a sounding kick rose by {sr_:.2f} of its peak (a retrigger; over {max(STILL_RISE, CLICK_FACTOR * rr):.2f})")
+        hs = sorted(hits)
+        off = [b - a for a, b in zip(hs, hs[1:]) if abs((b - a) - beat) > STILL_GRID_S]
+        if off:
+            failures.append(f"sweep: {name}: kicks {', '.join(f'{g * 1000:.0f} ms' for g in off)} apart, not a beat ({beat * 1000:.0f} ms): a move started one")
+        if len(hs) < int((hi - lo + 2 * HOLD_S) / beat) - 1:
+            failures.append(f"sweep: {name}: {len(hs)} kicks while the kick played, too few")
+    page.click('[data-appmode="simple"]')
+    page.click('[data-tab="play"]')
+    page.click("#play")
+    wait_for(page, f"!{E}.playing", 3.0)
+    return failures
+
+
 def load_vibe(page, vid: str) -> None:
     song = page.evaluate(f"window.__vibeSong({vid!r})")
     song["morph"] = {**(song.get("morph") or {}), "on": False}
@@ -307,8 +518,7 @@ def other_vibes(page) -> list:
     return [v["id"] for v in page.evaluate("window.__vibes") if not v["top"]]
 
 
-def others(app: App) -> dict:
-    page = app.page
+def others(page) -> dict:
     out = {}
     for vid in other_vibes(page):
         load_vibe(page, vid)
@@ -324,10 +534,10 @@ def others(app: App) -> dict:
     return out
 
 
-def check_others(app: App) -> list:
+def check_others(page) -> list:
     with open(FIXTURE) as fh:
         fx = json.load(fh)
-    now = others(app)
+    now = others(page)
     failures = []
     for vid, was in fx["vibes"].items():
         m = now.get(vid)
@@ -348,7 +558,7 @@ def check_others(app: App) -> list:
 
 
 def main() -> int:
-    modes = ("record", "others", "tune", "axes", "peak", "all")
+    modes = ("record", "others", "tune", "axes", "sweep", "peak", "all")
     if len(sys.argv) < 3 or sys.argv[2] not in modes:
         print(__doc__)
         return 2
@@ -356,7 +566,7 @@ def main() -> int:
     t0 = time.time()
     with App(root) as app:
         if what == "record":
-            out = others(app)
+            out = others(app.page)
             with open(FIXTURE, "w") as fh:
                 json.dump({"recorded_from": sys.argv[3] if len(sys.argv) > 3 else root, "bars": BARS, "block": BLOCK,
                            "length_db": LENGTH_DB, "vibes": out}, fh, indent=1)
@@ -365,9 +575,10 @@ def main() -> int:
             print(f"wrote {FIXTURE}")
         else:
             failures = []
-            for m in ("tune", "axes", "others", "peak"):
+            for m in ("tune", "axes", "sweep", "others", "peak"):
                 if what in (m, "all"):
-                    failures += {"tune": check_tune, "axes": check_axes, "others": check_others, "peak": check_peak}[m](app)
+                    failures += {"tune": check_tune, "axes": check_axes, "sweep": check_sweep, "others": check_others,
+                                 "peak": check_peak}[m](app.page)
         failures += [f"page error: {e}" for e in app.errors]
     print(f"{what}: {(time.time() - t0) / 60:.1f} min")
     if failures:
