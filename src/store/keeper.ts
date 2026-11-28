@@ -63,14 +63,15 @@ export class Keeper {
   openLaunch(doc: Song, section: number): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    this.launch = true;
+    // Loading counts as a change: the flag is set only once it has landed, so the load itself keeps nothing.
+    this.launch = false;
     this.scratch = false;
     this.queuedId = null;
     this.id = "";
     this.engine.loadSong(doc, section);
-    // Loading counts as a change; nothing is saved for it.
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.launch = true;
     this.savedLog = this.engine.getLog();
     this.emit();
   }

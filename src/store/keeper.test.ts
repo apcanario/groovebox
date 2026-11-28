@@ -195,6 +195,12 @@ describe("Keeper: the launch jam (F1, spec 10.1)", () => {
     })());
     const old = await lib.create({ ...vibeSong("loFi")!, name: "Old jam" });
     const engine = new FakeEngine();
+    // As the engine does: loading a song tells the change listeners.
+    const load = engine.loadSong.bind(engine);
+    engine.loadSong = (s: Song) => {
+      load(s);
+      for (const fn of engine.changeFns) fn();
+    };
     const keeper = new Keeper(engine as unknown as Engine, lib, old, true);
     keeper.listen();
     const draw = drawLaunch(1234, null)!;
