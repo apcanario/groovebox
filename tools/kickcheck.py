@@ -373,14 +373,52 @@ STILL_GRID_S = 0.002
 # peak a sample at 44.1 kHz, and the kick measures 0.004 to 0.007. The click's stereo noise, while it restarted the drive's
 # oversampler, put a step of 0.07 to 0.22 into every hit (fixed in slice c): a click of the kick itself, moved or not.
 STILL_JUMP_MAX = 0.02
+# A hit's onset in the audio: its first sample over this fraction of its peak. A kick whose onset comes more than
+# ONSET_LATE_S after its logged time reached the audio clock late (a main-thread stall, not the kick voice): unloaded,
+# onsets sit 0.3 to 2.7 ms after the logged time. The axis's capture is then taken again once (said in the output); a
+# kick late in the second capture too fails as late.
+ONSET_FRACTION = 0.3
+ONSET_LATE_S = 0.003
+SWEEP_TRIES = 2
 SWEEP_S = 2.4
 SWEEP_STEPS = 48
 HOLD_S = 1.3
 
 
+def find_onsets(x, sr: float, t0: float, hits: list) -> list:
+    """(logged time, onset time) of each logged hit in the capture: the onset is the first sample over ONSET_FRACTION of
+    the hit's peak, looked for from 2 ms before its logged time up to the next logged hit."""
+    import numpy as np
+    n = len(x)
+    a = np.abs(x)
+    hs = sorted(h for h in hits if t0 <= h < t0 + n / sr)
+    ends = hs[1:] + [t0 + n / sr]
+    out = []
+    for h, nx in zip(hs, ends):
+        i0, j = max(0, int(round((h - t0) * sr)) - int(0.002 * sr)), min(n, int(round((nx - t0) * sr)))
+        if j <= i0:
+            continue
+        pk = a[i0:j].max()
+        if pk <= 1e-6:
+            continue
+        k = int(np.flatnonzero(a[i0:j] > ONSET_FRACTION * pk)[0])
+        if os.environ.get("KICK_DEBUG") and k / sr - 0.002 > ONSET_LATE_S:
+            q = int(0.001 * sr)
+            print("   late onset: |x| over the peak per ms from 2 ms before the logged time: "
+                  + " ".join(f"{a[i0 + m * q:i0 + (m + 1) * q].max() / pk:.2f}" for m in range(min(14, (j - i0) // q))), flush=True)
+        out.append((h, t0 + (i0 + k) / sr))
+    return out
+
+
+def late_onsets(onsets: list) -> list:
+    """(index, ms) of each hit whose onset in the audio came more than ONSET_LATE_S after its logged time."""
+    return [(k + 1, (o - h) * 1000) for k, (h, o) in enumerate(onsets) if o - h > ONSET_LATE_S]
+
+
 def still_figures(x, sr: float, t0: float, hits: list, lo: float, hi: float, inside: bool) -> tuple:
     """(largest jump, largest envelope rise), each over its hit's peak, over the samples whose time is in [lo, hi)
-    (inside) or outside it (not inside), from the first logged hit on."""
+    (inside) or outside it (not inside), from the first hit on. `hits` are the onsets found in the audio
+    (find_onsets), so the skips past the sweep and click are measured from where each kick really starts."""
     import numpy as np
     n = len(x)
     t = t0 + np.arange(n) / sr
@@ -469,69 +507,100 @@ SWEEPS = [
 ]
 
 
+def sweep_axis(page, name: str, mode: str, chip, start: dict, sweep, held) -> tuple:
+    """One axis swept once: (failures, lateness). lateness lists what says a kick reached the audio clock late:
+    scheduled after its time, or its onset in the audio more than ONSET_LATE_S after its logged time."""
+    import numpy as np
+    from dropcheck import CLICK_FACTOR
+    failures = []
+    page.click(f'[data-appmode="{mode}"]')
+    page.click('[data-tab="drums"]')
+    if chip:
+        page.click(f'[data-page="{chip}"]')
+    page.evaluate(f"(v) => {E}.setParams('drums', v)", start)
+    time.sleep(0.3)
+    page.evaluate(RAW_START)
+    time.sleep(HOLD_S)
+    lo = page.evaluate(NOW)
+    before = page.evaluate(f"{E}.kickState()")
+    decay0 = page.evaluate(f"{E}.getSong().patches.drums.kickDecay")
+    sweep(page)
+    hi = page.evaluate(NOW)
+    # Acts at once: the engine holds the end the moment the finger lifts, well before the next kick.
+    now = page.evaluate(f"{E}.kickState()")
+    decay1 = page.evaluate(f"{E}.getSong().patches.drums.kickDecay")
+    if held and not page.evaluate(f"(s) => ({held})(s)", now):
+        failures.append(f"sweep: {name}: when the finger lifts the kick does not hold the axis's end ({now['settings']}, next {now['next']})")
+    if name == "Length" and not (decay0 < 0.05 and decay1 > 0.95):
+        failures.append(f"sweep: Length: the drum patch's Length moved {decay0:.2f} -> {decay1:.2f}, not end to end")
+    if name != "Length" and now["next"] == before["next"]:
+        failures.append(f"sweep: {name}: the next kick's shape did not move ({now['next']})")
+    time.sleep(HOLD_S + 0.6)
+    last = page.evaluate(f"{E}.kickState()")
+    if last["last"] != now["next"]:
+        failures.append(f"sweep: {name}: the next kick played {last['last']}, not what the engine held when the finger lifted ({now['next']})")
+    r = page.evaluate(RAW_STOP)
+    x, sr, t0, hits, beat = np.asarray(r["x"], dtype=float), r["sr"], r["t0"], r["hits"], r["beat"]
+    ons = find_onsets(x, sr, t0, hits)
+    starts = [o for _, o in ons]
+    # The sounding kicks the sweep can step: from the hit before the sweep began to half a second after it.
+    sj, sr_ = still_figures(x, sr, t0, starts, lo - beat, hi + 0.5, True)
+    rj, rr = still_figures(x, sr, t0, starts, lo - beat, hi + 0.5, False)
+    ahead = min((-v for v in r["late"]), default=float("nan"))
+    print(f"sweep: {name}: jump {sj:.4f} of the hit's peak (still {rj:.4f}: {sj / max(rj, 1e-9):.2f} times), "
+          f"envelope rise {sr_:.3f} (still {rr:.3f}); {len(hits)} kicks, each scheduled {ahead * 1000:.0f} ms ahead or more, "
+          f"onsets {min(((o - h) * 1000 for h, o in ons), default=float('nan')):.1f} to {max(((o - h) * 1000 for h, o in ons), default=float('nan')):.1f} ms after their logged time", flush=True)
+    lateness = [f"kick {k} started {ms:.0f} ms late (main thread)" for k, ms in late_onsets(ons)]
+    # A kick the sequencer hands over after its time (ctx.currentTime trails the render, so this misses some: the
+    # onsets above catch the rest).
+    if ahead < 0:
+        lateness.append(f"a kick was scheduled {-ahead * 1000:.0f} ms after its time (the main thread stalled while it moved)")
+    if not (rj > 0 and sj == sj):
+        failures.append(f"sweep: {name}: no kicks measured ({len(hits)} logged)")
+    else:
+        if rj > STILL_JUMP_MAX:
+            failures.append(f"sweep: {name}: a step in the still kick (jump {rj:.4f} of its peak, over {STILL_JUMP_MAX}): it clicks unmoved")
+        elif sj > CLICK_FACTOR * rj:
+            failures.append(f"sweep: {name}: a step in a sounding kick (jump {sj:.4f} of its peak, {sj / rj:.1f} times the still kick's, over {CLICK_FACTOR})")
+        # The still kick only falls: a rise there is a retrigger of the kick itself, moved or not, and judged on its own
+        # so that it cannot raise the swept stretch's bar.
+        if rr > STILL_RISE:
+            failures.append(f"sweep: {name}: the still kick rose by {rr:.2f} of its peak (over {STILL_RISE}): it retriggers unmoved")
+        elif sr_ > max(STILL_RISE, CLICK_FACTOR * rr):
+            failures.append(f"sweep: {name}: a sounding kick rose by {sr_:.2f} of its peak (a retrigger; over {max(STILL_RISE, CLICK_FACTOR * rr):.2f})")
+    hs = sorted(hits)
+    off = [b - a for a, b in zip(hs, hs[1:]) if abs((b - a) - beat) > STILL_GRID_S]
+    if off:
+        failures.append(f"sweep: {name}: kicks {', '.join(f'{g * 1000:.0f} ms' for g in off)} apart, not a beat ({beat * 1000:.0f} ms): a move started one")
+    if len(hs) < int((hi - lo + 2 * HOLD_S) / beat) - 1:
+        failures.append(f"sweep: {name}: {len(hs)} kicks while the kick played, too few")
+    return failures, lateness
+
+
 def check_sweep(page) -> list:
     """F2 Done-when: the quadrant acts at once and never clicks. Deep house in A, Four floor, Morph off: each axis
     (Punch and Length on the Simple Drums quadrant; Click, Tune with Root off, and the Root switch on the Advanced Kick
-    page) swept from one end to the other through the UI while the kick plays, its samples captured throughout."""
-    from dropcheck import CLICK_FACTOR
+    page) swept from one end to the other through the UI while the kick plays, its samples captured throughout.
+
+    Steps and rises are measured from each kick's onset as found in the audio, not from its logged time. A kick that
+    reached the audio clock late (a main-thread stall: another browser or a busy machine) makes the axis's capture be
+    taken again, once, and said; late again, it fails as late. The sweep needs a quiet machine: the smoke runs one part
+    at a time with no other browser."""
     page.set_viewport_size({"width": 390, "height": 844})
     failures = []
     kick_song(page, "A")
     play(page)
-    for name, mode, chip, start, sweep, held in SWEEPS:
-        page.click(f'[data-appmode="{mode}"]')
-        page.click('[data-tab="drums"]')
-        if chip:
-            page.click(f'[data-page="{chip}"]')
-        page.evaluate(f"(v) => {E}.setParams('drums', v)", start)
-        time.sleep(0.3)
-        page.evaluate(RAW_START)
-        time.sleep(HOLD_S)
-        lo = page.evaluate(NOW)
-        before = page.evaluate(f"{E}.kickState()")
-        decay0 = page.evaluate(f"{E}.getSong().patches.drums.kickDecay")
-        sweep(page)
-        hi = page.evaluate(NOW)
-        # Acts at once: the engine holds the end the moment the finger lifts, well before the next kick.
-        now = page.evaluate(f"{E}.kickState()")
-        decay1 = page.evaluate(f"{E}.getSong().patches.drums.kickDecay")
-        if held and not page.evaluate(f"(s) => ({held})(s)", now):
-            failures.append(f"sweep: {name}: when the finger lifts the kick does not hold the axis's end ({now['settings']}, next {now['next']})")
-        if name == "Length" and not (decay0 < 0.05 and decay1 > 0.95):
-            failures.append(f"sweep: Length: the drum patch's Length moved {decay0:.2f} -> {decay1:.2f}, not end to end")
-        if name != "Length" and now["next"] == before["next"]:
-            failures.append(f"sweep: {name}: the next kick's shape did not move ({now['next']})")
-        time.sleep(HOLD_S + 0.6)
-        last = page.evaluate(f"{E}.kickState()")
-        if last["last"] != now["next"]:
-            failures.append(f"sweep: {name}: the next kick played {last['last']}, not what the engine held when the finger lifted ({now['next']})")
-        r = page.evaluate(RAW_STOP)
-        import numpy as np
-        x, sr, t0, hits, beat = np.asarray(r["x"], dtype=float), r["sr"], r["t0"], r["hits"], r["beat"]
-        # The sounding kicks the sweep can step: from the hit before the sweep began to half a second after it.
-        sj, sr_ = still_figures(x, sr, t0, hits, lo - beat, hi + 0.5, True)
-        rj, rr = still_figures(x, sr, t0, hits, lo - beat, hi + 0.5, False)
-        ahead = min((-v for v in r["late"]), default=float("nan"))
-        print(f"sweep: {name}: jump {sj:.4f} of the hit's peak (still {rj:.4f}: {sj / max(rj, 1e-9):.2f} times), "
-              f"envelope rise {sr_:.3f} (still {rr:.3f}); {len(hits)} kicks, each scheduled {ahead * 1000:.0f} ms ahead or more", flush=True)
-        # A kick the sequencer hands over after its time starts late, past where its onset is looked for: said apart,
-        # since a step found then may be that kick's own start (the main thread stalled while the axis moved).
-        if ahead < 0:
-            failures.append(f"sweep: {name}: a kick was scheduled {-ahead * 1000:.0f} ms after its time (the main thread stalled while it moved)")
-        if not (rj > 0 and sj == sj):
-            failures.append(f"sweep: {name}: no kicks measured ({len(hits)} logged)")
-        elif rj > STILL_JUMP_MAX:
-            failures.append(f"sweep: {name}: a step in the still kick (jump {rj:.4f} of its peak, over {STILL_JUMP_MAX}): it clicks unmoved")
-        elif sj > CLICK_FACTOR * rj:
-            failures.append(f"sweep: {name}: a step in a sounding kick (jump {sj:.4f} of its peak, {sj / rj:.1f} times the still kick's, over {CLICK_FACTOR})")
-        if sr_ > max(STILL_RISE, CLICK_FACTOR * rr):
-            failures.append(f"sweep: {name}: a sounding kick rose by {sr_:.2f} of its peak (a retrigger; over {max(STILL_RISE, CLICK_FACTOR * rr):.2f})")
-        hs = sorted(hits)
-        off = [b - a for a, b in zip(hs, hs[1:]) if abs((b - a) - beat) > STILL_GRID_S]
-        if off:
-            failures.append(f"sweep: {name}: kicks {', '.join(f'{g * 1000:.0f} ms' for g in off)} apart, not a beat ({beat * 1000:.0f} ms): a move started one")
-        if len(hs) < int((hi - lo + 2 * HOLD_S) / beat) - 1:
-            failures.append(f"sweep: {name}: {len(hs)} kicks while the kick played, too few")
+    for axis in SWEEPS:
+        name = axis[0]
+        for attempt in range(1, SWEEP_TRIES + 1):
+            got, lateness = sweep_axis(page, *axis)
+            if not lateness:
+                failures += got
+                break
+            if attempt < SWEEP_TRIES:
+                print(f"sweep: {name}: {'; '.join(lateness)}: capture taken again (try {attempt + 1} of {SWEEP_TRIES})", flush=True)
+                continue
+            failures += [f"sweep: {name}: {msg}, in {SWEEP_TRIES} captures" for msg in lateness] + got
     page.click('[data-appmode="simple"]')
     page.click('[data-tab="play"]')
     page.click("#play")
