@@ -52,7 +52,7 @@ export function RootSwitch({ ctx }: { ctx: Ctx }) {
       role="switch"
       aria-checked={on}
       aria-label={on ? "Root: the kick is tuned to the song's root; tap for Tune" : "Root off: Tune sets the kick; tap to tune it to the song's root"}
-      data-kickroot={on ? "on" : "off"}
+      data-kickroot="drums"
       onClick={() => ctx.engine.setParam("drums", "kickRoot", on ? 0 : 1)}
     >
       <b>Root</b>

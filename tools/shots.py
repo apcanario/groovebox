@@ -161,7 +161,8 @@ SIMPLE_TEXT = r"""() => {
 # T2 review S3: the controls a tab body shows, one key each: the first data attribute that names the control
 # (name=value), else its id. A fader and a Levels dial are the same control (fader=level:x is dial=level:x); a picker
 # paged behind More counts once by its name; the phone's sequencer view (its voice, its view and its eight-step cells)
-# is a view of the sixteen-step grid the whole Drums shows, the drum sound picker sits behind its Sound button, and the
+# is a view of the sixteen-step grid the whole Drums shows, the drum sound picker sits behind its Sound button (F2: and
+# so does the drums' filter pad, whose place at the foot of the whole Drums column the kick quadrant took), and the
 # phone's slot chips (which slot its FX page shows) are the whole panel's two slots.
 CONTROL_KEYS = r"""() => {
   const body = document.querySelector('.shell .inst .body') || document.querySelector('.shell > .body');
@@ -183,7 +184,7 @@ CONTROL_KEYS = r"""() => {
     if (k === 'step16') key = 'drum sequencer';
     // The phone's slot chips choose which effect slot its FX page shows; the whole panel shows both slots' pickers.
     if (k === 'fxslot') key = `fxpick=${el.dataset[k]}`;
-    if (drums && (key === '#drums-sound' || k === 'patch' || key === 'more=patch')) key = 'drum sound';
+    if (drums && (key === '#drums-sound' || k === 'patch' || key === 'more=patch' || key === 'xy=drums')) key = 'drum sound';
     out.add(key);
   }
   return [...out].sort();
