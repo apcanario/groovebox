@@ -131,7 +131,7 @@ def measure(page, block: int = BLOCK, bars: int = BARS) -> dict:
 
 # ---- Raw capture: the kick's own samples ------------------------------------------------------------------------
 
-RAW_READ = """async (seconds) => {
+RAW_READ = """async ([seconds, pre]) => {
   const e = window.__groovebox, d = e.graph.instruments.drums, ctx = d.channel.input.context, raw = ctx.rawContext;
   const code = `registerProcessor('kick-raw', class extends AudioWorkletProcessor {
     constructor() { super(); this.on = false; this.x = []; this.t0 = null;
@@ -157,13 +157,15 @@ RAW_READ = """async (seconds) => {
     if (voice === 'kick') hits.push(time);
     return orig.call(this, voice, time, vel, bpm, gap);
   };
-  d.gains.kick.connect(node);
+  // pre: the body's own sine, before the drive (the voice's private MembraneSynth), for check_tune's second reading.
+  const src = pre ? d.kick.body : d.gains.kick;
+  src.connect(node);
   node.port.postMessage('go');
   const until = ctx.currentTime + seconds;
   while (ctx.currentTime < until) await new Promise((r) => setTimeout(r, 30));
   const data = await new Promise((res) => { node.port.onmessage = (m) => res(m.data); node.port.postMessage('stop'); });
   d.trigger = orig;
-  d.gains.kick.disconnect(node);
+  src.disconnect(node);
   return { t0: data.t0, x: data.x, sr: ctx.sampleRate, hits, shape: e.kickState() };
 }"""
 
@@ -192,11 +194,12 @@ def kick_song(page, key: str = "A") -> None:
     page.evaluate(f"(s) => {E}.loadSong(s, 1)", song)
 
 
-def one_hit(page, settle: float = 0.3) -> tuple:
-    """The samples of one whole kick (the second one heard, from its start to the next) and the shape it played."""
+def one_hit(page, settle: float = 0.3, pre: bool = False) -> tuple:
+    """The samples of one whole kick (the second one heard, from its start to the next) and the shape it played; `pre`
+    reads the body before the drive."""
     import numpy as np
     time.sleep(settle)
-    r = page.evaluate(RAW_READ, 1.6)
+    r = page.evaluate(RAW_READ, [1.6, pre])
     x = np.asarray(r["x"], dtype=float)
     sr, t0 = r["sr"], r["t0"]
     hits = sorted(t for t in r["hits"] if t >= t0)
@@ -245,7 +248,11 @@ def check_tune(page) -> list:
         hz = fundamental(x, sr, SETTLE_S, BODY_S)
         c = cents_to_class(hz, key)
         band = any(45 <= hz * m <= 60 for m in (0.5, 1, 2))
-        print(f"tune: {key}: body {hz:.2f} Hz ({c:+.1f} cents from {key}; the voice set {shape['last']['bodyHz']:.2f} Hz)")
+        # F2 review M3: the body read before the drive as well, printed only, to say where the offset comes from.
+        xp, _, _ = one_hit(page, 0.0, pre=True)
+        hp = fundamental(xp, sr, SETTLE_S, BODY_S)
+        print(f"tune: {key}: body {hz:.2f} Hz ({c:+.1f} cents from {key}; the voice set {shape['last']['bodyHz']:.2f} Hz; "
+              f"before the drive {hp:.2f} Hz, {cents_to_class(hp, key):+.1f} cents)")
         if not abs(c) <= TUNE_CENTS:
             failures.append(f"tune: in {key} the kick's fundamental is {hz:.2f} Hz, {c:+.1f} cents from the root (more than {TUNE_CENTS})")
         if band and not 45 <= hz <= 60:
@@ -495,7 +502,7 @@ def taps(page, sel: str, n: int, seconds: float = SWEEP_S) -> None:
 DIAL_UP = ((0.5, 0.5), (0.5, -2.8))
 SWEEPS = [
     ("Punch", "simple", None, {"kickPunch": 0.0}, lambda p: slow_drag(p, '[data-xy="kick"]', (0.5, 0.98), (0.5, 0.02)),
-     "s => s.settings.kickPunch > 0.95 && s.next.bodyHz * s.next.sweepRatio > 237"),  # Root on: sweepStartHz(1), 237.7 Hz
+     "s => s.settings.kickPunch > 0.95 && s.next.bodyHz * s.next.sweepRatio > 234.9"),  # Root on: sweepStartHz(0.98), as the old 6.9 was sweepRatio(0.98)
     ("Length", "simple", None, {"kickDecay": 0.0}, lambda p: slow_drag(p, '[data-xy="kick"]', (0.02, 0.5), (0.98, 0.5)),
      None),
     ("Click", "advanced", "drums:kick", {"kickClick": 0.0}, lambda p: slow_drag(p, '[data-dial="drums:kickClick"]', *DIAL_UP),

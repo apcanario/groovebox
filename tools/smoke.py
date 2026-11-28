@@ -3649,6 +3649,9 @@ def part_kick(browser, page, failures: list, shot) -> None:
     # F2 (spec 10.5): the kick quadrant on every size and mode (tools/shots.py), then the kick's own sound
     # (tools/kickcheck.py): Root's tuning in three keys and C, Punch's and Length's ends, every axis swept while the
     # kick plays (no step, no retrigger, at once), the ten other vibes against the old voice's fixture.
+    # The sweep needs a quiet machine (F2 review S3): a main-thread stall hands kicks to the audio clock late. Steps are
+    # measured from each kick's onset in the audio; a capture with a late kick is taken again once, and a kick late
+    # in both fails as late, by its own message.
     walk_kick_pad(page, failures)
     failures += check_tune(page)
     failures += check_axes(page)

@@ -7,7 +7,9 @@
  *   at the default Pitch), so the ten other vibes are unchanged. With Root on, Punch sets the start in hertz
  *   (`sweepStartHz`), so the top vibes' Punch values start the sweep in spec 10.5's 150 to 200 Hz in any key.
  * - Body: a sine at `bodyHz`: the song's root in its octave nearest 45 to 60 Hz with Root on, the Pitch dial (Tune) as
- *   built with it off.
+ *   built with it off. F2 review M3: read by its zero crossings, the body sits on the set pitch to 0.1 cent before the
+ *   drive and 9 to 13 cents flat after it (A, G, F# and C; tools/kickcheck.py tune prints both), so the offset is the
+ *   drive's, not Tone's ramp; which part of the drive was not isolated.
  * - Tail: the body's decay, the Length axis: the kick's Decay dial as built (`drumDecay`), so a song that never set
  *   Length keeps the old kick's length.
  *
