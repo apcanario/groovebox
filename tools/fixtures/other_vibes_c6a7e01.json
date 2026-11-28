@@ -1,0 +1,6717 @@
+{
+ "tropicalHouse": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Tropical house",
+   "key": "C",
+   "mood": "major",
+   "bpm": 108,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.15,
+     "delay": 0,
+     "reverb": 0.15,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.45,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 0.8,
+     "hatDecay": 0.5,
+     "openLevel": 0.7,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.2,
+     "sustain": 0.3,
+     "release": 0.08,
+     "cutoff": 0.3,
+     "resonance": 0.25,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.45,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "triangle",
+     "attack": 0.004,
+     "decay": 0.15,
+     "sustain": 0,
+     "release": 0.3,
+     "cutoff": 0.5,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.35,
+     "reverb": 0.3,
+     "level": 0.45,
+     "envAmount": 0.5,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "sine",
+     "attack": 0.02,
+     "decay": 0.2,
+     "sustain": 0.4,
+     "release": 0.2,
+     "cutoff": 0.9,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.45,
+     "reverb": 0.35,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "triangle",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.7,
+     "resonance": 0.05,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.75,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 4,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "tropical"
+     },
+     "bass": {
+      "rhythm": "offbeat"
+     },
+     "synth": {
+      "rhythm": "pluck"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.65,
+       "seed": 914209435,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "arch",
+       "range": 0.4,
+       "register": 0.7,
+       "noteLength": 0.45,
+       "slide": 0.25,
+       "accent": 0.2
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 2048840947,
+       "style": "drift",
+       "register": 0.6,
+       "noteLength": 0.75
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 4,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "tropical"
+     },
+     "bass": {
+      "rhythm": "offbeat"
+     },
+     "synth": {
+      "rhythm": "pluck"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.85,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.3,
+       "density": 0.65,
+       "seed": 777897184,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "arch",
+       "range": 0.4,
+       "register": 0.7,
+       "noteLength": 0.45,
+       "slide": 0.25,
+       "accent": 0.2
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 250904028,
+       "style": "drift",
+       "register": 0.6,
+       "noteLength": 0.75
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 4,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "tropical"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.9,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 1248667544,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "arch",
+       "range": 0.4,
+       "register": 0.7,
+       "noteLength": 0.7,
+       "slide": 0.25,
+       "accent": 0.2
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.6,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 1674911278,
+       "style": "drift",
+       "register": 0.6,
+       "noteLength": 0.75
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": false,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 4,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "tropical"
+     },
+     "bass": {
+      "rhythm": "offbeat"
+     },
+     "synth": {
+      "rhythm": "pluck"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.65,
+       "seed": 44374478,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "arch",
+       "range": 0.4,
+       "register": 0.7,
+       "noteLength": 0.45,
+       "slide": 0.25,
+       "accent": 0.2
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 306414947,
+       "style": "drift",
+       "register": 0.6,
+       "noteLength": 0.75
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.5,
+    "saturation": 0
+   },
+   "style": "tropicalHouse",
+   "fx": {
+    "drums": [
+     {
+      "effect": "pan",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.43,
+       0.2
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "fuzz",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.5,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.35,
+       0.4,
+       0.35
+      ]
+     },
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.4,
+       0.3
+      ]
+     },
+     {
+      "effect": "ring",
+      "on": false,
+      "knobs": [
+       0.6,
+       0.45,
+       0
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "chorus",
+      "on": true,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "pan",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.43,
+       0.2
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "acidHouse": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Acid house",
+   "key": "A",
+   "mood": "house",
+   "bpm": 125,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.35,
+     "delay": 0,
+     "reverb": 0.1,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.6,
+     "kickLevel": 1,
+     "kickDecay": 0.3,
+     "clapLevel": 1,
+     "clapDecay": 0.35,
+     "hatLevel": 1,
+     "hatDecay": 0.25,
+     "openLevel": 1,
+     "openDecay": 0.35,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.3,
+     "percPitch": 0.75,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.18,
+     "sustain": 0.15,
+     "release": 0.08,
+     "cutoff": 0.3,
+     "resonance": 0.75,
+     "drive": 0.35,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.75,
+     "detune": 0.37,
+     "sub": 0.4,
+     "glide": 0.35,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.2,
+     "sustain": 0.5,
+     "release": 0.1,
+     "cutoff": 0.5,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.3,
+     "level": 0.45,
+     "envAmount": 0.2,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "sawtooth",
+     "attack": 0.003,
+     "decay": 0.18,
+     "sustain": 0.2,
+     "release": 0.12,
+     "cutoff": 0.4,
+     "resonance": 0.7,
+     "drive": 0.3,
+     "delay": 0.25,
+     "reverb": 0.2,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "sawtooth",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.35,
+     "resonance": 0.15,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.6,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "acid"
+     },
+     "bass": {
+      "rhythm": "acidLine"
+     },
+     "synth": {
+      "rhythm": "stabs"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 669987194,
+       "style": "roll",
+       "range": 0.35,
+       "register": 0.45,
+       "noteLength": 0.3,
+       "slide": 0.45,
+       "accent": 0.6
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 707702918,
+       "style": "drift",
+       "register": 0.45,
+       "noteLength": 0.8
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "acid"
+     },
+     "bass": {
+      "rhythm": "acidLine"
+     },
+     "synth": {
+      "rhythm": "stabs"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 1238841047,
+       "style": "roll",
+       "range": 0.35,
+       "register": 0.45,
+       "noteLength": 0.3,
+       "slide": 0.45,
+       "accent": 0.6
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.3,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1900513105,
+       "style": "drift",
+       "register": 0.45,
+       "noteLength": 0.8
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": true,
+      "synth": false,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 3,
+       "bars": 2
+      },
+      {
+       "degree": 4,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "acid"
+     },
+     "bass": {
+      "rhythm": "acidLine"
+     },
+     "synth": {
+      "rhythm": "offbeat"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.5,
+       "seed": 1393843689,
+       "style": "roll",
+       "range": 0.35,
+       "register": 0.45,
+       "noteLength": 0.3,
+       "slide": 0.45,
+       "accent": 0.6
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 1.5,
+       "release": 3,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1716942398,
+       "style": "drift",
+       "register": 0.45,
+       "noteLength": 0.8
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": false,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "acid"
+     },
+     "bass": {
+      "rhythm": "acidLine"
+     },
+     "synth": {
+      "rhythm": "stabs"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 250555946,
+       "style": "roll",
+       "range": 0.35,
+       "register": 0.45,
+       "noteLength": 0.3,
+       "slide": 0.45,
+       "accent": 0.6
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1047577541,
+       "style": "drift",
+       "register": 0.45,
+       "noteLength": 0.8
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.45,
+    "saturation": 0.25
+   },
+   "style": "acidHouse",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": false,
+      "knobs": [
+       0.3,
+       0.45,
+       0.8
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "fuzz",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.55,
+       0.4
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.6,
+       0.5
+      ]
+     },
+     {
+      "effect": "tremolo",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.71,
+       0.3
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "flanger",
+      "on": true,
+      "knobs": [
+       0.45,
+       0.7,
+       0.55
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "afroHouse": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Afro house",
+   "key": "G",
+   "mood": "deep",
+   "bpm": 120,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.4,
+     "delay": 0,
+     "reverb": 0.1,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.2,
+     "sustain": 0.3,
+     "release": 0.08,
+     "cutoff": 0.3,
+     "resonance": 0.25,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.45,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "triangle",
+     "attack": 0.01,
+     "decay": 0.7,
+     "sustain": 0.4,
+     "release": 0.8,
+     "cutoff": 0.45,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.4,
+     "level": 0.45,
+     "envAmount": 0.15,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "sine",
+     "attack": 0.02,
+     "decay": 0.2,
+     "sustain": 0.4,
+     "release": 0.2,
+     "cutoff": 0.9,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.45,
+     "reverb": 0.35,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "noise",
+     "attack": 1,
+     "decay": 1,
+     "sustain": 0.8,
+     "release": 2.5,
+     "cutoff": 0.5,
+     "resonance": 0.25,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.8,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0.35,
+     "driftRate": 0.25,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": true,
+      "bass": false,
+      "synth": false,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 6,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "afro"
+     },
+     "bass": {
+      "rhythm": "garageSkip"
+     },
+     "synth": {
+      "rhythm": "skank"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.55,
+       "seed": 1714824587,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "zigzag",
+       "range": 0.4,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 1.5,
+       "release": 3,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1347634513,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "afro"
+     },
+     "bass": {
+      "rhythm": "garageSkip"
+     },
+     "synth": {
+      "rhythm": "skank"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.6,
+       "seed": 817718042,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "zigzag",
+       "range": 0.4,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1695211292,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": true,
+      "bass": false,
+      "synth": true,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 3,
+       "bars": 2
+      },
+      {
+       "degree": 0,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "afro"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.55,
+       "seed": 604582548,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "zigzag",
+       "range": 0.4,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 2,
+       "release": 4,
+       "brightness": 0.4,
+       "motion": 0.5
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 137357101,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": true,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 6,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "afro"
+     },
+     "bass": {
+      "rhythm": "garageSkip"
+     },
+     "synth": {
+      "rhythm": "skank"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.55,
+       "seed": 85572836,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "zigzag",
+       "range": 0.4,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 662962822,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.5,
+    "saturation": 0.1
+   },
+   "style": "afroHouse",
+   "fx": {
+    "drums": [
+     {
+      "effect": "pan",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.43,
+       0.2
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "fuzz",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.5,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "tremolo",
+      "on": true,
+      "knobs": [
+       0.4,
+       0.43,
+       0
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.4,
+       0.4
+      ]
+     },
+     {
+      "effect": "vowel",
+      "on": false,
+      "knobs": [
+       0.85,
+       0.25,
+       0.5
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "chorus",
+      "on": true,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "dubstep": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Dubstep",
+   "key": "F",
+   "mood": "dark",
+   "bpm": 140,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.3,
+     "delay": 0,
+     "reverb": 0.15,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.15,
+     "kickLevel": 1,
+     "kickDecay": 0.9,
+     "clapLevel": 1,
+     "clapDecay": 0.45,
+     "hatLevel": 1,
+     "hatDecay": 0.3,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.3,
+     "sustain": 0.8,
+     "release": 0.08,
+     "cutoff": 0.75,
+     "resonance": 0.45,
+     "drive": 0.25,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.1,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.714,
+     "lfoDepth": 0.6,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "sawtooth",
+     "attack": 0.6,
+     "decay": 1,
+     "sustain": 0.8,
+     "release": 1.5,
+     "cutoff": 0.3,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.2,
+     "reverb": 0.7,
+     "level": 0.45,
+     "envAmount": 0.1,
+     "detune": 0.5,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.2,
+     "sustain": 0.35,
+     "release": 0.2,
+     "cutoff": 0.55,
+     "resonance": 0.15,
+     "drive": 0,
+     "delay": 0.35,
+     "reverb": 0.25,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "sawtooth",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.25,
+     "resonance": 0.15,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.6,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 1,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "dubstep"
+     },
+     "bass": {
+      "rhythm": "wobbleRhythm"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 619356075,
+       "style": "phrase",
+       "phrase": 2,
+       "shape": "valley",
+       "range": 0.4,
+       "register": 0.55,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 2,
+       "release": 4,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 836917116,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "dubstep"
+     },
+     "bass": {
+      "rhythm": "wobbleRhythm"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 275687356,
+       "style": "phrase",
+       "phrase": 2,
+       "shape": "valley",
+       "range": 0.4,
+       "register": 0.55,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 1272609471,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": true,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "dubstep"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "swell"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1230227716,
+       "style": "phrase",
+       "phrase": 2,
+       "shape": "valley",
+       "range": 0.4,
+       "register": 0.55,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 1157090942,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 1,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "dubstep"
+     },
+     "bass": {
+      "rhythm": "wobbleRhythm"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 344705551,
+       "style": "phrase",
+       "phrase": 2,
+       "shape": "valley",
+       "range": 0.4,
+       "register": 0.55,
+       "noteLength": 0.4,
+       "slide": 0.2,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 840845611,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.9
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.3,
+    "saturation": 0.3
+   },
+   "style": "dubstep",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": false,
+      "knobs": [
+       0.3,
+       0.45,
+       0.8
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "fuzz",
+      "on": true,
+      "knobs": [
+       0.4,
+       0.55,
+       0.5
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.35,
+       0.8,
+       0.5
+      ]
+     },
+     {
+      "effect": "vowel",
+      "on": false,
+      "knobs": [
+       0.85,
+       0.25,
+       0.5
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "ring",
+      "on": true,
+      "knobs": [
+       0.35,
+       0.5,
+       0.5
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     },
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "futureGarage": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Future garage",
+   "key": "D",
+   "mood": "deep",
+   "bpm": 132,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.15,
+     "delay": 0,
+     "reverb": 0.15,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.45,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 0.8,
+     "hatDecay": 0.5,
+     "openLevel": 0.7,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.4,
+     "sustain": 0.6,
+     "release": 0.08,
+     "cutoff": 0.2,
+     "resonance": 0.25,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.1,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "sawtooth",
+     "attack": 0.4,
+     "decay": 1,
+     "sustain": 0.8,
+     "release": 2,
+     "cutoff": 0.35,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.2,
+     "reverb": 0.7,
+     "level": 0.45,
+     "envAmount": 0.1,
+     "detune": 0.5,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "sine",
+     "attack": 0.01,
+     "decay": 0.3,
+     "sustain": 0.2,
+     "release": 0.4,
+     "cutoff": 0.8,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.4,
+     "reverb": 0.5,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "triangle",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.7,
+     "resonance": 0.05,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.75,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0.4,
+     "driftRate": 0.2,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 3,
+       "bars": 2
+      },
+      {
+       "degree": 0,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "garageShuffle"
+     },
+     "bass": {
+      "rhythm": "garageSkip"
+     },
+     "synth": {
+      "rhythm": "swell"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 800187562,
+       "style": "drift",
+       "register": 0.65,
+       "range": 0.5,
+       "noteLength": 0.8,
+       "slide": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 2,
+       "release": 5,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 531173833,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.95
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "garageShuffle"
+     },
+     "bass": {
+      "rhythm": "garageSkip"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 1770049263,
+       "style": "drift",
+       "register": 0.65,
+       "range": 0.5,
+       "noteLength": 0.8,
+       "slide": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.5
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 1410901447,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.95
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 5,
+       "bars": 2
+      },
+      {
+       "degree": 4,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "garageShuffle"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1771773347,
+       "style": "drift",
+       "register": 0.65,
+       "range": 0.5,
+       "noteLength": 0.8,
+       "slide": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 3,
+       "release": 6,
+       "brightness": 0.4,
+       "motion": 0.2,
+       "swoop": 0.5
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 1942705269,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.95
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 3,
+       "bars": 2
+      },
+      {
+       "degree": 0,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "garageShuffle"
+     },
+     "bass": {
+      "rhythm": "garageSkip"
+     },
+     "synth": {
+      "rhythm": "swell"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 305912982,
+       "style": "drift",
+       "register": 0.65,
+       "range": 0.5,
+       "noteLength": 0.8,
+       "slide": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 199520285,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.95
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.3,
+    "saturation": 0.1,
+    "reverbDecay": 5
+   },
+   "style": "futureGarage",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": true,
+      "knobs": [
+       0.55,
+       0.6,
+       0.4
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.35,
+       0.6,
+       0.5
+      ]
+     },
+     {
+      "effect": "tremolo",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.71,
+       0.3
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "vowel",
+      "on": true,
+      "knobs": [
+       0.5,
+       0.5,
+       0.33
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "chorus",
+      "on": true,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "shifter",
+      "on": false,
+      "knobs": [
+       0.6,
+       0.62,
+       0.3
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "idm": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "IDM",
+   "key": "C",
+   "mood": "deep",
+   "bpm": 110,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.35,
+     "delay": 0,
+     "reverb": 0.1,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.6,
+     "kickLevel": 1,
+     "kickDecay": 0.3,
+     "clapLevel": 1,
+     "clapDecay": 0.35,
+     "hatLevel": 1,
+     "hatDecay": 0.25,
+     "openLevel": 1,
+     "openDecay": 0.35,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.3,
+     "percPitch": 0.75,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.15,
+     "sustain": 0.2,
+     "release": 0.08,
+     "cutoff": 0.2,
+     "resonance": 0.3,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.6,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "fm",
+     "attack": 0.004,
+     "decay": 0.8,
+     "sustain": 0.15,
+     "release": 1.2,
+     "cutoff": 0.75,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.45,
+     "level": 0.45,
+     "envAmount": 0.15,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.625,
+     "fmIndex": 0.35,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "triangle",
+     "attack": 0.003,
+     "decay": 0.16,
+     "sustain": 0.05,
+     "release": 0.2,
+     "cutoff": 0.8,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.5,
+     "reverb": 0.35,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "fm",
+     "attack": 1.2,
+     "decay": 1.5,
+     "sustain": 0.6,
+     "release": 3,
+     "cutoff": 0.7,
+     "resonance": 0.1,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.75,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.75,
+     "fmIndex": 0.2,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "glitch"
+     },
+     "bass": {
+      "rhythm": "arpBass"
+     },
+     "synth": {
+      "rhythm": "broken"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 3,
+       "length": 12,
+       "tension": 0.35,
+       "density": 0.75,
+       "seed": 282795922,
+       "style": "pulse",
+       "register": 0.65,
+       "range": 0.55,
+       "noteLength": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1295402158,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "glitch"
+     },
+     "bass": {
+      "rhythm": "arpBass"
+     },
+     "synth": {
+      "rhythm": "broken"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 3,
+       "length": 12,
+       "tension": 0.35,
+       "density": 0.75,
+       "seed": 238798274,
+       "style": "pulse",
+       "register": 0.65,
+       "range": 0.55,
+       "noteLength": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.6
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 302200166,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "glitch"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "gate"
+     },
+     "layer1": {
+      "mode": "arp",
+      "arp": {
+       "direction": "random",
+       "rate": 4,
+       "octaves": 3,
+       "gate": 0.4
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 3,
+       "length": 12,
+       "tension": 0.35,
+       "density": 0.75,
+       "seed": 385067956,
+       "style": "pulse",
+       "register": 0.65,
+       "range": 0.55,
+       "noteLength": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 1.5,
+       "release": 3,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 623482400,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "glitch"
+     },
+     "bass": {
+      "rhythm": "arpBass"
+     },
+     "synth": {
+      "rhythm": "broken"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 3,
+       "length": 12,
+       "tension": 0.35,
+       "density": 0.75,
+       "seed": 340500435,
+       "style": "pulse",
+       "register": 0.65,
+       "range": 0.55,
+       "noteLength": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 446884406,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.9
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.2,
+    "saturation": 0.15
+   },
+   "style": "idm",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": true,
+      "knobs": [
+       0.6,
+       0.5,
+       0.5
+      ]
+     },
+     {
+      "effect": "gate",
+      "on": false,
+      "knobs": [
+       0,
+       0.9,
+       0.3
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     },
+     {
+      "effect": "fuzz",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.5,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "shifter",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.58,
+       0.3
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "ring",
+      "on": true,
+      "knobs": [
+       0.4,
+       0.6,
+       0.5
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "vowel",
+      "on": true,
+      "knobs": [
+       0.4,
+       0.5,
+       0.5
+      ]
+     },
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "edm": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "EDM",
+   "key": "F",
+   "mood": "minor",
+   "bpm": 128,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.6,
+     "delay": 0,
+     "reverb": 0.3,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.45,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.7,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.6,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.15,
+     "sustain": 0.2,
+     "release": 0.08,
+     "cutoff": 0.2,
+     "resonance": 0.3,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.6,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "sawtooth",
+     "attack": 0.01,
+     "decay": 0.4,
+     "sustain": 0.6,
+     "release": 0.5,
+     "cutoff": 0.7,
+     "resonance": 0.1,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.5,
+     "level": 0.45,
+     "envAmount": 0.2,
+     "detune": 0.9,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.25,
+     "cutoff": 0.5,
+     "resonance": 0.3,
+     "drive": 0,
+     "delay": 0.35,
+     "reverb": 0.3,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "sawtooth",
+     "attack": 0.8,
+     "decay": 1,
+     "sustain": 0.8,
+     "release": 1.6,
+     "cutoff": 0.4,
+     "resonance": 0.05,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.65,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0.25,
+     "driftRate": 0.3,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": true,
+      "bass": false,
+      "synth": false,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "edm"
+     },
+     "bass": {
+      "rhythm": "octave"
+     },
+     "synth": {
+      "rhythm": "offbeat"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 1514856269,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "rise",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.1,
+       "accent": 0.5
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 1910116592,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.85
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "edm"
+     },
+     "bass": {
+      "rhythm": "octave"
+     },
+     "synth": {
+      "rhythm": "offbeat"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.75,
+       "seed": 338517530,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "rise",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.1,
+       "accent": 0.5
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.55,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 522029335,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.85
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "edm"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "swell"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.45,
+       "seed": 109637849,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "rise",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.1,
+       "accent": 0.5
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 1.5,
+       "release": 3,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 1279129654,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.85
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": false,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "edm"
+     },
+     "bass": {
+      "rhythm": "octave"
+     },
+     "synth": {
+      "rhythm": "offbeat"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 425831246,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "rise",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.4,
+       "slide": 0.1,
+       "accent": 0.5
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 1303513914,
+       "style": "drift",
+       "register": 0.5,
+       "noteLength": 0.85
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.75,
+    "saturation": 0.25
+   },
+   "style": "edm",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": false,
+      "knobs": [
+       0.3,
+       0.45,
+       0.8
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "fuzz",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.5,
+       0.4
+      ]
+     },
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.6,
+       0.4
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.4,
+       0.4
+      ]
+     },
+     {
+      "effect": "flanger",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.7,
+       0.55
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "trance": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Trance",
+   "key": "F#",
+   "mood": "minor",
+   "bpm": 138,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.6,
+     "delay": 0,
+     "reverb": 0.3,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.45,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.7,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.6,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.12,
+     "sustain": 0.1,
+     "release": 0.08,
+     "cutoff": 0.25,
+     "resonance": 0.35,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.6,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "sawtooth",
+     "attack": 0.01,
+     "decay": 0.4,
+     "sustain": 0.6,
+     "release": 0.2,
+     "cutoff": 0.7,
+     "resonance": 0.1,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.5,
+     "level": 0.45,
+     "envAmount": 0.2,
+     "detune": 0.9,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "sawtooth",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.25,
+     "cutoff": 0.5,
+     "resonance": 0.3,
+     "drive": 0,
+     "delay": 0.35,
+     "reverb": 0.3,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "sawtooth",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.45,
+     "resonance": 0.1,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.6,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      },
+      {
+       "degree": 3,
+       "bars": 2
+      },
+      {
+       "degree": 4,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "trance"
+     },
+     "bass": {
+      "rhythm": "offbeat"
+     },
+     "synth": {
+      "rhythm": "gate"
+     },
+     "layer1": {
+      "mode": "arp",
+      "arp": {
+       "direction": "up",
+       "rate": 4,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 1075998835,
+       "style": "roll",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.35,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 1697567007,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 2,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "trance"
+     },
+     "bass": {
+      "rhythm": "offbeat"
+     },
+     "synth": {
+      "rhythm": "gate"
+     },
+     "layer1": {
+      "mode": "arp",
+      "arp": {
+       "direction": "updown",
+       "rate": 4,
+       "octaves": 3,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 1448431834,
+       "style": "roll",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.35,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.5,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 618479547,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 5,
+       "bars": 2
+      },
+      {
+       "degree": 6,
+       "bars": 2
+      },
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 2,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "trance"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.5,
+       "seed": 308219326,
+       "style": "phrase",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.35,
+       "accent": 0.3,
+       "phrase": 4,
+       "shape": "rise"
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 2,
+       "release": 4,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 741428871,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": true,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 5,
+       "bars": 2
+      },
+      {
+       "degree": 3,
+       "bars": 2
+      },
+      {
+       "degree": 4,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "trance"
+     },
+     "bass": {
+      "rhythm": "offbeat"
+     },
+     "synth": {
+      "rhythm": "gate"
+     },
+     "layer1": {
+      "mode": "arp",
+      "arp": {
+       "direction": "up",
+       "rate": 4,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.7,
+       "seed": 1753274870,
+       "style": "roll",
+       "range": 0.5,
+       "register": 0.65,
+       "noteLength": 0.35,
+       "accent": 0.3
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.4,
+       "seed": 313609547,
+       "style": "drift",
+       "register": 0.55,
+       "noteLength": 0.9
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.6,
+    "saturation": 0.15,
+    "reverbDecay": 3
+   },
+   "style": "trance",
+   "fx": {
+    "drums": [
+     {
+      "effect": "pan",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.43,
+       0.2
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "fuzz",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.5,
+       0.7
+      ]
+     },
+     {
+      "effect": "tremolo",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.71,
+       0.3
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "chorus",
+      "on": true,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "flanger",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.7,
+       0.55
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.35,
+       0.4,
+       0.45
+      ]
+     },
+     {
+      "effect": "pan",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.43,
+       0.2
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "gate",
+      "on": true,
+      "knobs": [
+       0.42857142857142855,
+       0.9,
+       0.3
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "electro": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Electro",
+   "key": "E",
+   "mood": "dark",
+   "bpm": 126,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.35,
+     "delay": 0,
+     "reverb": 0.1,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.6,
+     "kickLevel": 1,
+     "kickDecay": 0.3,
+     "clapLevel": 1,
+     "clapDecay": 0.35,
+     "hatLevel": 1,
+     "hatDecay": 0.25,
+     "openLevel": 1,
+     "openDecay": 0.35,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.3,
+     "percPitch": 0.75,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.15,
+     "sustain": 0.2,
+     "release": 0.08,
+     "cutoff": 0.2,
+     "resonance": 0.3,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.6,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.2,
+     "sustain": 0.5,
+     "release": 0.1,
+     "cutoff": 0.5,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.3,
+     "level": 0.45,
+     "envAmount": 0.2,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "square",
+     "attack": 0.005,
+     "decay": 0.2,
+     "sustain": 0.35,
+     "release": 0.2,
+     "cutoff": 0.55,
+     "resonance": 0.15,
+     "drive": 0,
+     "delay": 0.35,
+     "reverb": 0.25,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "sawtooth",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.25,
+     "resonance": 0.15,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.6,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "electro"
+     },
+     "bass": {
+      "rhythm": "octave"
+     },
+     "synth": {
+      "rhythm": "push"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 6,
+       "rotate": 2,
+       "length": 16,
+       "tension": 0.35,
+       "density": 0.85,
+       "seed": 1827881601,
+       "style": "pulse",
+       "register": 0.55,
+       "range": 0.4,
+       "noteLength": 0.35
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 147887050,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.85
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "electro"
+     },
+     "bass": {
+      "rhythm": "octave"
+     },
+     "synth": {
+      "rhythm": "push"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 6,
+       "rotate": 2,
+       "length": 16,
+       "tension": 0.35,
+       "density": 0.85,
+       "seed": 117922366,
+       "style": "pulse",
+       "register": 0.55,
+       "range": 0.4,
+       "noteLength": 0.35
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.25,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 2052180526,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.85
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "electro"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "stabs"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 6,
+       "rotate": 2,
+       "length": 16,
+       "tension": 0.35,
+       "density": 0.5,
+       "seed": 1545907346,
+       "style": "pulse",
+       "register": 0.55,
+       "range": 0.4,
+       "noteLength": 0.35
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 816386402,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.85
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": true,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 3,
+       "bars": 1
+      },
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 1,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "electro"
+     },
+     "bass": {
+      "rhythm": "octave"
+     },
+     "synth": {
+      "rhythm": "push"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 6,
+       "rotate": 2,
+       "length": 16,
+       "tension": 0.35,
+       "density": 0.85,
+       "seed": 446115082,
+       "style": "pulse",
+       "register": 0.55,
+       "range": 0.4,
+       "noteLength": 0.35
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 1530548561,
+       "style": "drift",
+       "register": 0.35,
+       "noteLength": 0.85
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.35,
+    "saturation": 0.3
+   },
+   "style": "electro",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": true,
+      "knobs": [
+       0.65,
+       0.55,
+       0.4
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "fuzz",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.5,
+       0.7
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "ring",
+      "on": true,
+      "knobs": [
+       0.35,
+       0.4,
+       0.5
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "vowel",
+      "on": true,
+      "knobs": [
+       0.6,
+       0.25,
+       0.83
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     },
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "trap": {
+  "start": 1,
+  "song": {
+   "version": 1,
+   "name": "Trap",
+   "key": "C",
+   "mood": "minor",
+   "bpm": 140,
+   "patches": {
+    "drums": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 0.25,
+     "sustain": 0.3,
+     "release": 0.3,
+     "cutoff": 1,
+     "resonance": 0,
+     "drive": 0.3,
+     "delay": 0,
+     "reverb": 0.15,
+     "level": 0.9,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.15,
+     "kickLevel": 1,
+     "kickDecay": 0.9,
+     "clapLevel": 1,
+     "clapDecay": 0.45,
+     "hatLevel": 1,
+     "hatDecay": 0.3,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "bass": {
+     "wave": "sine",
+     "attack": 0.005,
+     "decay": 1.2,
+     "sustain": 0.5,
+     "release": 0.4,
+     "cutoff": 0.35,
+     "resonance": 0.25,
+     "drive": 0.35,
+     "delay": 0,
+     "reverb": 0,
+     "level": 0.7,
+     "envAmount": 0.05,
+     "detune": 0.37,
+     "sub": 0.6,
+     "glide": 0.55,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "synth": {
+     "wave": "triangle",
+     "attack": 0.01,
+     "decay": 0.7,
+     "sustain": 0.4,
+     "release": 0.8,
+     "cutoff": 0.45,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.3,
+     "reverb": 0.4,
+     "level": 0.45,
+     "envAmount": 0.15,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer1": {
+     "wave": "fm",
+     "attack": 0.002,
+     "decay": 0.2,
+     "sustain": 0,
+     "release": 0.25,
+     "cutoff": 0.7,
+     "resonance": 0.2,
+     "drive": 0,
+     "delay": 0.45,
+     "reverb": 0.35,
+     "level": 0.35,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.375,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    },
+    "layer2": {
+     "wave": "sawtooth",
+     "attack": 0.02,
+     "decay": 0.3,
+     "sustain": 0.1,
+     "release": 0.4,
+     "cutoff": 0.25,
+     "resonance": 0.15,
+     "drive": 0,
+     "delay": 0,
+     "reverb": 0.6,
+     "level": 0.7,
+     "envAmount": 0.3,
+     "detune": 0.37,
+     "sub": 1,
+     "glide": 0,
+     "pitch": 0.4,
+     "kickLevel": 1,
+     "kickDecay": 0.5,
+     "clapLevel": 1,
+     "clapDecay": 0.5,
+     "hatLevel": 1,
+     "hatDecay": 0.5,
+     "openLevel": 1,
+     "openDecay": 0.5,
+     "fmRatio": 0.25,
+     "fmIndex": 0.3,
+     "lfoRate": 0.5,
+     "lfoDepth": 0,
+     "drift": 0,
+     "driftRate": 0.5,
+     "percLevel": 1,
+     "percDecay": 0.5,
+     "percPitch": 0.5,
+     "shakerLevel": 1,
+     "shakerDecay": 0.5
+    }
+   },
+   "sections": [
+    {
+     "name": "Intro",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": false
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 3,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "trap"
+     },
+     "bass": {
+      "rhythm": "glide808"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.5,
+       "seed": 4448202,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "fall",
+       "range": 0.4,
+       "register": 0.6,
+       "noteLength": 0.35,
+       "slide": 0.05,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 1378345366,
+       "style": "drift",
+       "register": 0.4,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Groove",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 4,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 4,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "trap"
+     },
+     "bass": {
+      "rhythm": "glide808"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.5,
+       "seed": 756226599,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "fall",
+       "range": 0.4,
+       "register": 0.6,
+       "noteLength": 0.35,
+       "slide": 0.05,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.25,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 160408198,
+       "style": "drift",
+       "register": 0.4,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Break",
+     "on": {
+      "drums": false,
+      "bass": false,
+      "synth": true,
+      "layer1": true,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      },
+      {
+       "degree": 5,
+       "bars": 1
+      },
+      {
+       "degree": 6,
+       "bars": 1
+      }
+     ],
+     "drums": {
+      "preset": "trap"
+     },
+     "bass": {
+      "rhythm": "long"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.35,
+       "seed": 107632004,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "fall",
+       "range": 0.4,
+       "register": 0.6,
+       "noteLength": 0.35,
+       "slide": 0.05,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 300165346,
+       "style": "drift",
+       "register": 0.4,
+       "noteLength": 0.9
+      }
+     }
+    },
+    {
+     "name": "Outro",
+     "on": {
+      "drums": true,
+      "bass": true,
+      "synth": false,
+      "layer1": false,
+      "layer2": true
+     },
+     "chords": [
+      {
+       "degree": 0,
+       "bars": 2
+      },
+      {
+       "degree": 3,
+       "bars": 2
+      }
+     ],
+     "drums": {
+      "preset": "trap"
+     },
+     "bass": {
+      "rhythm": "glide808"
+     },
+     "synth": {
+      "rhythm": "sustained"
+     },
+     "layer1": {
+      "mode": "generative",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.5,
+       "seed": 668948015,
+       "style": "hook",
+       "phrase": 2,
+       "shape": "fall",
+       "range": 0.4,
+       "register": 0.6,
+       "noteLength": 0.35,
+       "slide": 0.05,
+       "accent": 0.4
+      }
+     },
+     "layer2": {
+      "mode": "pad",
+      "arp": {
+       "direction": "up",
+       "rate": 2,
+       "octaves": 2,
+       "gate": 0.6
+      },
+      "pad": {
+       "attack": 0.7,
+       "release": 1.8,
+       "brightness": 0.4,
+       "motion": 0.2
+      },
+      "gen": {
+       "lock": 0.75,
+       "hits": 7,
+       "rotate": 0,
+       "length": 5,
+       "tension": 0.35,
+       "density": 0.3,
+       "seed": 2031523357,
+       "style": "drift",
+       "register": 0.4,
+       "noteLength": 0.9
+      }
+     }
+    }
+   ],
+   "mix": {
+    "sweep": 0,
+    "pump": 0.2,
+    "saturation": 0.25
+   },
+   "style": "trap",
+   "fx": {
+    "drums": [
+     {
+      "effect": "crush",
+      "on": false,
+      "knobs": [
+       0.3,
+       0.45,
+       0.8
+      ]
+     },
+     {
+      "effect": "pan",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.43,
+       0.2
+      ]
+     }
+    ],
+    "bass": [
+     {
+      "effect": "fuzz",
+      "on": true,
+      "knobs": [
+       0.25,
+       0.4,
+       0.35
+      ]
+     },
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     }
+    ],
+    "synth": [
+     {
+      "effect": "tremolo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.43,
+       0
+      ]
+     },
+     {
+      "effect": "echo",
+      "on": false,
+      "knobs": [
+       0.45,
+       0.6,
+       0.45
+      ]
+     }
+    ],
+    "layer1": [
+     {
+      "effect": "echo",
+      "on": true,
+      "knobs": [
+       0.3,
+       0.6,
+       0.4
+      ]
+     },
+     {
+      "effect": "shifter",
+      "on": false,
+      "knobs": [
+       0.6,
+       0.62,
+       0.3
+      ]
+     }
+    ],
+    "layer2": [
+     {
+      "effect": "chorus",
+      "on": false,
+      "knobs": [
+       0.7,
+       0.35,
+       0.55
+      ]
+     },
+     {
+      "effect": "phaser",
+      "on": false,
+      "knobs": [
+       0.8,
+       0.85,
+       0.7
+      ]
+     }
+    ]
+   }
+  }
+ }
+}

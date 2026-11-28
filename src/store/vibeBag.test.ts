@@ -141,4 +141,14 @@ describe("the launch draw (spec 10.1)", () => {
     const ids = Array.from({ length: 14 }, () => drawLaunch(8, s)!.id);
     expect(new Set(ids).size).toBe(14);
   });
+
+  it("through the bag too, rolls the key from the twelve and the bpm inside the vibe's range", () => {
+    const s = new MapStorage();
+    for (let i = 0; i < 14 * 4; i++) {
+      const got = drawLaunch(8, s)!;
+      const [lo, hi] = vibeBpmRange(STYLES[got.id]);
+      expect(NOTE_NAMES, got.id).toContain(got.song.key);
+      expect(Number.isInteger(got.song.bpm) && got.song.bpm >= lo && got.song.bpm <= hi, `${got.id} ${got.song.bpm}`).toBe(true);
+    }
+  });
 });
