@@ -1842,9 +1842,11 @@ def walk_picker_open(page, failures: list) -> None:
     for size in [(360, 640), (390, 844)]:
         page.set_viewport_size({"width": size[0], "height": size[1]})
         time.sleep(0.15)
-        page.click("#vibe-open")
+        # The vibe control's name on Simple Play; New jam in the header where there is no vibe control (Advanced).
+        opener = "#vibe-open" if page.locator("#vibe-open").count() else "#new-jam"
+        page.click(opener)
         if not wait_for(page, "!!document.querySelector('.vpick')", 2.0):
-            failures.append(f"{size}: the vibe control's name did not open the picker")
+            failures.append(f"{size}: {opener} did not open the picker")
             continue
         time.sleep(0.15)
         where = f"vibe picker at {size[0]} x {size[1]}"
@@ -3148,9 +3150,15 @@ def wait_for(page, expr: str, timeout: float) -> bool:
 
 
 def open_app(page, failures: list) -> None:
-    """The opening of every part: F1 (spec 10.1), the Play tab with the launch jam (FIRST_SONG, from the bag run_part
-    seeds) and no picker, the picker's check, the app in Simple, Play."""
+    """The opening of every part: F1 (spec 10.1), the Play tab with the launch jam (from the bag run_part seeds) and no
+    picker, the picker's check, then the default song (FIRST_SONG) from Songs, the app in Simple, Play."""
     walk_picker_open(page, failures)
+    # The parts were measured on the default song, which a first launch opened before F1: a new song from Songs is
+    # that song, and the untouched launch jam it replaces is not kept. Marked as the old first launch's (scratch), so
+    # the first vibe loaded over it replaces it in Songs as before. Slice c's core check plays the launch jam itself.
+    page.evaluate("window.__keeper.create().then(() => { window.__keeper.scratch = true; })")
+    if not wait_for(page, "window.__keeper.list().then(l => l.length === 1 && l[0].name === 'Song 1')", 3.0):
+        failures.append(f"the untouched launch jam was kept in Songs: {page.evaluate('window.__keeper.list().then(l => l.map(e => e.name))')}")
     FIRST_SONG.append(page.evaluate(SONG))
     if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
         failures.append("the app does not start in Simple")
