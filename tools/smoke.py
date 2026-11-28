@@ -55,7 +55,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp3check import mp3_info  # noqa: E402
-from shots import SMALL, sample_play, simple_words, walk_fingers, walk_frame, walk_picker, walk_play_button, walk_punch, walk_tablet  # noqa: E402
+from shots import BAG_SEED, SMALL, sample_play, simple_words, walk_fingers, walk_frame, walk_picker, walk_play_button, walk_punch, walk_tablet  # noqa: E402
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 from basscheck import walk_bass_run  # noqa: E402
@@ -1834,7 +1834,8 @@ def walk_picker_open(page, failures: list) -> None:
     if page.evaluate("document.querySelector('.tabs .tab.on')?.dataset.tab") != "play":
         failures.append("the app did not open on the Play tab")
     vibes = page.evaluate("window.__vibes")
-    top = page.evaluate("window.__vibes.filter((v) => v.top).map((v) => v.id)")
+    # F1 review M2: the top group in spec 10.2's order (window.__topIds), the others in the arrows' order.
+    top = page.evaluate("window.__topIds")
     ids = [v["id"] for v in vibes]
     others = [i for i in ids if i not in top]
     if page.evaluate(f"{E}.getSong().style") not in top or page.evaluate(f"{E}.playing"):
@@ -1866,7 +1867,7 @@ def walk_picker_open(page, failures: list) -> None:
         elif p["groups"] != ["top", "other"]:
             failures.append(f"{where}: groups {p['groups']}, expected the top group first, then the others")
         got = [t["id"] for q in sets for t in q["tiles"]]
-        if got != [i for i in ids if i in top] + others:
+        if got != top + others:
             failures.append(f"{where}: tiles {got}, expected the top vibes then the others")
         for q in sets:
             xs = sorted({round(t["x"]) for t in q["tiles"]})
@@ -3058,8 +3059,6 @@ def walk_p9(page, failures: list) -> None:
 
 
 FIRST_SONG: list = []
-BAG_SEED = """try { if (!localStorage.getItem('groovebox.vibeBag'))
-  localStorage.setItem('groovebox.vibeBag', JSON.stringify({ seed: 1, bag: ['dubTechno'], last: null })); } catch (e) {}"""
 
 
 def audio_load(browser, page, seconds: float = 4.0) -> float:
@@ -3154,8 +3153,10 @@ def open_app(page, failures: list) -> None:
     picker, the picker's check, then the default song (FIRST_SONG) from Songs, the app in Simple, Play."""
     walk_picker_open(page, failures)
     # The parts were measured on the default song, which a first launch opened before F1: a new song from Songs is
-    # that song, and the untouched launch jam it replaces is not kept. Marked as the old first launch's (scratch), so
-    # the first vibe loaded over it replaces it in Songs as before. Slice c's core check plays the launch jam itself.
+    # that song, and the untouched launch jam it replaces is not kept. F1 review S3: the scratch flag is the app's
+    # only where there are no top vibes (main.tsx); it is set here only to reproduce the pre-F1 baseline the parts'
+    # fingerprints were measured on (the first vibe loaded over the default song replaces it in Songs, as before F1).
+    # The path the app runs, a vibe loaded over the untouched launch jam, is checked in core (walk_launch_draws).
     page.evaluate("window.__keeper.create().then(() => { window.__keeper.scratch = true; })")
     if not wait_for(page, "window.__keeper.list().then(l => l.length === 1 && l[0].name === 'Song 1')", 3.0):
         failures.append(f"the untouched launch jam was kept in Songs: {page.evaluate('window.__keeper.list().then(l => l.map(e => e.name))')}")
@@ -3322,9 +3323,113 @@ def walk_cold_start(browser, failures: list) -> None:
         ctx.close()
 
 
+def walk_launch_draws(browser, failures: list) -> None:
+    """F1 review S2 and S3, in a fresh browser context with the bag seeded (BAG_SEED), so the launch jam is Dub techno:
+    a picker tile tapped over the untouched launch jam plays that vibe, and it is the one song in Songs, named after it
+    (the path Pedro's phone runs, which the parts' opening skips); then, playing, the dice queues a top vibe from the bag
+    that lands whole on the next bar line, its bpm inside the vibe's range, and sound goes on; then, stopped, Surprise
+    me in the picker closes it and plays a top vibe."""
+    E = "window.__groovebox"
+    ctx = browser.new_context(viewport={"width": 390, "height": 844})
+    page = ctx.new_page()
+    errors: list = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    where = "launch draws"
+    try:
+        page.add_init_script(BAG_SEED)
+        page.goto(f"http://localhost:{PORT}/index.html")
+        if not wait_for(page, "!!window.__groovebox && !!document.querySelector('.shell')", 8.0):
+            failures.append(f"{where}: the app did not open")
+            return
+        time.sleep(0.3)
+        vibes = {v["id"]: v for v in page.evaluate("window.__vibes")}
+        top = page.evaluate("window.__topIds")
+        first = page.evaluate(f"{E}.getSong().style")
+        if not page.evaluate("window.__keeper.launch") or page.evaluate("window.__keeper.list().then(l => l.length)"):
+            failures.append(f"{where}: the app did not open on an untouched launch jam")
+        # S3: a tile over the untouched launch jam.
+        pick = next(i for i in top if i != first)
+        page.click("#vibe-open")
+        if not wait_for(page, "!!document.querySelector('.vpick')", 2.0):
+            failures.append(f"{where}: the vibe control did not open the picker")
+            return
+        page.click(f'[data-vibe="{pick}"]')
+        if not wait_for(page, f"{E}.playing && {E}.getSong().style === {pick!r}", 4.0):
+            failures.append(f"{where}: a tile over the launch jam did not play {pick} ({page.evaluate(f'{E}.getSong().style')})")
+            return
+        if page.locator(".vpick").count():
+            failures.append(f"{where}: the picker stayed open after a tile")
+        want = vibes[pick]["name"]
+        if not wait_for(page, f"window.__keeper.list().then(l => l.length === 1 && l[0].name === {want!r} && l[0].id === window.__keeper.id)"
+                              " && !window.__keeper.launch", 3.0):
+            failures.append(f"{where}: after a tile over the launch jam, Songs holds "
+                            f"{page.evaluate('window.__keeper.list().then(l => l.map(e => e.name))')}, expected [{want!r}] "
+                            f"(launch {page.evaluate('window.__keeper.launch')})")
+        # S2: the dice while playing, asked mid-bar.
+        wait_for(page, f"{E}.position().step >= 2 && {E}.position().step <= 8", 6.0)
+        page.click("#vibe-dice")
+        if not wait_for(page, f"!!{E}.pendingLoad()", 2.0):
+            failures.append(f"{where}: the dice did not queue a vibe for the bar line")
+            return
+        pend = page.evaluate(f"{E}.pendingLoad()")
+        got = pend.get("style")
+        if got not in top:
+            failures.append(f"{where}: the dice queued {got!r}, not a top vibe")
+        if page.evaluate(f"{E}.getSong().style") != pick:
+            failures.append(f"{where}: the dice's vibe loaded before the bar line")
+        if "pending" not in (page.get_attribute("#vibe-open", "class") or ""):
+            failures.append(f"{where}: the vibe control does not show the dice's vibe as next bar")
+        if got not in vibes or not wait_for(page, f"{E}.getSong().style === {got!r}", 10.0):
+            failures.append(f"{where}: the dice's vibe {got!r} did not land")
+            return
+        time.sleep(0.4)  # the scheduler runs a look-ahead before what is heard
+        landed = page.evaluate(f"{E}.landed.slice(-1)[0]")
+        v = vibes[got]
+        if not landed or (landed.get("loaded") or {}).get("style") != got or landed["pending"]["section"] != v["start"]:
+            failures.append(f"{where}: the dice's {got} did not land on a bar line as a whole song: {landed}")
+        bpm = page.evaluate(f"{E}.bpm")
+        lo, hi = v["range"]
+        if not lo <= bpm <= hi or page.evaluate(f"{E}.position().section") != v["start"]:
+            failures.append(f"{where}: the dice's {got} plays at {bpm} bpm (range {lo} to {hi}) in section "
+                            f"{page.evaluate(f'{E}.position().section')}, expected {v['start']}")
+        level = read_level(page, 2.0, 0.2)
+        if not page.evaluate(f"{E}.playing") or level < -60:
+            failures.append(f"{where}: after the dice's landing, playing {page.evaluate(f'{E}.playing')} at {level:.1f} dB")
+        if page.evaluate("window.__keeper.list().then(l => l.length)") != 2:
+            failures.append(f"{where}: the dice's vibe is not a new song in Songs beside the first")
+        print(f"dice: {got} queued mid-bar, landed on the bar line at {bpm} bpm (range {lo} to {hi}), {level:.1f} dB after")
+        # S2: Surprise me, stopped.
+        page.click("#play")
+        if not wait_for(page, f"!{E}.playing", 3.0):
+            failures.append(f"{where}: Stop did not stop")
+        page.click("#vibe-open")
+        if not wait_for(page, "!!document.querySelector('#vibe-surprise')", 2.0):
+            failures.append(f"{where}: the picker has no Surprise me")
+            return
+        page.click("#vibe-surprise")
+        if not wait_for(page, f"{E}.playing && !document.querySelector('.vpick')", 4.0):
+            failures.append(f"{where}: Surprise me did not close the picker and play "
+                            f"(playing {page.evaluate(f'{E}.playing')}, picker {page.locator('.vpick').count()})")
+        s = page.evaluate(f"{E}.getSong().style")
+        bpm = page.evaluate(f"{E}.bpm")
+        if s not in top or s == got or not vibes[s]["range"][0] <= bpm <= vibes[s]["range"][1]:
+            failures.append(f"{where}: Surprise me plays {s!r} at {bpm} bpm, expected a new top vibe inside its range")
+        level = read_level(page, 2.0, 0.3)
+        if level < -60:
+            failures.append(f"{where}: Surprise me made no sound ({level:.1f} dB)")
+        print(f"tile over the launch jam: {pick} kept as {want!r}; Surprise me, stopped: {s} at {bpm} bpm, {level:.1f} dB")
+        page.click("#play")
+    finally:
+        for e in errors:
+            failures.append(f"{where}: page error: {e}")
+        ctx.close()
+
+
 def part_core(browser, page, failures: list, shot) -> None:
     # F1 (spec 10.1): a cold start opens on the Play tab with a top vibe, and one tap on Play sounds.
     walk_cold_start(browser, failures)
+    # F1 review S2, S3: a tile over the untouched launch jam; the dice while playing and Surprise me stopped.
+    walk_launch_draws(browser, failures)
     # Sound and switching, then the screens, as one span of the single run (its walks build on one another's state):
     # the C4 and P5 layer levels, the Now view, the P1b look, P2's modes, a section and three toggles landing on the
     # bar, the master level and peak, every layer soloed; then in Advanced the G2 shell, G3 and G4 controls, P6's lead

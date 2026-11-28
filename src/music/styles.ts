@@ -227,8 +227,32 @@ export function vibeStart(id: string): number {
 
 // ---- F1 (spec 10.1, 10.2): the top vibes and the launch draw ------------------------------------------------------
 
-/** The top vibes (spec 10.2), in picker order: the styles whose file says `top: true`. */
-export const TOP_IDS: readonly string[] = STYLE_IDS.filter((id) => STYLES[id].top === true);
+/** Spec 10.2's order of the top vibes, which the picker's top group follows (F1 review M2, the phase 4 mock). */
+export const TOP_ORDER: readonly string[] = [
+  "deepTechno",
+  "melodicTechno",
+  "minimalTechno",
+  "dubTechno",
+  "deepHouse",
+  "progressive",
+  "drumAndBass",
+  "twoStep",
+  "breakbeat",
+  "loFi",
+  "ambient",
+  "drone",
+  "downtempo",
+  "synthwave",
+];
+
+/**
+ * The top vibes (spec 10.2), in picker order: the styles whose file says `top: true`, in TOP_ORDER, then any other
+ * top style in family order (F7's Signature goes first in TOP_ORDER when it lands).
+ */
+export const TOP_IDS: readonly string[] = [
+  ...TOP_ORDER.filter((id) => STYLES[id]?.top === true),
+  ...STYLE_IDS.filter((id) => STYLES[id].top === true && !TOP_ORDER.includes(id)),
+];
 
 /** The bpm a launch draw may roll for a style: its `bpmRange`, else its bpm plus or minus 2, inside the app's limits. */
 export function vibeBpmRange(def: StyleDef): [number, number] {

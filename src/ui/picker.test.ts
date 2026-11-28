@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import css from "../style.css?raw";
-import vibesSource from "./vibes.tsx?raw";
-import mainSource from "../main.tsx?raw";
-import appSource from "./App.tsx?raw";
-import { TOP_IDS, STYLE_IDS } from "../music/styles.ts";
+import { STYLES, TOP_IDS, STYLE_IDS, vibeBpmRange, vibeStart } from "../music/styles.ts";
+import type { Song } from "../engine/song.ts";
+import type { Ctx } from "./App.tsx";
+import { loadDrawn } from "./vibes.tsx";
 import { bothHeight, groupHeight, pickerPlan, PICK_GAP, PICK_GROUP, PICK_ROW, swapHeight } from "./picker.ts";
 
 const TOP = TOP_IDS.length;
@@ -68,20 +68,51 @@ describe("vibe picker plan (F1, spec 10.1)", () => {
 });
 
 describe("straight in (F1, spec 10.1)", () => {
-  it("opens the launch jam from the bag on a cold start, not the picker", () => {
-    expect(mainSource).toMatch(/drawLaunch\(Date\.now\(\), localBagStorage\(\)\)/);
-    expect(mainSource).toMatch(/keeper\.openLaunch\(/);
-    expect(appSource).toMatch(/const \[vibes, setVibes\] = useState\(false\)/);
-    expect(appSource).toMatch(/const \[tab, setTab\] = useState<Tab>\("play"\)/);
+  // F1 review M1: behaviour, not source text. The cold start itself is checked in the browser (smoke core's
+  // walk_cold_start), the dice and "Surprise me" taps there too (walk_vibe_draws).
+  type Fake = { ctx: Ctx; picked: { doc: Song; section: number }[]; plays: () => number; starts: () => number };
+  const fake = (playing: boolean): Fake => {
+    const picked: { doc: Song; section: number }[] = [];
+    let plays = 0;
+    let starts = 0;
+    const ctx = {
+      startAudio: () => {
+        starts++;
+        return Promise.resolve(true);
+      },
+      engine: { playing, play: () => void plays++ },
+      keeper: {
+        startVibeWith: async (pick: () => { doc: Song; section: number } | null) => {
+          const got = pick();
+          if (got) picked.push(got);
+          return !!got;
+        },
+      },
+    } as unknown as Ctx;
+    return { ctx, picked, plays: () => plays, starts: () => starts };
+  };
+
+  it("the dice and Surprise me draw a top vibe from the bag, rolled inside its bpm range", async () => {
+    for (let i = 0; i < 20; i++) {
+      const f = fake(false);
+      expect(await loadDrawn(f.ctx, false)).toBe(true);
+      const { doc, section } = f.picked[0];
+      expect(TOP_IDS).toContain(doc.style);
+      const [lo, hi] = vibeBpmRange(STYLES[doc.style!]);
+      expect(doc.bpm >= lo && doc.bpm <= hi, `${doc.style} ${doc.bpm}`).toBe(true);
+      expect(section).toBe(vibeStart(doc.style!));
+      // The dice does not start the transport.
+      expect(f.starts()).toBe(0);
+      expect(f.plays()).toBe(0);
+    }
   });
 
-  it("has a dice on the vibe control and Surprise me in the picker, both drawing from the bag", () => {
-    expect(vibesSource).toContain('id="vibe-dice"');
-    expect(vibesSource).toContain('id="vibe-surprise"');
-    expect(vibesSource).toMatch(/drawLaunch\(Date\.now\(\), localBagStorage\(\)\)/);
-  });
-
-  it("C28: the vibe pick no longer checks engine.playing", () => {
-    expect(vibesSource).not.toMatch(/engine\.playing/);
+  it("C28: Surprise me calls play() whether or not the transport already runs (play() returns early on a running one)", async () => {
+    for (const playing of [false, true]) {
+      const f = fake(playing);
+      expect(await loadDrawn(f.ctx, true)).toBe(true);
+      expect(f.starts(), `playing ${playing}`).toBe(1);
+      expect(f.plays(), `playing ${playing}`).toBe(1);
+    }
   });
 });

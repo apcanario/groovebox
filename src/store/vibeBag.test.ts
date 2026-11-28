@@ -37,6 +37,10 @@ describe("top vibes (spec 10.2)", () => {
     expect(TOP_IDS.map((id) => STYLES[id].name).sort()).toEqual([...TOP_NAMES].sort());
   });
 
+  it("come in spec 10.2's order, the picker's top group order (F1 review M2)", () => {
+    expect(TOP_IDS.map((id) => STYLES[id].name)).toEqual(TOP_NAMES);
+  });
+
   it("each has a bpm range inside the app's limits that holds its own bpm, plus or minus 2 by default", () => {
     for (const id of TOP_IDS) {
       const def = STYLES[id];
@@ -65,6 +69,45 @@ describe("the launch bag (spec 10.1)", () => {
     const got = Array.from({ length: 14 * 6 }, () => drawFromBag(42, store)!.id);
     for (let b = 0; b < 6; b++) expect(new Set(got.slice(b * 14, b * 14 + 14)).size).toBe(14);
     for (let i = 1; i < got.length; i++) expect(got[i]).not.toBe(got[i - 1]);
+  });
+
+  it("14 launches from a fresh bag give 14 different vibes and the 15th differs from the 14th", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const store = new MapStorage();
+      const got = Array.from({ length: 15 }, (_, i) => drawFromBag(seed * 31 + i, store, TOP_IDS, true)!.id);
+      expect(new Set(got.slice(0, 14)).size, `seed ${seed}`).toBe(14);
+      expect(got[14], `seed ${seed}`).not.toBe(got[13]);
+    }
+  });
+
+  it("F1 review S4: a dice draw between two launches never lets the next launch repeat the last launch's vibe", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const store = new MapStorage();
+      // 14 launches empty the bag; the last of them is X.
+      let x = "";
+      for (let i = 0; i < 14; i++) x = drawFromBag(seed * 13 + i, store, TOP_IDS, true)!.id;
+      expect(JSON.parse(store.getItem(BAG_KEY)!).bag, `seed ${seed}`).toEqual([]);
+      // The dice refills the bag (X allowed in it, just not first) and draws once.
+      const dice = drawFromBag(seed, store)!.id;
+      expect(dice, `seed ${seed}`).not.toBe(x);
+      expect(drawFromBag(seed, store, TOP_IDS, true)!.id, `seed ${seed}`).not.toBe(x);
+    }
+    // The same after any number of dice draws: the next launch is never the last launch's vibe.
+    for (let seed = 1; seed <= 50; seed++) {
+      const store = new MapStorage();
+      const x = drawFromBag(seed, store, TOP_IDS, true)!.id;
+      for (let d = 0; d < seed % 20; d++) drawFromBag(seed + d, store);
+      expect(drawFromBag(seed, store, TOP_IDS, true)!.id, `seed ${seed}`).not.toBe(x);
+    }
+  });
+
+  it("a launch that skips the last launch's vibe leaves it in the bag for a later draw", () => {
+    const store = new MapStorage();
+    store.setItem(BAG_KEY, JSON.stringify({ seed: 3, bag: ["drone", "ambient"], last: "loFi", lastLaunch: "drone" }));
+    expect(drawFromBag(1, store, TOP_IDS, true)!.id).toBe("ambient");
+    expect(JSON.parse(store.getItem(BAG_KEY)!)).toMatchObject({ bag: ["drone"], last: "ambient", lastLaunch: "ambient" });
+    expect(drawFromBag(1, store)!.id).toBe("drone");
+    expect(JSON.parse(store.getItem(BAG_KEY)!).lastLaunch).toBe("ambient");
   });
 
   it("is kept in storage: the same storage goes on with the same bag, whatever seed the launch passes", () => {

@@ -242,11 +242,15 @@ export function knobValue(k: KnobCurve, pos: number): number {
 
 /**
  * What the dial shows: milliseconds for times, 0..100 for amounts. The unit goes in the dial's name
- * (knobLabel), so the value fits inside the ring's hole on the smallest dial (P1b review S2).
+ * (knobLabel), so the value fits inside the ring's hole on the smallest dial (P1b review S2). A time of a second or
+ * more (a style can set one past the dial's range: Drone's 2 s bass attack) shows in seconds with its unit, "2.0s",
+ * as four digits of ms do not fit that hole at 10 px on a 360 px screen (F1 review S1).
  */
 export function knobText(k: KnobCurve, v: number): string {
   if (k.text) return k.text(v);
-  return k.seconds ? String(Math.round(v * 1000)) : String(Math.round(v * 100));
+  if (!k.seconds) return String(Math.round(v * 100));
+  const ms = Math.round(v * 1000);
+  return ms < 1000 ? String(ms) : `${secondsText(v)}s`;
 }
 
 /** The dial's name: a time carries its unit ("Decay ms"). */

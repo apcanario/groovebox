@@ -263,7 +263,11 @@ describe("patch knobs (G3)", () => {
     expect(knobValue(a, 0.3)).toBe(0.3);
     expect(knobText(a, 0.42)).toBe("42");
     expect(knobText(k, 0.004)).toBe("4");
-    expect(knobText(k, 1.25)).toBe("1250");
+    expect(knobText(k, 0.9994)).toBe("999");
+    // F1 review S1: a second or more shows in seconds, with its unit, so it fits the ring's hole.
+    expect(knobText(k, 1.25)).toBe("1.3s");
+    expect(knobText(k, 2)).toBe("2.0s");
+    expect(knobText(k, 12)).toBe("12s");
     expect(knobLabel({ ...k, label: "Decay" })).toBe("Decay ms");
     expect(knobLabel(a)).toBe("D");
   });

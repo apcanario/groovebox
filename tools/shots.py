@@ -22,6 +22,9 @@ no tile under 48 px, no label wrapped or overflowing, the top group first, More'
 
 tools/smoke.py runs the same walk (without screenshots) while the transport plays.
 
+F1 review E1: the launch bag is seeded (bag_seed), and the walks run on the default song opened from Songs, so a run
+is the same every time. SHOTS_LAUNCH=<vibe id> runs them on that vibe's launch jam instead.
+
 Usage: python3 tools/shots.py [dist] [out_dir]    (builds first: npm run build)
 Exits 1 on any failure.
 """
@@ -411,6 +414,16 @@ def close_picker(page) -> None:
         page.keyboard.press("Escape")
 
 
+def bag_seed(first: str = "dubTechno") -> str:
+    """F1: an init script that seeds the launch bag (once per browser context), so the launch jam is always `first`,
+    its key and bpm rolled from seed 1, whatever the clock. Shared with tools/smoke.py (BAG_SEED)."""
+    return ("try { if (!localStorage.getItem('groovebox.vibeBag'))\n"
+            f"  localStorage.setItem('groovebox.vibeBag', JSON.stringify({{ seed: 1, bag: ['{first}'], last: null }})); }} catch (e) {{}}")
+
+
+BAG_SEED = bag_seed()
+
+
 PICKER_SIZES = [(360, 640), (412, 915), (800, 1280), (1280, 800)]
 # F1 (spec 10.1): what the vibe picker sheet shows, measured: its groups in order with their tiles, whether it or the
 # document scrolls, tiles off the screen or under 48 px, labels that wrap or overflow, the More switch.
@@ -477,7 +490,8 @@ def walk_picker(page, failures: list, out_dir: str | None = None) -> int:
     vibes with the same checks, and both groups would not have fit (where they fit, both show). Leaves the app in
     Simple on the Play tab at 390 x 844 with the picker closed. Returns the number of screens checked."""
     vibes = page.evaluate("window.__vibes")
-    top = [v["id"] for v in vibes if v["top"]]
+    # F1 review M2: the top group in spec 10.2's order (window.__topIds), the others in the arrows' order.
+    top = page.evaluate("window.__topIds")
     others = [v["id"] for v in vibes if not v["top"]]
     page.click('[data-appmode="simple"]')
     page.click('[data-tab="play"]')
@@ -1516,11 +1530,24 @@ def main() -> int:
             page = browser.new_page(viewport={"width": 390, "height": 844})
             errors: list[str] = []
             page.on("pageerror", lambda e: errors.append(str(e)))
+            # F1 review E1: the bag is seeded before the first load, so the run is the same every time. SHOTS_LAUNCH=<id>
+            # keeps that vibe's launch jam open for the walks (a check of one vibe's screens, e.g. drone); by default the
+            # default song is opened from Songs, as the smoke's open_app does, so the walks measure what they did
+            # before F1.
+            launch = os.environ.get("SHOTS_LAUNCH")
+            page.add_init_script(bag_seed(launch) if launch else BAG_SEED)
             page.goto(f"http://localhost:{port}/index.html")
             end = time.time() + 5
             while time.time() < end and not page.evaluate("!!window.__groovebox"):
                 time.sleep(0.05)
             close_picker(page)
+            if launch:
+                if page.evaluate(f"{E}.getSong().style") != launch:
+                    failures.append(f"SHOTS_LAUNCH={launch}: the launch jam is {page.evaluate(f'{E}.getSong().style')!r}")
+            else:
+                page.evaluate("window.__keeper.create()")
+                if not _wait(page, "window.__keeper.list().then(l => l.length === 1 && l[0].name === 'Song 1')", 3.0):
+                    failures.append("the default song did not open from Songs")
             sample_play(page, failures, "first tap after load", True)
             page.click('[data-strip="1"]')  # Groove: every instrument on
             time.sleep(2.5)

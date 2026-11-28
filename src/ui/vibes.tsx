@@ -122,7 +122,8 @@ export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) 
   const [more, setMore] = useState(false);
   const height = useViewHeight();
   const tiles = vibeTiles();
-  const top = tiles.filter((t) => TOP_IDS.includes(t.id));
+  // F1 review M2: the top group in spec 10.2's order (TOP_IDS), the others in family order.
+  const top = TOP_IDS.map((id) => tiles.find((t) => t.id === id)).filter((t): t is VibeTile => !!t);
   const others = tiles.filter((t) => !TOP_IDS.includes(t.id));
   const plan = pickerPlan(height, top.length, others.length);
   const pending = engine.pendingLoad();
