@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """The smoke's parts cover every check.
 
-`uncovered()` (run by tools/smoke.py before any part) lists every function of tools/smoke.py, tools/dropcheck.py and
-tools/morphcheck.py
-that records a failure (`failures.append`) but is reached from no part of PARTS: a check that would never run.
+`uncovered()` (run by tools/smoke.py before any part) lists every function of tools/smoke.py, tools/dropcheck.py,
+tools/morphcheck.py and tools/kickcheck.py that records a failure (`failures.append`) but is reached from no part of PARTS: a check that would never run.
 
     python3 tools/smoke_parts.py              exits 1 if a check sits in no part
     python3 tools/smoke_parts.py --files NAME   lists what part NAME's ledger fingerprint hashes
@@ -15,7 +14,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 # basscheck.py's smoke check (walk_bass_run, in drop-5) is reached through smoke.py; the file is not listed, since its
 # hand-run commands (levels, probe) record failures on purpose outside any part.
-FILES = ["smoke.py", "dropcheck.py", "morphcheck.py"]
+# kickcheck.py (F2): its checks run in the kick part and drop-1, so a check added there and left out of a part fails.
+FILES = ["smoke.py", "dropcheck.py", "morphcheck.py", "kickcheck.py"]
 
 
 def _defs(tree) -> dict:

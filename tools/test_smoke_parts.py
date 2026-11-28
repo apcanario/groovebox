@@ -62,10 +62,19 @@ class PartFingerprints(unittest.TestCase):
                 fh.write(text)
 
     def test_parts_named(self):
-        self.assertEqual(self.names, ["core", "vibes", "additions", "effects"] + DROPS + ["morph", "cost"])
+        self.assertEqual(self.names, ["core", "vibes", "additions", "effects"] + DROPS + ["kick", "morph", "cost"])
 
     def test_every_check_in_a_part(self):
         self.assertEqual(sp.uncovered(), [])
+
+    def test_kick_checks_in_their_parts(self):
+        # F2: the kick's Done-when checks (tools/kickcheck.py) run in the kick part, its peak in drop-1 (Deep house's group).
+        kick = sp.part_inputs("kick")["tools"]
+        for fn in ["check_tune", "check_axes", "check_sweep", "check_others"]:
+            self.assertIn(f"kickcheck.py:{fn}", kick)
+        self.assertIn("shots.py:walk_kick_pad", kick)
+        self.assertIn("kickcheck.py:check_peak", sp.part_inputs("drop-1")["tools"])
+        self.assertIn(os.path.join("src", "ui", "tabs", "kick.tsx"), sp.part_inputs("kick")["files"])
 
     def test_unchanged_tree_keeps_every_entry(self):
         self.assertEqual(self.changed("package.json", '"private"', '"private"'), set())

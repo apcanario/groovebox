@@ -33,6 +33,12 @@ Filter, the lift lets go (shots.walk_punch); stopped, a press does nothing.
 T3 slice c: many fingers through real touch points (shots.walk_fingers): two dials, an XY pad with a pad, three pads,
 each ending with its own value; the pads' pulse and the Filter dial's ghost with motion on, neither with it off. The cost
 part measures the worst main-thread stall and the audio load at the desk with motion on and off (walk_motion_cost).
+F2 (spec 10.5): the kick part. The kick quadrant at 360 x 640, 412 x 915, 800 x 1280 and 1280 x 800 in both modes, 48 px
+a side, its words fitting, DROP and Morph unmoved (shots.walk_kick_pad); then tools/kickcheck.py on the kick's own
+samples: its body within 30 cents of the root in A, G, F# and C with Root on; Punch's ends changing the first 30 ms and
+Length's the tail; each axis (Punch, Length, Click, Tune, Root) swept through the UI while the kick plays with no step,
+no retrigger and acting at once; the ten other vibes' kick level and length within tolerance of the fixture recorded
+from the old voice. drop-1 adds the master under the limit through a drop with Pump at full and the loudest kick.
 
 Usage: python3 tools/smoke.py dist [screenshot.png] [--fresh]
 The walk runs in parts (PARTS), each in its own browser and its own process, in order. A part that passes is recorded
@@ -59,6 +65,8 @@ from shots import BAG_SEED, SMALL, sample_play, simple_words, walk_fingers, walk
 from dropcheck import CLICK_FACTOR, drop_vibes, walk_drop  # noqa: E402
 from morphcheck import walk_morph  # noqa: E402
 from basscheck import walk_bass_run  # noqa: E402
+from kickcheck import check_axes, check_others, check_peak, check_sweep, check_tune  # noqa: E402
+from shots import walk_kick_pad  # noqa: E402
 
 LAYERS = ["drums", "bass", "synth", "layer1", "layer2"]
 PORT = 4179
@@ -3602,6 +3610,9 @@ def part_effects(browser, page, failures: list, shot) -> None:
 def part_drop_1(browser, page, failures: list, shot) -> None:
     walk_drop(page, failures)
     drop_vibes(page, failures, 1)
+    # F2 (spec 10.5, tools/kickcheck.py): in Deep house (this group's), the master under the limit through a drop with
+    # Pump at full and the loudest kick (Punch 1, Click 1, Root on).
+    failures += check_peak(page)
 
 
 def part_drop_2(browser, page, failures: list, shot) -> None:
@@ -3625,6 +3636,17 @@ def part_drop_5(browser, page, failures: list, shot) -> None:
 
 def part_drop_6(browser, page, failures: list, shot) -> None:
     drop_vibes(page, failures, 6)
+
+
+def part_kick(browser, page, failures: list, shot) -> None:
+    # F2 (spec 10.5): the kick quadrant on every size and mode (tools/shots.py), then the kick's own sound
+    # (tools/kickcheck.py): Root's tuning in three keys and C, Punch's and Length's ends, every axis swept while the
+    # kick plays (no step, no retrigger, at once), the ten other vibes against the old voice's fixture.
+    walk_kick_pad(page, failures)
+    failures += check_tune(page)
+    failures += check_axes(page)
+    failures += check_sweep(page)
+    failures += check_others(page)
 
 
 def part_morph(browser, page, failures: list, shot) -> None:
@@ -3747,6 +3769,7 @@ PARTS = [
     ("drop-4", part_drop_4, None),
     ("drop-5", part_drop_5, None),
     ("drop-6", part_drop_6, None),
+    ("kick", part_kick, None),
     ("morph", part_morph, None),
     ("cost", part_cost, None),
 ]

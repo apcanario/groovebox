@@ -13,6 +13,10 @@ Screenshots left from an earlier run are deleted first, so shots/ holds only the
 After the walk, the live walk (P10c M5) loads Ambient and saves, at both sizes, Morph on, the Morph page with Sections
 off and on, the Drop page and DROP in build, on and wind-down (LIVE_SCREENS); a missing one fails the run.
 
+F2: the kick quadrant (walk_kick_pad) at 360 x 640, 412 x 915, 800 x 1280 and 1280 x 800 in both modes: one on the
+Drums panel, at least 48 px a side, its words on one line inside it, and DROP and Morph unmoved while it is opened and
+dragged; the smoke's kick part runs it too, without screenshots.
+
 T1: the tablet walk (walk_tablet) saves six tablet sizes in both modes: the desk at 1280 x 800, 1024 x 768 and 880 x 620
 and the dock at 800 x 1280, 768 x 1024 and 600 x 960, every rail panel and page, with the same checks and the layout's own (DESK,
 DOCK); the smoke's core part runs it too, without screenshots.
@@ -721,6 +725,115 @@ def sample_play(page, failures: list, where: str, want: bool, seconds: float | N
         if back:
             failures.append(f"{where}: the Play button showed {word!r}, then {back[0][0]!r} (lit {back[0][1]}) in {len(back)} "
                             f"of {len(got) - shown} later frames; once it shows {word!r} it must keep it")
+
+
+# F2 (spec 10.5): the kick quadrant on the Drums panel (the phone's Drums tab, its Kick page in Advanced; the rail's
+# Drums panel on a tablet, its Kick page where the panel is paged): one on screen, at least 48 px a side, inside the
+# screen, its words (Length, Punch and the readout) each on one line, inside the pad and drawn at 10 px or more.
+KICK_PAD = r"""() => {
+  const pads = [...document.querySelectorAll('[data-xy="kick"]')].filter((e) => e.getClientRects().length);
+  if (pads.length !== 1) return { bad: [`${pads.length} kick quadrants on screen, not 1`] };
+  const xy = pads[0], r = xy.getBoundingClientRect(), bad = [];
+  const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  if (r.width < 47.5 || r.height < 47.5) bad.push(`the kick quadrant is ${r.width.toFixed(0)} x ${r.height.toFixed(0)} px`);
+  if (r.left < -0.5 || r.top < -0.5 || r.right > vw + 0.5 || r.bottom > vh + 0.5) bad.push('the kick quadrant is outside the screen');
+  const at = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+  if (!at || !xy.contains(at)) bad.push('the kick quadrant is covered at its centre');
+  const words = {};
+  for (const cls of ['lx', 'ly', 'rv']) {
+    const l = xy.querySelector('.' + cls);
+    if (!l) { bad.push(`the kick quadrant has no .${cls}`); continue; }
+    const t = l.textContent.trim(), b = l.getBoundingClientRect();
+    words[cls] = t;
+    const rg = document.createRange();
+    rg.selectNodeContents(l);
+    const tops = new Set([...rg.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top)));
+    if (tops.size > 1) bad.push(`the kick quadrant's "${t}" wraps onto ${tops.size} lines`);
+    if (l.scrollWidth > l.clientWidth + 0.5 || l.scrollHeight > l.clientHeight + 0.5) bad.push(`the kick quadrant's "${t}" overflows its box`);
+    const tr = rg.getBoundingClientRect();
+    if (tr.left < r.left - 0.5 || tr.right > r.right + 0.5 || tr.top < r.top - 0.5 || tr.bottom > r.bottom + 0.5) bad.push(`the kick quadrant's "${t}" sticks out of the pad`);
+    if (parseFloat(getComputedStyle(l).fontSize) < 10) bad.push(`the kick quadrant's "${t}" is drawn under 10 px`);
+  }
+  if (words.lx !== 'Length' || words.ly !== 'Punch') bad.push(`the kick quadrant reads "${words.lx}" across and "${words.ly}" up, not Length and Punch`);
+  return { bad, w: r.width, h: r.height };
+}"""
+
+# Where DROP and Morph are: the Play tab's (PLAY_PLACE) on a phone; on a tablet, DROP and Morph as the layout shows them.
+DROP_MORPH = r"""() => {
+  const r = (s) => { const e = [...document.querySelectorAll(s)].find((x) => x.getClientRects().length); return e ? e.getBoundingClientRect() : null; };
+  const d = r('#drop'), m = r('#morph') || r('.droprow .morph');
+  return d && m ? [d.left, d.top, d.width, d.height, m.left, m.top, m.width, m.height].map((v) => Math.round(v * 2) / 2) : null;
+}"""
+
+KICK_SIZES = [(360, 640), (412, 915), (800, 1280), (1280, 800)]
+
+
+def walk_kick_pad(page, failures: list, out_dir: str | None = None) -> int:
+    """F2 Done-when: the kick quadrant is at least 48 px a side on every size (360 x 640, 412 x 915, 800 x 1280 and
+    1280 x 800) in Simple and Advanced, with its words fitting (KICK_PAD), and nothing moves DROP or Morph: on a phone
+    the Play tab's PLAY_PLACE is the same after the Drums tab is opened and the quadrant dragged, on a tablet DROP and
+    Morph stay put while the Drums panel opens and the quadrant is dragged. The quadrant is dragged corner to corner and
+    put back. Leaves the phone at 390 x 844 in Simple on the Play tab. Returns the screens checked."""
+    n = 0
+    saved = page.evaluate(f"(() => {{ const p = {E}.getSong().patches.drums; return {{ kickDecay: p.kickDecay, kickPunch: p.kickPunch ?? 0.5 }}; }})()")
+    for size in KICK_SIZES:
+        page.set_viewport_size({"width": size[0], "height": size[1]})
+        tablet = size[0] >= 600
+        _wait(page, f"document.documentElement.dataset.size {'!==' if tablet else '==='} 'phone'", 2.0)
+        for mode in ("simple", "advanced"):
+            where = f"{size[0]}x{size[1]} {mode}"
+            page.click(f'[data-appmode="{mode}"]')
+            tab = '.rail [data-tab="drums"]' if tablet else '[data-tab="drums"]'
+            if tablet:
+                page.click('.rail [data-tab="chords"]')
+            else:
+                page.click('[data-tab="play"]')
+            _settle(page)
+            place0 = page.evaluate(DROP_MORPH if tablet else PLAY_PLACE)
+            if not place0:
+                failures.append(f"{where}: no DROP and Morph to measure")
+            page.click(tab)
+            chip = page.locator('[data-page="drums:kick"]')
+            if chip.count() and chip.first.is_visible():
+                chip.first.click()
+            _settle(page)
+            got = page.evaluate(KICK_PAD)
+            for b in got["bad"]:
+                failures.append(f"{where}: {b}")
+            if out_dir:
+                page.screenshot(path=os.path.join(out_dir, f"{size[0]}x{size[1]}-{mode}-kick-quadrant.png"))
+            n += 1
+            if "w" in got:
+                print(f"kick quadrant {where}: {got['w']:.0f} x {got['h']:.0f} px")
+                box = page.locator('[data-xy="kick"]').first.bounding_box()
+                page.mouse.move(box["x"] + 2, box["y"] + box["height"] - 2)
+                page.mouse.down()
+                for i in range(1, 9):
+                    page.mouse.move(box["x"] + 2 + (box["width"] - 4) * i / 8, box["y"] + box["height"] - 2 - (box["height"] - 4) * i / 8)
+                page.mouse.up()
+                _settle(page)
+                after = page.evaluate(KICK_PAD)
+                for b in after["bad"]:
+                    failures.append(f"{where}, the quadrant dragged: {b}")
+                if "w" in after and (abs(after["w"] - got["w"]) > 0.5 or abs(after["h"] - got["h"]) > 0.5):
+                    failures.append(f"{where}: dragging the kick quadrant resized it ({got['w']:.0f} x {got['h']:.0f} -> {after['w']:.0f} x {after['h']:.0f})")
+                pad = page.evaluate(f"{E}.getSong().patches.drums")
+                if not (pad["kickDecay"] > 0.95 and pad.get("kickPunch", 0) > 0.95):
+                    failures.append(f"{where}: the quadrant dragged to its top right corner set Length {pad['kickDecay']:.2f}, Punch {pad.get('kickPunch')}")
+                page.evaluate(f"(v) => {E}.setParams('drums', v)", saved)
+            if tablet:
+                place1 = page.evaluate(DROP_MORPH)
+            else:
+                page.click('[data-tab="play"]')
+                _settle(page)
+                place1 = page.evaluate(PLAY_PLACE)
+            if place0 and place1 != place0:
+                failures.append(f"{where}: DROP or Morph moved with the Drums panel and the kick quadrant ({place0} -> {place1})")
+    page.click('[data-appmode="simple"]')
+    page.set_viewport_size({"width": 390, "height": 844})
+    _wait(page, "document.documentElement.dataset.size === 'phone'", 2.0)
+    page.click('[data-tab="play"]')
+    return n
 
 
 def walk_play_button(page, failures: list, label: str) -> None:
@@ -1555,6 +1668,8 @@ def main() -> int:
             # F1: the vibe picker at the four sizes of its Done-when line.
             n = walk_picker(page, failures, out)
             n += walk_frame(page, failures, out)
+            # F2: the kick quadrant at the four sizes of its Done-when line, both modes; DROP and Morph unmoved.
+            n += walk_kick_pad(page, failures, out)
             n += walk_live(page, failures, out)
             # P10d: with Ambient (Morph on) playing, every tap during a morph.
             walk_play_button(page, failures, "Ambient, Morph on")
