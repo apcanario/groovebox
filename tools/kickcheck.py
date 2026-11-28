@@ -21,7 +21,8 @@ The smoke runs them: tune, axes, sweep and others in its kick part, peak in drop
 What is measured: the kick's own sound, at its voice gain (after the drive and the C1 trim, before the drum channel),
 read on the audio thread in blocks of BLOCK samples (the largest sample of each block). Every kick the sequencer starts
 is logged with its audio time; a hit's level is its largest sample (dBFS), its length the time from its start to the
-last block over LENGTH_DB under that peak. A vibe's figures are the largest of each over the hits of BARS bars (every bar of an 8-bar phrase, from wherever it is entered) of its own
+last block over LENGTH_DB under that peak, read only up to a guard block before the next kick's onset (a hit that rings
+up to that point is said to be cut by the gap, and fails). A vibe's figures are the largest of each over the hits of BARS bars (every bar of an 8-bar phrase, from wherever it is entered) of its own
 start section, Morph off: the loudest hit (as the smoke's peak reads) and the longest-ringing one (the median moved by
 29 ms run to run in Trap, whose hits ring for two lengths). It measures; it cannot judge how the kick sounds.
 """
@@ -45,6 +46,9 @@ LENGTH_DB = 30.0
 # How far a vibe's kick length may move from the fixture: half a sixteenth at 176 bpm is 43 ms; 10 ms is about a
 # twentieth of the default 0.2 s kick and three render quanta.
 LENGTH_TOL_S = 0.010
+# A hit whose length reaches within this many blocks of the next kick's onset has been cut by the gap, not measured to
+# its tail (E1 of the F2 review): such a vibe's length says nothing, so it fails.
+SATURATE_BLOCKS = 2
 
 KICK_READ = """async ([bars, block]) => {
   const e = window.__groovebox, d = e.graph.instruments.drums, ctx = d.channel.input.context, raw = ctx.rawContext;
@@ -96,12 +100,16 @@ def measure(page, block: int = BLOCK, bars: int = BARS) -> dict:
     span = block / sr
     hits = sorted(h["t"] for h in r["hits"] if r["t0"] is not None and h["t"] >= t0)
     end = t0 + len(b) * span
-    levels, lengths = [], []
+    levels, lengths, saturated = [], [], 0
     for i, t in enumerate(hits):
-        nxt = hits[i + 1] if i + 1 < len(hits) else end
+        has_next = i + 1 < len(hits)
+        nxt = hits[i + 1] if has_next else end
         if nxt > end:
             break
-        lo, hi = int((t - t0) / span), min(len(b), int((nxt - t0) / span) + 1)
+        # The segment ends a guard block before the block the next onset falls in (as one_hit slices), so a hit's
+        # length is its own tail, never the gap to the next kick.
+        lo = int((t - t0) / span)
+        hi = min(len(b), int((nxt - t0) / span) - 1) if has_next else len(b)
         seg = b[lo:hi]
         if not seg:
             continue
@@ -111,10 +119,14 @@ def measure(page, block: int = BLOCK, bars: int = BARS) -> dict:
         floor = pk * 10 ** (-LENGTH_DB / 20)
         last = max(j for j, x in enumerate(seg) if x > floor)
         levels.append(20 * math.log10(pk))
-        lengths.append((lo + last + 1) * span + t0 - t)
+        ln = (lo + last + 1) * span + t0 - t
+        lengths.append(ln)
+        # A tail that reaches within SATURATE_BLOCKS of the next onset is cut by it, not measured.
+        if has_next and ln >= (nxt - t) - SATURATE_BLOCKS * span:
+            saturated += 1
     if not levels:
-        return {"level": None, "length": None, "hits": 0}
-    return {"level": round(max(levels), 2), "length": round(max(lengths), 4), "hits": len(levels)}
+        return {"level": None, "length": None, "hits": 0, "saturated": 0}
+    return {"level": round(max(levels), 2), "length": round(max(lengths), 4), "hits": len(levels), "saturated": saturated}
 
 
 # ---- Raw capture: the kick's own samples ------------------------------------------------------------------------
@@ -549,7 +561,7 @@ def others(page) -> dict:
         wait_for(page, f"{E}.position().bar >= {b + 1}", 2 * bar_s(page) + 2)
         m = measure(page)
         out[vid] = m
-        print(f"  {vid}: kick {m['level']} dBFS, {m['length']} s ({m['hits']} hits)", flush=True)
+        print(f"  {vid}: kick {m['level']} dBFS, {m['length']} s ({m['hits']} hits, {m['saturated']} cut by the next kick)", flush=True)
         page.click("#play")
         wait_for(page, f"!{E}.playing", 3.0)
         time.sleep(0.6)
@@ -566,6 +578,8 @@ def check_others(page) -> list:
         if not m or m["level"] is None:
             failures.append(f"others: {vid} played no kick")
             continue
+        if m.get("saturated"):
+            failures.append(f"others: {vid}: {m['saturated']} of {m['hits']} hits ring to within {SATURATE_BLOCKS} blocks of the next kick: the length is the gap, not the tail")
         dl, dt = m["level"] - was["level"], m["length"] - was["length"]
         print(f"others: {vid} level {was['level']:.2f} -> {m['level']:.2f} dB ({dl:+.2f}; within {LOUD_DB}), "
               f"length {was['length']:.4f} -> {m['length']:.4f} s ({dt * 1000:+.1f} ms; within {LENGTH_TOL_S * 1000:.0f})")
@@ -594,6 +608,7 @@ def main() -> int:
                            "length_db": LENGTH_DB, "vibes": out}, fh, indent=1)
                 fh.write("\n")
             failures = [f"record: {v} played no kick" for v, m in out.items() if m["level"] is None]
+            failures += [f"record: {v}: {m['saturated']} hits cut by the next kick (the length is the gap)" for v, m in out.items() if m.get("saturated")]
             print(f"wrote {FIXTURE}")
         else:
             failures = []
