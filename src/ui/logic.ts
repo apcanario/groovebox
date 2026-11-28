@@ -306,7 +306,8 @@ export const KNOB_PAGES: Partial<Record<InstrumentId, KnobPage[]>> = {
       name: "Kick",
       knobs: [
         { key: "kickLevel", label: "Kick" },
-        { key: "kickDecay", label: "K decay" },
+        // F2 review M6: the same value as the kick quadrant's Length, so the same name.
+        { key: "kickDecay", label: "Length" },
         { key: "pitch", label: "Tune" },
         { key: "drive", label: "K drive" },
       ],

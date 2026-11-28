@@ -24,7 +24,7 @@ import {
 import type { Ctx } from "../App.tsx";
 import { Chips, Dial, GroupLabel, PagedChips, Pager, SendBar, Sheet, Toggle, XYPad } from "../components.tsx";
 import { SoundPicker } from "./SimpleTab.tsx";
-import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, DRUM_EXTRAS, VOICE_KNOBS, drumKnob, patchName, patchOf, presetName, WAVE_LABEL, hzLabel, knobLabel, knobPos, knobText, knobValue, sectionLetter, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
+import { KIT_KNOBS, KNOB_PAGES, MOD_KNOBS, DRUM_EXTRAS, VOICE_KNOBS, drumKnob, patchName, patchOf, presetName, WAVE_LABEL, hzLabel, kickRootOn, knobLabel, knobPos, knobText, knobValue, sectionLetter, simpleXYReadout, shownPage, withFilterPage, type KnobSpec, type PageDef } from "../logic.ts";
 import { INST_COLOR, INST_NAME, InstName } from "../theme.tsx";
 import { Lane } from "../lanes.tsx";
 import { FxPage, FxSlots } from "./fx.tsx";
@@ -42,50 +42,64 @@ function Knobs({ ctx, inst, knobs, children, cls }: { ctx: Ctx; inst: Instrument
   const patch = ctx.song.patches[inst];
   return (
     <div class={`dials n${knobs.length}${cls ? ` ${cls}` : ""}`}>
-      {knobs.map((k) => (
-        <Dial
-          key={k.key}
-          id={`${inst}:${k.key}`}
-          label={knobLabel(k)}
-          value={knobPos(k, patch[k.key])}
-          min={0}
-          max={1}
-          display={knobText(k, patch[k.key])}
-          color={INST_COLOR[inst]}
-          onChange={(p) => ctx.engine.setParam(inst, k.key, knobValue(k, p))}
-        />
-      ))}
+      {knobs.map((k) => {
+        // F2 review M6: with Root on the kick's body is the song's root, so Tune is not heard: dimmed, and it says why.
+        const rooted = inst === "drums" && k.key === "pitch" && kickRootOn(patch);
+        return (
+          <Dial
+            key={k.key}
+            id={`${inst}:${k.key}`}
+            label={knobLabel(k)}
+            value={knobPos(k, patch[k.key])}
+            min={0}
+            max={1}
+            display={rooted ? "Root" : knobText(k, patch[k.key])}
+            color={INST_COLOR[inst]}
+            dim={rooted}
+            onChange={(p) => ctx.engine.setParam(inst, k.key, knobValue(k, p))}
+          />
+        );
+      })}
       {children}
     </div>
   );
 }
 
-/** The filter XY pad alone (T2: on the desk the sends sit with the effects). */
-export function FilterXY({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
+/**
+ * The filter XY pad alone (T2: on the desk the sends sit with the effects). `narrow`: half of the whole Drums column
+ * (F2 review S4, about 71 px across), too narrow for "Resonance" and a hertz readout: Simple's words for the same two
+ * values, Tone and Edge, and the readout as 0..100, as the Simple pads read.
+ */
+export function FilterXY({ ctx, inst, narrow }: { ctx: Ctx; inst: InstrumentId; narrow?: boolean }) {
   const { engine } = ctx;
   const patch = ctx.song.patches[inst];
   const hz = engine.cutoffHz(inst, patch.cutoff);
-  const readout = `${hz === null ? `${Math.round(patch.cutoff * 100)}%` : hzLabel(hz)} · ${Math.round(patch.resonance * 100)}%`;
+  const readout = narrow
+    ? simpleXYReadout(patch.cutoff, patch.resonance)
+    : `${hz === null ? `${Math.round(patch.cutoff * 100)}%` : hzLabel(hz)} · ${Math.round(patch.resonance * 100)}%`;
   return (
     <XYPad
       id={inst}
       x={patch.cutoff}
       y={patch.resonance}
-      xLabel="Cutoff"
-      yLabel="Resonance"
+      xLabel={narrow ? "Tone" : "Cutoff"}
+      yLabel={narrow ? "Edge" : "Resonance"}
       readout={readout}
       onChange={(x, y) => engine.setParams(inst, { cutoff: x, resonance: y })}
     />
   );
 }
 
-/** The filter XY pad and the two sends: the lowest controls of every instrument tab. */
-export function FilterPanel({ ctx, inst }: { ctx: Ctx; inst: InstrumentId }) {
+/**
+ * The filter XY pad and the two sends: the lowest controls of every instrument tab. `pad` takes the filter pad's place
+ * (F2 review M7: on the Drums Kick page the kick quadrant, the control touched most, sits lowest).
+ */
+export function FilterPanel({ ctx, inst, pad }: { ctx: Ctx; inst: InstrumentId; pad?: ComponentChildren }) {
   const { engine } = ctx;
   const patch = ctx.song.patches[inst];
   return (
     <>
-      <FilterXY ctx={ctx} inst={inst} />
+      {pad ?? <FilterXY ctx={ctx} inst={inst} />}
       <div class="sends">
         <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(v) => engine.setParam(inst, "delay", v)} />
         <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(v) => engine.setParam(inst, "reverb", v)} />
@@ -398,9 +412,6 @@ function SoundButton({ ctx }: { ctx: Ctx }) {
         <Sheet onClose={() => setOpen(false)}>
           <h2>Drum sound</h2>
           <SoundPicker ctx={ctx} inst="drums" />
-          {/* F2: the drums' filter pad, which the kick quadrant replaced at the foot of the column. */}
-          <GroupLabel thing="Filter" />
-          <FilterXY ctx={ctx} inst="drums" />
           <button class="btn wide" id="sound-close" onClick={() => setOpen(false)}>
             Close
           </button>
@@ -414,8 +425,8 @@ function SoundButton({ ctx }: { ctx: Ctx }) {
  * T2 (spec 9.2): Drums whole, on the desk. Every voice's 16 steps as one grid, each voice two rows of eight (a half
  * bar each: 16 cells of 48 px do not fit across the panel), with the voice's level and decay beside its two rows; the
  * beat over the grid; the name and switch, the Drums lane (spec 8.12, T2 review M1), the sound, Reset, the kick's Tune and drive, the perc's pitch,
- * Click, Swing and Root, both effect slots, the sends and the kick quadrant (lowest, in thumb reach; F2) in the column on the right.
- * F2: the drums' filter pad, which sat where the quadrant is, is in the Sound sheet.
+ * Click, Swing and Root, both effect slots, the sends, and at the foot (in thumb reach) the drums' filter pad beside the
+ * kick quadrant (F2; F2 review S4: spec 9.2, everything at once on the desk, nothing behind a sheet).
  */
 function WholeDrums({ ctx, f }: { ctx: Ctx; f: Full }) {
   const { engine, song, edit } = ctx;
@@ -493,8 +504,11 @@ function WholeDrums({ ctx, f }: { ctx: Ctx; f: Full }) {
           <SendBar label="Delay" value={patch.delay} color="var(--blue)" onChange={(x) => engine.setParam("drums", "delay", x)} />
           <SendBar label="Reverb" value={patch.reverb} color="var(--teal)" onChange={(x) => engine.setParam("drums", "reverb", x)} />
         </div>
-        {/* F2 (spec 10.5): the kick quadrant, lowest in thumb reach; the filter pad is in the Sound sheet. */}
-        <KickPad ctx={ctx} />
+        {/* F2 (spec 10.5): the kick quadrant, lowest in thumb reach, with the drums' filter pad beside it (review S4). */}
+        <div class="xypair">
+          <FilterXY ctx={ctx} inst="drums" narrow />
+          <KickPad ctx={ctx} />
+        </div>
       </div>
     </section>
   );
@@ -505,6 +519,9 @@ function PagedInstrument({ ctx, inst, sref, chosen, setPage }: { ctx: Ctx; inst:
   const pages = withFilterPage(basePages(inst), roomy);
   const page = shownPage(pages, chosen);
   const knobPages = KNOB_PAGES[inst] ?? [];
+  // F2 review M7: where the filter panel shows under every page, the Kick page puts the quadrant in the filter pad's
+  // place, lowest; the filter pad is under every other page.
+  const kickLow = roomy && page === "kick";
   return (
     <section ref={sref} class={`insttab${roomy ? " roomy" : ""}`} style={{ "--c": INST_COLOR[inst], "--chip": INST_COLOR[inst] }}>
       <HeadRow ctx={ctx} inst={inst} />
@@ -519,7 +536,7 @@ function PagedInstrument({ ctx, inst, sref, chosen, setPage }: { ctx: Ctx; inst:
             <Knobs ctx={ctx} inst={inst} knobs={knobPages[0].knobs} cls="kickdials">
               <ClickDial ctx={ctx} />
               <RootSwitch ctx={ctx} />
-              <KickPad ctx={ctx} />
+              {!kickLow && <KickPad ctx={ctx} />}
             </Knobs>
           )}
           {page === "hats" && <Knobs ctx={ctx} inst={inst} knobs={knobPages[1].knobs} />}
@@ -536,7 +553,7 @@ function PagedInstrument({ ctx, inst, sref, chosen, setPage }: { ctx: Ctx; inst:
           {page === "fx" && <FxPage ctx={ctx} inst={inst} />}
         </div>
       )}
-      {(roomy || page === "filter") && <FilterPanel ctx={ctx} inst={inst} />}
+      {(roomy || page === "filter") && <FilterPanel ctx={ctx} inst={inst} pad={kickLow ? <KickPad ctx={ctx} /> : undefined} />}
     </section>
   );
 }

@@ -1305,6 +1305,13 @@ def advanced_read(page, sec: int, inst: str, t: dict) -> tuple:
         want = str(jsround(v)) if key == "hits" else str(jsround(v * 100))
         return dial(f"{inst}:{kind}:{key}"), want
     v = page.evaluate(f"{SONG}.patches.{inst}.{key}")
+    if key in ("kickPunch", "kickDecay"):
+        # F2 review S2: the drums' Punch dial moves the kick quadrant's Punch; the quadrant reads Length · Punch on the
+        # Kick page (a song that never set Punch reads its default, 0.5).
+        go("kick")
+        x, y = page.get_attribute('.body [data-xy="kick"]', "data-value").split()
+        v = 0.5 if v is None else v
+        return (y if key == "kickPunch" else x), str(jsround(v * 100))
     if key in ("cutoff", "resonance"):
         go("filter")
         x, y = page.get_attribute(f'.body [data-xy="{inst}"]', "data-value").split()

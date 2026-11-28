@@ -3262,9 +3262,20 @@ button:disabled {
 .drumwhole .dright > .dials {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-/* The drums' filter pad in the Sound sheet on the desk. */
-.sheet .xy {
-  flex: none;
-  height: 160px;
+/* F2 review S4: at the foot of the whole Drums column, the drums' filter pad beside the kick quadrant, each half the
+   150 px column (71 px across) and the pads' 96 px or more tall. */
+.drumwhole .xypair {
+  flex: 1 1 0;
+  min-height: 96px;
+  display: flex;
+  gap: var(--gap);
+}
+.drumwhole .xypair .xy {
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 0;
+}
+/* F2 review M6: a dial nothing hears now (Tune with Root on): it still turns. */
+.dial.dim .knob {
+  opacity: 0.4;
 }

@@ -128,6 +128,8 @@ export interface DialProps {
   id?: string;
   /** The name under the dial when it is more than its label's words (an instrument's icon and name). */
   name?: ComponentChildren;
+  /** Drawn dimmed: the dial still turns, but nothing hears it now (F2 review M6: Tune while Root is on). */
+  dim?: boolean;
 }
 
 /**
@@ -135,7 +137,7 @@ export interface DialProps {
  * spec 8.12 says: a square-cut arc on a dark track, three ticks, a short white pointer at the value,
  * the value in the middle and the name under it.
  */
-export function Dial({ label, value, min, max, step = 0, display, color, onChange, bipolar, id, name }: DialProps) {
+export function Dial({ label, value, min, max, step = 0, display, color, onChange, bipolar, id, name, dim }: DialProps) {
   const drag = useVerticalDrag(value, min, max, onChange, step);
   const f = fraction(value, min, max);
   const end = 135 + 270 * f;
@@ -144,9 +146,10 @@ export function Dial({ label, value, min, max, step = 0, display, color, onChang
   const text = display ?? String(Math.round(f * 100));
   return (
     <div
-      class="dial"
+      class={dim ? "dial dim" : "dial"}
       role="slider"
       aria-label={label}
+      aria-description={dim ? "Not heard now" : undefined}
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={value}

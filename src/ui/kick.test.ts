@@ -93,7 +93,13 @@ describe("the drum pages (F2)", () => {
     expect(kick.knobs.map((k) => k.key)).toEqual(["kickLevel", "kickDecay", "pitch", "drive"]);
     expect(kick.knobs.find((k) => k.key === "pitch")!.label).toBe("Tune");
     const src: string = instSrc;
-    expect(src).toMatch(/page === "kick" && \(\s*<Knobs[^>]*knobs=\{knobPages\[0\]\.knobs\} cls="kickdials">\s*<ClickDial ctx=\{ctx\} \/>\s*<RootSwitch ctx=\{ctx\} \/>\s*<KickPad ctx=\{ctx\} \/>/);
+    expect(src).toMatch(/page === "kick" && \(\s*<Knobs[^>]*knobs=\{knobPages\[0\]\.knobs\} cls="kickdials">\s*<ClickDial ctx=\{ctx\} \/>\s*<RootSwitch ctx=\{ctx\} \/>\s*\{!kickLow && <KickPad ctx=\{ctx\} \/>\}/);
+    // Review M6: the Kick page's decay is the quadrant's Length, by name too.
+    expect(kick.knobs.find((k) => k.key === "kickDecay")!.label).toBe("Length");
+    // Review M6: with Root on, Tune is dimmed and reads "Root".
+    expect(src).toMatch(/const rooted = inst === "drums" && k\.key === "pitch" && kickRootOn\(patch\);/);
+    expect(src).toMatch(/display=\{rooted \? "Root" : knobText\(k, patch\[k\.key\]\)\}/);
+    expect(src).toMatch(/dim=\{rooted\}/);
     // The clap moved to Hats, Swing to Kit: no page over six dials.
     expect(hats.knobs.map((k) => k.key)).toEqual(["clapLevel", "clapDecay", "hatLevel", "hatDecay", "openLevel", "openDecay"]);
     expect(src).toMatch(/page === "kit" && \(\s*<Knobs ctx=\{ctx\} inst=\{inst\} knobs=\{KIT_KNOBS\}>\s*<SwingDial ctx=\{ctx\} \/>/);
@@ -104,10 +110,15 @@ describe("the drum pages (F2)", () => {
     const simple: string = simpleSrc;
     expect(simple).toMatch(/inst === "drums" \? <KickPad ctx=\{ctx\} \/> : <SimpleXY/);
     const src: string = instSrc;
-    // Desk: the quadrant lowest in the column, the drums' filter pad in the Sound sheet.
-    expect(src).toMatch(/<SoundPicker ctx=\{ctx\} inst="drums" \/>[\s\S]{0,200}<FilterXY ctx=\{ctx\} inst="drums" \/>/);
-    expect(src).toMatch(/<KickPad ctx=\{ctx\} \/>\s*<\/div>\s*<\/section>/);
-    // Phone and tablet pages: the filter pad and sends where they were (under every page, or the Filter page).
-    expect(src).toMatch(/\(roomy \|\| page === "filter"\) && <FilterPanel ctx=\{ctx\} inst=\{inst\} \/>/);
+    // Desk (F2 review S4): at the foot of the column the drums' filter pad beside the quadrant, nothing in a sheet.
+    expect(src).toMatch(/<div class="xypair">\s*<FilterXY ctx=\{ctx\} inst="drums" narrow \/>\s*<KickPad ctx=\{ctx\} \/>\s*<\/div>\s*<\/div>\s*<\/section>/);
+    const sheet = src.slice(src.indexOf("function SoundButton"), src.indexOf("function WholeDrums"));
+    expect(sheet).toContain("<Sheet");
+    expect(sheet).not.toContain("FilterXY");
+    // Phone and tablet pages: the filter pad and sends where they were (under every page, or the Filter page); where
+    // they are under every page, the Kick page puts the quadrant in the filter pad's place, lowest (review M7).
+    expect(src).toMatch(/const kickLow = roomy && page === "kick";/);
+    expect(src).toMatch(/\{!kickLow && <KickPad ctx=\{ctx\} \/>\}/);
+    expect(src).toMatch(/\(roomy \|\| page === "filter"\) && <FilterPanel ctx=\{ctx\} inst=\{inst\} pad=\{kickLow \? <KickPad ctx=\{ctx\} \/> : undefined\} \/>/);
   });
 });
