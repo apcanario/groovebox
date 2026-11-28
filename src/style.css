@@ -1700,12 +1700,18 @@ button:disabled {
   flex: none;
   display: grid;
   /* F1 (spec 10.1): the dice, then the arrows either side of the vibe's name; the dice stands a little apart. */
-  grid-template-columns: var(--hit) var(--hit) minmax(0, 1fr) var(--hit);
+  grid-template-columns: calc(var(--hit) + 6px) var(--hit) minmax(0, 1fr) var(--hit);
   gap: var(--gap);
   margin-bottom: var(--group);
 }
 .vibectl .vdice {
   margin-right: 6px;
+}
+/* F1: with the dice beside the arrows, a phone under 400 px wide drops "All 24 vibes", so the vibe's name keeps its size. */
+@media (max-width: 399.98px) {
+  .vibectl .vmain:not(.pending) > span {
+    display: none;
+  }
 }
 .vibectl .varrow {
   display: flex;

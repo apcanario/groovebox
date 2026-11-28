@@ -401,9 +401,11 @@ class Walk:
 
 
 def close_picker(page) -> None:
-    """The vibe picker opens the app (P3): close it, keeping the song that opened."""
-    page.wait_for_selector(".vibes", timeout=5000)
-    page.keyboard.press("Escape")  # C9: the picker has no Close; Escape keeps the song that opened
+    """F1 (spec 10.1): the app opens on the Play tab with the launch jam, no picker. Wait for the Play tab; should a
+    picker show, Escape closes it, keeping the song that opened."""
+    page.wait_for_selector(".shell", timeout=5000)
+    if page.locator(".vpick, .vibes").count():
+        page.keyboard.press("Escape")
 
 
 def walk_frame(page, failures: list, out_dir: str | None = None) -> int:
