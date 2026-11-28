@@ -319,14 +319,14 @@ RAW_START = """async () => {
   }
   await raw.__kickRaw;
   const node = ctx.createAudioWorkletNode('kick-raw', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
-  const hits = [], orig = d.trigger;
+  const hits = [], late = [], orig = d.trigger;
   d.trigger = function (voice, time, vel, bpm, gap) {
-    if (voice === 'kick') hits.push(time);
+    if (voice === 'kick') { hits.push(time); late.push(ctx.currentTime - time); }
     return orig.call(this, voice, time, vel, bpm, gap);
   };
   d.gains.kick.connect(node);
   node.port.postMessage('go');
-  window.__kickCap = { node, hits, orig, d };
+  window.__kickCap = { node, hits, late, orig, d };
   return ctx.currentTime;
 }"""
 RAW_STOP = """async () => {
@@ -335,7 +335,7 @@ RAW_STOP = """async () => {
   c.d.trigger = c.orig;
   c.d.gains.kick.disconnect(c.node);
   window.__kickCap = null;
-  return { t0: data.t0, x: data.x, sr: ctx.sampleRate, hits: c.hits, beat: 60 / window.__groovebox.bpm };
+  return { t0: data.t0, x: data.x, sr: ctx.sampleRate, hits: c.hits, late: c.late, beat: 60 / window.__groovebox.bpm };
 }"""
 NOW = "window.__groovebox.graph.instruments.drums.channel.input.context.currentTime"
 
@@ -381,6 +381,7 @@ def still_figures(x, sr: float, t0: float, hits: list, lo: float, hi: float, ins
         peak[i0:j] = a[i0:j].max() if j > i0 else 0
         skip[i0:min(j, i + int(STILL_SKIP_S * sr))] = True
         skip[i + int(STILL_SKIP_S * sr):j] = False
+        rskip[i0:min(j, i + int(STILL_RISE_SKIP_S * sr))] = True
         rskip[i + int(STILL_RISE_SKIP_S * sr):j] = False
     sel = (t >= lo) & (t < hi)
     if not inside:
@@ -392,6 +393,10 @@ def still_figures(x, sr: float, t0: float, hits: list, lo: float, hi: float, ins
     jumps[1:] = np.abs(np.diff(x))
     m = sel & ~skip & ok
     jump = float((jumps[m] / peak[m]).max()) if m.any() else 0.0
+    if os.environ.get("KICK_DEBUG") and m.any():
+        k = int(np.flatnonzero(m)[np.argmax(jumps[m] / peak[m])])
+        prev = max((h for h in hs if h <= t[k]), default=None)
+        print(f"   worst jump at {t[k] - t0:.4f} s of the capture, {(t[k] - prev) * 1000 if prev else -1:.1f} ms after a logged hit", flush=True)
     w, hop = int(STILL_ENV_S * sr), int(STILL_HOP_S * sr)
     from numpy.lib.stride_tricks import sliding_window_view
     env = np.zeros(n)
@@ -401,6 +406,11 @@ def still_figures(x, sr: float, t0: float, hits: list, lo: float, hi: float, ins
     m = sel & ~rskip & ok
     m[:w + hop] = False
     up = float((rise[m] / peak[m]).max()) if m.any() else 0.0
+    if os.environ.get("KICK_DEBUG") and m.any():
+        k = int(np.flatnonzero(m)[np.argmax(rise[m] / peak[m])])
+        prev = max((h for h in hs if h <= t[k]), default=None)
+        print(f"   worst rise at {t[k] - t0:.4f} s, {(t[k] - prev) * 1000 if prev else -1:.1f} ms after a logged hit; hits at "
+              + ", ".join(f"{h - t0:.3f}" for h in hs), flush=True)
     return jump, max(up, 0.0)
 
 
@@ -484,8 +494,13 @@ def check_sweep(page) -> list:
         # The sounding kicks the sweep can step: from the hit before the sweep began to half a second after it.
         sj, sr_ = still_figures(x, sr, t0, hits, lo - beat, hi + 0.5, True)
         rj, rr = still_figures(x, sr, t0, hits, lo - beat, hi + 0.5, False)
+        ahead = min((-v for v in r["late"]), default=float("nan"))
         print(f"sweep: {name}: jump {sj:.4f} of the hit's peak (still {rj:.4f}: {sj / max(rj, 1e-9):.2f} times), "
-              f"envelope rise {sr_:.3f} (still {rr:.3f}); {len(hits)} kicks", flush=True)
+              f"envelope rise {sr_:.3f} (still {rr:.3f}); {len(hits)} kicks, each scheduled {ahead * 1000:.0f} ms ahead or more", flush=True)
+        # A kick the sequencer hands over after its time starts late, past where its onset is looked for: said apart,
+        # since a step found then may be that kick's own start (the main thread stalled while the axis moved).
+        if ahead < 0:
+            failures.append(f"sweep: {name}: a kick was scheduled {-ahead * 1000:.0f} ms after its time (the main thread stalled while it moved)")
         if not (rj > 0 and sj == sj):
             failures.append(f"sweep: {name}: no kicks measured ({len(hits)} logged)")
         elif sj > CLICK_FACTOR * rj:
