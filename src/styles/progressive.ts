@@ -9,7 +9,14 @@ export default {
   top: true,
   key: "A",
   mood: "minor",
-  patches: { drums: "punchy", bass: "rubber", synth: "pluck", layer1: "pluckLead", layer2: "strings" },
+  // F2 (spec 10.3's Drums, 10.5): Progressive: a firm kick, a little click; Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "punchy", kick: { kickPunch: 0.55, kickClick: 0.25, kickRoot: 1 } },
+    bass: "rubber",
+    synth: "pluck",
+    layer1: "pluckLead",
+    layer2: "strings",
+  },
   mix: { sweep: 0, pump: 0.55, saturation: 0.1 },
   leads: {
     layer1: { style: "phrase", phrase: 4, density: 0.6, shape: "rise", range: 0.5, register: 0.65, noteLength: 0.5, slide: 0.05, accent: 0.3 },

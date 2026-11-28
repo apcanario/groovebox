@@ -3,7 +3,7 @@ import type { StyleDef } from "../music/data.ts";
 /**
  * Ambient (P7 rework, spec 8.10): slow and major, chords of four and eight bars, a drone on Layer 2 that glides
  * from chord to chord, a pad on Layer 1 that swoops between them, long attacks and releases, slow drift on the
- * pads, a 12-second reverb and the air layer. A sparse halftime pulse only in the groove. P8: Layer 1 is the new
+ * pads, a 12-second reverb and the air layer. F2: a very soft Thump only in the groove (spec 10.3). P8: Layer 1 is the new
  * Shimmer pad (FM, long and wet) beside the airy pad on Layer 2.
  */
 export default {
@@ -15,8 +15,10 @@ export default {
   bpmRange: [60, 72],
   key: "E",
   mood: "major",
+  // F2 (spec 10.3's Drums, 10.5): None, or Thump very soft: the kick down, a shallow sweep, no click;
+  // Root tunes the kick to the song's key.
   patches: {
-    drums: "soft",
+    drums: { patch: "soft", set: { kickLevel: 0.4 }, kick: { kickPunch: 0.2, kickClick: 0, kickRoot: 1 } },
     bass: "sub",
     synth: { patch: "padSwell", set: { attack: 3, release: 8, drift: 0.35, driftRate: 0.2 } },
     layer1: { patch: "shimmer", set: { level: 0.5 } },
@@ -75,7 +77,7 @@ export default {
       name: "Groove",
       on: ["drums", "bass", "synth", "layer1", "layer2"],
       chords: [[0, 4], [3, 4], [5, 4], [4, 4]],
-      beat: "halftime",
+      beat: "thump",
       bass: "pedal",
       synth: "sustained",
       layer1: { mode: "pad", pad: { attack: 3, release: 10, motion: 0.4, swoop: 0.5 } },

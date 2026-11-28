@@ -9,7 +9,15 @@ export default {
   top: true,
   key: "C",
   mood: "house",
-  patches: { drums: "deep", bass: "sub", synth: "dubChord", layer1: "driftPad", layer2: "tapePad" },
+  // F2 (spec 10.3's Drums, 10.5): Dub, soft round kick: a shallow sweep, no click;
+  // Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "deep", kick: { kickPunch: 0.3, kickClick: 0, kickRoot: 1 } },
+    bass: "sub",
+    synth: "dubChord",
+    layer1: "driftPad",
+    layer2: "tapePad",
+  },
   mix: { sweep: -0.1, pump: 0.35, saturation: 0.15, reverbDecay: 4 },
   leads: {
     layer1: { style: "drift", register: 0.6, noteLength: 0.9, density: 0.35 },

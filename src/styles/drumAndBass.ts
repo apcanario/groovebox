@@ -9,7 +9,15 @@ export default {
   top: true,
   key: "F",
   mood: "minor",
-  patches: { drums: "tight", bass: "sub", synth: "softKeys", layer1: "airyPad", layer2: "bell" },
+  // F2 (spec 10.3's Drums, 10.5): DnB two-step: a hard sweep and click that cut through the breaks;
+  // Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "tight", kick: { kickPunch: 0.7, kickClick: 0.5, kickRoot: 1 } },
+    bass: "sub",
+    synth: "softKeys",
+    layer1: "airyPad",
+    layer2: "bell",
+  },
   mix: { sweep: 0, pump: 0.35, saturation: 0.1 },
   // P6: a long bell line over four bars in call and response, floating over the breaks; the pad layer drifts.
   leads: {

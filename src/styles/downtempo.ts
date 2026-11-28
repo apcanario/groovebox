@@ -10,7 +10,14 @@ export default {
   bpmRange: [86, 100],
   key: "A",
   mood: "house",
-  patches: { drums: "dusty", bass: "warmBass", synth: "softKeys", layer1: "softSine", layer2: "tapePad" },
+  // F2 (spec 10.3's Drums, 10.5): Downtempo: a gentle kick, a little click; Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "dusty", kick: { kickPunch: 0.4, kickClick: 0.15, kickRoot: 1 } },
+    bass: "warmBass",
+    synth: "softKeys",
+    layer1: "softSine",
+    layer2: "tapePad",
+  },
   mix: { sweep: -0.05, pump: 0.25, saturation: 0.2 },
   leads: {
     layer1: { style: "phrase", phrase: 4, density: 0.5, shape: "arch", range: 0.4, register: 0.55, noteLength: 0.65, slide: 0.2, accent: 0.15 },

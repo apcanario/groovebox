@@ -728,6 +728,9 @@ export class Engine {
    * Load a patch (C8, spec 8.2's pickers list whatever exists): every value of the patch file `id` for this
    * instrument, its level kept (the Level dial is the mix). One change, logged as setParams. False for an unknown id
    * or a patch for another instrument.
+   *
+   * F2 (spec 10.5): the kick's settings (Punch, Click, Root) are the vibe's, not a patch file's: no patch file holds
+   * them, so a pick leaves them where they are, as it keeps the level. A top vibe keeps Root on through a sound change.
    */
   setPatch(inst: InstrumentId, id: string): boolean {
     const def = PATCHES[id];

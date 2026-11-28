@@ -9,7 +9,15 @@ export default {
   top: true,
   key: "F",
   mood: "deep",
-  patches: { drums: "punchy", bass: "round", synth: "warmStab", layer1: "bell", layer2: "warmPad" },
+  // F2 (spec 10.3's Drums, 10.5): Thump or House shuffle, round kick: a middle sweep, a touch of click;
+  // Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "punchy", kick: { kickPunch: 0.45, kickClick: 0.1, kickRoot: 1 } },
+    bass: "round",
+    synth: "warmStab",
+    layer1: "bell",
+    layer2: "warmPad",
+  },
   mix: { sweep: 0, pump: 0.6, saturation: 0.1 },
   // P6: a short bell hook over two bars on Layer 1; the pad layer, switched to Lead, drifts in long notes.
   leads: {
@@ -42,7 +50,7 @@ export default {
       name: "Intro",
       on: ["drums", "layer2"],
       chords: [[0, 2], [3, 2]],
-      beat: "fourFloor",
+      beat: "thump",
       bass: "offbeat",
       synth: "stabs",
       layer1: { mode: "generative" },

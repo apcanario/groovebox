@@ -14,8 +14,9 @@ export default {
   bpmRange: [60, 66],
   key: "D",
   mood: "dark",
+  // F2 (spec 10.3's Drums, 10.5): None: the kick soft for when Pedro adds one; Root tunes the kick to the song's key.
   patches: {
-    drums: "soft",
+    drums: { patch: "soft", kick: { kickPunch: 0.3, kickClick: 0, kickRoot: 1 } },
     bass: { patch: "sub", set: { attack: 2, release: 6, sustain: 0.9 } },
     // P8 review M6: a low, closed organ (square) held long, darker than Ambient's sawtooth Pad swell.
     synth: { patch: "organ", set: { attack: 8, decay: 1, sustain: 0.9, release: 14, cutoff: 0.2, envAmount: 0, reverb: 0.8, drift: 0.5, driftRate: 0.1 } },

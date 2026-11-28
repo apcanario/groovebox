@@ -9,7 +9,15 @@ export default {
   top: true,
   key: "A",
   mood: "minor",
-  patches: { drums: "punchy", bass: "pluckBass", synth: "padSwell", layer1: "bell", layer2: "sawLead" },
+  // F2 (spec 10.3's Drums, 10.5): Thump or Techno, offbeat hat: a firm kick with some click;
+  // Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "punchy", kick: { kickPunch: 0.6, kickClick: 0.3, kickRoot: 1 } },
+    bass: "pluckBass",
+    synth: "padSwell",
+    layer1: "bell",
+    layer2: "sawLead",
+  },
   mix: { sweep: 0, pump: 0.55, saturation: 0.1 },
   // P6: the saw lead rolls in sixteenths with slides and accents; the arp layer, switched to Lead, plays a high hook.
   leads: {
@@ -42,7 +50,7 @@ export default {
       name: "Intro",
       on: ["drums", "bass", "layer1"],
       chords: [[0, 2], [5, 2], [3, 2], [4, 2]],
-      beat: "progressive",
+      beat: "thump",
       bass: "rolling",
       synth: "sustained",
       layer1: { mode: "arp", arp: { direction: "up", rate: 1, octaves: 2, gate: 0.5 } },

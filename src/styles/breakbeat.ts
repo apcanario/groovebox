@@ -9,7 +9,14 @@ export default {
   top: true,
   key: "E",
   mood: "minor",
-  patches: { drums: "dusty", bass: "pluckBass", synth: "organ", layer1: "sawLead", layer2: "darkPad" },
+  // F2 (spec 10.3's Drums, 10.5): Breakbeat: a hard kick with click; Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "dusty", kick: { kickPunch: 0.65, kickClick: 0.4, kickRoot: 1 } },
+    bass: "pluckBass",
+    synth: "organ",
+    layer1: "sawLead",
+    layer2: "darkPad",
+  },
   mix: { sweep: 0, pump: 0.35, saturation: 0.3 },
   leads: {
     layer1: { style: "hook", phrase: 2, density: 0.6, shape: "fall", range: 0.45, register: 0.55, noteLength: 0.35, slide: 0.15, accent: 0.45 },

@@ -9,7 +9,14 @@ export default {
   top: true,
   key: "G",
   mood: "house",
-  patches: { drums: "punchy", bass: "round", synth: "organ", layer1: "bell", layer2: "warmPad" },
+  // F2 (spec 10.3's Drums, 10.5): 2-step: a firm kick with click; Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "punchy", kick: { kickPunch: 0.6, kickClick: 0.35, kickRoot: 1 } },
+    bass: "round",
+    synth: "organ",
+    layer1: "bell",
+    layer2: "warmPad",
+  },
   mix: { sweep: 0, pump: 0.45, saturation: 0.05 },
   // P6: a choppy one-bar hook with quick repeats, swung by the beat; the pad layer drifts.
   leads: {

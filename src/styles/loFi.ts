@@ -14,8 +14,10 @@ export default {
   bpmRange: [74, 88],
   key: "D",
   mood: "deep",
+  // F2 (spec 10.3's Drums, 10.5): Boom bap, soft kick: a shallow sweep, no click;
+  // Root tunes the kick to the song's key.
   patches: {
-    drums: "crunchy",
+    drums: { patch: "crunchy", kick: { kickPunch: 0.25, kickClick: 0, kickRoot: 1 } },
     bass: "warmBass",
     synth: "softKeys",
     layer1: "softSine",

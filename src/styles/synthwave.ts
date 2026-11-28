@@ -9,7 +9,14 @@ export default {
   top: true,
   key: "A",
   mood: "minor",
-  patches: { drums: "bigRoom", bass: "pluckBass", synth: "brass", layer1: "sawLead", layer2: "strings" },
+  // F2 (spec 10.3's Drums, 10.5): Synthwave: a firm kick with click; Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "bigRoom", kick: { kickPunch: 0.65, kickClick: 0.35, kickRoot: 1 } },
+    bass: "pluckBass",
+    synth: "brass",
+    layer1: "sawLead",
+    layer2: "strings",
+  },
   mix: { sweep: 0, pump: 0.3, saturation: 0.2, reverbDecay: 3 },
   leads: {
     layer1: { style: "phrase", phrase: 4, density: 0.55, shape: "arch", range: 0.5, register: 0.6, noteLength: 0.6, slide: 0.15, accent: 0.25 },

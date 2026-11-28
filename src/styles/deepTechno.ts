@@ -9,7 +9,15 @@ export default {
   top: true,
   key: "F",
   mood: "dark",
-  patches: { drums: "deep", bass: "sub", synth: "dubChord", layer1: "softSine", layer2: "darkPad" },
+  // F2 (spec 10.3's Drums, 10.5): Thump, long dark kick, sparse hats: a soft sweep, no click, a longer tail;
+  // Root tunes the kick to the song's key.
+  patches: {
+    drums: { patch: "deep", set: { kickDecay: 0.8 }, kick: { kickPunch: 0.35, kickClick: 0, kickRoot: 1 } },
+    bass: "sub",
+    synth: "dubChord",
+    layer1: "softSine",
+    layer2: "darkPad",
+  },
   mix: { sweep: -0.1, pump: 0.5, saturation: 0.15 },
   // P6: Layer 1 keeps the hypnotic Euclidean pulse, low and clipped, rarely changing; the pad layer drifts dark.
   leads: {
@@ -42,7 +50,7 @@ export default {
       name: "Intro",
       on: ["drums", "bass"],
       chords: [[0, 2], [6, 2]],
-      beat: "dub",
+      beat: "thump",
       bass: "dub",
       synth: "dubChord",
       layer1: { mode: "generative" },
@@ -72,7 +80,7 @@ export default {
       name: "Outro",
       on: ["drums", "bass", "synth"],
       chords: [[0, 2], [6, 2]],
-      beat: "techno",
+      beat: "thump",
       bass: "dub",
       synth: "dubChord",
       layer1: { mode: "generative" },

@@ -9,8 +9,10 @@ export default {
   top: true,
   key: "G",
   mood: "dark",
+  // F2 (spec 10.3's Drums, 10.5): Minimal, short dry kick: Machine's short tail, a sharp click;
+  // Root tunes the kick to the song's key.
   patches: {
-    drums: "machine",
+    drums: { patch: "machine", kick: { kickPunch: 0.55, kickClick: 0.45, kickRoot: 1 } },
     bass: "rubber",
     synth: { patch: "glass", set: { decay: 0.4, release: 0.5 } },
     layer1: "bell",
