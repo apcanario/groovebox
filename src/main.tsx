@@ -6,6 +6,7 @@ import { App } from "./ui/App.tsx";
 import { startSizeWatch, type SizeClass } from "./ui/size.ts";
 import { openIdb } from "./store/idb.ts";
 import { Keeper } from "./store/keeper.ts";
+import { drawLaunch, localBagStorage } from "./store/vibeBag.ts";
 import { Library, MemoryKv, type Kv } from "./store/library.ts";
 
 const hintParam = new URLSearchParams(location.search).get("hint");
@@ -40,7 +41,14 @@ async function boot(): Promise<void> {
   const keeper = new Keeper(engine, lib, id, persistent);
   keeper.scratch = !!opened.fresh;
   keeper.start();
-  // The vibe picker opens the app (spec 8.2); "Continue last jam" shows unless this is a first launch's new song.
+  // F1 (spec 10.1): a cold start opens the Play tab on a top vibe drawn from the launch bag, its key and bpm rolled in
+  // the same draw, seeded from the clock. Nothing sounds until Play. The jam from last time stays first in Songs; the
+  // launch jam joins Songs only once it is played or edited. A first launch's empty "Song 1" is not kept beside it.
+  const launch = drawLaunch(Date.now(), localBagStorage());
+  if (launch) {
+    if (opened.fresh) await lib.remove(id).catch(() => undefined);
+    keeper.openLaunch(launch.song, vibeStart(launch.id));
+  }
   // T1 (spec 9.1): the layout follows the screen's size live; `?size=` or `__size.force` holds one for smoke and shots.
   const sizes = startSizeWatch();
   render(<App engine={engine} hint={hint} keeper={keeper} sizes={sizes} />, document.querySelector<HTMLDivElement>("#app")!);

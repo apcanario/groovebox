@@ -1,17 +1,17 @@
 /**
- * Vibes (P3, spec 8.2 and 8.6): the vibe picker that opens the app, and the vibe control at the top of the
- * Simple Play tab. A vibe loads as a new song (the jam it replaces stays in Songs) and, while playing, lands on
- * the next bar line. The list is whatever is in `src/styles/`.
+ * Vibes (P3, spec 8.2 and 8.6; F1, spec 10.1): the vibe picker, a sheet opened from the vibe control's name and from
+ * New jam, and the vibe control itself (the top of the Simple Play tab, the header on a tablet) with its dice. A vibe
+ * loads as a new song (the jam it replaces stays in Songs) and, while playing, lands on the next bar line. The list
+ * is whatever is in `src/styles/`.
  */
 import { useEffect, useState } from "preact/hooks";
-import { STYLES, STYLE_IDS, stepVibe, vibeSong, vibeStart, vibeTiles, type VibeTile } from "../music/styles.ts";
+import { STYLES, STYLE_IDS, TOP_IDS, stepVibe, vibeSong, vibeStart, vibeTiles, type VibeTile } from "../music/styles.ts";
 import type { StyleFamily } from "../music/data.ts";
+import type { Song } from "../engine/song.ts";
+import { drawLaunch, localBagStorage } from "../store/vibeBag.ts";
 import type { Ctx } from "./App.tsx";
 import { Icon } from "./icons.tsx";
-import { stripWord } from "./logic.ts";
-
-/** Room for the jam's name on "Continue last jam" at 10 px, at 360 px wide (spec 8.6: shortened, never cut off). */
-const CONTINUE_WORD_PX = 110;
+import { pickerPlan } from "./picker.ts";
 
 /** Each family's colour (spec 8.2: tiles coloured by family; as in docs/design/phase2/groovebox-6). */
 export const FAMILY_COLOR: Record<StyleFamily, string> = {
@@ -34,17 +34,35 @@ export function vibeName(id: string | undefined): string | null {
 export async function loadVibe(ctx: Ctx, id: string, play: boolean): Promise<boolean> {
   const doc = vibeSong(id);
   if (!doc) return false;
+  return loadWith(ctx, () => ({ doc, section: vibeStart(id) }), play);
+}
+
+/**
+ * The next vibe from the launch bag (F1, spec 10.1), with its key and bpm rolled in the same draw: the dice and
+ * "Surprise me". The seed is the clock's; the generator is the seeded one. Null when there are no top vibes.
+ */
+export function drawVibe(): { doc: Song; section: number } | null {
+  const got = drawLaunch(Date.now(), localBagStorage());
+  return got ? { doc: got.song, section: vibeStart(got.id) } : null;
+}
+
+/** Load the next vibe from the bag as a new song (the dice, "Surprise me"), drawn when the keeper gets to it. */
+export function loadDrawn(ctx: Ctx, play: boolean): Promise<boolean> {
+  return loadWith(ctx, drawVibe, play);
+}
+
+async function loadWith(ctx: Ctx, pick: () => { doc: Song; section: number } | null, play: boolean): Promise<boolean> {
   // Start the audio inside the tap that asked for it: browsers only start audio from a gesture.
   const ready = play ? ctx.startAudio() : null;
-  const ok = await ctx.keeper.startVibe(doc, vibeStart(id));
-  if (ok && ready && (await ready) && !ctx.engine.playing) ctx.engine.play();
+  const ok = await ctx.keeper.startVibeWith(pick);
+  // C28: no check of `playing` here; play() does nothing on a running transport.
+  if (ok && ready && (await ready)) ctx.engine.play();
   return ok;
 }
 
 /**
- * C9 (P8, spec 8.6): the picker has no title row and no Close, so 24 tiles and "Continue last jam" fit at 360 x 640;
- * "Continue last jam" (or "This jam's vibe") is the way back, and on a first launch a tile is the way in. A keyboard's
- * Escape also closes it (a desktop browser, and the scripts that keep the first launch's song).
+ * A keyboard's Escape closes a picker (a desktop browser, and the scripts). C9 (P8, spec 8.6): the borrowing picker
+ * has no title row and no Close, so 24 tiles and "This jam's vibe" fit at 360 x 640; "This jam's vibe" is the way back.
  */
 function useEscape(onClose: () => void): void {
   useEffect(() => {
@@ -73,10 +91,6 @@ function Tile({ tile, on, onPick, off }: { tile: VibeTile; on: boolean; onPick: 
 }
 
 /**
- * The vibe picker (spec 8.2): every vibe as a tile in two columns on one screen, coloured by family, "Continue
- * last jam" first when there is one. A tile loads its vibe and plays. It never scrolls.
- */
-/**
  * Borrowing (P4, spec 8.4): the picker opened from Simple Chords to borrow another vibe's chords. A tile then picks
  * whose progressions the cards show and loads nothing; "This jam's vibe" goes back to the song's own.
  */
@@ -85,42 +99,88 @@ export interface Borrow {
   onPick: (id: string | undefined) => void;
 }
 
+/** The screen's height, re-read when it changes (display only). */
+function useViewHeight(): number {
+  const [h, setH] = useState(() => window.innerHeight);
+  useEffect(() => {
+    const read = (): void => setH(window.innerHeight);
+    window.addEventListener("resize", read);
+    return () => window.removeEventListener("resize", read);
+  }, []);
+  return h;
+}
+
+/**
+ * The vibe picker (F1, spec 10.1), a sheet from the bottom: "Surprise me" beside the title, the top vibes in two
+ * columns, a line, the other vibes. Where both groups do not fit at 48 px a tile (picker.ts), the line carries a
+ * "More" switch that swaps the top group for the others and back. A tile loads its vibe and plays; on the next bar
+ * line while playing. Tapping outside the sheet, or Escape, closes it. Signature's tile (F7) is not here yet.
+ */
 export function VibePicker({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
-  const { engine, keeper, song } = ctx;
+  const { engine, song } = ctx;
   const [busy, setBusy] = useState(false);
+  const [more, setMore] = useState(false);
+  const height = useViewHeight();
   const tiles = vibeTiles();
+  const top = tiles.filter((t) => TOP_IDS.includes(t.id));
+  const others = tiles.filter((t) => !TOP_IDS.includes(t.id));
+  const plan = pickerPlan(height, top.length, others.length);
   const pending = engine.pendingLoad();
   const current = pending ? pending.style : song.style;
-  // The first launch's untouched default song is no jam to continue.
-  const canContinue = !keeper.scratch;
   const st = engine.recordInfo().state;
   const recording = st === "recording" || st === "finishing";
-  const rows = Math.ceil(tiles.length / 2);
-  // As in groovebox-6 (P3 review M5): the jam's vibe, or its name for a song with none.
-  const jam = vibeName(song.style) ?? song.name;
   useEscape(onClose);
-  const pick = async (id: string): Promise<void> => {
+  const run = async (load: () => Promise<boolean>): Promise<void> => {
+    if (busy || recording) return;
     setBusy(true);
     try {
-      if (await loadVibe(ctx, id, true)) onClose();
+      if (await load()) onClose();
     } finally {
       setBusy(false);
     }
   };
+  const group = (list: VibeTile[], name: "top" | "other") => (
+    <div class={`vibegrid v${name}`} data-group={name} style={plan.both ? undefined : { height: `${plan.place}px` }}>
+      {list.map((t) => (
+        <Tile key={t.id} tile={t} on={t.id === current} off={recording} onPick={() => void run(() => loadVibe(ctx, t.id, true))} />
+      ))}
+    </div>
+  );
+  const showOthers = !plan.both && more;
   return (
-    <div class="vibes" role="dialog" aria-label="Pick a vibe">
-      {canContinue && (
-        <button class="btn vcont" id="vibe-continue" aria-label={`Continue last jam: ${jam}`} onClick={onClose}>
-          <span>Continue last jam</span>
-          <small>{recording ? "Recording" : `${vibeName(song.style) ?? stripWord(song.name, CONTINUE_WORD_PX)} · ${song.bpm}`}</small>
-        </button>
-      )}
-      <div class="vibegrid" style={{ gridTemplateRows: `repeat(${rows}, minmax(48px, 64px))` }}>
-        {tiles.map((t) => (
-          <Tile key={t.id} tile={t} on={t.id === current} off={recording} onPick={() => !busy && !recording && void pick(t.id)} />
-        ))}
+    <div class="shade" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div class="sheet vpick" role="dialog" aria-label="Pick a vibe">
+        <div class="vphead">
+          <h2>{recording ? "Stop recording first" : "Vibes"}</h2>
+          <button
+            class="btn vsurprise"
+            id="vibe-surprise"
+            aria-label="Surprise me: a vibe from the bag, load it and play"
+            disabled={recording}
+            onClick={() => void run(() => loadDrawn(ctx, true))}
+          >
+            <Icon thing="New idea" />
+            <span>Surprise me</span>
+          </button>
+        </div>
+        {showOthers ? group(others, "other") : group(top, "top")}
+        <div class={`vline${plan.both ? "" : " swap"}`}>
+          <span>More vibes</span>
+          <i aria-hidden="true" />
+          {!plan.both && (
+            <button
+              class={`btn vmore${more ? " on" : ""}`}
+              id="vibe-more"
+              aria-pressed={more}
+              aria-label={more ? "More: on, showing the other vibes; tap for the top vibes" : "More: show the other vibes"}
+              onClick={() => setMore(!more)}
+            >
+              More
+            </button>
+          )}
+        </div>
+        {plan.both && group(others, "other")}
       </div>
-      <p class="note vnote">{recording ? "Stop recording to load a vibe." : "One tap loads a full groove on the next bar."}</p>
     </div>
   );
 }
@@ -162,8 +222,9 @@ export function BorrowPicker({ ctx, onClose, borrow }: { ctx: Ctx; onClose: () =
 }
 
 /**
- * The vibe control (spec 8.6), top of the Simple Play tab: the current vibe as one large button that opens
- * the picker, with an arrow each side that loads the previous or next vibe from the next bar line.
+ * The vibe control (spec 8.6, F1 spec 10.1), top of the Simple Play tab and in a tablet's header: the dice, which
+ * draws the next vibe from the bag, then the current vibe as one large button that opens the picker, with an arrow
+ * each side that loads the previous or next vibe. The dice and the arrows land on the next bar line while playing.
  */
 export function VibeControl({ ctx, onOpen }: { ctx: Ctx; onOpen: () => void }) {
   const { engine, song } = ctx;
@@ -183,6 +244,9 @@ export function VibeControl({ ctx, onOpen }: { ctx: Ctx; onOpen: () => void }) {
   };
   return (
     <div class="vibectl">
+      <button class="btn varrow vdice" id="vibe-dice" aria-label="Dice: the next vibe from the bag, from the next bar" disabled={recording} onClick={() => void loadDrawn(ctx, false)}>
+        <Icon thing="New idea" />
+      </button>
       <button class="btn varrow" id="vibe-prev" aria-label="Previous vibe, from the next bar" disabled={recording} onClick={() => step(-1)}>
         <Icon name="chevron_left" />
       </button>

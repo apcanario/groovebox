@@ -371,8 +371,8 @@ export function App({ engine, hint, keeper, sizes }: { engine: Engine; hint: Lat
   };
   const [held, setHeld] = useState<number | null>(null);
   const [songs, setSongs] = useState(false);
-  // The vibe picker opens the app (spec 8.2).
-  const [vibes, setVibes] = useState(true);
+  // F1 (spec 10.1): the app opens on the Play tab with the launch jam loaded; the picker opens only when asked.
+  const [vibes, setVibes] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [take, setTake] = useState<NamedTake | null>(null);

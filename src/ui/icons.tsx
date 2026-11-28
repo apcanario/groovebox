@@ -1,6 +1,7 @@
 /**
  * Icons (spec 8.12): Material Symbols, outlined, weight 300, shipped as SVG. An icon always sits beside
- * its word, never in place of it; the exceptions (vibe arrows, play and stop, record) are drawn shapes.
+ * its word, never in place of it; the exceptions (vibe arrows, play and stop, record) are drawn shapes, and the vibe
+ * control's dice (F1, spec 10.1: New idea's icon), whose word is "Surprise me" in the picker.
  */
 import { ICON_PATHS, type IconName } from "./icon-paths.ts";
 

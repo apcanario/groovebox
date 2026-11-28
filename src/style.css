@@ -1699,9 +1699,13 @@ button:disabled {
 .vibectl {
   flex: none;
   display: grid;
-  grid-template-columns: var(--hit) minmax(0, 1fr) var(--hit);
+  /* F1 (spec 10.1): the dice, then the arrows either side of the vibe's name; the dice stands a little apart. */
+  grid-template-columns: var(--hit) var(--hit) minmax(0, 1fr) var(--hit);
   gap: var(--gap);
   margin-bottom: var(--group);
+}
+.vibectl .vdice {
+  margin-right: 6px;
 }
 .vibectl .varrow {
   display: flex;
@@ -1809,6 +1813,63 @@ button:disabled {
   .vnote {
     display: none;
   }
+}
+/*
+ * F1 (spec 10.1): the vibe picker as a sheet. The sizes are picker.ts's (PICK_*): 12 px padding top and bottom, a 48 px
+ * title row, 48 px tile rows with 2 px gaps, 10 px between parts, a 28 px line (48 px when it carries "More").
+ */
+.sheet.vpick {
+  padding: 12px var(--pad);
+  gap: var(--group);
+}
+.vphead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--group);
+  min-height: var(--hit);
+}
+.btn.vsurprise {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.vpick .vibegrid {
+  flex: none;
+  grid-auto-rows: var(--hit);
+  align-content: start;
+}
+.vother .vibe {
+  font-size: 15px;
+  font-weight: 700;
+}
+.vline {
+  flex: none;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--group);
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vline.swap {
+  min-height: var(--hit);
+}
+.vline i {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 1px;
+  background: var(--line);
+}
+.btn.vmore {
+  flex: none;
+  color: var(--text);
+  font-weight: 700;
 }
 .chip.more {
   color: var(--text);
