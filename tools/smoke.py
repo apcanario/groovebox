@@ -1705,9 +1705,12 @@ def walk_g5_songs(page, failures: list, url: str) -> None:
     if not wait_for(page, "!!window.__groovebox", 5.0):
         failures.append("the app did not come back after a reload")
         return
-    # P3: the picker opens the app again, now with the jam to continue first.
-    walk_picker_open(page, failures, first=False)
-    page.click("#vibe-continue")
+    # F1 (spec 10.1): a reload opens on a launch jam from the bag; the jam from last time is first in Songs.
+    walk_picker_open(page, failures)
+    if not wait_for(page, "window.__keeper.list().then(l => l[0]?.name === 'Smoke jam')", 3.0):
+        failures.append("the jam from last time is not first in Songs after a reload")
+    page.evaluate("window.__keeper.list().then(l => window.__keeper.open(l[0].id))")
+    wait_for(page, "window.__groovebox.getSong().name === 'Smoke jam'", 3.0)
     # P2: the Simple / Advanced switch is remembered (the walk left it on Advanced).
     if page.get_attribute('[data-appmode="advanced"]', "aria-checked") != "true":
         failures.append("the Advanced mode was not remembered over a reload")
@@ -1749,9 +1752,12 @@ def walk_g5_songs(page, failures: list, url: str) -> None:
         failures.append(f"delete did not go back to the other song ({n} songs)")
     page.goto(url)
     wait_for(page, "!!window.__groovebox", 5.0)
-    page.click("#vibe-continue")
-    if page.evaluate("window.__groovebox.getSong().name") != "Smoke jam":
-        failures.append("the last song did not reopen on launch")
+    # F1: the launch jam opens; the last song is first in Songs and opens from there.
+    if not wait_for(page, "window.__keeper.list().then(l => l[0]?.name === 'Smoke jam')", 3.0):
+        failures.append("the last song is not first in Songs on launch")
+    page.evaluate("window.__keeper.list().then(l => window.__keeper.open(l[0].id))")
+    if not wait_for(page, "window.__groovebox.getSong().name === 'Smoke jam'", 3.0):
+        failures.append("the last song did not reopen from Songs")
 
     # Armed while stopped: the take starts with Play, and Stop keeps a tail.
     page.click("#rec")
@@ -1805,7 +1811,7 @@ def walk_g5_songs(page, failures: list, url: str) -> None:
 
 
 PICKER = """() => {
-  const v = document.querySelector('.vibes');
+  const v = document.querySelector('.vpick');
   if (!v) return null;
   const r = v.getBoundingClientRect();
   const tiles = [...v.querySelectorAll('[data-vibe]')].map((t) => {
@@ -1813,47 +1819,75 @@ PICKER = """() => {
     return { id: t.dataset.vibe, name: t.innerText.trim(), x: b.left, y: b.top, bottom: b.bottom, hgt: b.height, c: getComputedStyle(t).getPropertyValue('--c').trim() };
   });
   return { tiles, scrolls: v.scrollHeight > v.clientHeight + 1, bottom: r.bottom, h: window.innerHeight,
-           cont: !!v.querySelector('#vibe-continue'), first: v.querySelector('button.vcont, [data-vibe]')?.id || '' };
+           groups: [...v.querySelectorAll('[data-group]')].map((g) => g.dataset.group), more: !!v.querySelector('#vibe-more'),
+           surprise: !!v.querySelector('#vibe-surprise') };
 }"""
 
 
-def walk_picker_open(page, failures: list, first: bool) -> None:
-    """P3 (spec 8.2): the picker opens the app; every vibe that exists is a tile, two columns, coloured by family,
-    on one screen at 360 x 640 without scrolling; "Continue last jam" comes first when there is a jam."""
-    if not wait_for(page, "!!document.querySelector('.vibes')", 3.0):
-        failures.append("the app did not open on the vibe picker")
-        return
+def walk_picker_open(page, failures: list) -> None:
+    """F1 (spec 10.1): the app opens on the Play tab with a top vibe loaded and no picker. The picker, a sheet from the
+    vibe control's name: the top vibes first in two columns, coloured by family, then the other vibes; where both do not
+    fit at 48 px a tile, a More switch swaps them; "Surprise me"; no scroll and no tile under 48 px. Closed with Escape."""
+    E = "window.__groovebox"
+    if not wait_for(page, "!!document.querySelector('.shell')", 3.0) or page.locator(".vpick, .vibes").count():
+        failures.append("the app did not open straight on the Play tab")
+    if page.evaluate("document.querySelector('.tabs .tab.on')?.dataset.tab") != "play":
+        failures.append("the app did not open on the Play tab")
     vibes = page.evaluate("window.__vibes")
+    top = page.evaluate("window.__vibes.filter((v) => v.top).map((v) => v.id)")
+    ids = [v["id"] for v in vibes]
+    others = [i for i in ids if i not in top]
+    if page.evaluate(f"{E}.getSong().style") not in top or page.evaluate(f"{E}.playing"):
+        failures.append(f"the app did not open on a top vibe, stopped: {page.evaluate(f'{E}.getSong().style')}")
     for size in [(360, 640), (390, 844)]:
         page.set_viewport_size({"width": size[0], "height": size[1]})
         time.sleep(0.15)
-        p = page.evaluate(PICKER)
+        page.click("#vibe-open")
+        if not wait_for(page, "!!document.querySelector('.vpick')", 2.0):
+            failures.append(f"{size}: the vibe control's name did not open the picker")
+            continue
+        time.sleep(0.15)
         where = f"vibe picker at {size[0]} x {size[1]}"
-        if [t["id"] for t in p["tiles"]] != [v["id"] for v in vibes]:
-            failures.append(f"{where}: tiles {[t['id'] for t in p['tiles']]}, expected every vibe {[v['id'] for v in vibes]}")
-        xs = sorted({round(t["x"]) for t in p["tiles"]})
-        if len(xs) != 2:
-            failures.append(f"{where}: tiles in {len(xs)} columns, expected two")
-        if p["scrolls"] or any(t["bottom"] > p["h"] + 0.5 for t in p["tiles"]):
-            failures.append(f"{where}: the picker scrolls or a tile is off the screen")
-        # C9 (P8): all 24 tiles, each at least 48 px tall, with Continue first, on one screen at 360 x 640.
-        if len(p["tiles"]) != 24:
-            failures.append(f"{where}: {len(p['tiles'])} tiles, expected the 24 vibes of spec 8.2")
-        low = [f"{t['id']} {t['hgt']:.1f}" for t in p["tiles"] if t["hgt"] < 47.99]
-        if low:
-            failures.append(f"{where}: tiles under 48 px tall: {low}")
-        if len({t["c"] for t in p["tiles"]}) < 4:
-            failures.append(f"{where}: tiles not coloured by family: {sorted({t['c'] for t in p['tiles']})}")
-        if p["cont"] == first:
-            failures.append(f"{where}: Continue last jam {'shown on a first launch' if first else 'missing'}")
-        if not first and p["first"] != "vibe-continue":
-            failures.append(f"{where}: Continue last jam is not first")
+        p = page.evaluate(PICKER)
+        sets = [p]
+        if p["more"]:
+            if p["groups"] != ["top"]:
+                failures.append(f"{where}: with More, the groups shown are {p['groups']}, expected the top group first")
+            page.click("#vibe-more")
+            time.sleep(0.15)
+            q = page.evaluate(PICKER)
+            sets.append(q)
+            if q["groups"] != ["other"]:
+                failures.append(f"{where}: More did not swap in the other vibes ({q['groups']})")
+            check_sizes(page, f"{where}, More", failures)
+            page.click("#vibe-more")
+        elif p["groups"] != ["top", "other"]:
+            failures.append(f"{where}: groups {p['groups']}, expected the top group first, then the others")
+        got = [t["id"] for q in sets for t in q["tiles"]]
+        if got != [i for i in ids if i in top] + others:
+            failures.append(f"{where}: tiles {got}, expected the top vibes then the others")
+        for q in sets:
+            xs = sorted({round(t["x"]) for t in q["tiles"]})
+            if len(xs) != 2:
+                failures.append(f"{where}: tiles in {len(xs)} columns, expected two")
+            if q["scrolls"] or any(t["bottom"] > q["h"] + 0.5 for t in q["tiles"]):
+                failures.append(f"{where}: the picker scrolls or a tile is off the screen")
+            low = [f"{t['id']} {t['hgt']:.1f}" for t in q["tiles"] if t["hgt"] < 47.99]
+            if low:
+                failures.append(f"{where}: tiles under 48 px tall: {low}")
+            if not q["surprise"]:
+                failures.append(f"{where}: no Surprise me")
+        if len({t["c"] for q in sets for t in q["tiles"]}) < 4:
+            failures.append(f"{where}: tiles not coloured by family")
         check_sizes(page, where, failures)
         for b in page.evaluate(OFF_SCREEN):
             failures.append(f"{where}: {b}")
+        page.keyboard.press("Escape")
+        if not wait_for(page, "!document.querySelector('.vpick')", 2.0):
+            failures.append(f"{where}: Escape did not close the picker")
     page.set_viewport_size({"width": 390, "height": 844})
     time.sleep(0.1)
-    print(f"vibe picker: {len(vibes)} tiles, two columns, one screen, continue {'hidden' if first else 'first'}")
+    print(f"vibe picker: {len(top)} top vibes first, then {len(others)} others, two columns, no scroll")
 
 
 def solo_bar(page, layer: str, bar_s: float) -> float:
@@ -2017,8 +2051,8 @@ def walk_p3(page, failures: list) -> None:
         page.evaluate(CUTOFF_TRACE, "synth")
         page.click(f'[data-vibe="{v["id"]}"]')
         wait_for(page, f"!!{E}.pendingLoad() || {E}.getSong().style === {v['id']!r}", 2.0)
-        wait_for(page, "!document.querySelector('.vibes')", 2.0)
-        if page.locator(".vibes").count():
+        wait_for(page, "!document.querySelector('.vpick')", 2.0)
+        if page.locator(".vpick").count():
             failures.append(f"{v['id']}: the picker stayed open after a tap")
             page.keyboard.press("Escape")
         if not load_vibe_and_check(page, failures, v, "picker"):
@@ -2069,13 +2103,13 @@ def walk_p3(page, failures: list) -> None:
     wait_for(page, f"!!{E}.pendingLoad()", 2.0)
     load_vibe_and_check(page, failures, vibes[-1], "previous arrow")
     page.click("#vibe-open")
-    if not page.locator(".vibes").count():
+    if not page.locator(".vpick").count():
         failures.append("the vibe control's middle did not open the picker")
     else:
-        # C9: no Close; "Continue last jam" is the way back.
-        page.click("#vibe-continue")
-        if page.locator(".vibes").count():
-            failures.append("Continue last jam did not close the picker")
+        # F1: the picker is a sheet; a tap outside it closes it.
+        page.mouse.click(10, 10)
+        if not wait_for(page, "!document.querySelector('.vpick')", 2.0):
+            failures.append("a tap outside the picker did not close it")
     check_sizes(page, "simple play with the vibe control", failures)
     print("vibe arrows: next and previous landed on the bar")
 
@@ -3022,6 +3056,8 @@ def walk_p9(page, failures: list) -> None:
 
 
 FIRST_SONG: list = []
+BAG_SEED = """try { if (!localStorage.getItem('groovebox.vibeBag'))
+  localStorage.setItem('groovebox.vibeBag', JSON.stringify({ seed: 1, bag: ['dubTechno'], last: null })); } catch (e) {}"""
 
 
 def audio_load(browser, page, seconds: float = 4.0) -> float:
@@ -3112,13 +3148,9 @@ def wait_for(page, expr: str, timeout: float) -> bool:
 
 
 def open_app(page, failures: list) -> None:
-    """The opening of every part, as the single run opened: the vibe picker on a first launch, Escape keeps the
-    first launch's song (FIRST_SONG), the app starts in Simple, Play."""
-    # P3: the vibe picker opens the app; on a first launch there is no jam to continue.
-    walk_picker_open(page, failures, first=True)
-    page.keyboard.press("Escape")  # C9: no Close; Escape keeps the first launch's song
-    if not wait_for(page, "!document.querySelector('.vibes')", 2.0):
-        failures.append("Escape did not close the vibe picker")
+    """The opening of every part: F1 (spec 10.1), the Play tab with the launch jam (FIRST_SONG, from the bag run_part
+    seeds) and no picker, the picker's check, the app in Simple, Play."""
+    walk_picker_open(page, failures)
     FIRST_SONG.append(page.evaluate(SONG))
     if page.get_attribute('[data-appmode="simple"]', "aria-checked") != "true":
         failures.append("the app does not start in Simple")
@@ -3573,6 +3605,9 @@ def run_part(root: str, name: str, shot) -> int:
                 if r.status >= 400 and "localhost" in r.url
                 else None,
             )
+            # F1: the launch bag is seeded before the first load, so every part opens on the same launch jam (Dub
+            # techno, its key and bpm rolled from seed 1); later loads draw from the bag as the app does.
+            page.add_init_script(BAG_SEED)
             page.goto(f"http://localhost:{PORT}/index.html")
             wait_for(page, "!!window.__groovebox", 5.0)
             open_app(page, failures)

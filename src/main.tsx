@@ -57,7 +57,7 @@ async function boot(): Promise<void> {
     __groovebox: Engine;
     __keeper: Keeper;
     __macros: typeof MACROS;
-    __vibes: { id: string; name: string; bpm: number; start: number }[];
+    __vibes: { id: string; name: string; bpm: number; start: number; top: boolean }[];
     __data: { beats: readonly string[]; bass: readonly string[]; synth: readonly string[] };
     __fx: { defs: typeof EFFECT_DEFS };
     __vibeSong: typeof vibeSong;
@@ -67,7 +67,8 @@ async function boot(): Promise<void> {
   // T1: the size class shown, and a way to force one (null follows the screen again).
   w.__size = { get: () => sizes.current, force: (c) => sizes.force(c) };
   // P3: every vibe and every beat and rhythm that exists, so the smoke test loops whatever is there.
-  w.__vibes = STYLE_IDS.map((id) => ({ id, name: STYLES[id].name, bpm: STYLES[id].bpm, start: vibeStart(id) }));
+  // F1: `top` marks the top vibes (spec 10.2), which the picker shows first.
+  w.__vibes = STYLE_IDS.map((id) => ({ id, name: STYLES[id].name, bpm: STYLES[id].bpm, start: vibeStart(id), top: STYLES[id].top === true }));
   w.__data = { beats: DRUM_PRESETS, bass: BASS_PRESETS, synth: SYNTH_PRESETS };
   // P9: the effects that exist, so the smoke test walks whatever is there.
   w.__fx = { defs: EFFECT_DEFS };
